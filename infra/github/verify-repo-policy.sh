@@ -28,7 +28,9 @@ for key, expected in policy["repository"].items():
         errors.append(f"repository.{key}: expected {expected!r}, got {repo.get(key)!r}")
 for name, actual in (("develop", develop), ("main", main)):
     expected = policy["branches"][name]
-    actual_contexts = sorted(item["context"] for item in actual["required_status_checks"]["contexts"])
+    def context_name(item):
+        return item if isinstance(item, str) else item["context"]
+    actual_contexts = sorted(context_name(item) for item in actual["required_status_checks"]["contexts"])
     if actual_contexts != sorted(expected["required_status_checks"]):
         errors.append(f"{name}.required_status_checks: expected {expected['required_status_checks']!r}, got {actual_contexts!r}")
     for key in ("enforce_admins", "required_linear_history", "allow_force_pushes", "allow_deletions", "required_conversation_resolution"):

@@ -1,0 +1,32 @@
+name: Repository hygiene
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check whitespace and confidential-path guardrails
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git diff --check "$BASE_SHA"...HEAD
+          test -f .gitignore
+          ! git ls-files --error-unmatch 'artifacts/**' >/dev/null 2>&1
+          ! git ls-files --error-unmatch 'docs/client-deliverables/**' >/dev/null 2>&1
+          ! git ls-files --error-unmatch '.DS_Store' '**/.DS_Store' >/dev/null 2>&1
+      - name: Scan for secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

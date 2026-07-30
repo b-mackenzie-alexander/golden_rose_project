@@ -13,7 +13,7 @@ This is the concise decision register. Detailed immutable decision records live 
 | TD-007 | Use React/TypeScript frontend, FastAPI domain API, PostgreSQL, SQLAlchemy, and Alembic as the proposed V1 stack. | Proposed | Fits current engineering capability and relational/audit needs; no deployment/vendor commitment. |
 | TD-008 | Use migration-managed schema evolution and append attributable corrections. | Proposed | Preserve operational/audited meaning and support rolling release safety. |
 | TD-009 | Treat Google Cloud Run + Cloud SQL as the first-priced hosting reference, with AWS equivalent mapping. | Proposed | Managed services reduce small-team operations; provider, ownership, price, region, and recovery remain open. |
-| TD-010 | Manage repository governance through reviewed IaC. | Accepted | `infra/github/` supplies desired policy plus apply/verify scripts. `develop` and `main` are protected with required CI checks, update-before-merge, administrator enforcement, conversation resolution, and deletion/force-push prevention. |
+| TD-010 | Manage repository governance through reviewed IaC. | Accepted | `infra/github/` supplies desired policy plus apply/verify scripts. `develop` and `main` are protected with required `enforce` (Branch policy) and `check` (Repository hygiene) CI checks, update-before-merge, administrator enforcement, conversation resolution, and deletion/force-push prevention. |
 | TD-011 | Block document uploads until a secure ingestion boundary is designed and qualified. | Accepted planning guardrail | Untrusted files must be isolated, validated, scanned, and safely released before staff use. |
 
 ## Decision process

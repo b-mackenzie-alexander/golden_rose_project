@@ -36,7 +36,7 @@ Turn the completed initial discovery baseline into an approved, narrow first del
 - Do not start cloud services, provision accounts, or change client systems without explicit scoped approval.
 
 ## Repository-governance closeout
-- `develop` and `main` are now protected: pull requests, required `Branch policy / enforce` and `Repository hygiene / check` statuses, up-to-date branches, resolved conversations, administrator enforcement, and deletion/force-push prevention.
+- `develop` and `main` are now protected: pull requests, required `enforce` (Branch policy) and `check` (Repository hygiene) statuses, up-to-date branches, resolved conversations, administrator enforcement, and deletion/force-push prevention.
 - Repository policy was applied from `infra/github/repo-policy.json` and verified by `infra/github/verify-repo-policy.sh`.
 - PR #3 qualified the permitted `develop` → `main` source path: both required checks passed; it was then closed without merge because it was a synthetic governance test, not a release.
 - The next slice is a confidentiality/content review of the currently local discovery/compliance/governance Markdown and PDF-generation script before any future documentation-tracking PR.

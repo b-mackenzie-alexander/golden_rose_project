@@ -9,8 +9,8 @@
   "branches": {
     "develop": {
       "required_status_checks": [
-        "Branch policy / enforce",
-        "Repository hygiene / check"
+        "enforce",
+        "check"
       ],
       "required_approving_review_count": 0,
       "required_conversation_resolution": true,
@@ -21,8 +21,8 @@
     },
     "main": {
       "required_status_checks": [
-        "Branch policy / enforce",
-        "Repository hygiene / check"
+        "enforce",
+        "check"
       ],
       "required_approving_review_count": 0,
       "required_conversation_resolution": true,

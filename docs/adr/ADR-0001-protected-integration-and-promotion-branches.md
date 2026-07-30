@@ -1,6 +1,6 @@
 # ADR-0001: Protected `develop` Integration and `main` Promotion Branches
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-07-30
 
 ## Context

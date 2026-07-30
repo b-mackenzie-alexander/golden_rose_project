@@ -46,6 +46,11 @@ ci: add dependency audit
 chore: refresh development fixture
 ```
 
+## Promotion constraint: `develop` → `main`
+Only `develop` or `hotfix/*` may target `main`; required CI enforces the allowed source branches. `develop` and `main` are protected from deletion and force pushes.
+
+GitHub repository settings do not natively enforce a different merge method by PR target. Since feature → `develop` PRs use squash merge, every `develop` → `main` promotion must manually select **Create a merge commit** and retain `develop`. This is an explicit release checklist gate, not a claimed automatic protection. ADR-0001 records the limitation and revisit trigger.
+
 ## Pull-request flow
 ```text
 purpose branch → PR → CI + review → develop

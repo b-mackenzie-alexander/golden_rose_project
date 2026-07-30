@@ -1,0 +1,42 @@
+name: Branch policy
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  enforce:
+    name: enforce
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate source-to-target flow
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          case "$BASE_REF" in
+            main)
+              if [[ "$HEAD_REF" == "develop" || "$HEAD_REF" == hotfix/* ]]; then
+                echo "Allowed promotion: $HEAD_REF -> main"
+              else
+                echo "Only develop or hotfix/* may target main; got $HEAD_REF -> main." >&2
+                exit 1
+              fi
+              ;;
+            develop)
+              if [[ "$HEAD_REF" =~ ^(feat|fix|docs|chore|hotfix|security|ci|test|refactor|spike)/[a-z0-9][a-z0-9._-]*$ ]]; then
+                echo "Allowed integration branch: $HEAD_REF -> develop"
+              else
+                echo "Feature branches targeting develop must use an approved prefix and lowercase slug; got $HEAD_REF." >&2
+                exit 1
+              fi
+              ;;
+            *)
+              echo "Unexpected protected target branch: $BASE_REF" >&2
+              exit 1
+              ;;
+          esac

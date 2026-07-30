@@ -25,5 +25,11 @@ This is the concise, dated engineering and operational note log. It records obse
 - **Deferred review:** Existing discovery/compliance/governance Markdown notes and the PDF-generation script remain untracked pending a confidentiality/content review before a future documentation commit.
 - **Verification:** `git diff --cached --check` passed for the initial staged surface. A gitleaks scan of a temporary materialization of the staged content reported no leaks.
 
+## 2026-07-30 — Repository-governance direction
+- **Observed:** `develop` was created from the initial `main` baseline and pushed to the private GitHub repository.
+- **Proposed:** The active `docs/repository-governance-as-code` slice adds branch-source CI checks, GitHub policy IaC, drift verification, and ADR-0001 before protections are applied.
+- **Required policy:** only `develop` or `hotfix/*` may target `main`; approved purpose-named branches target `develop`; both protected branches reject deletion and force pushes.
+- **Constraint:** GitHub does not natively enforce a different merge method by base branch. Retain squash merging for feature → `develop`, and treat merge-commit selection for `develop` → `main` as a documented release gate pending a separately reviewed stronger control.
+
 ## Updating this file
 Add a short dated entry after a material planning, implementation, test, security, or release event. Link detailed evidence rather than duplicating it. Record commands and results only when they were actually run.

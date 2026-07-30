@@ -35,6 +35,12 @@ Turn the completed initial discovery baseline into an approved, narrow first del
 - Do not implement automated matching, ranking, eligibility, hiring, or referral decisions.
 - Do not start cloud services, provision accounts, or change client systems without explicit scoped approval.
 
+## Repository-governance slice
+- `develop` now exists from the initial `main` baseline and is the intended protected integration branch.
+- Active branch: `docs/repository-governance-as-code`, which defines CI branch-source enforcement, repository policy IaC, verification scripts, and ADR-0001.
+- Before applying GitHub protections, open and exercise this PR into `develop`; then apply and verify the committed policy for both protected branches.
+- GitHub does not natively offer per-target merge-method enforcement. Feature work may squash into `develop`; `develop` → `main` promotions must use a merge commit under the documented release gate until a separately approved stronger mechanism exists.
+
 ## Repository bootstrap state
 - The initial tracked baseline contains the living documents, ADR convention, and a protective `.gitignore`.
 - Client-source artifacts, generated client PDFs, existing discovery/compliance/governance notes, and the PDF-generation script remain intentionally untracked pending a separate confidentiality/content review.

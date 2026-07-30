@@ -1,0 +1,41 @@
+# macOS and editor metadata
+.DS_Store
+**/.DS_Store
+.vscode/
+.idea/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Client-confidential source material and generated client deliverables
+artifacts/
+docs/client-deliverables/
+
+# Local data, logs, caches, and build output
+*.log
+logs/
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+node_modules/
+dist/
+build/
+coverage/
+htmlcov/
+
+# Infrastructure tool local state
+.terraform/
+*.tfstate
+*.tfstate.*

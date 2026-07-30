@@ -10,8 +10,8 @@
 - [x] Record the proposed public-plane / staff-plane security boundary.
 - [x] Create repository living-document baseline.
 - [x] Create and push `develop` from the initial `main` baseline.
-- [ ] Exercise the governance-as-code PR into `develop`, then apply and verify protections for both `develop` and `main`.
-- [ ] Confirm the protected promotion path: purpose branch → `develop` (squash) and `develop`/`hotfix/*` → `main` (merge commit only by release checklist).
+- [x] Exercise the governance-as-code PR into `develop`, then apply and verify protections for both `develop` and `main`.
+- [x] Confirm the protected promotion path: purpose branch → `develop` (squash) and `develop`/`hotfix/*` → `main` (merge commit only by release checklist).
 - [ ] Complete client validation of current workflow, owners, source records, and exceptions.
 - [ ] Obtain approved business model, legal statements, and production content/rule owners.
 - [ ] Reconcile the client-provided DCWP checklist against current authoritative sources and counsel/client validation.

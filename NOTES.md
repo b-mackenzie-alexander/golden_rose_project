@@ -31,5 +31,11 @@ This is the concise, dated engineering and operational note log. It records obse
 - **Required policy:** only `develop` or `hotfix/*` may target `main`; approved purpose-named branches target `develop`; both protected branches reject deletion and force pushes.
 - **Constraint:** GitHub does not natively enforce a different merge method by base branch. Retain squash merging for feature → `develop`, and treat merge-commit selection for `develop` → `main` as a documented release gate pending a separately reviewed stronger control.
 
+## 2026-07-30 — Repository-governance closeout
+- **Validated:** PR #1 successfully added and exercised branch-source CI, repository-hygiene checks, secret scanning, policy IaC, and ADR-0001; PR #2 corrected the personal-repository protection payload.
+- **Validated:** `infra/github/apply-repo-policy.sh` applied the committed policy and `infra/github/verify-repo-policy.sh` confirmed no checked-policy drift. Both `develop` and `main` report protected.
+- **Validated:** Synthetic draft PR #3 from `develop` to `main` passed both required checks and was closed without merge, proving the permitted promotion source path without authorizing a release.
+- **Known limitation:** source-branch policy is enforced by required CI; GitHub does not provide per-target merge-method enforcement. `develop` → `main` must select a merge commit under the documented release gate until a stronger reviewed mechanism is adopted.
+
 ## Updating this file
 Add a short dated entry after a material planning, implementation, test, security, or release event. Link detailed evidence rather than duplicating it. Record commands and results only when they were actually run.

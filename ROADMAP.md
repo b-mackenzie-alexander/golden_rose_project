@@ -49,7 +49,8 @@
 - [ ] Validate provisional business hours, thresholds, escalation ownership, and no-response procedure with the client before production policy or SLA claims.
 - [x] Accept calendar/coverage semantics for request milestones, explicit shift occurrences, state visibility, timezone/overnight behavior, aggregate counts, address reveal, corrections, overlap, and audited rescheduling.
 - [x] Create `docs/planning/phase-1-operational-discovery-register.md` to distinguish slice blockers from implementation-time discoveries, live-data gates, and public/legal release gates.
-- [ ] Approve the narrow first implementation plan, application stack/toolchain, slice-specific field requiredness, synthetic data classification, acceptance tests, and explicit stop boundaries.
+- [x] Accept the first-slice shape, stack/toolchain, and minimal draft-Employer requiredness in ADR-0002 and ADR-0003: client supplies only employer type/display name; the server controls draft state, source, actor, identifiers, timestamps, and version.
+- [ ] Review and merge `.hermes/plans/2026-08-04_phase-1-first-slice-plan.md`, including synthetic data classification, TDD acceptance evidence, PostgreSQL service approval, recovery posture, independent review handoff, and explicit stop boundaries.
 - [ ] Define household and general-labor request extensions without creating separate workflows or data stores.
 - [ ] Create synthetic/de-identified fixtures only; do not import live legacy data.
 - [ ] Implement staff authentication and authorization boundary.

@@ -1,6 +1,6 @@
 # Git Workflow — Golden Rose Operations Platform
 
-**Status:** Proposed repository policy. GitHub enforcement/configuration will be managed through reviewed infrastructure as code after the remote/default branch exists.
+**Status:** Accepted repository policy. GitHub enforcement/configuration is managed through reviewed infrastructure as code in `infra/github/`; `develop` and `main` protections have been exercised through real PRs.
 
 ## Core rules
 - Protected integration/release branches are `develop` and `main`; never commit directly, force-push, or bypass review/checks.

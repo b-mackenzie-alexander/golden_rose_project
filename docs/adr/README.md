@@ -11,6 +11,11 @@ ADRs preserve material architecture, security, data-governance, delivery, and re
 ## Naming
 Use `ADR-NNNN-short-title.md`, with monotonic numbers. Never renumber an existing ADR. Link superseding records both ways.
 
+## Records
+- `ADR-0001-protected-integration-and-promotion-branches.md` — accepted protected-branch and promotion topology.
+- `ADR-0002-first-phase-1-slice-and-synthetic-data-boundary.md` — accepted first tracer scope, synthetic-data boundary, and planning/coding/review handoff.
+- `ADR-0003-phase-1-backend-toolchain.md` — accepted Python/FastAPI/PostgreSQL synchronous backend toolchain for the first slice.
+
 ## Required sections
 - Status and date
 - Context/evidence posture
@@ -19,10 +24,8 @@ Use `ADR-NNNN-short-title.md`, with monotonic numbers. Never renumber an existin
 - Alternatives considered
 - Approval/owner and revisit trigger
 
-## First records to create when decisions are ready
-- First staff-pilot scope and production-data boundary.
+## Next records to create when decisions are ready
 - Public/staff identity and API boundary.
 - Canonical employer-demand data model and extension approach.
-- Repository governance as code policy.
 - Dashboard KPI and comparison-aid decision boundaries.
 - Secure document-ingestion architecture, if uploads are approved.

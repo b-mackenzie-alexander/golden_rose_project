@@ -1,8 +1,8 @@
 # Current Work — Golden Rose Operations Platform
 
 **Updated:** 2026-08-04
-**Lane:** Planning / Phase 1 coding-readiness closeout
-**Overall status:** Phase 0 discovery is moving into implementation planning. The client has accepted the Phase 1 authorized-staff demand map and staff role model. A bounded synthetic/local coding slice may begin only after its implementation plan, stack, field-requiredness scope, and data classification are approved. Infrastructure provisioning, public release, live integrations, and production-data use remain unauthorized.
+**Lane:** Planning / first Phase 1 implementation slice
+**Overall status:** PR #6 merged the coding-readiness closeout into `develop`. The first synthetic/local backend tracer and stack are now accepted for implementation planning: authorize `employer:draft:create`, transactionally reserve an actor/payload-bound `CommandReceipt`, create one draft `Employer`, and append its `AuditEvent`. Coding remains blocked until ADR-0002, ADR-0003, and `.hermes/plans/2026-08-04_phase-1-first-slice-plan.md` are reviewed and merged. Infrastructure provisioning, public release, live integrations, real identity, and client/production-data use remain unauthorized.
 
 ## Active objective
 Turn the completed initial discovery baseline into an approved, narrow first delivery: an agency-staff pilot for employer demand entry and retrieval, followed by a governed dashboard and transparent worker/employer comparison aid.
@@ -29,17 +29,17 @@ Turn the completed initial discovery baseline into an approved, narrow first del
 - Accepted correction/audit baseline: PostgreSQL domain rows hold current operational truth; append-only `AuditEvent` records preserve material history through atomic expected-version/idempotent commands; restricted prior/new values remain field-authorized; and derived projections are disposable rather than competing record stores. `docs/planning/phase-1-correction-audit-event-contract.md` is authoritative.
 
 ## Immediate next steps
-1. Complete and review this coding-readiness documentation closeout against the preliminary PRD.
-2. Approve the application stack and a narrow first synthetic/local implementation slice, including its field-requiredness boundary, data classification, acceptance tests, recovery posture, and explicit non-scope.
-3. Convert the accepted field-purpose, workflow, access, audit, map, and operational-discovery contracts into a concrete implementation plan.
-4. After the documentation plan is reviewed and merged, re-baseline live Git state and create a purpose-named implementation branch from `develop`.
+1. Review ADR-0002, ADR-0003, and the first-slice implementation plan for exact scope, schema/API shape, TDD order, CI, recovery, and stop boundaries.
+2. Merge the approved planning packet into `develop`; do not make the coding session depend on a local-only plan.
+3. In a fresh coding session, re-baseline `develop`, create `feat/staff-draft-employer-tracer`, obtain explicit approval before starting local PostgreSQL or the API process, and execute the merged plan test-first.
+4. Hand the verified branch to a separate review session before opening a PR. Use the later bug/hotfix lane for post-integration defects without bypassing the development pipeline.
 5. Record implementation and pilot findings in the operational-discovery register and `NOTES.md`; escalate only changes to accepted behavior, data purpose, authorization, legal posture, or trust boundaries into reviewed contract/ADR updates.
 
 ## Gate classification
 
 ### Required before the affected synthetic/local implementation slice
-- Approved narrow implementation plan and accepted application stack/toolchain.
-- Slice-specific field-by-state requiredness and validation rules; do not invent fields, transitions, or nullability policy.
+- Reviewed and merged narrow implementation plan. The first-tracer stack/toolchain and request requiredness are accepted in ADR-0002/ADR-0003; later slices still require their own affected decisions.
+- For this tracer, only `employer_type` and bounded `display_name` are client supplied; the server controls draft state, staff-entry source, identifiers, timestamps, actor, and version. Do not generalize these values into later lifecycle/intake policy.
 - Slice-specific data classification, synthetic-fixture procedure, acceptance owner, test/CI evidence, and rollback/forward-recovery posture.
 
 ### Discover during implementation; validate before affected live use
@@ -64,7 +64,8 @@ The complete discovery inventory and evidence rules are in `docs/planning/phase-
 - `develop` and `main` are now protected: pull requests, required `enforce` (Branch policy) and `check` (Repository hygiene) statuses, up-to-date branches, resolved conversations, administrator enforcement, and deletion/force-push prevention.
 - Repository policy was applied from `infra/github/repo-policy.json` and verified by `infra/github/verify-repo-policy.sh`.
 - PR #3 qualified the permitted `develop` → `main` source path: both required checks passed; it was then closed without merge because it was a synthetic governance test, not a release.
-- PR #5 merged the reviewed Phase 1 discovery, compliance, governance, planning, and PDF-generation documentation into `develop`. The active follow-up is this coding-readiness drift closeout and first-slice implementation plan.
+- PR #5 merged the reviewed Phase 1 discovery, compliance, governance, planning, and PDF-generation documentation into `develop`.
+- PR #6 merged the coding-readiness drift closeout into `develop`. The active follow-up is review/merge of the first-slice planning packet; product code has not begun.
 
 ## Repository bootstrap state
 - The initial tracked baseline contains the living documents, ADR convention, and a protective `.gitignore`.

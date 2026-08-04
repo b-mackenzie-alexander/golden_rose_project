@@ -1,6 +1,6 @@
 # Architecture — Golden Rose Operations Platform
 
-**Status:** Proposed architecture baseline. It describes intended boundaries, not an approved cloud deployment or running system.
+**Status:** Accepted Phase 1 structural/security baseline with slice-scoped implementation decisions. It does not describe an approved cloud deployment or running system.
 
 ## Architectural posture
 Start with one modular product and a relational operational core. Preserve explicit trust boundaries and auditability without prematurely splitting into microservices.
@@ -30,7 +30,7 @@ The logical split does not require independent products or microservices in V1. 
 - `docs/planning/phase-1-mfa-recovery-support-ownership.md` controls individual staff/privileged identities, required MFA factors, step-up actions, staff/privileged session limits, independent recovery, access reviews, and support ownership. The identity provider must be qualified against that contract and cannot silently weaken application authorization or combine public/staff identity audiences.
 
 ## Authoritative data and derived views
-PostgreSQL is the proposed transactional system of record for approved operational entities. Domain rows are authoritative current truth; append-only `AuditEvent` records are authoritative material history, not a full event-sourcing/replay store. `docs/planning/phase-1-correction-audit-event-contract.md` controls draft revisions, material corrections, atomic domain/event commands, concurrency/idempotency, protected prior/new values, correction-of-correction, and projection failure behavior. The dashboard, calendar/month views, work queues, map, search, reporting, and metrics are disposable derived projections/queries, not independent manual response stores.
+PostgreSQL is the accepted transactional system of record for approved operational entities. Domain rows are authoritative current truth; append-only `AuditEvent` records are authoritative material history, not a full event-sourcing/replay store. `docs/planning/phase-1-correction-audit-event-contract.md` controls draft revisions, material corrections, atomic domain/event commands, concurrency/idempotency, protected prior/new values, correction-of-correction, and projection failure behavior. The dashboard, calendar/month views, work queues, map, search, reporting, and metrics are disposable derived projections/queries, not independent manual response stores.
 
 The accepted Phase 1 structural source of truth is `Employer → EmployerContact / Worksite / StaffingRequest → ShiftNeed / RequestRequirement`, supported by `WorksiteZoneMembership`, `ServiceZone`, `ServiceZoneComposition`, `MapAreaDatasetVersion`, `MapArea`, `WorksiteMapAreaAssignment`, and `AuditEvent`. Worksite-to-zone and worksite-to-map-area relationships use explicit versioned association records; they are not collapsed into a direct service-zone foreign key. `Employer` is neutral across household and business hiring parties; employer type enables governed extensions without separate forms or response stores. `docs/planning/phase-1-canonical-field-purpose-inventory.md` controls the purpose, classification, visibility boundary, prohibited uses, and exclusions for these fields.
 
@@ -46,10 +46,9 @@ The accepted Phase 1 structural source of truth is `Employer → EmployerContact
 
 Material operational changes preserve the accepted event envelope, changed-field evidence, actor, server time, reason where applicable, source/reference, and relationship to prior record/event. Required domain changes and audit inserts commit atomically through one reviewed authority boundary; stale writes are rejected. Corrections, cancellations, replacements, and supersessions are linked actions rather than silent overwrites. Projection failure never rolls back committed truth or becomes a false empty result.
 
-## Proposed technology direction
-- React + TypeScript + Vite + Tailwind CSS for browser UIs.
-- Python + FastAPI for typed domain APIs and authorization.
-- PostgreSQL with SQLAlchemy and Alembic for transactional data and migration-managed changes.
+## Accepted and proposed technology direction
+- React + TypeScript remains the proposed browser-UI direction; exact frontend tooling is selected with the first frontend slice rather than added to the backend tracer.
+- ADR-0003 accepts Python 3.12, uv, FastAPI/Pydantic v2, synchronous SQLAlchemy 2/psycopg 3, Alembic, and PostgreSQL 16 for the first backend slice.
 - GCP is the selected platform. Cloud Run + Cloud SQL is the managed-container/database baseline; private Cloud Storage, Secret Manager, Artifact Registry, Cloud Logging/Monitoring, and GitHub Actions with Workload Identity Federation are the proposed supporting services. Exact region, account/billing topology, identity, network, recovery, and service configuration remain separately gated. `us-east4` is the current East-US/NYC-area-friendly region candidate pending exact service, cost, and recovery validation; EU primary, active-secondary, or default-backup placement is not proposed.
 - GitHub-based CI/CD and repository governance as code; exact provider/account configuration remains unapproved.
 
@@ -64,12 +63,14 @@ See `TECHNOLOGY_DECISIONS.md` for rationale and `docs/adr/` for durable decision
 
 ## Environment and promotion model
 ```text
-feature/* → PR/CI → develop (isolated non-production, synthetic/approved data)
+feat/*    → PR/CI → develop (isolated non-production, synthetic/approved data)
 develop   → PR/release evidence → main (immutable production candidate)
 main artifact → protected explicit production promotion
 ```
 
 `develop` and production require isolated projects/accounts/resources, identity clients, secrets, databases, buckets, and budgets. Production is a deliberate promotion of the qualified immutable artifact, not an automatic side effect of a merge.
+
+The first implementation slice is narrower than this eventual environment model. ADR-0002 permits one local/test-only staff route, synthetic configuration-supplied principal, security-internal transactional `CommandReceipt`, draft `Employer` insert, and atomic creation `AuditEvent`; it creates no deployment, public plane, real identity, or live-data path.
 
 ## Interim infrastructure billing and handoff
 - **Accepted contractual constraint:** Beatrice is responsible for paying approved cloud-infrastructure charges until the final payment for the engagement has been rendered. Billing responsibility then transfers to the client through a documented handoff.

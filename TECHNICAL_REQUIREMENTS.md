@@ -1,6 +1,6 @@
 # Technical Requirements — Golden Rose Operations Platform
 
-**Status:** Phase 1 technical planning baseline. The map and staff-role requirements are client-accepted; remaining proposed technology choices and each implementation slice still require the applicable approvals, acceptance evidence, data classification, and live-use gates below.
+**Status:** Phase 1 technical planning baseline. The map and staff-role requirements are client-accepted, and ADR-0002/ADR-0003 accept the first synthetic backend tracer and its toolchain; later technology choices and implementation slices still require their applicable approvals, acceptance evidence, data classification, and live-use gates below.
 
 ## Product outcome
 Provide agency staff a reliable browser-based operations workspace that replaces fragmented paper/form/spreadsheet employer-demand handling, supports governed operational reporting, and later supports transparent staff review of worker-to-employer/job compatibility.

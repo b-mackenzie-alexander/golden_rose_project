@@ -34,4 +34,4 @@ Classify claims as Observed, Reported, Proposed, or Validated. Client documents,
 - Never commit secrets, client personal data, raw exports, production data/backups, or unreviewed generated artifacts.
 
 ## First implementation boundary
-The likely first slice is staff-only employer demand: employer → contact → worksite → staffing request → shift need, with attributable events and authorized staff search. This remains proposed until field-purpose, role/access, data-classification, and rollout approvals are recorded.
+The accepted first implementation slice is the synthetic/local staff-only tracer in ADR-0002 and `.hermes/plans/2026-08-04_phase-1-first-slice-plan.md`: bootstrap the approved backend toolchain, accept only `employer_type` and `display_name` for one draft `Employer`, authorize a synthetic staff principal through `employer:draft:create`, and atomically append `employer.created` audit history. No frontend, real identity, contact, worksite, request, shift, search, map, cloud service, public route, client/live data, or legal behavior is included. Coding starts only from a fresh session after the planning packet is reviewed and merged.

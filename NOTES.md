@@ -81,14 +81,14 @@ This is the concise, dated engineering and operational note log. It records obse
 - **Late-classification boundary:** Unassigned/review/outside-area conditions are not fake zones. Unassigned requests may open and must remain visible/countable. Later assignment does not alter lifecycle or coverage; terminal history changes only through explicit Owner correction.
 - **Source of truth:** `docs/planning/phase-1-service-zone-taxonomy.md`. Exact names, descriptions, translations, and overlap conventions may emerge through pilot use and are not implementation prerequisites; local fixtures remain fictional.
 
-## 2026-08-03 — NYC job-demand map accepted
+## 2026-08-03 — NYC job-demand map accepted; client acceptance confirmed 2026-08-04
 - **Required capability:** Phase 1 includes an authorized-staff NYC map. Official DCP 2020 Community District Tabulation Areas are pinned/checksummed base cells; the Owner groups cells into adaptive zones. Boroughs provide context only.
 - **Derivation boundary:** Worksite addresses are geocoded server-side through a provider-neutral interface, then classified locally into the pinned CDTA geometry. Exact coordinates are transient/discarded by default; ambiguous/failed/outside results remain visible for Owner correction. A live provider remains separately gated.
 - **Measures:** The map exposes named open-request, upcoming-shift, requested-worker, confirmed-coverage, remaining-gap, and classification-exception measures with accessible list parity—never an opaque heat/match score.
 - **Worker boundary:** Phase 1 maps job demand only. Worker supply follows an approved worker-location/availability/privacy/suppression contract; geographic overlap does not establish suitability, referral, assignment, or commute feasibility.
 - **Source of truth:** `docs/planning/phase-1-nyc-job-demand-map-contract.md`.
 
-## 2026-08-03 — Staff permission matrix accepted
+## 2026-08-03 — Staff permission matrix accepted; client acceptance confirmed 2026-08-04
 - **Accepted authorization baseline:** Phase 1 uses server-enforced named permissions for Owner, delegated Manager, Operations Staff, and separately bounded Platform Administrator. Role labels alone never authorize broad data access or a bypass of record/field/state controls.
 - **Operational boundaries:** Operations Staff share day-to-day employer-demand work but cannot reopen terminal records, govern zones/CDTAs, administer roles, export records, or access infrastructure. Manager elevation is explicitly delegated, attributable, revocable, and never self-granted. Exports are disabled in Phase 1.
 - **Privacy/support boundaries:** Exact worksite access is a distinct, server-enforced permission and calendar access does not imply it. Platform Administrators use a separate technical identity/path with no standing operational-record, document, raw-database, backup, secret, or business-role access. Exceptional support is time-bounded, scoped, approved where feasible, attributable, automatically revoked, and Owner-reviewed.
@@ -109,6 +109,14 @@ This is the concise, dated engineering and operational note log. It records obse
 - **Projection boundary:** Queue, calendar, map, dashboard, reporting, and search are disposable authorized projections. Staleness/failure is explicit and never represented as false empty/zero state.
 - **Live-data gates:** Client/counsel must still approve event/payload retention and disposal, restricted-history recipients, final reason terminology, legally required deletion/anonymization, and any stronger legal-record archival requirement.
 - **Source of truth:** `docs/planning/phase-1-correction-audit-event-contract.md`.
+
+## 2026-08-04 — Phase 1 coding-readiness drift closeout
+- **Client acceptance:** The authorized-staff NYC job-demand map and the Owner/delegated Manager/Operations Staff/separately bounded Platform Administrator role model are accepted by the client. Named users, delegation details, map ergonomics, zone names, providers, and pilot configuration remain operational discoveries rather than reasons to reopen the accepted structural/security boundaries.
+- **Legal posture correction:** Public-source legal research is suggested candidate guidance, not validated software behavior. Legal wording, fees, schedules, receipts, agreements, retention, and compliance claims remain disabled/unimplemented until current counsel documentation is translated into versioned requirements and acceptance tests and accepted by the client.
+- **Operational discovery:** `docs/planning/phase-1-operational-discovery-register.md` records expected implementation/pilot questions and separates before-slice decisions from implementation discoveries, live-data gates, and public/legal release gates.
+- **Model drift repair:** `TECHNICAL_REQUIREMENTS.md` and `ARCHITECTURE.md` now preserve explicit `WorksiteZoneMembership`, `WorksiteMapAreaAssignment`, `ServiceZoneComposition`, `MapAreaDatasetVersion`, and `MapArea` relationships instead of implying a direct Worksite-to-ServiceZone foreign key.
+- **Migration clarification:** The audit contract prohibits unapproved legacy/live-data migration or import, not reviewed Alembic-style schema evolution for synthetic/local implementation.
+- **Next handoff:** Approve a narrow first implementation plan and toolchain, including field-requiredness scope, synthetic-data classification, acceptance tests, and hard stop boundaries, before beginning the coding branch.
 
 ## Updating this file
 Add a short dated entry after a material planning, implementation, test, security, or release event. Link detailed evidence rather than duplicating it. Record commands and results only when they were actually run.

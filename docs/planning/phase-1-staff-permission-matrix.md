@@ -1,8 +1,9 @@
 # Phase 1 Staff Permission Matrix
 
-**Status:** Accepted Phase 1 planning source of truth
-**Accepted:** 2026-08-03
-**Decision owner:** Beatrice, technical delivery owner; client validation names delegated actors and operational access-review owners before live use
+**Status:** Client-accepted Phase 1 planning source of truth
+**Technical acceptance:** 2026-08-03
+**Client acceptance confirmed:** 2026-08-04
+**Decision owners:** Golden Rose client for the operational role model; Beatrice for technical delivery and security boundaries. Named actors, delegated capabilities, and operational access-review owners are discovered and recorded before live use.
 **Scope:** Agency-staff employer-demand workflow and bounded technical support; no public-plane, worker, document, export, or production-infrastructure authorization
 
 ## Decision
@@ -15,6 +16,8 @@ The accepted staff-plane roles are:
 - **Delegated Manager:** a business-operations role explicitly delegated and revocably bounded by the Owner.
 - **Operations Staff:** interchangeable day-to-day agency workflow coverage. Accountable queue ownership never creates private record visibility.
 - **Platform Administrator:** a distinct technical-support role using a separate privileged identity and access path. It has no standing business-record, document, raw-database, secret, or business-role access.
+
+The client accepts these role and separation boundaries. Implementation and pilot preparation may discover staff-facing labels, named assignees, delegation details, support contacts, and access-review ownership under `docs/planning/phase-1-operational-discovery-register.md`; those operational details may not weaken the accepted server-side permissions or separation of duties.
 
 The matrix governs the approved Phase 1 canonical records and derived staff surfaces under `docs/planning/phase-1-canonical-field-purpose-inventory.md`, `docs/planning/phase-1-request-shift-state-model.md`, `docs/planning/phase-1-calendar-coverage-semantics.md`, `docs/planning/phase-1-service-zone-taxonomy.md`, `docs/planning/phase-1-nyc-job-demand-map-contract.md`, and `docs/planning/phase-1-correction-audit-event-contract.md`.
 

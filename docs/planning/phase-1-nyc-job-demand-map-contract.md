@@ -1,13 +1,16 @@
 # Phase 1 NYC Job-Demand Map Contract
 
-**Status:** Accepted Phase 1 planning source of truth
-**Accepted:** 2026-08-03
-**Decision owner:** Beatrice, technical delivery owner
+**Status:** Client-accepted Phase 1 planning source of truth
+**Technical acceptance:** 2026-08-03
+**Client acceptance confirmed:** 2026-08-04
+**Decision owners:** Golden Rose client for operational feature acceptance; Beatrice for technical delivery and security/privacy boundaries
 **Scope:** Authorized staff NYC map foundation and employer-demand/coverage layer; worker-supply overlay is separately gated
 
 ## Decision
 
 Phase 1 includes an interactive New York City map for authorized staff. Its immediate purpose is to help the client understand where employer demand and coverage gaps occur. It uses aggregate geographic cells and Owner-defined service zones rather than exact job or worker pins.
+
+The client accepts the authorized-staff Phase 1 demand-map capability and the role model that governs it. Zone names, map ergonomics, default measures, out-of-area handling, named users, and provider choices remain operational discoveries recorded in `docs/planning/phase-1-operational-discovery-register.md`; those discoveries do not reopen the accepted feature or permission boundaries.
 
 The Phase 1 map contains employer-demand and shift-coverage measures only. A worker-supply overlay is an intended follow-on capability, but it cannot be enabled until worker location, availability, authorization, correction, retention, and anti-ranking rules are accepted as an authoritative contract.
 

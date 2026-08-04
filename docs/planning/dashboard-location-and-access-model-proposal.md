@@ -1,6 +1,6 @@
 # Dashboard, Location Analysis, and Staff Access Model — Proposal
 
-**Status:** Proposed planning direction. This is a durable discovery-to-delivery record, not client approval, an authorization design, or production implementation scope.
+**Status:** Historical discovery-to-delivery proposal, partially superseded by client-accepted Phase 1 map and staff-permission contracts.
 **Recorded:** 2026-07-31
 **Decision owners:** Golden Rose owner/client for operational policy and delegated roles; technical delivery owner for platform support boundaries; counsel/client approval for policy, privacy, and any employment-decision use.
 
@@ -9,6 +9,8 @@
 The agency currently coordinates demand through fragmented workbooks, calendars, forms, messaging, and manual follow-up. Staff reportedly use Google Maps to investigate proximity between worker and hiring locations. The worker-preference evidence captures broad desired work zones and commute tolerance, and describes a potential measurement of areas with greater worker supply.
 
 These are evidence of operational questions, not approval to collect precise locations, expose a map, select a mapping vendor, or automate placement decisions.
+
+The proposal itself did not grant approval. Client acceptance was subsequently recorded for the aggregate authorized-staff Phase 1 demand map and the Owner/delegated Manager/Operations Staff/Platform Administrator role model in `docs/planning/phase-1-nyc-job-demand-map-contract.md` and `docs/planning/phase-1-staff-permission-matrix.md`. Precise-location use, live providers, named assignments, and worker mapping remain separately gated.
 
 ## Evidence and confidence
 
@@ -47,7 +49,7 @@ Minimum proposed behavior:
 - show missing/incomplete scheduling data honestly rather than infer availability; and
 - preserve actual dates/times and relevant timezone information once, then derive calendar views by query.
 
-Active shift coverage uses the accepted uncovered/partial/covered state contract and explicit completed/unfulfilled/cancelled outcomes. Remaining validation covers future assignment authority, final service-zone taxonomy, exact-address reveal permissions, who can perform each command/transition, and which fields each role may see.
+Active shift coverage uses the accepted uncovered/partial/covered state contract and explicit completed/unfulfilled/cancelled outcomes. The service-zone structure and command/field permission matrix are accepted. Remaining operational discovery covers future assignment authority, client-facing zone names, named exact-address recipients/delegations, and pilot terminology/usability.
 
 ## Proposed dashboard progression
 
@@ -94,13 +96,13 @@ The Platform Administrator should operate through separate staff/admin identitie
 - English/Spanish functionality and accessibility must remain equivalent for every released staff surface.
 - Do not collect/import live data, enable third-party mapping/geocoding, or provision infrastructure under this proposal.
 
-## Client validation questions
+## Continuing operational-discovery questions
 
 1. Do the accepted request/shift state meanings match staff terminology, and which events should start, pause, resume, and stop service-time measurement?
 2. What does “who is available” mean operationally, and what source record is authoritative for that fact?
-3. Which service-zone taxonomy is understandable to staff and appropriate for reporting without revealing sensitive addresses?
+3. Which accepted service-zone labels and conventions are understandable to staff and appropriate for reporting without revealing sensitive addresses?
 4. Which dashboard questions are decision-critical, and what action should staff take from each answer?
-5. Who may view business-wide reporting, manage staff access, approve exports, and configure approved operational settings?
+5. Which named client actors receive the accepted permissions for business-wide reporting, staff-access management, and approved operational settings? Phase 1 exports remain denied.
 6. What limited platform-administration tasks are needed, who performs them, and what emergency/break-glass access is acceptable?
 7. What information must each role never see, change, export, or administer?
 

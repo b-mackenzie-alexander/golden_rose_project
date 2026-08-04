@@ -11,7 +11,7 @@ PostgreSQL domain records are the authoritative current operational state. `Audi
 
 Phase 1 is not a full event-sourced system. Current domain rows are not reconstructed solely by replaying every audit event, and the system does not retain every keystroke or draft value. Domain changes and required audit events are committed consistently through one reviewed command boundary.
 
-This contract is accepted for Phase 1 implementation. Production live-data admission still requires approved retention/disposal periods, restricted historical-value access, production data classification, tested backup/restore, and the separately named production-readiness controls. This contract does not authorize deployment, live data, migration, exports, or legal/compliance claims.
+This contract is accepted for Phase 1 implementation. Production live-data admission still requires approved retention/disposal periods, restricted historical-value access, production data classification, tested backup/restore, and the separately named production-readiness controls. This contract does not authorize deployment, live data, legacy/live-data import or migration, exports, or legal/compliance claims. It does authorize reviewed migration-managed schema evolution for synthetic/local implementation, provided migrations preserve current truth and append-only audit history under this contract.
 
 ## Correction vocabulary
 

@@ -1,6 +1,6 @@
 # Technical Requirements — Golden Rose Operations Platform
 
-**Status:** Proposed planning baseline. Requirements become build commitments only after the listed approval gates are satisfied.
+**Status:** Phase 1 technical planning baseline. The map and staff-role requirements are client-accepted; remaining proposed technology choices and each implementation slice still require the applicable approvals, acceptance evidence, data classification, and live-use gates below.
 
 ## Product outcome
 Provide agency staff a reliable browser-based operations workspace that replaces fragmented paper/form/spreadsheet employer-demand handling, supports governed operational reporting, and later supports transparent staff review of worker-to-employer/job compatibility.
@@ -15,7 +15,7 @@ Provide agency staff a reliable browser-based operations workspace that replaces
 
 ### Follow-on release: dashboard and comparison aid
 - Agency-only dashboard derives approved KPIs from authoritative workflow records; staff do not re-enter information solely to create metrics.
-- Charts and aggregate service-area demand/coverage visualizations may be included only after KPI definition, calculation, audience, aggregation/redaction, refresh, export, and location-privacy rules are approved. A map is optional; broad-zone aggregation is the proposed default.
+- Charts and aggregate service-area demand/coverage visualizations may be included only after KPI definition, calculation, audience, aggregation/redaction, refresh, export, and location-privacy rules are approved. The client-accepted Phase 1 authorized-staff job-demand map is not optional; optional follow-on mapping refers to worker-supply, comparison, or additional dashboard layers, all of which require separate contracts.
 - Comparison aid exposes only approved, job-relevant, explainable signals and missing information for staff review.
 - The aid must not rank people, make eligibility/hiring/referral decisions, or use unapproved protected-trait/proxy fields.
 
@@ -33,20 +33,23 @@ Provide agency staff a reliable browser-based operations workspace that replaces
 - Routine operational/reporting location uses the adaptive Owner-managed taxonomy in `docs/planning/phase-1-service-zone-taxonomy.md`: worksites may have overlapping memberships with one primary/default, while requests/shifts may be assigned later and remain visibly unassigned until then. Exact names/conventions are configuration discovered through use, not implementation prerequisites. Exact worksite/household address remains separately restricted.
 - Phase 1 includes the authorized-staff NYC demand map defined by `docs/planning/phase-1-nyc-job-demand-map-contract.md`. It pins official DCP 2020 CDTAs, derives worksite CDTA server-side through a provider-neutral geocoder boundary, discards precise coordinates by default, and shows named request/shift/coverage measures with a synchronized accessible table. Worker supply is deferred to its own authoritative contract.
 - Core workflow supports correction, cancellation, and replacement as atomic attributable events under the accepted correction/audit contract. Referral/delivery history remains follow-on scope.
-- Policy/legal/business-controlled copy is versioned, owned, and approved before production use.
+- Policy/legal/business-controlled copy is versioned, owned, and approved before production use. Public-source legal research supplies suggested candidate controls only; legal behavior becomes validated software only after counsel documentation is translated into approved versioned requirements and acceptance tests.
 
-## Proposed domain model
+## Accepted Phase 1 domain model
 ```text
 Employer → EmployerContact
-         → Worksite → ServiceZone
+         → Worksite → WorksiteZoneMembership → ServiceZone
+                    → WorksiteMapAreaAssignment → MapArea
          → StaffingRequest → ShiftNeed
                            → RequestRequirement (approved typed values + restricted source text)
+MapAreaDatasetVersion → MapArea
+ServiceZone → ServiceZoneComposition → MapArea
 Worker → WorkerProfile / governed preferences
 WorkerAssignment → ReferralOrDeliveryEvent
 All Phase 1 material actions → AuditEvent
 ```
 
-The Phase 1 employer-demand structure and field purposes are accepted in `docs/planning/phase-1-canonical-field-purpose-inventory.md`. `Employer` is the neutral household/business hiring-party record; employer type controls approved extensions without separate stores. Workflow-state requiredness, role/field permissions, retention, and client terminology remain separate approval contracts. Worker, assignment, referral, and delivery records remain follow-on proposals.
+The Phase 1 employer-demand structure and field purposes are accepted in `docs/planning/phase-1-canonical-field-purpose-inventory.md`. `Employer` is the neutral household/business hiring-party record; employer type controls approved extensions without separate stores. Worksite-to-zone and worksite-to-map-area relationships are explicit versioned association records, not a direct `Worksite.service_zone_id` shortcut. `MapAreaDatasetVersion`, `MapArea`, `ServiceZoneComposition`, and `WorksiteMapAreaAssignment` preserve pinned public-geography provenance and evolving client-managed zones. Workflow-state requiredness, retention, named role assignments, and client terminology remain tracked operational discoveries. Worker, assignment, referral, and delivery records remain follow-on proposals.
 
 Request and shift lifecycle is controlled by `docs/planning/phase-1-request-shift-state-model.md`. Shift coverage is part of the active shift state and may reverse when coverage changes or a no-show occurs. Terminal shift outcomes are `completed`, `unfulfilled`, and `cancelled`; request `closed` never erases or replaces those outcomes. No state transition implies automated matching, referral, placement, payment, or worker discipline.
 
@@ -66,7 +69,7 @@ Zone classification is optional during intake and active work. Unassigned, revie
 - CI validation for tests, lint/type checks, migrations, secret/dependency/SAST scanning, and relevant configuration/IaC checks.
 
 ## Out of scope without separate approval
-- Public portals, public job posting, precise mapping, AI ranking/screening, and automatic decisions.
+- Public portals, public job posting, public or individual-level precise mapping, AI ranking/screening, and automatic decisions. The accepted aggregate authorized-staff Phase 1 demand map remains in scope.
 - Live data migration/import, résumé upload, e-signature, payment, messaging, calendar, screening, and identity-verification integrations.
 - Hardcoded legal requirements, legal copy, fees, retention periods, or commercial policy.
 

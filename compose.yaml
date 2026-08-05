@@ -1,0 +1,21 @@
+services:
+  postgres-test:
+    image: postgres:16.10
+    environment:
+      POSTGRES_USER: golden_rose_test
+      POSTGRES_PASSWORD: ${GOLDEN_ROSE_TEST_DB_PASSWORD:?set in .env.test}
+      POSTGRES_DB: golden_rose_test
+    ports:
+      - "127.0.0.1:55432:5432"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U golden_rose_test -d golden_rose_test",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+    tmpfs:
+      - /var/lib/postgresql/data

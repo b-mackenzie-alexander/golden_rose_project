@@ -127,5 +127,69 @@ This is the concise, dated engineering and operational note log. It records obse
 - **Planning authority:** ADR-0002, ADR-0003, and `.hermes/plans/2026-08-04_phase-1-first-slice-plan.md`. Coding remains blocked until this planning packet is independently reviewed and merged to `develop`.
 - **Independent planning audit:** Three read-only audit lanes assessed persistence/atomicity, project bootstrap/CI, and API/security behavior. The packet incorporates their command-receipt serialization, locked PostgreSQL test boundary, framework-default probe, actor-bound replay denial, redacted 503/500 behavior, static/dependency checks, and SBOM evidence. No audit identified a discovery/legal blocker to this synthetic staff-only slice.
 
+## 2026-08-04 — Coding lane kickoff after PR #7 merge
+- **Observed:** `git fetch origin --prune` showed `origin/develop` advanced from `bbe5c1d` to `3128762` and the planning branch `origin/docs/phase-1-first-slice-plan` was deleted after merge.
+- **Observed:** Local `develop` was fast-forwarded to `3128762`, and `feat/staff-draft-employer-tracer` was created from that merged `origin/develop` tip for the coding lane.
+- **Observed:** The merged planning authority is now present in-repo: ADR-0002, ADR-0003, and `.hermes/plans/2026-08-04_phase-1-first-slice-plan.md`.
+- **Status correction:** `CURRENT_WORK.md` and `ROADMAP.md` were updated to reflect that PR #7 merged and coding is now active, while local PostgreSQL/API startup remains a separately approved runtime boundary.
+- **Next coding boundary:** Begin Task 1 of the approved plan on `feat/staff-draft-employer-tracer`; do not start PostgreSQL or Uvicorn until explicit runtime approval is given.
+
+## 2026-08-04 — FastAPI/Pydantic validation probe before Task 4 schema work
+- **Observed:** With FastAPI 0.141.1 and Pydantic 2.13.4, a body model using `extra="forbid"` returns default `422` validation details with `type="extra_forbidden"` and `loc=["body", <field>]` when an unexpected request property is submitted.
+- **Observed:** A required `Idempotency-Key` header declared through FastAPI returns default `422` validation details with `loc=["header", "Idempotency-Key"]` and `type="missing"` when the header is absent.
+- **Implementation note:** Task 4 schema tests should rely on default model-level extra-field rejection unless the accepted contract later requires a custom response shape at the API boundary.
+
+## 2026-08-04 — Task 5 non-runtime PostgreSQL scaffolding
+- **Observed:** Non-runtime Task 5 scaffolding is now present: `compose.yaml`, `alembic.ini`, `migrations/env.py`, `migrations/script.py.mako`, `migrations/versions/0001_create_first_slice_tables.py`, `src/golden_rose/database.py`, `src/golden_rose/persistence/models.py`, and initial integration test files under `tests/integration/`.
+- **Observed:** `docker compose config` rendered successfully with a dummy `GOLDEN_ROSE_TEST_DB_PASSWORD`, confirming loopback-only `127.0.0.1:55432` publication, PostgreSQL 16 image pinning, synthetic `golden_rose_test` database/user names, health check wiring, and ephemeral `tmpfs` data storage.
+- **Observed:** The initial non-runtime integration surface passes: migration file exists at the expected path and SQLAlchemy metadata already contains `employers`, `command_receipts`, and `audit_events`.
+- **Boundary reminder:** PostgreSQL service startup, live Alembic upgrade/downgrade execution, and real append-only/constraint qualification are still blocked pending explicit runtime approval.
+
+## 2026-08-04 — Task 5 live PostgreSQL qualification
+- **Observed RED:** Before startup, `uv run pytest tests/integration/test_initial_migration.py::test_live_schema_contains_expected_tables -v` failed with a PostgreSQL connection refusal at `127.0.0.1:55432`. After approved startup but before migrations, the same test failed because the database contained no application tables.
+- **Observed startup:** Docker Desktop was not initially running; after launching it, `docker version` showed a live Docker Desktop 4.79.0 daemon. `docker compose --env-file .env.test up -d postgres-test` pulled `postgres:16.10`, started the loopback-only test container, and the container reached `healthy` state.
+- **Observed migration evidence:** `uv run alembic upgrade head` succeeded against the synthetic `golden_rose_test` database. Live integration tests then passed for expected tables, exact column sets, check/unique constraints, append-only update/delete rejection on `command_receipts` and `audit_events`, and the repository guard that no Python file uses `create_all(`.
+- **Observed downgrade evidence:** `uv run alembic downgrade base` succeeded; an immediate schema inspection showed only `alembic_version` remained. `uv run alembic upgrade head` then succeeded again and the combined unit + integration suite passed.
+- **Observed teardown:** `docker compose --env-file .env.test down` removed the PostgreSQL test container and network; `docker compose ... ps -a` returned an empty service list.
+
+## 2026-08-04 — Task 6 atomic command tracer
+- **Observed RED 1:** The first focused Task 6 test failed with `ModuleNotFoundError: No module named 'golden_rose.application'` before the command module and persistence helpers existed.
+- **Observed GREEN 1:** After adding `clock.py`, `identifiers.py`, `persistence/employers.py`, `persistence/command_receipts.py`, `persistence/audit_events.py`, and `application/create_draft_employer.py`, the happy-path integration test passed and proved one committed `command_receipts` row, one `employers` row, and one `audit_events` row with the expected version, actor, sequence, correlation, and payload-classification semantics.
+- **Observed RED 2:** The changed-fields contract test failed because the first implementation recorded only field names and omitted the approved-value sub-object.
+- **Observed GREEN 2:** The command now builds a narrow typed `changed_fields` payload containing only `field_names` plus approved safe values for `employer_type`, `lifecycle_status`, and `source_channel`, while omitting the `display_name` value and any row/request snapshot.
+- **Observed RED 3:** A monkeypatched late failure during audit insertion left uncommitted employer and command-receipt rows visible inside the same session, proving the application command needed explicit rollback ownership.
+- **Observed GREEN 3:** `create_draft_employer` now wraps the receipt/domain/audit write path in caller-owned rollback-on-error logic; the late-failure test passes and leaves zero rows in the same session after the exception.
+
+## 2026-08-04 — Task 7 replay, conflict, and concurrency behavior
+- **Observed RED 1:** A reused audit-event UUID raised a raw PostgreSQL/SQLAlchemy unique-violation message that exposed driver/SQL detail. After wrapping SQLAlchemy failures in `SafePersistenceError`, the same collision still rolled back the second command cleanly while returning the redacted message `persistence operation failed`.
+- **Observed RED 2:** Reissuing the same command UUID with the same actor and identical payload failed as a persistence error on `command_receipts_pkey` instead of replaying the original success.
+- **Observed GREEN 2:** `persistence/command_receipts.py` now reserves the command receipt with PostgreSQL `ON CONFLICT DO NOTHING`, re-loads the existing receipt on collision, compares actor + command metadata + request fingerprint, and replays the original `Employer` when the request is identical.
+- **Observed GREEN 3:** Conflicting replays now raise `IdempotencyConflictError` without disclosing the original employer ID or request content, and conflicting actor/payload attempts leave row counts unchanged.
+- **Validated concurrency:** Two independent sessions/threads racing the same command UUID now produce one authoritative create and one replay for identical payloads, and one authoritative create plus one `IdempotencyConflictError` for conflicting payloads. In both cases PostgreSQL persisted exactly one `command_receipts` row, one `employers` row, and one `audit_events` row.
+- **Validation evidence:** `uv run pytest tests/integration/application/test_create_draft_employer.py -v` passed with `9 passed`; `uv run pytest tests/unit tests/integration -v` passed with `41 passed`; `git diff --check` passed.
+
+## 2026-08-04 — Task 8 staff API endpoint tracer
+- **Observed RED 1:** The first API integration test failed with `ModuleNotFoundError: No module named 'golden_rose.main'` before the FastAPI app and route existed.
+- **Observed GREEN 1:** Added `src/golden_rose/api/errors.py`, `src/golden_rose/api/dependencies.py`, `src/golden_rose/api/staff/employers.py`, and `src/golden_rose/main.py`; the permitted POST now returns `201` with the exact draft-employer body and no retrieval `Location` header.
+- **Observed RED 2:** The API originally surfaced framework `422` behavior for missing/malformed idempotency keys and accepted nil/non-v4 UUIDs. The route now validates `Idempotency-Key` through an explicit dependency and returns safe `400` problem details for missing, malformed, nil, and non-v4 keys.
+- **Observed GREEN 2:** Identical replay now returns the same resource body with `Idempotency-Replayed: true`; conflicting replay maps to safe `409` problem details; denied principals return `403` before any receipt/employer/event write.
+- **Observed validation/error boundary:** Request-body violations now return safe `422` problem details without framework internals. Known persistence failures return safe `503`, unexpected failures return safe `500`, and both leave zero rows in the database in the tested failure paths.
+- **Observed route surface:** OpenAPI exposes the intended `POST /api/staff/v1/employers` route and no employer retrieval route.
+- **Loopback proof:** After approval, loopback-only Uvicorn ran on `127.0.0.1:8001` against the synthetic PostgreSQL test database. A fictional POST returned `201`; the identical replay returned `201` with `Idempotency-Replayed: true`; direct DB inspection showed exactly one `employers` row, one `command_receipts` row, and one `audit_events` row.
+- **Validation evidence:** `uv run pytest tests/integration/api/test_staff_employers.py -v` passed with `13 passed`; `uv run pytest tests/unit tests/integration -v` passed with `54 passed`; `git diff --check` passed.
+
+## 2026-08-04 — Task 9 application CI quality gate
+- **Observed implementation:** Added `.github/workflows/application-quality.yml` with one stable job/check named `application` for PRs targeting `develop` and `main`.
+- **Workflow scope:** The job uses Python 3.12, `uv`, an ephemeral PostgreSQL 16 service, synthetic local/test auth env only, and no repository/environment secrets beyond the default read-only checkout token.
+- **Quality steps encoded:** `uv lock --check`; locked sync; Ruff format/check; mypy on `src tests`; Bandit on `src`; pytest with `--cov-fail-under=95`; Alembic upgrade→downgrade→upgrade; `pip-audit`; reproducible CycloneDX SBOM generation to ignored `build/backend-sbom.cdx.json`; artifact upload via `actions/upload-artifact@v4`.
+- **SBOM evidence boundary:** The SBOM is validated as JSON/CycloneDX during workflow generation and uploaded as CI evidence only; it is ignored locally and not committed.
+- **Local verification evidence:** Ruby YAML parsing confirmed the workflow structure and the presence of the `application` job; a Python verification script confirmed the required workflow commands are present and that `pyproject.toml` dev dependencies include Ruff, mypy, Bandit, pip-audit, and CycloneDX tooling; `.gitignore` already ignores `build/`.
+
+## 2026-08-04 — Task 10 coding-lane closeout and review handoff prep
+- **Observed quality-gate tuning:** Local Task 10 qualification surfaced repo-level issues that the new CI workflow would have failed on: Ruff import/bugbear findings, strict mypy complaints on test helpers, and FastAPI `Annotated`/`Header` default incompatibility during route collection. The branch now uses FastAPI-compatible dependency signatures, a typed `occurred_at` audit insert parameter, a `Literal["local", "test"]` test annotation, Ruff per-file ignores only for the pre-existing PDF-generation helper's long lines/unused imports, and mypy configuration that still checks `src` and `tests` while disabling only `no-untyped-def` noise.
+- **Observed verification ordering:** Running pytest before `alembic upgrade head` against the fresh ephemeral PostgreSQL runtime produced missing-table failures and misleading low coverage. Re-running in the workflow's intended order—upgrade before pytest, then downgrade→upgrade—resolved the issue.
+- **Local verification evidence:** With `.env.test` loaded and approved `postgres-test` running healthy, `uv run pytest --cov=golden_rose --cov-report=term-missing --cov-fail-under=95` passed with `54 passed` and `99.03%` total coverage; `uv run mypy src tests` passed; `uv run ruff format --check .` and `uv run ruff check .` passed; `uv run alembic downgrade base && uv run alembic upgrade head` passed; `uv run pip-audit` reported no known vulnerabilities; and CycloneDX generation produced ignored `build/backend-sbom.cdx.json` with `bomFormat='CycloneDX'` and `specVersion='1.6'`.
+- **Handoff status:** The branch is at review-handoff prep: docs updated, local verification complete, exact commit-range secret scan/diff checks pending the final commit for `feat/staff-draft-employer-tracer`, after which the branch can be pushed for an independent review session.
+
 ## Updating this file
 Add a short dated entry after a material planning, implementation, test, security, or release event. Link detailed evidence rather than duplicating it. Record commands and results only when they were actually run.

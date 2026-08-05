@@ -1,0 +1,83 @@
+[build-system]
+requires = ["hatchling==1.31.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "golden-rose"
+version = "0.1.0"
+description = "Golden Rose Operations Platform backend tracer"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi==0.141.1",
+  "pydantic==2.13.4",
+  "pydantic-settings==2.14.2",
+  "sqlalchemy==2.0.51",
+  "psycopg[binary]==3.3.4",
+  "alembic==1.19.0",
+  "uvicorn==0.52.1",
+]
+
+[dependency-groups]
+dev = [
+  "bandit==1.9.4",
+  "cyclonedx-bom==7.3.1",
+  "httpx==0.28.1",
+  "mypy==2.3.0",
+  "pip-audit==2.10.1",
+  "pytest==9.1.1",
+  "pytest-cov==7.1.0",
+  "ruff==0.16.1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/golden_rose"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/golden_rose",
+  "tests",
+  "migrations",
+  "alembic.ini",
+]
+
+[tool.uv]
+package = true
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "C4", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/generate_client_prd_pdfs.py" = ["E501", "F401"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+markers = [
+  "unit: fast unit tests without external services",
+  "integration: tests that exercise PostgreSQL or other process boundaries",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["golden_rose"]
+omit = [
+  "migrations/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+disallow_untyped_defs = false
+disable_error_code = ["no-untyped-def"]
+warn_unused_configs = true
+mypy_path = "src"
+exclude = ["^migrations/"]

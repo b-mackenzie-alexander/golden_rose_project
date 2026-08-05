@@ -33,6 +33,7 @@ node_modules/
 dist/
 build/
 coverage/
+.coverage
 htmlcov/
 
 # Infrastructure tool local state

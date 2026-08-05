@@ -1,0 +1,93 @@
+name: Application quality
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  application:
+    name: application
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16.10
+        env:
+          POSTGRES_USER: golden_rose_test
+          POSTGRES_PASSWORD: golden_rose_test_ci_password
+          POSTGRES_DB: golden_rose_test
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U golden_rose_test -d golden_rose_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+          --health-start-period 5s
+    env:
+      GOLDEN_ROSE_ENVIRONMENT: test
+      GOLDEN_ROSE_AUTH_MODE: synthetic
+      GOLDEN_ROSE_SYNTHETIC_STAFF_ID: 22222222-2222-4222-8222-222222222222
+      GOLDEN_ROSE_DATABASE_URL: postgresql+psycopg://golden_rose_test:golden_rose_test_ci_password@127.0.0.1:55432/golden_rose_test
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Wait for PostgreSQL health
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 30); do
+            if pg_isready -h 127.0.0.1 -p 55432 -U golden_rose_test -d golden_rose_test; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "PostgreSQL did not become ready in time" >&2
+          exit 1
+
+      - name: Run application quality gate
+        run: |
+          set -euo pipefail
+          uv lock --check
+          uv sync --locked --all-groups
+          uv run ruff format --check .
+          uv run ruff check .
+          uv run mypy src tests
+          uv run bandit -q -r src
+          uv run pytest --cov=golden_rose --cov-report=term-missing --cov-fail-under=95
+          uv run alembic upgrade head
+          uv run alembic downgrade base
+          uv run alembic upgrade head
+          uv run pip-audit
+          mkdir -p build
+          uv run cyclonedx-py environment --pyproject pyproject.toml --output-reproducible --of JSON -o build/backend-sbom.cdx.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          sbom_path = Path('build/backend-sbom.cdx.json')
+          document = json.loads(sbom_path.read_text())
+          assert document['bomFormat'] == 'CycloneDX'
+          assert 'specVersion' in document
+          PY
+
+      - name: Upload backend SBOM evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-sbom-cdx
+          path: build/backend-sbom.cdx.json
+          if-no-files-found: error

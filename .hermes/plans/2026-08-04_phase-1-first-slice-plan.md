@@ -2,7 +2,7 @@
 
 > **For Hermes:** Execute this plan only from a fresh coding session after this planning packet is reviewed and merged. Use the `plan-to-code-handoff`, `test-driven-development`, and `python-project-test-environment` skills. Keep each behavior in a real RED → GREEN → REFACTOR cycle. Stop before opening a pull request so the independent review session can inspect the branch first.
 
-**Status:** Implemented on `feat/staff-draft-employer-tracer`; review remediation locally verified, independent re-review pending
+**Status:** Historical implemented plan; PR #8 merged the reviewed tracer into `develop` at `0938c17`. The qualified `application` check passed and now requires a separate governance-as-code activation slice.
 **Planning baseline:** `develop` at `bbe5c1d24d11d1ef9833e4af9de8da1c4ebcc887` (merged PR #6)
 **Implementation branch after plan merge:** `feat/staff-draft-employer-tracer` from current `origin/develop`
 **Goal:** Establish the minimum tested backend path through which an authorized synthetic staff principal creates one draft `Employer` and the application atomically appends the required `AuditEvent`.

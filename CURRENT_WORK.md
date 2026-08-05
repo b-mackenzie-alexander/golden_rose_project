@@ -2,7 +2,7 @@
 
 **Updated:** 2026-08-05
 **Lane:** CI governance closeout / next Phase 1 planning
-**Overall status:** PR #8 merged the reviewed synthetic/local staff draft-employer tracer into `develop` at `0938c17`. The qualified `application` workflow passed on that PR but is not yet a required protected-branch context. The active governance slice records `application` as required for both `develop` and `main`; live GitHub protection must be applied and verified only after this policy change is reviewed and merged. The next product-planning target is a bounded authorization-scoped employer read/search tracer. Infrastructure provisioning, public release, live integrations, real identity, and client/production-data use remain unauthorized.
+**Overall status:** PR #8 merged the reviewed synthetic/local staff draft-employer tracer into `develop` at `0938c17`. The qualified `application` workflow passed on that PR but is not yet a required protected-branch context. The active governance slice records `application` as required for both `develop` and `main`; as a sole-maintainer repository, it uses documented independent-evidence, PR-CI, and staged-approval protocols rather than a CODEOWNERS/separate-reviewer gate. Live GitHub protection must be applied and verified only after this policy change is reviewed and merged. The next product-planning target is a bounded authorization-scoped employer read/search tracer. Infrastructure provisioning, public release, live integrations, real identity, and client/production-data use remain unauthorized.
 
 ## Active objective
 Turn the completed initial discovery baseline into an approved, narrow first delivery: an agency-staff pilot for employer demand entry and retrieval, followed by a governed dashboard and transparent worker/employer comparison aid.
@@ -29,7 +29,7 @@ Turn the completed initial discovery baseline into an approved, narrow first del
 - Accepted correction/audit baseline: PostgreSQL domain rows hold current operational truth; append-only `AuditEvent` records preserve material history through atomic expected-version/idempotent commands; restricted prior/new values remain field-authorized; and derived projections are disposable rather than competing record stores. `docs/planning/phase-1-correction-audit-event-contract.md` is authoritative.
 
 ## Immediate next steps
-1. Review and merge the narrow `ci/require-application-check` governance slice, then apply the committed policy and verify no GitHub drift under separate approval.
+1. Complete documented solo-maintainer evidence review, open and merge the narrow `ci/require-application-check` governance PR, then apply the committed policy and verify no GitHub drift under separate approval.
 2. Plan the next bounded product slice around authorization-scoped employer retrieval/search using only accepted Employer fields; do not add contact/worksite/request/shift requiredness by implication.
 3. Keep implementation inside separately reviewed plans: no frontend, real identity, contact/worksite/request/shift, cloud, public route, or live/client data until the affected contract and slice are approved.
 

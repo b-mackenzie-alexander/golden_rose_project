@@ -2,7 +2,7 @@
 
 **Updated:** 2026-08-04
 **Lane:** Coding / first Phase 1 implementation slice
-**Overall status:** PR #7 merged the first-slice planning packet into `develop`, and the coding lane on `feat/staff-draft-employer-tracer` has completed the approved synthetic/local tracer implementation through Task 10 verification. The branch now contains the narrow staff-only backend slice: authorize `employer:draft:create`, transactionally reserve an actor/payload-bound `CommandReceipt`, create one draft `Employer`, append its `AuditEvent`, expose only `POST /api/staff/v1/employers`, and add the `application` CI workflow. Local PostgreSQL and API startup were exercised only under explicit approval and then shut down. Infrastructure provisioning, public release, live integrations, real identity, and client/production-data use remain unauthorized.
+**Overall status:** PR #7 merged the first-slice planning packet into `develop`, and the coding lane on `feat/staff-draft-employer-tracer` has completed the approved synthetic/local tracer implementation through Task 10 verification and push. The branch now contains the narrow staff-only backend slice: authorize `employer:draft:create`, transactionally reserve an actor/payload-bound `CommandReceipt`, create one draft `Employer`, append its `AuditEvent`, expose only `POST /api/staff/v1/employers`, and add the `application` CI workflow. Local PostgreSQL and API startup were exercised only under explicit approval and then shut down. The branch is ready for separate review before any PR is opened. Infrastructure provisioning, public release, live integrations, real identity, and client/production-data use remain unauthorized.
 
 ## Active objective
 Turn the completed initial discovery baseline into an approved, narrow first delivery: an agency-staff pilot for employer demand entry and retrieval, followed by a governed dashboard and transparent worker/employer comparison aid.
@@ -29,7 +29,7 @@ Turn the completed initial discovery baseline into an approved, narrow first del
 - Accepted correction/audit baseline: PostgreSQL domain rows hold current operational truth; append-only `AuditEvent` records preserve material history through atomic expected-version/idempotent commands; restricted prior/new values remain field-authorized; and derived projections are disposable rather than competing record stores. `docs/planning/phase-1-correction-audit-event-contract.md` is authoritative.
 
 ## Immediate next steps
-1. Commit and push `feat/staff-draft-employer-tracer`, then hand the verified branch to a separate review session before opening a PR.
+1. Hand `origin/feat/staff-draft-employer-tracer` to a separate review session before opening a PR.
 2. Keep implementation inside the accepted tracer boundary until review feedback explicitly expands scope: no frontend, real identity, contact/worksite/request/shift, cloud, public route, or live/client data.
 3. Use the later bug/hotfix lane for any post-review defects without bypassing the protected development pipeline.
 4. Record implementation and pilot findings in the operational-discovery register and `NOTES.md`; escalate only changes to accepted behavior, data purpose, authorization, legal posture, or trust boundaries into reviewed contract/ADR updates.

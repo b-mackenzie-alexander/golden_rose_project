@@ -390,13 +390,15 @@ The existing create-command replay path requires an existing Employer and contin
 
 ## 6. Error, cache, and logging contract
 
-Extend existing RFC 9457-style problem responses with stable safe behavior:
+Extend existing RFC 9457-style problem responses with the observed `application/json` media type and these exact JSON objects. Preserve that media type for existing and new problems in this slice; changing it to `application/problem+json` requires separate reviewed API-contract work rather than opportunistic drift here.
 
-- `403` — type `https://golden-rose.local/problems/forbidden`, title `Forbidden`, detail `forbidden`;
-- `404` — type `https://golden-rose.local/problems/employer-not-found`, title `Not Found`, detail `employer not found`;
-- `422` — type `https://golden-rose.local/problems/request-validation`, title `Unprocessable Entity`, detail `request validation failed` for body/filter/cursor violations;
-- `503` — type `https://golden-rose.local/problems/service-unavailable`, title `Service Unavailable`, detail `service unavailable`;
-- `500` — type `https://golden-rose.local/problems/internal-error`, title `Internal Server Error`, detail `internal server error`.
+```json
+{"type":"https://golden-rose.local/problems/forbidden","title":"Forbidden","detail":"forbidden","status":403}
+{"type":"https://golden-rose.local/problems/employer-not-found","title":"Not Found","detail":"employer not found","status":404}
+{"type":"https://golden-rose.local/problems/request-validation","title":"Unprocessable Entity","detail":"request validation failed","status":422}
+{"type":"https://golden-rose.local/problems/service-unavailable","title":"Service Unavailable","detail":"service unavailable","status":503}
+{"type":"https://golden-rose.local/problems/internal-error","title":"Internal Server Error","detail":"internal server error","status":500}
+```
 
 The existing create route's 400/403/409/422/503/500 status, media type, type/title/detail values, and exact success/replay bodies remain byte-for-byte stable. Tests must assert the full problem object for each new read/search error and rerun the existing exact create assertions.
 
@@ -468,11 +470,11 @@ No migration, manifest, lockfile, Compose, CI workflow, repository-policy, or de
 
 ### Mandatory per-behavior RED → GREEN procedure
 
-For every numbered behavior below, use the exact proposed pytest node ID shown in backticks and do not batch later behavior into the same cycle:
+For every behavior explicitly listed under a `RED → GREEN cycles` heading, use the exact proposed pytest node ID shown in backticks and do not batch later behavior into the same cycle. Items explicitly labeled `GREEN regression` assert already-satisfied invariants: run them before and after the task, but do not fabricate a RED or production change for them.
 
 1. Add only that one test (plus the minimum fixture/import needed to collect it).
-2. Run `uv run pytest <exact-node-id> -v` and record the observed RED command and reason in the coding evidence. A new surface should fail at import/collection because the symbol/route does not exist; an extension should collect and fail the named assertion against current behavior. A setup/environment failure is not RED and must be fixed before proceeding.
-3. Write only the minimum production change for that behavior.
+2. Run `uv run pytest <exact-node-id> -v` and record the observed RED command, assertion/import failure, and reason in the coding evidence. The cycle text below names the expected RED and minimal GREEN checkpoint. A setup/environment failure is not RED and must be fixed before proceeding.
+3. Write only the named minimal GREEN production change for that behavior. If that change makes a later proposed RED node pass, reclassify the later node as a GREEN regression and record why; never weaken production behavior to manufacture RED.
 4. Rerun the same node and observe GREEN.
 5. Run the task-level focused command after each GREEN to catch regressions; refactor only while green.
 6. Commit only after every named node in the task has its own recorded RED and GREEN evidence.
@@ -507,12 +509,16 @@ Expected: clean feature branch from the exact merged plan tip.
 
 RED → GREEN cycles:
 
-1. `tests/unit/auth/test_permissions.py::test_principal_with_read_permission_is_allowed` — RED because the permission constant/helper does not exist.
-2. `tests/unit/auth/test_permissions.py::test_principal_without_read_permission_is_denied` — RED until the helper denies absence explicitly.
-3. `tests/unit/auth/test_permissions.py::test_role_labels_do_not_grant_read_permission` — RED if role labels are consulted or until the helper exists.
-4. `tests/unit/api/test_dependencies.py::test_synthetic_principal_has_exact_create_and_read_permissions` — RED because the dependency grants only create.
-5. `tests/unit/api/test_dependencies.py::test_request_headers_cannot_grant_read_permission` — RED until the test proves the dependency's exact configuration-owned grant is unchanged by submitted headers.
-6. `tests/unit/test_main.py::test_create_app_rejects_production_synthetic_auth_before_serving` — pre-existing regression node; observe GREEN before and after Task 1 rather than fabricating a new RED.
+1. `tests/unit/auth/test_permissions.py::test_employer_read_permission_constant_has_exact_value` — RED: importing `EMPLOYER_READ_PERMISSION` fails. Minimal GREEN: add only `EMPLOYER_READ_PERMISSION = "employer:read"` beside the existing create constant.
+2. `tests/unit/auth/test_permissions.py::test_principal_with_read_permission_is_allowed` — RED: importing `can_read_employer` fails after cycle 1. Minimal GREEN: add only `can_read_employer(principal)` as exact permission-set membership, mirroring the create helper.
+3. `tests/unit/api/test_dependencies.py::test_synthetic_principal_has_exact_create_and_read_permissions` — RED: expected `{employer:draft:create, employer:read}` differs from the current create-only set. Minimal GREEN: import `EMPLOYER_READ_PERMISSION` and add it to the configuration-owned synthetic principal permission set.
+
+GREEN regressions before and after Task 1:
+
+1. `tests/unit/auth/test_permissions.py::test_principal_without_read_permission_is_denied` — the exact-membership helper from cycle 2 should already satisfy absence denial; add no production branch.
+2. `tests/unit/auth/test_permissions.py::test_role_labels_do_not_grant_read_permission` — role labels are already ignored by permission helpers; add no production role logic.
+3. `tests/unit/api/test_dependencies.py::test_request_headers_cannot_grant_read_permission` — `get_staff_principal` already accepts settings rather than request/header grants; add no header parsing.
+4. `tests/unit/test_main.py::test_create_app_rejects_production_synthetic_auth_before_serving` — preserve the observed startup guard; add no production change.
 
 The dependency unit test constructs validated non-production synthetic `Settings`, calls `get_staff_principal`, and asserts the configured actor UUID, synthetic role label, and exact permission set. It must not instantiate a database engine or accept request/header permission input.
 
@@ -541,28 +547,34 @@ Commit: `security(auth): add employer read permission`.
 
 Schema RED → GREEN cycles:
 
-1. `tests/unit/application/test_employer_text.py::test_normalize_employer_text_returns_trimmed_nfc` — RED because the application normalizer does not exist.
-2. `tests/unit/api/test_employer_schemas.py::test_name_only_search_is_trimmed_and_nfc_normalized` — RED because the search schema does not exist.
-3. `tests/unit/api/test_employer_schemas.py::test_search_rejects_type_only_and_missing_name` — RED until name is required.
-4. `tests/unit/api/test_employer_schemas.py::test_search_accepts_name_with_optional_type` — RED until combined filters exist.
-5. `tests/unit/api/test_employer_schemas.py::test_search_rejects_name_outside_two_to_one_hundred_characters` — RED until bounds exist.
-6. `tests/unit/api/test_employer_schemas.py::test_search_rejects_unicode_control_characters` — RED until control validation exists.
-7. `tests/unit/api/test_employer_schemas.py::test_search_forbids_unknown_fields_and_invalid_type` — RED until strict schema/type validation exists.
-8. `tests/unit/api/test_employer_schemas.py::test_search_page_size_defaults_and_bounds` — RED until default/range validation exists.
-9. `tests/unit/api/test_employer_schemas.py::test_search_rejects_cursor_over_512_characters` — RED until cursor length validation exists.
-10. `tests/unit/api/test_employer_schemas.py::test_employer_read_responses_expose_exact_accepted_fields` — RED until detail/search response models exist.
+1. `tests/unit/application/test_employer_text.py::test_normalize_employer_text_returns_trimmed_nfc` — RED: normalizer import fails. Minimal GREEN: create only the typed strip-plus-`unicodedata.normalize("NFC", value)` helper.
+2. `tests/unit/api/test_employer_schemas.py::test_name_only_search_is_trimmed_and_nfc_normalized` — RED: search request model import fails. Minimal GREEN: add the strict request model with required name wired to the shared normalizer.
+3. `tests/unit/api/test_employer_schemas.py::test_search_accepts_name_with_optional_type` — RED: `employer_type` is absent. Minimal GREEN: add only the optional existing controlled Employer type field.
+4. `tests/unit/api/test_employer_schemas.py::test_search_rejects_name_outside_two_to_one_hundred_characters` — RED: one boundary case validates. Minimal GREEN: add only the 2..100 post-normalization length constraint.
+5. `tests/unit/api/test_employer_schemas.py::test_search_rejects_unicode_control_characters` — RED: control-bearing name validates. Minimal GREEN: add only Unicode category `C*` rejection.
+6. `tests/unit/api/test_employer_schemas.py::test_search_forbids_unknown_fields_and_invalid_type` — RED: unknown field or invalid type validates. Minimal GREEN: forbid extras and reuse the controlled Employer type validation.
+7. `tests/unit/api/test_employer_schemas.py::test_search_page_size_defaults_and_bounds` — RED: page-size field/default is absent. Minimal GREEN: add strict integer `page_size=25` constrained to 1..50.
+8. `tests/unit/api/test_employer_schemas.py::test_search_rejects_cursor_over_512_characters` — RED: cursor field/limit is absent. Minimal GREEN: add optional cursor with maximum length 512.
+9. `tests/unit/api/test_employer_schemas.py::test_employer_read_responses_expose_exact_accepted_fields` — RED: response model imports fail. Minimal GREEN: add only the exact detail/item/page response fields listed in Section 3.
+
+Schema GREEN regression after cycle 2:
+
+- `tests/unit/api/test_employer_schemas.py::test_search_rejects_type_only_and_missing_name` — required normalized name already rejects both forms; add no alternate browse behavior.
 
 Cursor RED → GREEN cycles:
 
-1. `tests/unit/application/test_employer_search_cursor.py::test_filter_fingerprint_is_deterministic_for_normalized_filters` — RED because the codec does not exist.
-2. `tests/unit/application/test_employer_search_cursor.py::test_cursor_round_trips_without_transport_padding` — RED until encode/decode exists.
-3. `tests/unit/application/test_employer_search_cursor.py::test_cursor_payload_contains_only_approved_keys` — RED until exact payload construction exists.
-4. `tests/unit/application/test_employer_search_cursor.py::test_cursor_rejects_malformed_or_invalid_typed_payloads` — RED until strict safe validation exists.
-5. `tests/unit/application/test_employer_search_cursor.py::test_cursor_rejects_noncanonical_transport_payload` — RED until decode/re-encode comparison exists.
-6. `tests/unit/application/test_employer_search_cursor.py::test_cursor_rejects_different_normalized_filters` — RED until filter binding exists.
-7. `tests/unit/application/test_employer_search_cursor.py::test_cursor_filter_binding_ignores_page_size` — RED until page size is excluded from the fingerprint.
-8. `tests/unit/application/test_employer_search_cursor.py::test_cursor_errors_do_not_reflect_cursor_or_filter_text` — RED until safe exception behavior exists.
-9. `tests/unit/application/test_employer_search_cursor.py::test_cursor_encoder_canonicalizes_aware_timestamp_to_utc` — RED until `astimezone(UTC)` plus fixed six-digit `Z` serialization exists.
+1. `tests/unit/application/test_employer_search_cursor.py::test_filter_fingerprint_is_deterministic_for_normalized_filters` — RED: fingerprint import fails. Minimal GREEN: canonical JSON plus SHA-256 over normalized name/optional type only.
+2. `tests/unit/application/test_employer_search_cursor.py::test_cursor_round_trips_without_transport_padding` — RED: codec imports fail. Minimal GREEN: encode/decode only the version, UTC position, UUID, and fingerprint using unpadded URL-safe Base64.
+3. `tests/unit/application/test_employer_search_cursor.py::test_cursor_rejects_malformed_or_invalid_typed_payloads` — RED: at least one malformed class escapes or decodes. Minimal GREEN: add strict exact-key/type/version/UUID/timestamp/fingerprint validation with one safe exception.
+4. `tests/unit/application/test_employer_search_cursor.py::test_cursor_rejects_noncanonical_transport_payload` — RED: alternate encoding decodes. Minimal GREEN: compare submitted cursor to canonical re-encoding.
+5. `tests/unit/application/test_employer_search_cursor.py::test_cursor_rejects_different_normalized_filters` — RED: mismatched fingerprint is accepted. Minimal GREEN: constant-time compare decoded and expected fingerprints.
+6. `tests/unit/application/test_employer_search_cursor.py::test_cursor_encoder_canonicalizes_aware_timestamp_to_utc` — RED: offset-equivalent instants encode differently. Minimal GREEN: `astimezone(UTC)` and fixed six-digit fractional seconds plus `Z` before serialization.
+
+Cursor GREEN regressions:
+
+1. `tests/unit/application/test_employer_search_cursor.py::test_cursor_payload_contains_only_approved_keys` — cycle 2's minimal codec already emits the exact key set; add no extra payload data.
+2. `tests/unit/application/test_employer_search_cursor.py::test_cursor_filter_binding_ignores_page_size` — cycle 1's canonical filter input already excludes page size; add no page-size binding.
+3. `tests/unit/application/test_employer_search_cursor.py::test_cursor_errors_do_not_reflect_cursor_or_filter_text` — cycle 3's one constant safe exception should already avoid reflection; add no diagnostic payload.
 
 Run:
 
@@ -592,20 +604,23 @@ Use the existing create command to seed canonical Employers for name-search beha
 
 RED → GREEN cycles:
 
-1. `tests/integration/application/test_create_draft_employer.py::test_create_normalizes_display_name_before_fingerprint_and_insert` — RED because direct application input is currently stored/fingerprinted unchanged.
-2. `tests/integration/application/test_create_draft_employer.py::test_replay_treats_composed_and_decomposed_names_as_same_payload` — RED because canonically equivalent input currently conflicts under the same idempotency key.
-3. `tests/integration/persistence/test_employer_reads.py::test_find_employer_by_id_returns_minimized_detail_record` — RED because the read record/function does not exist.
-4. `tests/integration/persistence/test_employer_reads.py::test_find_employer_by_id_returns_none_when_absent` — RED until missing lookup is implemented.
-5. `tests/integration/persistence/test_employer_reads.py::test_name_search_is_case_insensitive_in_postgresql` — RED until literal search exists.
-6. `tests/integration/persistence/test_employer_reads.py::test_name_search_escapes_percent_underscore_and_escape_character` — RED until explicit literal escaping exists.
-7. `tests/integration/persistence/test_employer_reads.py::test_name_and_type_filters_use_and_semantics` — RED until optional type narrowing exists.
-8. `tests/integration/persistence/test_employer_reads.py::test_search_orders_by_received_at_then_uuid_descending` — RED until deterministic ordering exists.
-9. `tests/integration/persistence/test_employer_reads.py::test_search_enforces_limit_without_count_query` — RED until bounded selection exists.
-10. `tests/integration/persistence/test_employer_reads.py::test_keyset_continuation_has_no_duplicate_or_missing_rows` — RED until continuation predicate exists.
-11. `tests/integration/persistence/test_employer_reads.py::test_equal_timestamp_boundary_uses_uuid_tiebreak` — RED until UUID tie logic exists.
-12. `tests/integration/persistence/test_employer_reads.py::test_newer_insert_is_excluded_from_existing_continuation_and_visible_fresh` — RED until keyset semantics are implemented.
-13. `tests/integration/persistence/test_employer_reads.py::test_read_helpers_issue_no_writes_or_count` — RED until read helpers exist and can be instrumented.
-14. `tests/integration/application/test_create_draft_employer.py::test_create_draft_employer_identical_replay_returns_original_result_without_duplicates` — pre-existing regression node; observe GREEN before/after Task 3 rather than fabricating RED.
+1. `tests/integration/application/test_create_draft_employer.py::test_create_normalizes_display_name_before_fingerprint_and_insert` — RED: decomposed direct input is stored unchanged. Minimal GREEN: compute one normalized display name and pass it to persistence; leave fingerprint input unchanged for this cycle.
+2. `tests/integration/application/test_create_draft_employer.py::test_replay_treats_composed_and_decomposed_names_as_same_payload` — RED: raw display name still changes the payload hash. Minimal GREEN: use the same normalized value in command fingerprint input.
+3. `tests/integration/persistence/test_employer_reads.py::test_find_employer_by_id_returns_minimized_detail_record` — RED: read record/function imports fail. Minimal GREEN: add the immutable minimized detail record and one scalar optional SELECT by UUID.
+4. `tests/integration/persistence/test_employer_reads.py::test_name_search_is_case_insensitive_in_postgresql` — RED: search function import fails. Minimal GREEN: add a basic SELECT with `ILIKE` input and no type/cursor/order expansion yet.
+5. `tests/integration/persistence/test_employer_reads.py::test_name_search_escapes_percent_underscore_and_escape_character` — RED: wildcard marker broadens matches. Minimal GREEN: add explicit escape-character transformation and SQLAlchemy `escape=` semantics.
+6. `tests/integration/persistence/test_employer_reads.py::test_name_and_type_filters_use_and_semantics` — RED: type does not narrow. Minimal GREEN: add only the optional equality predicate combined with AND.
+7. `tests/integration/persistence/test_employer_reads.py::test_search_orders_by_received_at_then_uuid_descending` — RED: rows follow database/default order. Minimal GREEN: add only the two descending order clauses.
+8. `tests/integration/persistence/test_employer_reads.py::test_search_enforces_limit_without_count_query` — RED: result is unbounded. Minimal GREEN: apply only caller-supplied bounded limit and issue no count.
+9. `tests/integration/persistence/test_employer_reads.py::test_keyset_continuation_has_no_duplicate_or_missing_rows` — RED: no continuation predicate exists. Minimal GREEN: add the strict older-timestamp branch for fixtures with distinct timestamps.
+10. `tests/integration/persistence/test_employer_reads.py::test_equal_timestamp_boundary_uses_uuid_tiebreak` — RED: equal-timestamp continuation misses/duplicates rows. Minimal GREEN: add the equality-plus-descending-UUID branch.
+
+Persistence/create GREEN regressions after the relevant cycles:
+
+1. `tests/integration/persistence/test_employer_reads.py::test_find_employer_by_id_returns_none_when_absent` — cycle 3's optional scalar lookup already returns `None`; add no exception.
+2. `tests/integration/persistence/test_employer_reads.py::test_newer_insert_is_excluded_from_existing_continuation_and_visible_fresh` — cycles 9–10's keyset predicate already provides this non-snapshot behavior; add no snapshot state.
+3. `tests/integration/persistence/test_employer_reads.py::test_read_helpers_issue_no_writes_or_count` — the SELECT-only cycles should already satisfy this; add no transaction/write/count behavior.
+4. `tests/integration/application/test_create_draft_employer.py::test_create_draft_employer_identical_replay_returns_original_result_without_duplicates` — preserve existing replay behavior before/after cycles 1–2.
 
 Run focused tests, then:
 
@@ -634,16 +649,19 @@ Commit: `feat(db): add bounded employer read queries`.
 
 RED → GREEN cycles:
 
-1. `tests/integration/application/test_get_employer.py::test_permitted_get_returns_current_minimized_employer` — RED because the query module does not exist.
-2. `tests/integration/application/test_get_employer.py::test_denied_get_never_calls_persistence` — RED until permission is enforced before lookup.
-3. `tests/integration/application/test_get_employer.py::test_missing_get_raises_nonreflective_not_found` — RED until shared not-found translation exists.
-4. `tests/integration/application/test_search_employers.py::test_permitted_search_returns_page_and_next_cursor` — RED because the application search does not exist.
-5. `tests/integration/application/test_search_employers.py::test_denied_search_never_decodes_fingerprints_or_queries` — RED until authorization precedes every cursor/filter/persistence operation; use malformed and filter-mismatched length-valid cursors with spies that fail if called.
-6. `tests/integration/application/test_search_employers.py::test_search_normalizes_decomposed_query_after_authorization` — RED until the shared NFC normalizer runs before fingerprint/query construction and matches the canonically equivalent stored name.
-7. `tests/integration/application/test_search_employers.py::test_role_label_without_permission_remains_denied` — RED if role labels are consulted.
-8. `tests/integration/application/test_search_employers.py::test_successful_queries_perform_no_writes_or_transaction_control` — RED until read-only behavior exists and can be instrumented.
-9. `tests/integration/application/test_search_employers.py::test_persistence_failure_rolls_back_once_and_raises_safe_error` — RED until shared safe translation exists.
-10. `tests/integration/application/test_create_draft_employer.py::test_safe_persistence_error_redacts_driver_details_for_db_failures` and `tests/integration/api/test_staff_employers.py::test_post_staff_employers_known_database_unavailability_returns_safe_503` — existing behavior/import regression nodes; observe GREEN before and after moving the class rather than fabricating RED.
+1. `tests/integration/application/test_get_employer.py::test_permitted_get_returns_current_minimized_employer` — RED: query import fails. Minimal GREEN: add one query function that checks `can_read_employer` first, calls minimized lookup, and returns the record.
+2. `tests/integration/application/test_get_employer.py::test_missing_get_raises_nonreflective_not_found` — RED: allowed missing lookup returns `None`. Minimal GREEN: add shared constant-message `EmployerNotFoundError` translation only after authorized lookup.
+3. `tests/integration/application/test_search_employers.py::test_permitted_search_returns_page_and_next_cursor` — RED: search query import fails. Minimal GREEN: add one function that authorizes first, normalizes, decodes/binds optional cursor, requests `page_size + 1`, and emits a cursor only for an extra row.
+4. `tests/integration/application/test_search_employers.py::test_persistence_failure_rolls_back_once_and_raises_safe_error` — RED: SQLAlchemy failure escapes. Minimal GREEN: move/reuse shared `SafePersistenceError`, roll back once, and raise it without raw detail.
+
+Application GREEN regressions after the relevant cycles:
+
+1. `tests/integration/application/test_get_employer.py::test_denied_get_never_calls_persistence` — cycle 1 authorizes first; spies must remain untouched and no alternate branch is added.
+2. `tests/integration/application/test_search_employers.py::test_denied_search_never_decodes_fingerprints_or_queries` — cycle 3 authorizes before normalization/codec/query; malformed and mismatched cursors must not reach spies.
+3. `tests/integration/application/test_search_employers.py::test_search_normalizes_decomposed_query_after_authorization` — cycle 3 already uses the shared normalizer before fingerprint/query construction; add no second normalization path.
+4. `tests/integration/application/test_search_employers.py::test_role_label_without_permission_remains_denied` — Task 1 exact permission membership already ignores role labels; add no role grant.
+5. `tests/integration/application/test_search_employers.py::test_successful_queries_perform_no_writes_or_transaction_control` — successful query paths are SELECT-only; add no commit/flush/rollback/event/receipt behavior.
+6. `tests/integration/application/test_create_draft_employer.py::test_safe_persistence_error_redacts_driver_details_for_db_failures` and `tests/integration/api/test_staff_employers.py::test_post_staff_employers_known_database_unavailability_returns_safe_503` — preserve existing behavior before/after moving the shared error.
 
 Run:
 
@@ -672,18 +690,21 @@ Before final route code, run a disposable FastAPI probe against the locked versi
 
 RED → GREEN cycles:
 
-1. `tests/integration/api/test_staff_employer_reads.py::test_get_existing_returns_exact_detail_with_no_store` — RED because the route does not exist.
-2. `tests/integration/api/test_staff_employer_reads.py::test_get_absent_returns_nonreflective_no_store_404` — RED until safe not-found mapping exists.
-3. `tests/integration/api/test_staff_employer_reads.py::test_denied_get_runs_no_sql_and_headers_cannot_elevate` — RED until route authorization is wired.
-4. `tests/integration/api/test_staff_employer_reads.py::test_search_returns_minimized_page_cursor_no_total_and_no_store` — RED because POST search does not exist.
-5. `tests/integration/api/test_staff_employer_reads.py::test_search_filters_and_cursor_round_trip_over_http` — RED until request/application/response mapping exists.
-6. `tests/integration/api/test_staff_employer_reads.py::test_authorized_invalid_search_inputs_return_nonreflective_no_store_422` — RED until safe validation/cursor mapping exists.
-7. `tests/integration/api/test_staff_employer_reads.py::test_denied_search_precedes_cursor_and_sql_and_headers_cannot_elevate` — RED until authorization-first application behavior is wired through HTTP.
-8. `tests/integration/api/test_staff_employer_reads.py::test_search_failures_map_to_safe_redacted_503_and_500` — RED until exact handlers exist.
-9. `tests/integration/api/test_staff_employer_reads.py::test_detail_and_search_leave_authoritative_row_counts_unchanged` — RED until routes exist and no-write behavior can be observed.
-10. `tests/integration/api/test_staff_employer_reads.py::test_openapi_exposes_only_approved_staff_employer_routes` — RED until exact route surface exists.
-11. `tests/integration/api/test_staff_employer_reads.py::test_search_logs_do_not_include_body_cursor_filter_sql_url_actor_or_exception` — RED until application/error/access logging can be captured and proven redacted.
-12. `tests/integration/api/test_staff_employers.py::test_post_staff_employers_returns_201_and_exact_body_for_permitted_request` and `tests/integration/api/test_staff_employers.py::test_openapi_exposes_only_intended_staff_route` — pre-existing regression nodes; observe GREEN before and after route/error changes rather than fabricating RED.
+1. `tests/integration/api/test_staff_employer_reads.py::test_search_returns_minimized_page_cursor_no_total_and_no_store` — RED: POST search returns 404/405. Minimal GREEN: declare and implement only static POST `/search` request/query/response mapping with `no-store`.
+2. `tests/integration/api/test_staff_employer_reads.py::test_authorized_invalid_search_inputs_return_nonreflective_no_store_422` — RED: at least cursor-originated validation is unhandled or lacks `no-store`. Minimal GREEN: map safe cursor validation to the exact 422 object and ensure route problems receive `no-store`.
+3. `tests/integration/api/test_staff_employer_reads.py::test_search_failures_map_to_safe_redacted_503_and_500` — RED: injected failure is unhandled or differs from the exact object. Minimal GREEN: reuse the exact shared 503 and existing 500 handlers without reflective detail.
+4. `tests/integration/api/test_staff_employer_reads.py::test_get_existing_returns_exact_detail_with_no_store` — RED: GET returns 404/405 because the dynamic route is absent. Minimal GREEN: after static `/search` exists, add only GET `/{employer_id}` mapping to the application query and exact response with `no-store`.
+5. `tests/integration/api/test_staff_employer_reads.py::test_get_absent_returns_nonreflective_no_store_404` — RED: application not-found is unhandled. Minimal GREEN: add only the exact 404 handler/problem object and `no-store`.
+
+API GREEN regressions after the relevant cycles:
+
+1. `tests/integration/api/test_staff_employer_reads.py::test_denied_get_runs_no_sql_and_headers_cannot_elevate` — Task 4 query authorizes first and the principal dependency ignores authority headers; add no route-level grant.
+2. `tests/integration/api/test_staff_employer_reads.py::test_search_filters_and_cursor_round_trip_over_http` — cycle 1 maps the already-tested schema/application page; add no alternate cursor path.
+3. `tests/integration/api/test_staff_employer_reads.py::test_denied_search_precedes_cursor_and_sql_and_headers_cannot_elevate` — Task 4 authorization order remains authoritative through HTTP; add no pre-authorization decode.
+4. `tests/integration/api/test_staff_employer_reads.py::test_detail_and_search_leave_authoritative_row_counts_unchanged` — the routes call read-only queries; add no write/audit/receipt behavior.
+5. `tests/integration/api/test_staff_employer_reads.py::test_openapi_exposes_only_approved_staff_employer_routes` — cycles 1 and 4 add only the accepted routes; add no list/export/public route.
+6. `tests/integration/api/test_staff_employer_reads.py::test_search_logs_do_not_include_body_cursor_filter_sql_url_actor_or_exception` — no request/query logging is introduced; add no logging of submitted markers.
+7. `tests/integration/api/test_staff_employers.py::test_post_staff_employers_returns_201_and_exact_body_for_permitted_request` and `tests/integration/api/test_staff_employers.py::test_openapi_exposes_only_intended_staff_route` — preserve observed create behavior before/after route/error changes.
 
 Use dependency overrides only in tests. The normal synthetic dependency remains configuration supplied.
 

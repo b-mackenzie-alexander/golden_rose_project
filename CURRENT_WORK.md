@@ -1,8 +1,8 @@
 # Current Work — Golden Rose Operations Platform
 
-**Updated:** 2026-08-05
-**Lane:** CI governance closeout / next Phase 1 planning
-**Overall status:** PR #8 merged the reviewed synthetic/local staff draft-employer tracer into `develop` at `0938c17`. The qualified `application` workflow passed on that PR but is not yet a required protected-branch context. The active governance slice records `application` as required for both `develop` and `main`; as a sole-maintainer repository, it uses documented independent-evidence, PR-CI, and staged-approval protocols rather than a CODEOWNERS/separate-reviewer gate. Live GitHub protection must be applied and verified only after this policy change is reviewed and merged. The next product-planning target is a bounded authorization-scoped employer read/search tracer. Infrastructure provisioning, public release, live integrations, real identity, and client/production-data use remain unauthorized.
+**Updated:** 2026-08-04
+**Lane:** Next Phase 1 planning — Employer detail and bounded search
+**Overall status:** PR #8 merged the reviewed synthetic/local staff draft-employer tracer into `develop` at `0938c17`. PR #9 merged the solo-maintainer governance/application-check closeout at `80f4505`; the reviewed policy has been applied and verified, and live `develop`/`main` now require `enforce`, `check`, and `application`. The proposed next product slice is an authorization-scoped Employer detail/search tracer governed by ADR-0004 and `.hermes/plans/2026-08-04_phase-1-employer-read-search-plan.md`. It remains planning-only until reviewed and merged. Infrastructure provisioning, public release, live integrations, real identity, and client/production-data use remain unauthorized.
 
 ## Active objective
 Turn the completed initial discovery baseline into an approved, narrow first delivery: an agency-staff pilot for employer demand entry and retrieval, followed by a governed dashboard and transparent worker/employer comparison aid.
@@ -29,9 +29,10 @@ Turn the completed initial discovery baseline into an approved, narrow first del
 - Accepted correction/audit baseline: PostgreSQL domain rows hold current operational truth; append-only `AuditEvent` records preserve material history through atomic expected-version/idempotent commands; restricted prior/new values remain field-authorized; and derived projections are disposable rather than competing record stores. `docs/planning/phase-1-correction-audit-event-contract.md` is authoritative.
 
 ## Immediate next steps
-1. Complete documented solo-maintainer evidence review, open and merge the narrow `ci/require-application-check` governance PR, then apply the committed policy and verify no GitHub drift under separate approval.
-2. Plan the next bounded product slice around authorization-scoped employer retrieval/search using only accepted Employer fields; do not add contact/worksite/request/shift requiredness by implication.
-3. Keep implementation inside separately reviewed plans: no frontend, real identity, contact/worksite/request/shift, cloud, public route, or live/client data until the affected contract and slice are approved.
+1. Independently review and merge ADR-0004 plus the Employer detail/bounded-search implementation plan before coding.
+2. Start implementation only in a fresh coding session from the exact merged `origin/develop` tip, using `feat/staff-employer-read-search` and strict RED → GREEN → REFACTOR sequencing.
+3. Keep the slice limited to `employer:read`, exact UUID detail, privacy-conscious POST search, literal bounded filters, and filter-bound keyset pagination over accepted Employer fields.
+4. Do not add frontend, real identity, unfiltered listing/counts/exports, mutations/audit events, contact/worksite/request/shift, schema/dependency changes, cloud, public routes, or live/client data.
 
 ## Gate classification
 
@@ -59,14 +60,14 @@ The complete discovery inventory and evidence rules are in `docs/planning/phase-
 - Do not present provisional queue business hours, thresholds, escalation behavior, or no-response procedure as production policy, an SLA, compliance rule, or staff-performance standard before client validation.
 
 ## Repository-governance closeout
-- `develop` and `main` are now protected: pull requests, required `enforce` (Branch policy) and `check` (Repository hygiene) statuses, up-to-date branches, resolved conversations, administrator enforcement, and deletion/force-push prevention.
+- `develop` and `main` are now protected: pull requests, required `enforce` (Branch policy), `check` (Repository hygiene), and `application` (Application quality) statuses, up-to-date branches, resolved conversations, administrator enforcement, and deletion/force-push prevention.
 - Repository policy was applied from `infra/github/repo-policy.json` and verified by `infra/github/verify-repo-policy.sh`.
 - PR #3 qualified the permitted `develop` → `main` source path: both required checks passed; it was then closed without merge because it was a synthetic governance test, not a release.
 - PR #5 merged the reviewed Phase 1 discovery, compliance, governance, planning, and PDF-generation documentation into `develop`.
 - PR #6 merged the coding-readiness closeout into `develop`.
 - PR #7 merged the reviewed first-slice planning packet into `develop`.
 - PR #8 merged the reviewed draft-employer tracer into `develop` at `0938c17`; its remote feature branch is retired.
-- The `application` check succeeded on PR #8. Requiring it on protected branches is the active, separately reviewed governance closeout; live policy application remains separately approved.
+- PR #9 merged the reviewed solo-maintainer governance and required-`application` policy at `80f4505`. The committed policy was then applied under explicit approval; `infra/github/verify-repo-policy.sh` reported no drift and direct GitHub queries confirmed all three required contexts on both protected branches.
 
 ## Repository bootstrap state
 - The initial tracked baseline contains the living documents, ADR convention, and a protective `.gitignore`.

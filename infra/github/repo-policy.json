@@ -10,7 +10,8 @@
     "develop": {
       "required_status_checks": [
         "enforce",
-        "check"
+        "check",
+        "application"
       ],
       "required_approving_review_count": 0,
       "required_conversation_resolution": true,
@@ -22,7 +23,8 @@
     "main": {
       "required_status_checks": [
         "enforce",
-        "check"
+        "check",
+        "application"
       ],
       "required_approving_review_count": 0,
       "required_conversation_resolution": true,

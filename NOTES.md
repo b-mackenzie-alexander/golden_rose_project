@@ -199,5 +199,13 @@ This is the concise, dated engineering and operational note log. It records obse
 - **Validated local CI-equivalent run:** A newly recreated loopback-only `postgres-test` container ran the migration-first sequence successfully: lock/sync, Ruff format/lint, mypy, Bandit, upgrade→pytest→downgrade→upgrade, editable-safe pip-audit, and CycloneDX generation. Pytest reported `55 passed` at `99.03%` coverage; SBOM validation reported CycloneDX `1.6`; pip-audit reported no known vulnerabilities.
 - **Validated hygiene:** The workflow YAML parses; `git diff --check origin/develop` passed; Gitleaks scanned the uncommitted review surface materialization (`257580` bytes) with zero findings. The remediation remains uncommitted and requires an independent re-review before PR creation.
 
+## 2026-08-05 — PR #8 merged and application-check governance handoff
+- **Observed:** PR #8, `feat: implement staff draft employer tracer`, merged into protected `develop` at `0938c172806c6e9c50bec01e0c686e20c9dc7d68`; the remote feature branch was deleted after merge.
+- **Validated:** PR #8 completed the owned `application`, `enforce`, and `check` checks successfully. The merged feature tree is patch-equivalent to the retired local feature branch.
+- **Observed governance gap:** GitHub protection and `infra/github/repo-policy.json` still require only `enforce` and `check` on `develop` and `main`; `application` is qualified but not yet mandatory.
+- **Active closeout:** `ci/require-application-check` adds `application` to both protected-branch required-context lists. The policy change must be independently reviewed and merged before the live branch protection is applied and verified under separate approval.
+- **Validated candidate:** JSON parsing, policy semantic assertions, governance-script shell syntax, documentation assertions, and `git diff --check` passed. The drift verifier failed only because live `develop` and `main` still lack the newly desired `application` context, which is the expected pre-apply state.
+- **Next product-planning boundary:** Plan an authorization-scoped employer read/search tracer using accepted Employer fields before adding contact, worksite, request, shift, or extension requiredness.
+
 ## Updating this file
 Add a short dated entry after a material planning, implementation, test, security, or release event. Link detailed evidence rather than duplicating it. Record commands and results only when they were actually run.

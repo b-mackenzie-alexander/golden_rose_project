@@ -23,13 +23,14 @@ It adds:
 4. authorization before any Employer lookup, search query, result derivation, or pagination operation;
 5. literal, case-insensitive substring matching over a required NFC-normalized `display_name` fragment plus an optional controlled `employer_type` secondary filter;
 6. rejection of missing-name and type-only searches so the two exhaustive Employer types cannot be paginated as a substitute for the prohibited list-all surface;
-7. deterministic newest-first ordering by immutable `received_at DESC`, then `employer_id DESC`;
-8. keyset pagination with a default page size of 25 and maximum of 50;
-9. a versioned opaque cursor containing only the prior `received_at`, prior Employer UUID, and a SHA-256 fingerprint of normalized filters;
-10. a filter-bound cursor: reuse with different filters is rejected rather than silently changing result meaning;
-11. no total count and no unfiltered list-all operation;
-12. minimized detail and search response fields with `Cache-Control: no-store`; and
-13. safe, non-reflective errors for denial, absence, validation/cursor failure, persistence unavailability, and unexpected failures.
+7. one application-owned NFC invariant applied before create-command payload fingerprinting/persistence and before search fingerprinting/query construction, so canonically equivalent accepted names remain findable regardless of API versus direct application invocation;
+8. deterministic newest-first ordering by immutable `received_at DESC`, then `employer_id DESC`;
+9. keyset pagination with a default page size of 25 and maximum of 50;
+10. a versioned opaque cursor containing only the prior `received_at`, prior Employer UUID, and a SHA-256 fingerprint of normalized filters;
+11. a filter-bound cursor: reuse with different filters is rejected rather than silently changing result meaning;
+12. no total count and no unfiltered list-all operation;
+13. minimized detail and search response fields with `Cache-Control: no-store`; and
+14. safe, non-reflective errors for denial, absence, validation/cursor failure, persistence unavailability, and unexpected failures.
 
 The search route uses POST because the potentially household-identifying name fragment belongs in a request body rather than a URL query string. It is a read operation: it requires no idempotency key, creates no `CommandReceipt`, and appends no `AuditEvent`. Request bodies and search text remain excluded from logs.
 

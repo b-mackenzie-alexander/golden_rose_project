@@ -1,7 +1,7 @@
-from conftest import VERSIONS_DIR
 from sqlalchemy import inspect, text
 
 from golden_rose.persistence.models import metadata
+from tests.integration.conftest import VERSIONS_DIR
 
 
 def test_initial_migration_file_exists_at_expected_path() -> None:

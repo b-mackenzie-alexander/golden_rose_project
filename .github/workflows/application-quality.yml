@@ -14,7 +14,8 @@ jobs:
     timeout-minutes: 30
     services:
       postgres:
-        image: postgres:16.10
+        # PostgreSQL 16.10 OCI index digest
+        image: postgres:16.10@sha256:21f6013073bc6b92830a2129570e2f5ec42a6c734b5a985a41e83aa58f54c3c1
         env:
           POSTGRES_USER: golden_rose_test
           POSTGRES_PASSWORD: golden_rose_test_ci_password
@@ -34,15 +35,18 @@ jobs:
       GOLDEN_ROSE_DATABASE_URL: postgresql+psycopg://golden_rose_test:golden_rose_test_ci_password@127.0.0.1:55432/golden_rose_test
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        # v4.4.0
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        # v5.6.0
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+        # v6.8.0
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
         with:
           enable-cache: true
 
@@ -67,11 +71,11 @@ jobs:
           uv run ruff check .
           uv run mypy src tests
           uv run bandit -q -r src
-          uv run pytest --cov=golden_rose --cov-report=term-missing --cov-fail-under=95
           uv run alembic upgrade head
+          uv run pytest --cov=golden_rose --cov-report=term-missing --cov-fail-under=95
           uv run alembic downgrade base
           uv run alembic upgrade head
-          uv run pip-audit
+          uv run pip-audit --skip-editable
           mkdir -p build
           uv run cyclonedx-py environment --pyproject pyproject.toml --output-reproducible --of JSON -o build/backend-sbom.cdx.json
           python - <<'PY'
@@ -86,7 +90,8 @@ jobs:
 
       - name: Upload backend SBOM evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: backend-sbom-cdx
           path: build/backend-sbom.cdx.json

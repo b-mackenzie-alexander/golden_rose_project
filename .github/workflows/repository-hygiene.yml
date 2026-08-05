@@ -13,7 +13,8 @@ jobs:
     name: check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - # v4.4.0
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
       - name: Check whitespace and confidential-path guardrails
@@ -27,6 +28,7 @@ jobs:
           ! git ls-files --error-unmatch 'docs/client-deliverables/**' >/dev/null 2>&1
           ! git ls-files --error-unmatch '.DS_Store' '**/.DS_Store' >/dev/null 2>&1
       - name: Scan for secrets
-        uses: gitleaks/gitleaks-action@v2
+        # v2 (resolved tag commit)
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

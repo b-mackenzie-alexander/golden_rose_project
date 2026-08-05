@@ -72,6 +72,8 @@ main artifact → protected explicit production promotion
 
 The first implementation slice is narrower than this eventual environment model. ADR-0002 permits one local/test-only staff route, synthetic configuration-supplied principal, security-internal transactional `CommandReceipt`, draft `Employer` insert, and atomic creation `AuditEvent`; it creates no deployment, public plane, real identity, or live-data path.
 
+ADR-0004 proposes the next bounded local/test slice: one `employer:read` permission, exact current-Employer detail, and privacy-conscious POST search over accepted Employer fields. Search remains a bounded query over authoritative PostgreSQL rows—not a second store or durable projection—and ordinary reads append no domain audit event. Filter-required literal matching, deterministic keyset pagination, minimized responses, no-store caching, and authorization before lookup/result derivation define the boundary. No schema, index, dependency, mutation, adjacent domain entity, real identity, frontend, public route, or live-data path is added. This paragraph is planning direction, not implemented behavior, until ADR-0004 and its plan are reviewed, merged, coded, and verified.
+
 ## Interim infrastructure billing and handoff
 - **Accepted contractual constraint:** Beatrice is responsible for paying approved cloud-infrastructure charges until the final payment for the engagement has been rendered. Billing responsibility then transfers to the client through a documented handoff.
 - The exact account and billing topology remains a planned operational decision; it must support least-privilege access, cost visibility, continuity, and an orderly transfer without exposing secrets or interrupting the staff workflow.

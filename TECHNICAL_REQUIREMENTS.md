@@ -1,6 +1,6 @@
 # Technical Requirements — Golden Rose Operations Platform
 
-**Status:** Phase 1 technical planning baseline. The map and staff-role requirements are client-accepted, and ADR-0002/ADR-0003 accept the first synthetic backend tracer and its toolchain; later technology choices and implementation slices still require their applicable approvals, acceptance evidence, data classification, and live-use gates below.
+**Status:** Phase 1 technical planning baseline. The map and staff-role requirements are client-accepted, ADR-0002/ADR-0003 accept the first synthetic backend tracer and its toolchain, and ADR-0004 proposes the next Employer detail/bounded-search slice; later technology choices and implementation slices still require their applicable approvals, acceptance evidence, data classification, and live-use gates below.
 
 ## Product outcome
 Provide agency staff a reliable browser-based operations workspace that replaces fragmented paper/form/spreadsheet employer-demand handling, supports governed operational reporting, and later supports transparent staff review of worker-to-employer/job compatibility.
@@ -28,6 +28,7 @@ Provide agency staff a reliable browser-based operations workspace that replaces
 - Web UI works on constrained office hardware and common modern browsers. Future worker/employer public workflows must be mobile-first, resilient to constrained networks, and measured against an approved responsiveness/performance budget before release.
 - English/Spanish functional and accessibility parity across all affected flows, validation/errors, notices, notification paths, documents, and staff interfaces.
 - Staff search honors record/field authorization before showing results.
+- The proposed first Employer read/search slice uses one server-enforced `employer:read` permission before exact lookup, filtered query, or pagination. Potentially household-identifying name fragments use a validated POST body rather than URL query parameters, remain excluded from logs, and are matched literally with bounded deterministic keyset pagination. It adds no unfiltered list, total count, export, ranking, read-side audit event, schema/index, or separate search store; ADR-0004 controls the exact planning boundary.
 - Staff authorization uses the server-enforced permission matrix in `docs/planning/phase-1-staff-permission-matrix.md`. Accepted roles are Owner, delegated Manager, interchangeable Operations Staff, and separately bounded Platform Administrator; role labels do not grant broad data access by themselves.
 - Dates/times are stored once with time zone where relevant; calendar/month views are derived, not separate storage silos.
 - Routine operational/reporting location uses the adaptive Owner-managed taxonomy in `docs/planning/phase-1-service-zone-taxonomy.md`: worksites may have overlapping memberships with one primary/default, while requests/shifts may be assigned later and remain visibly unassigned until then. Exact names/conventions are configuration discovered through use, not implementation prerequisites. Exact worksite/household address remains separately restricted.

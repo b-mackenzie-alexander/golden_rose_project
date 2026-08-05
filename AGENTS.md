@@ -33,5 +33,9 @@ Classify claims as Observed, Reported, Proposed, or Validated. Client documents,
 - Update `CURRENT_WORK.md`, `ROADMAP.md`, and `NOTES.md` after material planning/implementation/review milestones; update technical/security/decision docs when their contracts change.
 - Never commit secrets, client personal data, raw exports, production data/backups, or unreviewed generated artifacts.
 
-## First implementation boundary
-The accepted first implementation slice is the synthetic/local staff-only tracer in ADR-0002 and `.hermes/plans/2026-08-04_phase-1-first-slice-plan.md`: bootstrap the approved backend toolchain, accept only `employer_type` and `display_name` for one draft `Employer`, authorize a synthetic staff principal through `employer:draft:create`, and atomically append `employer.created` audit history. No frontend, real identity, contact, worksite, request, shift, search, map, cloud service, public route, client/live data, or legal behavior is included. Coding starts only from a fresh session after the planning packet is reviewed and merged.
+## Current implementation boundaries
+The completed first implementation slice is the synthetic/local staff-only create tracer in ADR-0002 and `.hermes/plans/2026-08-04_phase-1-first-slice-plan.md`: the approved backend toolchain accepts only `employer_type` and `display_name` for one draft `Employer`, authorizes a synthetic staff principal through `employer:draft:create`, and atomically appends `employer.created` audit history.
+
+The proposed next slice is the synthetic/local Employer detail and bounded-search tracer in ADR-0004 and `.hermes/plans/2026-08-05_phase-1-employer-read-search-plan.md`. It may be implemented only after that packet is reviewed and merged. The slice adds one `employer:read` permission, exact UUID detail, and privacy-conscious POST search requiring a bounded name fragment with optional employer type, filter-bound keyset pagination, minimized no-store responses, and no read-side domain/audit writes. It adds no frontend, real identity, mutation, contact, worksite, request, shift, count, unfiltered list, export, map, cloud service, public route, client/live data, or legal behavior.
+
+Every later slice requires its own reviewed and merged plan. Coding starts only from a fresh session re-baselined to the exact merged planning tip.

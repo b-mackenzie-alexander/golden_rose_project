@@ -1,8 +1,8 @@
 # Current Work — Golden Rose Operations Platform
 
-**Updated:** 2026-08-05
+**Updated:** 2026-08-04
 **Lane:** Next Phase 1 planning — Employer detail and bounded search
-**Overall status:** PR #8 merged the reviewed synthetic/local staff draft-employer tracer into `develop` at `0938c17`. PR #9 merged the solo-maintainer governance/application-check closeout at `80f4505`; the reviewed policy has been applied and verified, and live `develop`/`main` now require `enforce`, `check`, and `application`. The proposed next product slice is an authorization-scoped Employer detail/search tracer governed by ADR-0004 and `.hermes/plans/2026-08-05_phase-1-employer-read-search-plan.md`. It remains planning-only until reviewed and merged. Infrastructure provisioning, public release, live integrations, real identity, and client/production-data use remain unauthorized.
+**Overall status:** PR #8 merged the reviewed synthetic/local staff draft-employer tracer into `develop` at `0938c17`. PR #9 merged the solo-maintainer governance/application-check closeout at `80f4505`; the reviewed policy has been applied and verified, and live `develop`/`main` now require `enforce`, `check`, and `application`. The proposed next product slice is an authorization-scoped Employer detail/search tracer governed by ADR-0004 and `.hermes/plans/2026-08-04_phase-1-employer-read-search-plan.md`. It remains planning-only until reviewed and merged. Infrastructure provisioning, public release, live integrations, real identity, and client/production-data use remain unauthorized.
 
 ## Active objective
 Turn the completed initial discovery baseline into an approved, narrow first delivery: an agency-staff pilot for employer demand entry and retrieval, followed by a governed dashboard and transparent worker/employer comparison aid.

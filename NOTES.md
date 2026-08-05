@@ -191,7 +191,7 @@ This is the concise, dated engineering and operational note log. It records obse
 - **Local verification evidence:** With `.env.test` loaded and approved `postgres-test` running healthy, `uv run pytest --cov=golden_rose --cov-report=term-missing --cov-fail-under=95` passed with `54 passed` and `99.03%` total coverage; `uv run mypy src tests` passed; `uv run ruff format --check .` and `uv run ruff check .` passed; `uv run alembic downgrade base && uv run alembic upgrade head` passed; `uv run pip-audit` reported no known vulnerabilities; and CycloneDX generation produced ignored `build/backend-sbom.cdx.json` with `bomFormat='CycloneDX'` and `specVersion='1.6'`.
 - **Handoff status:** The branch was committed, exact-range checks passed (`git diff --check origin/develop...HEAD` and `gitleaks git --log-opts='origin/develop..HEAD'`), `postgres-test` was shut down, and `feat/staff-draft-employer-tracer` was pushed to `origin` for an independent review session before any PR is opened.
 
-## 2026-08-05 — Review remediation for draft-employer tracer
+## 2026-08-04 — Review remediation for draft-employer tracer
 - **Observed RED:** `create_app()` accepted `environment=production` with `auth_mode=synthetic`; the Pydantic validator ran only when a protected request resolved the settings dependency.
 - **Observed GREEN:** `create_app()` now constructs `Settings` before returning the FastAPI application. `tests/unit/test_main.py` first failed because no startup validation existed and then passed; a direct import under prohibited production/synthetic settings was rejected before any server was started.
 - **Observed CI remediation:** `.github/workflows/application-quality.yml` now applies `alembic upgrade head` before pytest, preserves downgrade→upgrade qualification, pins checkout/setup-python/setup-uv/upload-artifact to reviewed immutable SHAs, and uses `pip-audit --skip-editable` so the local editable project does not cause a false failing exit.
@@ -199,7 +199,7 @@ This is the concise, dated engineering and operational note log. It records obse
 - **Validated local CI-equivalent run:** A newly recreated loopback-only `postgres-test` container ran the migration-first sequence successfully: lock/sync, Ruff format/lint, mypy, Bandit, upgrade→pytest→downgrade→upgrade, editable-safe pip-audit, and CycloneDX generation. Pytest reported `55 passed` at `99.03%` coverage; SBOM validation reported CycloneDX `1.6`; pip-audit reported no known vulnerabilities.
 - **Validated hygiene:** The workflow YAML parses; `git diff --check origin/develop` passed; Gitleaks scanned the uncommitted review surface materialization (`257580` bytes) with zero findings. The remediation remains uncommitted and requires an independent re-review before PR creation.
 
-## 2026-08-05 — PR #8 merged and application-check governance handoff
+## 2026-08-04 — PR #8 merged and application-check governance handoff
 - **Observed:** PR #8, `feat: implement staff draft employer tracer`, merged into protected `develop` at `0938c172806c6e9c50bec01e0c686e20c9dc7d68`; the remote feature branch was deleted after merge.
 - **Validated:** PR #8 completed the owned `application`, `enforce`, and `check` checks successfully. The merged feature tree is patch-equivalent to the retired local feature branch.
 - **Observed governance gap:** GitHub protection and `infra/github/repo-policy.json` still require only `enforce` and `check` on `develop` and `main`; `application` is qualified but not yet mandatory.
@@ -207,24 +207,24 @@ This is the concise, dated engineering and operational note log. It records obse
 - **Validated candidate:** JSON parsing, policy semantic assertions, governance-script shell syntax, documentation assertions, and `git diff --check` passed. The drift verifier failed only because live `develop` and `main` still lack the newly desired `application` context, which is the expected pre-apply state.
 - **Next product-planning boundary:** Plan an authorization-scoped employer read/search tracer using accepted Employer fields before adding contact, worksite, request, shift, or extension requiredness.
 
-## 2026-08-05 — Solo-maintainer governance decision
+## 2026-08-04 — Solo-maintainer governance decision
 - **Observed operating constraint:** `b-mackenzie-alexander` is the repository's only eligible collaborator. Requiring a conventional approval or CODEOWNERS review would deadlock owner-authored PRs; the repository is user-owned and has no organization-level ruleset alternative.
 - **Accepted protocol:** Retain protected branches, required CI, branch/source policy, exact diff and secret scanning, independent delegated/separate-session review, documented blast-radius assessment, PR CI observation, and separate approval for policy application. Do not mandate CODEOWNERS or a separate-human reviewer while the repository has one maintainer.
 - **Residual risk:** GitHub Actions status contexts come from PR-controlled workflow definitions and are not an immutable external trust boundary. The solo-maintainer protocol reduces rather than eliminates that risk; revisit a second reviewer, CODEOWNERS, or an external trusted-workflow boundary when the collaboration model supports it.
 - **Validated governance-as-code hardening:** The apply script now derives every repository and branch-protection payload field from `repo-policy.json`; the verifier covers every declared applied control, including strict status checks, review flags, restrictions, lock/fork-sync, and block-creations. Both scripts fail closed if the policy branch scope is not exactly the supported `develop`/`main` pair. A mocked-API unit test exercises the generated apply payload without changing GitHub settings.
 
-## 2026-08-05 — PR #9 merged and required application policy applied
+## 2026-08-04 — PR #9 merged and required application policy applied
 - **Observed:** PR #9 merged the two-commit CI/governance slice into protected `develop` at `80f45053514c9854f9a100905028944eaf55fe9c`. Its `application`, `enforce`, and `check` checks all completed successfully.
 - **Validated live control:** Under explicit approval, local `develop` was fast-forwarded to the merged tip and `infra/github/apply-repo-policy.sh` applied the committed repository/branch policy. `infra/github/verify-repo-policy.sh` then reported `Repository policy matches the checked committed controls.`
 - **Validated direct evidence:** GitHub API responses for both `develop` and `main` reported strict required contexts `enforce`, `check`, and `application`, with administrator enforcement, conversation resolution, and force-push/deletion prevention retained.
 - **Result:** The CI governance prerequisite is closed before the next product implementation plan.
 
-## 2026-08-05 — Proposed Employer detail and bounded-search slice
+## 2026-08-04 — Proposed Employer detail and bounded-search slice
 - **Accepted planning direction:** The next bounded Phase 1 product slice retrieves one current Employer by UUID and searches current Employers through a privacy-conscious POST body using accepted Employer fields only.
 - **Proposed authorization/privacy contract:** One named `employer:read` permission controls detail and search before any lookup/result derivation. Household/person-identifying name fragments stay out of URLs and logs; successful reads and applicable problems use `Cache-Control: no-store`.
 - **Proposed search contract:** Require a normalized bounded name fragment; permit controlled employer type only as a secondary filter so the two exhaustive types cannot recreate list-all enumeration. Use literal case-insensitive substring matching, deterministic `received_at DESC`/UUID ordering, bounded filter-bound keyset pagination, no total count, and no unfiltered list/export.
 - **Proposed authority boundary:** Query current PostgreSQL Employer truth directly. Ordinary reads/search create no Employer, `CommandReceipt`, or `AuditEvent`; no migration, index, extension, dependency, frontend, identity, adjacent entity, public route, or live data is included.
-- **Planning artifacts:** ADR-0004 and `.hermes/plans/2026-08-05_phase-1-employer-read-search-plan.md` define the decision, exact TDD tasks, evidence, recovery, review focus, and stop conditions. They remain proposed until independently reviewed and merged.
+- **Planning artifacts:** ADR-0004 and `.hermes/plans/2026-08-04_phase-1-employer-read-search-plan.md` define the decision, exact TDD tasks, evidence, recovery, review focus, and stop conditions. They remain proposed until independently reviewed and merged.
 - **Observed planning review:** Three independent read-only audit lanes found no application-code change but identified planning defects in the authoritative `AGENTS.md` boundary, type-only enumeration risk, authorization/cursor ownership, UTC cursor canonicalization, minimized persistence records, shared safe-error ownership, exact file surfaces, and evidence-SHA wording. Those findings were remediated; a concise cross-lane re-review found no High finding and one remaining contradictory cursor-sensitivity phrase, which was also corrected before commit.
 
 ## Updating this file

@@ -1,7 +1,7 @@
 # ADR-0004: Phase 1 Employer Read and Search Boundary
 
 **Status:** Proposed for planning review
-**Date:** 2026-08-05
+**Date:** 2026-08-04
 
 ## Context and evidence posture
 

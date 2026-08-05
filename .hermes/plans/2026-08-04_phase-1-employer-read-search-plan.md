@@ -413,7 +413,7 @@ No application log may include request bodies, `display_name_query`, cursor, fil
 
 ```text
 docs/adr/ADR-0004-phase-1-employer-read-search-boundary.md       # planning packet
-.hermes/plans/2026-08-05_phase-1-employer-read-search-plan.md     # planning packet
+.hermes/plans/2026-08-04_phase-1-employer-read-search-plan.md     # planning packet
 
 src/golden_rose/
   api/

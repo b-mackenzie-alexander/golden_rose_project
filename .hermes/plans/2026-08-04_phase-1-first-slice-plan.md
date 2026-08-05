@@ -2,7 +2,7 @@
 
 > **For Hermes:** Execute this plan only from a fresh coding session after this planning packet is reviewed and merged. Use the `plan-to-code-handoff`, `test-driven-development`, and `python-project-test-environment` skills. Keep each behavior in a real RED → GREEN → REFACTOR cycle. Stop before opening a pull request so the independent review session can inspect the branch first.
 
-**Status:** Proposed for planning review
+**Status:** Implemented on `feat/staff-draft-employer-tracer`; review remediation locally verified, independent re-review pending
 **Planning baseline:** `develop` at `bbe5c1d24d11d1ef9833e4af9de8da1c4ebcc887` (merged PR #6)
 **Implementation branch after plan merge:** `feat/staff-draft-employer-tracer` from current `origin/develop`
 **Goal:** Establish the minimum tested backend path through which an authorized synthetic staff principal creates one draft `Employer` and the application atomically appends the required `AuditEvent`.
@@ -571,11 +571,11 @@ uv run ruff format --check .
 uv run ruff check .
 uv run mypy src tests
 uv run bandit -q -r src
-uv run pytest --cov=golden_rose --cov-report=term-missing --cov-fail-under=95
 uv run alembic upgrade head
+uv run pytest --cov=golden_rose --cov-report=term-missing --cov-fail-under=95
 uv run alembic downgrade base
 uv run alembic upgrade head
-uv run pip-audit
+uv run pip-audit --skip-editable
 mkdir -p build
 uv run cyclonedx-py environment --pyproject pyproject.toml --output-reproducible --of JSON -o build/backend-sbom.cdx.json
 ```
@@ -606,10 +606,11 @@ uv run ruff format --check .
 uv run ruff check .
 uv run mypy src tests
 uv run bandit -q -r src
+uv run alembic upgrade head
 uv run pytest --cov=golden_rose --cov-report=term-missing --cov-fail-under=95
 uv run alembic downgrade base
 uv run alembic upgrade head
-uv run pip-audit
+uv run pip-audit --skip-editable
 mkdir -p build
 uv run cyclonedx-py environment --pyproject pyproject.toml --output-reproducible --of JSON -o build/backend-sbom.cdx.json
 git diff --check origin/develop...HEAD

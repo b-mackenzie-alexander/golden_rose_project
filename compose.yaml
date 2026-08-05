@@ -1,0 +1,22 @@
+services:
+  postgres-test:
+    # PostgreSQL 16.10 OCI index digest
+    image: postgres:16.10@sha256:21f6013073bc6b92830a2129570e2f5ec42a6c734b5a985a41e83aa58f54c3c1
+    environment:
+      POSTGRES_USER: golden_rose_test
+      POSTGRES_PASSWORD: ${GOLDEN_ROSE_TEST_DB_PASSWORD:?set in .env.test}
+      POSTGRES_DB: golden_rose_test
+    ports:
+      - "127.0.0.1:55432:5432"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U golden_rose_test -d golden_rose_test",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+    tmpfs:
+      - /var/lib/postgresql/data

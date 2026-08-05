@@ -1,8 +1,8 @@
 # Current Work — Golden Rose Operations Platform
 
-**Updated:** 2026-08-04
-**Lane:** Planning / first Phase 1 implementation slice
-**Overall status:** PR #6 merged the coding-readiness closeout into `develop`. The first synthetic/local backend tracer and stack are now accepted for implementation planning: authorize `employer:draft:create`, transactionally reserve an actor/payload-bound `CommandReceipt`, create one draft `Employer`, and append its `AuditEvent`. Coding remains blocked until ADR-0002, ADR-0003, and `.hermes/plans/2026-08-04_phase-1-first-slice-plan.md` are reviewed and merged. Infrastructure provisioning, public release, live integrations, real identity, and client/production-data use remain unauthorized.
+**Updated:** 2026-08-05
+**Lane:** Review remediation / first Phase 1 implementation slice
+**Overall status:** The approved remediation is implemented and locally verified: application creation now validates settings and rejects production plus synthetic authentication before traffic can be served; the `application` workflow migrates a fresh PostgreSQL schema before pytest; third-party actions are pinned to immutable SHAs; and the unrelated PDF-generator formatting churn is removed from the intended PR surface. The tracer remains limited to the narrow staff-only backend slice: authorize `employer:draft:create`, transactionally reserve an actor/payload-bound `CommandReceipt`, create one draft `Employer`, append its `AuditEvent`, expose only `POST /api/staff/v1/employers`, and add the `application` CI workflow. Commit the remediation and obtain an independent re-review before opening a PR. Infrastructure provisioning, public release, live integrations, real identity, and client/production-data use remain unauthorized.
 
 ## Active objective
 Turn the completed initial discovery baseline into an approved, narrow first delivery: an agency-staff pilot for employer demand entry and retrieval, followed by a governed dashboard and transparent worker/employer comparison aid.
@@ -29,11 +29,9 @@ Turn the completed initial discovery baseline into an approved, narrow first del
 - Accepted correction/audit baseline: PostgreSQL domain rows hold current operational truth; append-only `AuditEvent` records preserve material history through atomic expected-version/idempotent commands; restricted prior/new values remain field-authorized; and derived projections are disposable rather than competing record stores. `docs/planning/phase-1-correction-audit-event-contract.md` is authoritative.
 
 ## Immediate next steps
-1. Review ADR-0002, ADR-0003, and the first-slice implementation plan for exact scope, schema/API shape, TDD order, CI, recovery, and stop boundaries.
-2. Merge the approved planning packet into `develop`; do not make the coding session depend on a local-only plan.
-3. In a fresh coding session, re-baseline `develop`, create `feat/staff-draft-employer-tracer`, obtain explicit approval before starting local PostgreSQL or the API process, and execute the merged plan test-first.
-4. Hand the verified branch to a separate review session before opening a PR. Use the later bug/hotfix lane for post-integration defects without bypassing the development pipeline.
-5. Record implementation and pilot findings in the operational-discovery register and `NOTES.md`; escalate only changes to accepted behavior, data purpose, authorization, legal posture, or trust boundaries into reviewed contract/ADR updates.
+1. Commit the verified remediation, scan the exact final commit range, and hand it to a separate review session before opening a PR; do not call it PR-ready until that review clears it.
+2. Keep implementation inside the accepted tracer boundary until review feedback explicitly expands scope: no frontend, real identity, contact/worksite/request/shift, cloud, public route, or live/client data.
+3. Record any subsequent review evidence in `NOTES.md`; escalate only changes to accepted behavior, data purpose, authorization, legal posture, or trust boundaries into reviewed contract/ADR updates.
 
 ## Gate classification
 
@@ -65,7 +63,9 @@ The complete discovery inventory and evidence rules are in `docs/planning/phase-
 - Repository policy was applied from `infra/github/repo-policy.json` and verified by `infra/github/verify-repo-policy.sh`.
 - PR #3 qualified the permitted `develop` → `main` source path: both required checks passed; it was then closed without merge because it was a synthetic governance test, not a release.
 - PR #5 merged the reviewed Phase 1 discovery, compliance, governance, planning, and PDF-generation documentation into `develop`.
-- PR #6 merged the coding-readiness drift closeout into `develop`. The active follow-up is review/merge of the first-slice planning packet; product code has not begun.
+- PR #6 merged the coding-readiness closeout into `develop`.
+- PR #7 merged the reviewed first-slice planning packet into `develop`.
+- Product-code implementation is now active on `feat/staff-draft-employer-tracer` from current `develop`; service startup remains separately gated.
 
 ## Repository bootstrap state
 - The initial tracked baseline contains the living documents, ADR convention, and a protective `.gitignore`.

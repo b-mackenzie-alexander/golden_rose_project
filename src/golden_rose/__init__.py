@@ -1,0 +1,1 @@
+"""Golden Rose backend package."""

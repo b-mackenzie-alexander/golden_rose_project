@@ -318,7 +318,7 @@ def test_post_staff_employers_known_database_unavailability_returns_safe_503(
     monkeypatch.setenv("GOLDEN_ROSE_SYNTHETIC_STAFF_ID", "22222222-2222-4222-8222-222222222222")
 
     import golden_rose.api.staff.employers as employers_module
-    from golden_rose.application.create_draft_employer import SafePersistenceError
+    from golden_rose.application.errors import SafePersistenceError
 
     def raise_safe_persistence_error(**_: object):
         raise SafePersistenceError("persistence operation failed")
@@ -412,6 +412,11 @@ def test_openapi_exposes_only_intended_staff_route() -> None:
 
     assert openapi.status_code == 200
     paths = openapi.json()["paths"]
-    assert "/api/staff/v1/employers" in paths
-    assert "post" in paths["/api/staff/v1/employers"]
-    assert "/api/staff/v1/employers/{employer_id}" not in paths
+    assert set(paths) == {
+        "/api/staff/v1/employers",
+        "/api/staff/v1/employers/search",
+        "/api/staff/v1/employers/{employer_id}",
+    }
+    assert set(paths["/api/staff/v1/employers"]) == {"post"}
+    assert set(paths["/api/staff/v1/employers/search"]) == {"post"}
+    assert set(paths["/api/staff/v1/employers/{employer_id}"]) == {"get"}

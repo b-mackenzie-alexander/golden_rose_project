@@ -7,7 +7,10 @@ from fastapi import Depends, Header
 from sqlalchemy.orm import Session
 
 from golden_rose.api.errors import InvalidIdempotencyKeyError
-from golden_rose.auth.permissions import CREATE_DRAFT_EMPLOYER_PERMISSION
+from golden_rose.auth.permissions import (
+    CREATE_DRAFT_EMPLOYER_PERMISSION,
+    EMPLOYER_READ_PERMISSION,
+)
 from golden_rose.auth.principal import StaffPrincipal
 from golden_rose.config import Settings
 from golden_rose.database import create_database_engine
@@ -37,7 +40,7 @@ def get_staff_principal(settings: Annotated[Settings, Depends(get_settings)]) ->
     return StaffPrincipal(
         actor_id=settings.synthetic_staff_id,
         role_name="synthetic_staff",
-        permissions=frozenset({CREATE_DRAFT_EMPLOYER_PERMISSION}),
+        permissions=frozenset({CREATE_DRAFT_EMPLOYER_PERMISSION, EMPLOYER_READ_PERMISSION}),
     )
 
 

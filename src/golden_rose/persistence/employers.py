@@ -22,6 +22,28 @@ class EmployerRecord:
     version: int
 
 
+@dataclass(frozen=True, slots=True)
+class EmployerDetailRecord:
+    employer_id: UUID
+    employer_type: Literal["household", "business"]
+    display_name: str
+    lifecycle_status: Literal["draft"]
+    source_channel: Literal["staff_entry"]
+    received_at: datetime
+    created_at: datetime
+    version: int
+
+
+@dataclass(frozen=True, slots=True)
+class EmployerSearchRecord:
+    employer_id: UUID
+    employer_type: Literal["household", "business"]
+    display_name: str
+    lifecycle_status: Literal["draft"]
+    received_at: datetime
+    version: int
+
+
 def insert_draft_employer(
     *,
     session: Session,
@@ -57,7 +79,7 @@ def insert_draft_employer(
     )
 
 
-def get_employer_by_id(*, session: Session, employer_id: UUID) -> EmployerRecord:
+def get_authoritative_employer_by_id(*, session: Session, employer_id: UUID) -> EmployerRecord:
     row = session.execute(
         select(
             employers.c.employer_id,
@@ -72,3 +94,19 @@ def get_employer_by_id(*, session: Session, employer_id: UUID) -> EmployerRecord
         ).where(employers.c.employer_id == employer_id)
     ).one()
     return EmployerRecord(*row)
+
+
+def get_employer_by_id(*, session: Session, employer_id: UUID) -> EmployerDetailRecord:
+    row = session.execute(
+        select(
+            employers.c.employer_id,
+            employers.c.employer_type,
+            employers.c.display_name,
+            employers.c.lifecycle_status,
+            employers.c.source_channel,
+            employers.c.received_at,
+            employers.c.created_at,
+            employers.c.version,
+        ).where(employers.c.employer_id == employer_id)
+    ).one()
+    return EmployerDetailRecord(*row)

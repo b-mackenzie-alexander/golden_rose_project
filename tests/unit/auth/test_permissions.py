@@ -1,6 +1,10 @@
 from uuid import uuid4
 
-from golden_rose.auth.permissions import can_create_draft_employer
+from golden_rose.auth.permissions import (
+    EMPLOYER_READ_PERMISSION,
+    can_create_draft_employer,
+    can_read_employer,
+)
 from golden_rose.auth.principal import StaffPrincipal
 
 
@@ -12,6 +16,40 @@ def test_principal_with_draft_permission_is_allowed() -> None:
     )
 
     assert can_create_draft_employer(principal) is True
+
+
+def test_employer_read_permission_constant_has_exact_value() -> None:
+    assert EMPLOYER_READ_PERMISSION == "employer:read"
+
+
+def test_principal_with_read_permission_is_allowed() -> None:
+    principal = StaffPrincipal(
+        actor_id=uuid4(),
+        role_name="operations_staff",
+        permissions=frozenset({EMPLOYER_READ_PERMISSION}),
+    )
+
+    assert can_read_employer(principal) is True
+
+
+def test_principal_without_read_permission_is_denied() -> None:
+    principal = StaffPrincipal(
+        actor_id=uuid4(),
+        role_name="operations_staff",
+        permissions=frozenset(),
+    )
+
+    assert can_read_employer(principal) is False
+
+
+def test_role_labels_do_not_grant_read_permission() -> None:
+    principal = StaffPrincipal(
+        actor_id=uuid4(),
+        role_name="owner",
+        permissions=frozenset({"system:health:read"}),
+    )
+
+    assert can_read_employer(principal) is False
 
 
 def test_principal_without_draft_permission_is_denied() -> None:

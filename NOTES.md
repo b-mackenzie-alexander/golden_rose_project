@@ -227,5 +227,398 @@ This is the concise, dated engineering and operational note log. It records obse
 - **Planning artifacts:** ADR-0004 and `.hermes/plans/2026-08-04_phase-1-employer-read-search-plan.md` define the decision, exact TDD tasks, evidence, recovery, review focus, and stop conditions. They remain proposed until independently reviewed and merged.
 - **Observed planning review:** Three independent read-only audit lanes found no application-code change but identified planning defects in the authoritative `AGENTS.md` boundary, acceptance/evidence ownership, type-only enumeration risk, cursor sensitivity, authorization/cursor ownership, UTC cursor canonicalization, minimized persistence records, shared safe-error ownership, exact file surfaces, strict TDD executability, NFC write/search invariants, and final-head evidence wording. The initially visible findings were remediated before the first push. Delayed complete summaries then exposed omitted NFC and per-behavior TDD findings; a later re-review also found that already-satisfied deny/header/no-write invariants had been mislabeled as RED and that safe-error objects needed literal complete contracts. The packet was reopened to add the application-owned normalization invariant, composed/decomposed create/replay/search tests, genuine RED versus GREEN-regression classification, exact pytest node IDs with expected failures and minimal production checkpoints, literal full error objects with observed media type, mandatory log-redaction checks, and post-closeout exact-range verification. Implementation remains blocked until the corrected planning tip is reviewed and merged.
 
+## 2026-08-05 — PR #10 merged; coding lane re-baselined for Employer read/search
+- **Observed merge evidence:** `git fetch origin --prune` showed `origin/develop` advanced to `bde9143` with commit subject `docs: plan employer detail and bounded search (#10)`. `git show origin/develop:.hermes/plans/2026-08-04_phase-1-employer-read-search-plan.md` and `git show origin/develop:docs/adr/ADR-0004-phase-1-employer-read-search-boundary.md` both succeeded, proving the planning packet is present on the merged integration tip.
+- **Observed re-baseline:** Local `develop` was fast-forwarded to `bde9143`, verified equal to `origin/develop`, and a fresh `feat/staff-employer-read-search` branch was created from that exact merged tip.
+- **Observed drift repair target:** `CURRENT_WORK.md` still claimed the next slice remained planning-only and `ROADMAP.md` still showed ADR-0004/plan merge as unchecked. The coding lane now owns repair of those living-doc mismatches before the first RED test.
+- **Coding boundary:** The approved slice remains limited to one named `employer:read` permission, exact UUID Employer detail, privacy-conscious POST search, filter-bound keyset pagination, no read-side writes, no schema/dependency changes, no frontend, no real identity, and no live/client data.
+- **Immediate next step:** Re-read ADR-0004 and Task 1 of `.hermes/plans/2026-08-04_phase-1-employer-read-search-plan.md`, then begin with `tests/unit/auth/test_permissions.py::test_employer_read_permission_constant_has_exact_value` as the first required RED cycle.
+
+## 2026-08-05 — Task 1 cycle 1 RED observed
+- **Observed RED:** After adding only `tests/unit/auth/test_permissions.py::test_employer_read_permission_constant_has_exact_value`, `uv run pytest tests/unit/auth/test_permissions.py::test_employer_read_permission_constant_has_exact_value -v` failed during collection with `ImportError: cannot import name 'EMPLOYER_READ_PERMISSION' from 'golden_rose.auth.permissions'`.
+- **Interpretation:** This is the expected Task 1 cycle 1 RED from the merged plan: the test fails because the exact read-permission constant does not yet exist, not because of an environment or unrelated collection problem.
+- **Minimal GREEN checkpoint:** Add only `EMPLOYER_READ_PERMISSION = "employer:read"` beside the existing create constant before re-running the exact node.
+
+## 2026-08-05 — Task 1 cycle 1 GREEN observed
+- **Observed GREEN:** After adding only `EMPLOYER_READ_PERMISSION = "employer:read"` beside `CREATE_DRAFT_EMPLOYER_PERMISSION`, `uv run pytest tests/unit/auth/test_permissions.py::test_employer_read_permission_constant_has_exact_value -v` passed with `1 passed`.
+- **Scope check:** No read helper, dependency grant, or role-based authorization logic was added in this cycle; the production change is limited to the exact permission constant required by Task 1 cycle 1.
+- **Next TDD step:** Add `tests/unit/auth/test_permissions.py::test_principal_with_read_permission_is_allowed`, observe the expected RED on missing `can_read_employer`, then add only the exact membership helper.
+
+## 2026-08-05 — Task 1 cycle 2 RED observed
+- **Observed RED:** After adding only `tests/unit/auth/test_permissions.py::test_principal_with_read_permission_is_allowed`, `uv run pytest tests/unit/auth/test_permissions.py::test_principal_with_read_permission_is_allowed -v` failed during collection with `ImportError: cannot import name 'can_read_employer' from 'golden_rose.auth.permissions'`.
+- **Interpretation:** This is the expected Task 1 cycle 2 RED from the merged plan: the test fails because the exact read-membership helper does not yet exist.
+- **Minimal GREEN checkpoint:** Add only `can_read_employer(principal)` as direct membership in `EMPLOYER_READ_PERMISSION`, mirroring the existing create helper.
+
+## 2026-08-05 — Task 1 cycle 2 GREEN observed
+- **Observed GREEN:** After adding only `can_read_employer(principal)` in `src/golden_rose/auth/permissions.py`, `uv run pytest tests/unit/auth/test_permissions.py::test_principal_with_read_permission_is_allowed -v` passed with `1 passed`.
+- **Scope check:** This cycle added no deny-path special case, no role-based branch, and no dependency wiring; it is limited to the exact permission-set membership helper required by Task 1 cycle 2.
+- **Next TDD step:** Add the Task 1 cycle 3 dependency test for the synthetic principal permission set, observe RED against the current create-only grant, then add only `EMPLOYER_READ_PERMISSION` to the synthetic principal configuration.
+
+## 2026-08-05 — Task 1 cycle 3 environment prerequisite and RED observed
+- **Observed prerequisite issue:** The first run of `uv run pytest tests/unit/api/test_dependencies.py::test_synthetic_principal_has_exact_create_and_read_permissions -v` failed during import because session `PYTHONPATH` injected `/Users/genie/.hermes/hermes-agent` and its Python 3.11 site-packages ahead of the repo venv, producing `ModuleNotFoundError: No module named 'pydantic_core._pydantic_core'` while importing FastAPI/Pydantic.
+- **Environment correction:** `uv run python` showed the repo interpreter was correct (`/Users/genie/Desktop/golden_rose_project/.venv/bin/python3`) but `sys.path` was polluted by the inherited Hermes-agent `PYTHONPATH`. Re-running the exact node with `env -u PYTHONPATH uv run pytest ...` isolated the project-local environment without changing the repo.
+- **Observed RED:** With the polluted `PYTHONPATH` removed, `env -u PYTHONPATH uv run pytest tests/unit/api/test_dependencies.py::test_synthetic_principal_has_exact_create_and_read_permissions -v` failed for the intended reason: `principal.permissions` was only `frozenset({'employer:draft:create'})`, missing `employer:read`.
+- **Minimal GREEN checkpoint:** Add only `EMPLOYER_READ_PERMISSION` to the synthetic principal permission set in `get_staff_principal()`.
+
+## 2026-08-05 — Task 1 cycle 3 GREEN observed
+- **Observed GREEN:** After adding only `EMPLOYER_READ_PERMISSION` to the `get_staff_principal()` synthetic permission set, `env -u PYTHONPATH uv run pytest tests/unit/api/test_dependencies.py::test_synthetic_principal_has_exact_create_and_read_permissions -v` passed with `1 passed`.
+- **Scope check:** This cycle added no request/header grant path, no database/session behavior, and no extra role logic; it is limited to the exact configuration-owned synthetic principal permission set required by Task 1 cycle 3.
+- **Next TDD step:** Run the Task 1 GREEN regressions before moving on: read-denial exact-membership behavior, role-label non-escalation, header non-escalation, and preserved startup rejection for production+synthentic auth.
+
+## 2026-08-05 — Task 1 GREEN regressions passed
+- **Observed regression coverage:** Added `tests/unit/auth/test_permissions.py::test_principal_without_read_permission_is_denied`, `tests/unit/auth/test_permissions.py::test_role_labels_do_not_grant_read_permission`, and `tests/unit/api/test_dependencies.py::test_request_headers_cannot_grant_read_permission` as the explicit Task 1 regression assertions for read-denial exact-membership, role-label non-escalation, and header non-escalation.
+- **Validation evidence:** `env -u PYTHONPATH uv run pytest tests/unit/auth/test_permissions.py tests/unit/api/test_dependencies.py tests/unit/test_main.py::test_create_app_rejects_production_synthetic_auth_before_serving -v` passed with `11 passed`.
+- **Preserved boundary:** The production+synthentic-auth startup rejection remained green, synthetic principal wiring stayed configuration-owned, and no new role/header escalation path was introduced while adding `employer:read`.
+- **Next TDD step:** Task 1 is now fully green. Proceed to Task 2 with the next exact RED cycle: `tests/unit/application/test_employer_text.py::test_normalize_employer_text_returns_trimmed_nfc`.
+
+## 2026-08-05 — Task 2 cycle 1 RED observed
+- **Observed RED:** After creating only `tests/unit/application/test_employer_text.py::test_normalize_employer_text_returns_trimmed_nfc`, `env -u PYTHONPATH uv run pytest tests/unit/application/test_employer_text.py::test_normalize_employer_text_returns_trimmed_nfc -v` failed during collection with `ModuleNotFoundError: No module named 'golden_rose.application.employer_text'`.
+- **Interpretation:** This is the expected Task 2 cycle 1 RED from the merged plan: the test fails because the shared text normalizer module does not yet exist.
+- **Minimal GREEN checkpoint:** Create only `src/golden_rose/application/employer_text.py` with the typed helper that strips outer whitespace and applies `unicodedata.normalize("NFC", value)`.
+
+## 2026-08-05 — Task 2 cycle 1 GREEN observed
+- **Observed GREEN:** After creating only `src/golden_rose/application/employer_text.py` with `normalize_employer_text(value: str) -> str` implemented as `unicodedata.normalize("NFC", value.strip())`, `env -u PYTHONPATH uv run pytest tests/unit/application/test_employer_text.py::test_normalize_employer_text_returns_trimmed_nfc -v` passed with `1 passed`.
+- **Scope check:** This cycle added only the shared typed normalizer helper. It did not yet wire search schemas, create-command normalization, cursor logic, or validation rules.
+- **Next TDD step:** Continue to Task 2 cycle 2 with `tests/unit/api/test_employer_schemas.py::test_name_only_search_is_trimmed_and_nfc_normalized`.
+
+## 2026-08-05 — Task 2 cycle 2 RED observed
+- **Observed RED:** After adding only `tests/unit/api/test_employer_schemas.py::test_name_only_search_is_trimmed_and_nfc_normalized`, `env -u PYTHONPATH uv run pytest tests/unit/api/test_employer_schemas.py::test_name_only_search_is_trimmed_and_nfc_normalized -v` failed during collection with `ImportError: cannot import name 'SearchEmployersRequest' from 'golden_rose.api.staff.schemas'`.
+- **Interpretation:** This is the expected Task 2 cycle 2 RED from the merged plan: the search request model does not yet exist.
+- **Minimal GREEN checkpoint:** Add only `SearchEmployersRequest` in `src/golden_rose/api/staff/schemas.py` with the required name field wired to the shared `normalize_employer_text()` helper.
+
+## 2026-08-05 — Task 2 cycle 2 GREEN observed
+- **Observed GREEN:** After adding only `SearchEmployersRequest` with required `display_name_query` normalization via `normalize_employer_text()`, `env -u PYTHONPATH uv run pytest tests/unit/api/test_employer_schemas.py::test_name_only_search_is_trimmed_and_nfc_normalized -v` passed with `1 passed`.
+- **Scope check:** This cycle added only the strict search request model shell plus shared normalization wiring. It did not yet add `employer_type`, page size, cursor support, response models, or new validation constraints.
+- **Next TDD step:** Continue to Task 2 cycle 3 with `tests/unit/api/test_employer_schemas.py::test_search_accepts_name_with_optional_type`.
+
+## 2026-08-05 — Task 2 cycle 3 RED observed
+- **Observed RED:** After adding only `tests/unit/api/test_employer_schemas.py::test_search_accepts_name_with_optional_type`, `env -u PYTHONPATH uv run pytest tests/unit/api/test_employer_schemas.py::test_search_accepts_name_with_optional_type -v` failed with Pydantic `extra_forbidden` validation on `employer_type`.
+- **Interpretation:** This is the expected Task 2 cycle 3 RED from the merged plan: `SearchEmployersRequest` does not yet accept the optional controlled employer-type filter.
+- **Minimal GREEN checkpoint:** Add only `employer_type: Literal["household", "business"] | None = None` to `SearchEmployersRequest`.
+
+## 2026-08-05 — Task 2 cycle 3 GREEN observed
+- **Observed GREEN:** After adding only `employer_type: Literal["household", "business"] | None = None` to `SearchEmployersRequest`, `env -u PYTHONPATH uv run pytest tests/unit/api/test_employer_schemas.py::test_search_accepts_name_with_optional_type -v` passed with `1 passed`.
+- **Scope check:** This cycle added only the optional controlled employer-type field. It did not yet add name-length bounds, control-character rejection, page size, cursor support, or response models.
+- **Next TDD step:** Continue to Task 2 cycle 4 with `tests/unit/api/test_employer_schemas.py::test_search_rejects_name_outside_two_to_one_hundred_characters`.
+
+## 2026-08-05 — Task 2 cycle 4 RED observed
+- **Observed RED:** After adding only `tests/unit/api/test_employer_schemas.py::test_search_rejects_name_outside_two_to_one_hundred_characters`, `env -u PYTHONPATH uv run pytest tests/unit/api/test_employer_schemas.py::test_search_rejects_name_outside_two_to_one_hundred_characters -v` failed because a one-character `display_name_query` validated successfully (`Failed: DID NOT RAISE ValidationError`).
+- **Interpretation:** This is the expected Task 2 cycle 4 RED from the merged plan: `SearchEmployersRequest` does not yet enforce the required 2..100 post-normalization length bounds.
+- **Minimal GREEN checkpoint:** Add only the 2..100 length constraint to the normalized `display_name_query` validator in `SearchEmployersRequest`.
+
+## 2026-08-05 — Task 2 cycle 4 GREEN observed
+- **Observed GREEN:** After adding only the 2..100 post-normalization length check to `SearchEmployersRequest.display_name_query`, `env -u PYTHONPATH uv run pytest tests/unit/api/test_employer_schemas.py::test_search_rejects_name_outside_two_to_one_hundred_characters -v` passed with `1 passed`.
+- **Scope check:** This cycle added only the name-length constraint. It did not yet add control-character rejection, unknown-field/type rejection updates for search, page size, cursor support, or response models.
+- **Next TDD step:** Continue to Task 2 cycle 5 with `tests/unit/api/test_employer_schemas.py::test_search_rejects_unicode_control_characters`.
+
+## 2026-08-05 — Task 2 cycle 5 RED observed
+- **Observed RED:** After adding only `tests/unit/api/test_employer_schemas.py::test_search_rejects_unicode_control_characters`, `env -u PYTHONPATH uv run pytest tests/unit/api/test_employer_schemas.py::test_search_rejects_unicode_control_characters -v` failed because `display_name_query="Bad\nName"` validated successfully (`Failed: DID NOT RAISE ValidationError`).
+- **Interpretation:** This is the expected Task 2 cycle 5 RED from the merged plan: `SearchEmployersRequest` does not yet reject Unicode control characters in the normalized search text.
+- **Minimal GREEN checkpoint:** Add only Unicode category `C*` rejection to the `SearchEmployersRequest.display_name_query` validator.
+
+## 2026-08-05 — Task 2 cycle 5 GREEN observed
+- **Observed GREEN:** After adding only Unicode category `C*` rejection to `SearchEmployersRequest.display_name_query`, `env -u PYTHONPATH uv run pytest tests/unit/api/test_employer_schemas.py::test_search_rejects_unicode_control_characters -v` passed with `1 passed`.
+- **Scope check:** This cycle added only control-character rejection. It did not yet add the remaining search-schema behaviors: unknown-field/type rejection updates, page size, cursor support, or response models.
+- **Next TDD step:** Continue to Task 2 cycle 6 with `tests/unit/api/test_employer_schemas.py::test_search_forbids_unknown_fields_and_invalid_type`.
+
+## 2026-08-05 — Task 2 cycle 6 reclassified as GREEN regression
+- **Observed result:** After adding `tests/unit/api/test_employer_schemas.py::test_search_forbids_unknown_fields_and_invalid_type`, `env -u PYTHONPATH uv run pytest tests/unit/api/test_employer_schemas.py::test_search_forbids_unknown_fields_and_invalid_type -v` passed immediately with `1 passed`.
+- **Reclassification rationale:** This planned RED is already satisfied by existing behavior. `SearchEmployersRequest` already uses `ConfigDict(extra="forbid")`, so unexpected fields are rejected with `extra_forbidden`, and the existing `Literal["household", "business"] | None` field already rejects invalid values with `literal_error`.
+- **Discipline note:** Per the merged plan's TDD rules, this node is reclassified to a GREEN regression rather than forcing a fake RED or weakening production behavior.
+- **Next TDD step:** Continue to Task 2 cycle 7 with `tests/unit/api/test_employer_schemas.py::test_search_page_size_defaults_and_bounds`.
+
+## 2026-08-05 — Task 2 cycle 7 RED observed
+- **Observed RED:** After adding only `tests/unit/api/test_employer_schemas.py::test_search_page_size_defaults_and_bounds`, `env -u PYTHONPATH uv run pytest tests/unit/api/test_employer_schemas.py::test_search_page_size_defaults_and_bounds -v` failed because `SearchEmployersRequest` has no `page_size` attribute (`AttributeError: 'SearchEmployersRequest' object has no attribute 'page_size'`).
+- **Interpretation:** This is the expected Task 2 cycle 7 RED from the merged plan: the bounded page-size field/default is not implemented yet.
+- **Minimal GREEN checkpoint:** Add only `page_size=25` constrained to integer bounds 1..50 on `SearchEmployersRequest`.
+
+## 2026-08-05 — Task 2 cycle 7 GREEN observed
+- **Observed GREEN:** After adding only `page_size: int = Field(default=25, ge=1, le=50)` to `SearchEmployersRequest`, `env -u PYTHONPATH uv run pytest tests/unit/api/test_employer_schemas.py::test_search_page_size_defaults_and_bounds -v` passed with `1 passed`.
+- **Scope check:** This cycle added only bounded page-size support. It did not yet add cursor support or the search response models.
+- **Next TDD step:** Continue to Task 2 cycle 8 with `tests/unit/api/test_employer_schemas.py::test_search_rejects_cursor_over_512_characters`.
+
+## 2026-08-05 — Task 2 cycle 8 RED observed
+- **Observed RED:** After adding only `tests/unit/api/test_employer_schemas.py::test_search_rejects_cursor_over_512_characters`, `env -u PYTHONPATH uv run pytest tests/unit/api/test_employer_schemas.py::test_search_rejects_cursor_over_512_characters -v` failed with `extra_forbidden` because `SearchEmployersRequest` does not yet define a `cursor` field.
+- **Interpretation:** This is the expected Task 2 cycle 8 RED from the merged plan: the optional cursor field/length bound is not implemented yet.
+- **Minimal GREEN checkpoint:** Add only `cursor: str | None = Field(default=None, max_length=512)` to `SearchEmployersRequest`.
+
+## 2026-08-05 — Task 2 cycle 8 GREEN observed
+- **Observed GREEN:** After adding only `cursor: str | None = Field(default=None, max_length=512)` to `SearchEmployersRequest`, `env -u PYTHONPATH uv run pytest tests/unit/api/test_employer_schemas.py::test_search_rejects_cursor_over_512_characters -v` passed with `1 passed`.
+- **Scope check:** This cycle added only the optional bounded cursor field. It did not yet add the search response models.
+- **Next TDD step:** Continue to Task 2 cycle 9 with `tests/unit/api/test_employer_schemas.py::test_employer_read_responses_expose_exact_accepted_fields`.
+
+## 2026-08-05 — Task 2 cycle 9 RED observed
+- **Observed RED:** After adding only `tests/unit/api/test_employer_schemas.py::test_employer_read_responses_expose_exact_accepted_fields`, `env -u PYTHONPATH uv run pytest tests/unit/api/test_employer_schemas.py::test_employer_read_responses_expose_exact_accepted_fields -v` failed during collection with `ImportError: cannot import name 'EmployerDetailResponse' from 'golden_rose.api.staff.schemas'`.
+- **Interpretation:** This is the expected Task 2 cycle 9 RED from the merged plan: the read/detail search response models do not yet exist.
+- **Minimal GREEN checkpoint:** Add only the exact detail/item/page response models and fields described in Section 3.
+
+## 2026-08-05 — Task 2 cycle 9 GREEN observed
+- **Observed GREEN:** After adding only `EmployerDetailResponse`, `EmployerSearchItemResponse`, and `EmployerSearchPageResponse` with the exact accepted Section 3 fields, `env -u PYTHONPATH uv run pytest tests/unit/api/test_employer_schemas.py::test_employer_read_responses_expose_exact_accepted_fields -v` passed with `1 passed`.
+- **Scope check:** This cycle added only the response schema models. It did not add routes, application queries, persistence reads, or cursor codec behavior.
+- **Next TDD step:** Task 2 schema cycles are complete. Continue with the cursor-codec RED sequence at `tests/unit/application/test_employer_search_cursor.py::test_filter_fingerprint_is_deterministic_for_normalized_filters`.
+
+## 2026-08-05 — Task 2 cursor cycle 1 RED observed
+- **Observed RED:** After creating only `tests/unit/application/test_employer_search_cursor.py::test_filter_fingerprint_is_deterministic_for_normalized_filters`, `env -u PYTHONPATH uv run pytest tests/unit/application/test_employer_search_cursor.py::test_filter_fingerprint_is_deterministic_for_normalized_filters -v` failed during collection with `ModuleNotFoundError: No module named 'golden_rose.application.search_cursor'`.
+- **Interpretation:** This is the expected first cursor-codec RED from the merged plan: the cursor helper module/import does not yet exist.
+- **Minimal GREEN checkpoint:** Create only `src/golden_rose/application/search_cursor.py` with canonical filter JSON plus SHA-256 fingerprinting over normalized `display_name_query` and optional `employer_type`.
+
+## 2026-08-05 — Task 2 cursor cycle 1 GREEN observed
+- **Observed GREEN:** After creating only `src/golden_rose/application/search_cursor.py` with `compute_filter_fingerprint(...)` using canonical JSON (`sort_keys=True`, compact separators), UTF-8 encoding, and SHA-256 hex digest output over `display_name_query` plus optional `employer_type`, `env -u PYTHONPATH uv run pytest tests/unit/application/test_employer_search_cursor.py::test_filter_fingerprint_is_deterministic_for_normalized_filters -v` passed with `1 passed`.
+- **Scope check:** This cycle added only deterministic filter fingerprinting. It did not yet add cursor transport encoding/decoding, payload validation, canonical transport checks, or filter-binding enforcement.
+- **Next TDD step:** Continue to cursor cycle 2 with `tests/unit/application/test_employer_search_cursor.py::test_cursor_round_trips_without_transport_padding`.
+
+## 2026-08-05 — Task 2 cursor cycle 2 RED observed
+- **Observed RED:** After adding only `tests/unit/application/test_employer_search_cursor.py::test_cursor_round_trips_without_transport_padding`, `env -u PYTHONPATH uv run pytest tests/unit/application/test_employer_search_cursor.py::test_cursor_round_trips_without_transport_padding -v` failed during collection with `ImportError: cannot import name 'decode_search_cursor' from 'golden_rose.application.search_cursor'`.
+- **Interpretation:** This is the expected second cursor-codec RED from the merged plan: transport encode/decode helpers do not yet exist.
+- **Minimal GREEN checkpoint:** Add only unpadded URL-safe Base64 cursor encode/decode for version, canonical UTC timestamp, employer UUID, and filter fingerprint.
+
+## 2026-08-05 — Task 2 cursor cycle 2 GREEN observed
+- **Observed GREEN:** After adding only `encode_search_cursor(...)` and `decode_search_cursor(...)` to `src/golden_rose/application/search_cursor.py`, using canonical JSON, canonical UTC `%Y-%m-%dT%H:%M:%S.%fZ` timestamps, and unpadded URL-safe Base64 transport with internal padding restoration on decode, `env -u PYTHONPATH uv run pytest tests/unit/application/test_employer_search_cursor.py::test_cursor_round_trips_without_transport_padding -v` passed with `1 passed`.
+- **Scope check:** This cycle added only cursor round-trip transport helpers. It did not yet add malformed-payload validation, non-canonical transport rejection, or filter-binding enforcement.
+- **Next TDD step:** Continue to cursor cycle 3 with `tests/unit/application/test_employer_search_cursor.py::test_cursor_rejects_malformed_or_invalid_typed_payloads`.
+
+## 2026-08-05 — Task 2 cursor cycle 3 RED observed
+- **Observed RED:** After adding only `tests/unit/application/test_employer_search_cursor.py::test_cursor_rejects_malformed_or_invalid_typed_payloads`, `env -u PYTHONPATH uv run pytest tests/unit/application/test_employer_search_cursor.py::test_cursor_rejects_malformed_or_invalid_typed_payloads -v` failed with `Failed: DID NOT RAISE ValueError`.
+- **Interpretation:** This is the expected third cursor-codec RED from the merged plan: at least one malformed or wrong-typed payload class currently decodes instead of failing safely.
+- **Minimal GREEN checkpoint:** Add only strict exact-key/type/version/UUID/timestamp/fingerprint validation with one safe exception path.
+
+## 2026-08-05 — Task 2 cursor cycle 3 GREEN observed
+- **Observed GREEN:** After adding only strict decode-time validation for exact key set, version, field types, canonical timestamp parsing, UUID parsing, and 64-lowercase-hex fingerprint format — all mapped to one safe `ValueError("invalid search cursor")` path — `env -u PYTHONPATH uv run pytest tests/unit/application/test_employer_search_cursor.py::test_cursor_rejects_malformed_or_invalid_typed_payloads -v` passed with `1 passed`.
+- **Scope check:** This cycle added only malformed/typed payload validation. It did not yet add non-canonical transport rejection or filter-binding enforcement.
+- **Next TDD step:** Continue to cursor cycle 4 with `tests/unit/application/test_employer_search_cursor.py::test_cursor_rejects_noncanonical_transport_payload`.
+
+## 2026-08-05 — Task 2 cursor cycle 4 RED observed
+- **Observed RED:** After adding only `tests/unit/application/test_employer_search_cursor.py::test_cursor_rejects_noncanonical_transport_payload`, `env -u PYTHONPATH uv run pytest tests/unit/application/test_employer_search_cursor.py::test_cursor_rejects_noncanonical_transport_payload -v` failed with `Failed: DID NOT RAISE ValueError` when the transport payload was the canonical cursor plus a trailing `=` padding character.
+- **Interpretation:** This is the expected fourth cursor-codec RED from the merged plan: non-canonical transport forms still decode instead of being rejected.
+- **Minimal GREEN checkpoint:** Reject transport payloads whose submitted form differs from canonical re-encoding.
+
+## 2026-08-05 — Task 2 cursor cycle 4 GREEN observed
+- **Observed GREEN:** After adding only canonical re-encoding comparison inside `decode_search_cursor(...)`, `env -u PYTHONPATH uv run pytest tests/unit/application/test_employer_search_cursor.py::test_cursor_rejects_noncanonical_transport_payload -v` passed with `1 passed`.
+- **Scope check:** This cycle added only non-canonical transport rejection. It did not yet add filter-binding enforcement.
+- **Next TDD step:** Continue to cursor cycle 5 with `tests/unit/application/test_employer_search_cursor.py::test_cursor_rejects_different_normalized_filters`.
+
+## 2026-08-05 — Task 2 cursor cycle 5 RED observed
+- **Observed RED:** After adding only `tests/unit/application/test_employer_search_cursor.py::test_cursor_rejects_different_normalized_filters`, `env -u PYTHONPATH uv run pytest tests/unit/application/test_employer_search_cursor.py::test_cursor_rejects_different_normalized_filters -v` failed with `TypeError: decode_search_cursor() got an unexpected keyword argument 'expected_filter_fingerprint'`.
+- **Interpretation:** This still opens the intended RED from the merged plan: filter-binding enforcement is absent, and the decoder has no way to compare the decoded fingerprint against the current normalized filters.
+- **Minimal GREEN checkpoint:** Add only expected-fingerprint binding with constant-time compare between the decoded fingerprint and the caller-provided normalized-filter fingerprint.
+
+## 2026-08-05 — Task 2 cursor cycle 5 GREEN observed
+- **Observed GREEN:** After adding only optional `expected_filter_fingerprint` binding to `decode_search_cursor(...)` with `hmac.compare_digest(...)` against the decoded cursor fingerprint, `env -u PYTHONPATH uv run pytest tests/unit/application/test_employer_search_cursor.py::test_cursor_rejects_different_normalized_filters -v` passed with `1 passed`.
+- **Scope check:** This cycle added only filter-fingerprint binding at the codec boundary. The final remaining cursor regression in the merged plan is the UTC canonicalization proof.
+- **Next TDD step:** Continue to cursor cycle 6 with `tests/unit/application/test_employer_search_cursor.py::test_cursor_encoder_canonicalizes_aware_timestamp_to_utc`.
+
+## 2026-08-05 — Task 2 cursor cycle 6 reclassified as GREEN regression
+- **Observed result:** After adding `tests/unit/application/test_employer_search_cursor.py::test_cursor_encoder_canonicalizes_aware_timestamp_to_utc`, `env -u PYTHONPATH uv run pytest tests/unit/application/test_employer_search_cursor.py::test_cursor_encoder_canonicalizes_aware_timestamp_to_utc -v` passed immediately with `1 passed`.
+- **Interpretation:** The planned RED did not materialize because the existing `encode_search_cursor(...)` implementation already canonicalizes aware timestamps with `astimezone(UTC)` and fixed `%Y-%m-%dT%H:%M:%S.%fZ` formatting before serialization.
+- **Scope check:** Reclassified as a GREEN regression rather than fabricating a failure or weakening working behavior. Cursor codec unit cycles are now complete.
+
+## 2026-08-05 — Task 4 cycle 1 RED observed
+- **Observed RED:** After creating `tests/integration/application/test_get_employer.py::test_permitted_get_returns_current_minimized_employer`, `env -u PYTHONPATH uv run pytest tests/integration/application/test_get_employer.py::test_permitted_get_returns_current_minimized_employer -v` failed during collection with `ModuleNotFoundError: No module named 'golden_rose.application.get_employer'`.
+- **Interpretation:** This is the expected first application-query RED from the merged plan: the authorized employer detail query module does not yet exist.
+- **Minimal GREEN checkpoint:** Create only `src/golden_rose/application/get_employer.py` with one query function that checks `can_read_employer` first, calls the minimized persistence lookup, and returns the record.
+
+## 2026-08-05 — Task 4 cycle 1 GREEN implementation landed, exact verification blocked by DB prerequisite
+- **Implemented checkpoint:** Created only `src/golden_rose/application/get_employer.py` with `get_employer(...)` that checks `can_read_employer` first, calls the minimized persistence lookup, and returns the record.
+- **Observed verification blocker:** Re-running `env -u PYTHONPATH uv run pytest tests/integration/application/test_get_employer.py::test_permitted_get_returns_current_minimized_employer -v` advanced past the missing-module RED but then failed in fixture setup with `sqlalchemy.exc.OperationalError` / `psycopg.OperationalError` because PostgreSQL at `127.0.0.1:55432` refused the connection.
+- **Interpretation:** The planned product-level GREEN is implemented, but the exact integration node is not yet verifiable in this session because the required synthetic PostgreSQL service is unavailable and has not been explicitly approved for startup here.
+
+## 2026-08-05 — PostgreSQL prerequisite restored and Task 4 cycle 1 verified GREEN
+- **Service path:** After explicit approval, created ignored local `.env.test`, started `postgres-test` with `docker compose --env-file .env.test up -d postgres-test`, and confirmed the container reached `healthy` on loopback port `55432`.
+- **Second RED (expected pre-migration):** With the service up and `GOLDEN_ROSE_DATABASE_URL=postgresql+psycopg://golden_rose_test:test@127.0.0.1:55432/golden_rose_test`, re-running `env -u PYTHONPATH uv run pytest tests/integration/application/test_get_employer.py::test_permitted_get_returns_current_minimized_employer -v` failed in fixture setup with `psycopg.errors.UndefinedTable` / `sqlalchemy.exc.ProgrammingError` because `audit_events`, `command_receipts`, and `employers` did not yet exist.
+- **Migration step:** Ran `env -u PYTHONPATH uv run alembic upgrade head` against the same synthetic database URL.
+- **Observed GREEN:** Re-running `env -u PYTHONPATH uv run pytest tests/integration/application/test_get_employer.py::test_permitted_get_returns_current_minimized_employer -v` then passed with `1 passed`.
+- **Current runtime state:** Synthetic PostgreSQL remains running for the next integration-node cycles.
+
+## 2026-08-05 — Task 4 cycle 2 RED observed
+- **Observed RED:** After extending `tests/integration/application/test_get_employer.py::test_missing_get_raises_nonreflective_not_found`, `env -u PYTHONPATH uv run pytest tests/integration/application/test_get_employer.py::test_missing_get_raises_nonreflective_not_found -v` failed during collection with `ModuleNotFoundError: No module named 'golden_rose.application.errors'`.
+- **Interpretation:** The planned not-found translation surface does not yet exist. This still serves as the next honest RED for cycle 2 because the shared application error module is missing, so the query cannot yet raise the intended nonreflective `EmployerNotFoundError`.
+- **Minimal GREEN checkpoint:** Create the shared application error module and translate authorized missing lookups to constant-message `EmployerNotFoundError` only after the authorized read attempt.
+
+## 2026-08-05 — Task 4 cycle 2 GREEN observed
+- **Implemented checkpoint:** Created `src/golden_rose/application/errors.py` with `EmployerNotFoundError` and updated `src/golden_rose/application/get_employer.py` to translate authorized missing lookups from `NoResultFound` to `EmployerNotFoundError("employer not found")` after the permission gate.
+- **Observed GREEN:** With the synthetic PostgreSQL service and migrated schema still available, `env -u PYTHONPATH uv run pytest tests/integration/application/test_get_employer.py::test_missing_get_raises_nonreflective_not_found -v` passed with `1 passed`.
+- **Scope check:** This cycle added only the shared not-found error surface and constant-message translation for the employer detail query.
+
+## 2026-08-05 — Task 4 cycle 3 RED observed
+- **Observed RED:** After creating `tests/integration/application/test_search_employers.py::test_permitted_search_returns_page_and_next_cursor`, `env -u PYTHONPATH uv run pytest tests/integration/application/test_search_employers.py::test_permitted_search_returns_page_and_next_cursor -v` failed during collection with `ModuleNotFoundError: No module named 'golden_rose.application.search_employers'`.
+- **Interpretation:** This matches the planned first RED for the authorized search application query: the search module does not yet exist.
+- **Minimal GREEN checkpoint:** Create one authorization-first `search_employers(...)` function that normalizes through the validated request, binds/decodes the optional cursor, requests `page_size + 1`, and emits `next_cursor` only when an extra row is present.
+
+## 2026-08-05 — Task 4 cycle 3 GREEN observed
+- **Implemented checkpoint:** Created `src/golden_rose/application/search_employers.py` with authorization-first `search_employers(...)`, literal case-insensitive name filtering, optional type narrowing, optional filter-bound cursor decode, `page_size + 1` bounded reads, descending received-at/UUID ordering, and `next_cursor` emission only when an extra row is present.
+- **Observed GREEN:** With the synthetic PostgreSQL service and migrated schema still available, `env -u PYTHONPATH uv run pytest tests/integration/application/test_search_employers.py::test_permitted_search_returns_page_and_next_cursor -v` passed with `1 passed`.
+- **Scope check:** This cycle added only the first authorized search query surface needed for the page/cursor happy path.
+
+## 2026-08-05 — Task 4 cycle 4 RED observed
+- **Observed RED:** After extending `tests/integration/application/test_search_employers.py::test_persistence_failure_rolls_back_once_and_raises_safe_error`, `env -u PYTHONPATH uv run pytest tests/integration/application/test_search_employers.py::test_persistence_failure_rolls_back_once_and_raises_safe_error -v` failed during collection with `ImportError: cannot import name 'SafePersistenceError' from 'golden_rose.application.errors'`.
+- **Interpretation:** The shared safe-persistence error has not yet been moved/reused in the common application error module, so the search query cannot yet raise the intended redacted failure type.
+- **Minimal GREEN checkpoint:** Move/reuse `SafePersistenceError` in `src/golden_rose/application/errors.py`, update create/search imports to use it, and make the search query roll back once before raising the shared safe error on `SQLAlchemyError`.
+
+## 2026-08-05 — Task 4 cycle 4 GREEN observed
+- **Implemented checkpoint:** Moved/reused `SafePersistenceError` in `src/golden_rose/application/errors.py`, updated `src/golden_rose/application/create_draft_employer.py` to import the shared error, and updated `src/golden_rose/application/search_employers.py` to roll back once and raise `SafePersistenceError("persistence operation failed")` on `SQLAlchemyError`.
+- **Observed GREEN:** With the synthetic PostgreSQL service and migrated schema still available, `env -u PYTHONPATH uv run pytest tests/integration/application/test_search_employers.py::test_persistence_failure_rolls_back_once_and_raises_safe_error -v` passed with `1 passed`.
+- **Scope check:** This cycle added only the shared safe-persistence error reuse and single-rollback redacted failure path for the employer search query.
+
+## 2026-08-05 — Task 4 regression 1 reclassified as GREEN regression
+- **Observed result:** After extending `tests/integration/application/test_get_employer.py::test_denied_get_never_calls_persistence`, `env -u PYTHONPATH uv run pytest tests/integration/application/test_get_employer.py::test_denied_get_never_calls_persistence -v` passed immediately with `1 passed`.
+- **Interpretation:** The planned RED did not materialize because `src/golden_rose/application/get_employer.py` already authorizes before the persistence lookup. The spy remained untouched, so denied detail reads execute no persistence path.
+- **Scope check:** Reclassified as a GREEN regression rather than fabricating a failure; no production change was required.
+
+## 2026-08-05 — Task 4 regression 2 reclassified as GREEN regression
+- **Observed result:** After extending `tests/integration/application/test_search_employers.py::test_denied_search_never_decodes_fingerprints_or_queries`, the first run exposed a test-harness setup error (`AttributeError` on attaching a probe to bare `object()`), which was corrected without production changes. Re-running `env -u PYTHONPATH uv run pytest tests/integration/application/test_search_employers.py::test_denied_search_never_decodes_fingerprints_or_queries -v` then passed immediately with `1 passed`.
+- **Interpretation:** The planned RED did not materialize because `src/golden_rose/application/search_employers.py` already authorizes before cursor decode and SQL execution. Both decode and query probes remained untouched for denied access.
+- **Scope check:** Reclassified as a GREEN regression after fixing the test harness only; no production change was required.
+
+## 2026-08-05 — Task 4 regression 3 reclassified as GREEN regression
+- **Observed result:** After extending `tests/integration/application/test_search_employers.py::test_search_normalizes_decomposed_query_after_authorization`, `env -u PYTHONPATH uv run pytest tests/integration/application/test_search_employers.py::test_search_normalizes_decomposed_query_after_authorization -v` passed immediately with `1 passed`.
+- **Interpretation:** The planned RED did not materialize because the validated `SearchEmployersRequest` already normalizes decomposed text through the shared normalizer before fingerprint construction and query execution. A decomposed `Cafe\u0301` search matched stored `Café Rose Staffing` without any new normalization path.
+- **Scope check:** Reclassified as a GREEN regression rather than fabricating a failure; no production change was required.
+
+## 2026-08-05 — Task 4 regression 4 reclassified as GREEN regression
+- **Observed result:** After extending `tests/integration/application/test_search_employers.py::test_role_label_without_permission_remains_denied`, `env -u PYTHONPATH uv run pytest tests/integration/application/test_search_employers.py::test_role_label_without_permission_remains_denied -v` passed immediately with `1 passed`.
+- **Interpretation:** The planned RED did not materialize because Task 1 permission checks already rely on exact permission membership rather than role labels. A `platform_administrator` role without `employer:read` remained denied, and the query probe was never reached.
+- **Scope check:** Reclassified as a GREEN regression rather than fabricating a failure; no production change was required.
+
+## 2026-08-05 — Task 4 regression 5 reclassified as GREEN regression
+- **Observed result:** After extending `tests/integration/application/test_search_employers.py::test_successful_queries_perform_no_writes_or_transaction_control`, `env -u PYTHONPATH uv run pytest tests/integration/application/test_search_employers.py::test_successful_queries_perform_no_writes_or_transaction_control -v` passed immediately with `1 passed`.
+- **Interpretation:** The planned RED did not materialize because successful `search_employers(...)` paths are already SELECT-only. With commit/flush/rollback rigged to fail, the query still succeeded and authoritative row counts for `employers`, `command_receipts`, and `audit_events` remained unchanged.
+- **Scope check:** Reclassified as a GREEN regression rather than fabricating a failure; no production change was required.
+
+## 2026-08-05 — Task 4 regression batch passed
+- **Observed result:** Ran `env -u PYTHONPATH uv run pytest tests/integration/application/test_get_employer.py tests/integration/application/test_search_employers.py tests/integration/application/test_create_draft_employer.py tests/integration/api/test_staff_employers.py -v` against the migrated synthetic PostgreSQL database after sourcing `.env.test`. Result: `31 passed, 1 warning in 1.63s`.
+- **Warning note:** The only warning was an upstream `StarletteDeprecationWarning` from `fastapi.testclient` about `httpx`/`starlette.testclient`; no slice-local failures or additional warnings appeared.
+- **Scope check:** Task 4 application regressions and adjacent create/API preservation checks are green, so the branch is ready to proceed into Task 5 HTTP read-route RED cycles.
+
+## 2026-08-05 — Task 5 cycle 1 RED observed
+- **Observed RED:** Created `tests/integration/api/test_staff_employer_reads.py` and ran `env -u PYTHONPATH uv run pytest tests/integration/api/test_staff_employer_reads.py::test_search_returns_minimized_page_cursor_no_total_and_no_store -v` after fixing one test-harness seeding issue (shared identifier factory instance required for deterministic double-create setup). The honest product RED is `404 Not Found` on `POST /api/staff/v1/employers/search`.
+- **Interpretation:** This matches the planned first RED for Task 5 cycle 1: the static search route is not declared yet, so the read-only HTTP slice does not exist.
+- **Scope check:** No production change yet; only the new API integration test and a harness correction were added.
+
+## 2026-08-05 — FastAPI route probe for static `/search` vs dynamic `/{employer_id}`
+- **Observed probe:** Ran a disposable `env -u PYTHONPATH uv run python` FastAPI/TestClient probe with both `POST /api/staff/v1/employers/search` and `GET /api/staff/v1/employers/{employer_id}` declared. Observed routing: `POST /search` hit the static search route, `GET /search` was captured by the dynamic detail route with `employer_id='search'`, `GET /123` hit detail, and `POST /123` returned `405 Method Not Allowed`.
+- **Implementation decision:** Declare the static `/search` route before any future dynamic `/{employer_id}` route exactly as planned.
+
+## 2026-08-05 — Task 5 cycle 1 GREEN observed
+- **Implemented checkpoint:** Added only static `POST /api/staff/v1/employers/search` in `src/golden_rose/api/staff/employers.py`, mapped `SearchEmployersRequest` to the existing `search_employers(...)` application query, converted items to the minimized `EmployerSearchPageResponse`, and set `Cache-Control: no-store` on success.
+- **Observed GREEN:** Re-ran `env -u PYTHONPATH uv run pytest tests/integration/api/test_staff_employer_reads.py::test_search_returns_minimized_page_cursor_no_total_and_no_store -v` after sourcing `.env.test`; result was `1 passed, 1 warning`. The only warning was the existing upstream `StarletteDeprecationWarning` from `fastapi.testclient`.
+- **Scope check:** This cycle added only the static POST search route and success-path `no-store` header; dynamic detail routing and extra error handling remain for later cycles.
+
+## 2026-08-05 — Task 5 cycle 2 RED observed
+- **Observed RED:** Extended `tests/integration/api/test_staff_employer_reads.py::test_authorized_invalid_search_inputs_return_nonreflective_no_store_422` and ran `env -u PYTHONPATH uv run pytest tests/integration/api/test_staff_employer_reads.py::test_authorized_invalid_search_inputs_return_nonreflective_no_store_422 -v` after sourcing `.env.test`. The exact failure was `500 Internal Server Error` for an authorized search request with `cursor="bad-cursor"`.
+- **Interpretation:** This matches the planned next RED: cursor-originated validation is still unhandled at the API boundary, so invalid search cursors currently fall through to the generic 500 path instead of a safe 422 with `Cache-Control: no-store`.
+- **Scope check:** No production change yet; only the new API integration node was added.
+
+## 2026-08-05 — Task 5 cycle 2 GREEN observed
+- **Implemented checkpoint:** Added `no_store_problem_response(...)` in `src/golden_rose/api/errors.py` and updated `src/golden_rose/api/staff/employers.py` so the search route catches safe cursor-decoder `ValueError` failures and returns the exact nonreflective 422 problem object with `Cache-Control: no-store`. The route return annotation was widened to allow the explicit problem response branch.
+- **Observed GREEN:** Re-ran `env -u PYTHONPATH uv run pytest tests/integration/api/test_staff_employer_reads.py::test_authorized_invalid_search_inputs_return_nonreflective_no_store_422 -v` after sourcing `.env.test`; result was `1 passed, 1 warning`. The only remaining warning was the existing upstream `StarletteDeprecationWarning` from `fastapi.testclient`.
+- **Scope check:** This cycle added only the safe 422 mapping and `no-store` problem response path for invalid search cursors; broader 503/500 route failure mapping remains for the next cycle.
+
+## 2026-08-05 — Task 5 cycle 3 RED observed
+- **Observed RED:** Extended `tests/integration/api/test_staff_employer_reads.py::test_search_failures_map_to_safe_redacted_503_and_500` and ran `env -u PYTHONPATH uv run pytest tests/integration/api/test_staff_employer_reads.py::test_search_failures_map_to_safe_redacted_503_and_500 -v` after sourcing `.env.test`. The exact failure was missing `Cache-Control` on the `503 Service Unavailable` response after monkeypatching `search_employers` to raise `SafePersistenceError`; the route still relied on generic exception handling for 503/500 paths.
+- **Interpretation:** This matches the planned RED: search-route failure responses are not yet routed through a `no-store` response path for shared `503` and fallback `500` errors.
+- **Scope check:** No production change yet; only the new API integration node was added.
+
+## 2026-08-05 — Task 5 cycle 3 GREEN observed
+- **Implemented checkpoint:** Updated `src/golden_rose/api/staff/employers.py` so the search route now catches `SafePersistenceError` and fallback `Exception` locally, returning exact redacted `503`/`500` problem objects via `no_store_problem_response(...)`. This preserved the shared problem shapes while adding route-local `Cache-Control: no-store` on failure responses.
+- **Observed GREEN:** Re-ran `env -u PYTHONPATH uv run pytest tests/integration/api/test_staff_employer_reads.py::test_search_failures_map_to_safe_redacted_503_and_500 -v` after sourcing `.env.test`; result was `1 passed, 1 warning`. The only warning remained the upstream `StarletteDeprecationWarning` from `fastapi.testclient`.
+- **Scope check:** This cycle added only search-route-local `no-store` mapping for safe `503` and fallback `500` failures; dynamic detail routing and 404 handling remain for later cycles.
+
+## 2026-08-05 — Task 5 cycle 4 RED observed
+- **Observed RED:** Extended `tests/integration/api/test_staff_employer_reads.py::test_get_existing_returns_exact_detail_with_no_store` and ran `env -u PYTHONPATH uv run pytest tests/integration/api/test_staff_employer_reads.py::test_get_existing_returns_exact_detail_with_no_store -v` after sourcing `.env.test`. The exact failure was `404 Not Found` on `GET /api/staff/v1/employers/81818181-8181-4181-8181-818181818181` after successfully seeding the employer through the existing POST command.
+- **Interpretation:** This matches the planned RED for cycle 4: the dynamic detail route is absent, so authorized exact employer detail reads are not yet exposed over HTTP.
+- **Scope check:** No production change yet; only the new API integration node was added.
+
+## 2026-08-05 — Task 5 cycle 4 GREEN observed
+- **Implemented checkpoint:** Added only `GET /api/staff/v1/employers/{employer_id}` in `src/golden_rose/api/staff/employers.py`, mapped it to the existing `get_employer(...)` application query, returned the exact `EmployerDetailResponse`, and set `Cache-Control: no-store` on success.
+- **Observed GREEN:** Re-ran `env -u PYTHONPATH uv run pytest tests/integration/api/test_staff_employer_reads.py::test_get_existing_returns_exact_detail_with_no_store -v` after sourcing `.env.test`; result was `1 passed, 1 warning`. The only warning remained the upstream `StarletteDeprecationWarning` from `fastapi.testclient`.
+- **Scope check:** This cycle added only the authorized detail GET route and success-path `no-store`; absent-detail 404 handling remains for the next cycle.
+
+## 2026-08-05 — Task 5 cycle 5 RED observed
+- **Observed RED:** Extended `tests/integration/api/test_staff_employer_reads.py::test_get_absent_returns_nonreflective_no_store_404` and ran `env -u PYTHONPATH uv run pytest tests/integration/api/test_staff_employer_reads.py::test_get_absent_returns_nonreflective_no_store_404 -v` after sourcing `.env.test`. The exact failure was `500 Internal Server Error` after monkeypatching the route-level `get_employer` import to raise `EmployerNotFoundError("employer not found")`.
+- **Interpretation:** This matches the planned RED for cycle 5: application-level not-found errors are still unhandled at the API boundary, so absent detail reads fall through to the generic 500 path instead of the exact nonreflective 404 object with `Cache-Control: no-store`.
+- **Scope check:** No production change yet; only the new API integration node was added.
+
+## 2026-08-05 — Task 5 cycle 5 GREEN observed
+- **Implemented checkpoint:** Updated `src/golden_rose/api/staff/employers.py` so the detail route now catches `EmployerNotFoundError` locally and returns the exact nonreflective `404 Not Found` problem object through `no_store_problem_response(...)`. The detail route return annotation was widened to allow the explicit problem-response branch.
+- **Observed GREEN:** Re-ran `env -u PYTHONPATH uv run pytest tests/integration/api/test_staff_employer_reads.py::test_get_absent_returns_nonreflective_no_store_404 -v` after sourcing `.env.test`; result was `1 passed, 1 warning`. The only warning remained the upstream `StarletteDeprecationWarning` from `fastapi.testclient`.
+- **Scope check:** This cycle added only absent-detail 404 mapping with `Cache-Control: no-store`; remaining API regressions are the planned authorization, cursor round-trip, write-silence, OpenAPI, and log-hygiene checks.
+
+## 2026-08-05 — Task 5 regression 1 reclassified as GREEN regression
+- **Observed result:** After extending `tests/integration/api/test_staff_employer_reads.py::test_denied_get_runs_no_sql_and_headers_cannot_elevate`, `env -u PYTHONPATH uv run pytest tests/integration/api/test_staff_employer_reads.py::test_denied_get_runs_no_sql_and_headers_cannot_elevate -v` passed immediately with `1 passed, 1 warning` after sourcing `.env.test`.
+- **Interpretation:** The planned RED did not materialize because the detail HTTP route still depends on the Task 4 authorization-first `get_employer(...)` query and the principal dependency ignores authority-escalation headers. A denied GET returned the exact safe `403` object, forged `X-Actor-Id` / `X-Role-Name` / `X-Permissions` headers did not elevate access, and the SQL probe observed zero statements.
+- **Scope check:** Reclassified as a GREEN regression rather than fabricating a failure; no production change was required.
+
+## 2026-08-05 — Task 5 regression 2 reclassified as GREEN regression
+- **Observed result:** After extending `tests/integration/api/test_staff_employer_reads.py::test_search_filters_and_cursor_round_trip_over_http`, `env -u PYTHONPATH uv run pytest tests/integration/api/test_staff_employer_reads.py::test_search_filters_and_cursor_round_trip_over_http -v` passed immediately with `1 passed, 1 warning` after sourcing `.env.test`.
+- **Interpretation:** The planned RED did not materialize because the existing HTTP search route already delegates to the previously verified schema/application/persistence path. A bounded `business` search for `rose` returned the newest matching employer, emitted an opaque cursor, and the follow-up request with the same filters returned the next older matching employer with `next_cursor: null`; the `household` match stayed excluded and both responses preserved `Cache-Control: no-store`.
+- **Scope check:** Reclassified as a GREEN regression rather than fabricating a failure; no production change was required.
+
+## 2026-08-05 — Task 5 regression 3 RED observed
+- **Observed RED:** After extending `tests/integration/api/test_staff_employer_reads.py::test_denied_search_precedes_cursor_and_sql_and_headers_cannot_elevate`, `env -u PYTHONPATH uv run pytest tests/integration/api/test_staff_employer_reads.py::test_denied_search_precedes_cursor_and_sql_and_headers_cannot_elevate -v` failed with `500 Internal Server Error` after sourcing `.env.test`.
+- **Interpretation:** This exposed an honest API-boundary defect in the planned regression node: the search route's local fallback `except Exception` branch was swallowing `PermissionError`, so denied search requests fell through to the generic `500` path instead of returning a safe `403` before any cursor decode or SQL work.
+- **Minimal GREEN checkpoint:** Add only a search-route-local `PermissionError` mapping to the exact `403 forbidden` problem object through `no_store_problem_response(...)`, preserving pre-authorization cursor/SQL silence and header non-elevation.
+
+## 2026-08-05 — Task 5 regression 3 GREEN observed
+- **Implemented checkpoint:** Updated `src/golden_rose/api/staff/employers.py` so `POST /api/staff/v1/employers/search` now catches `PermissionError` before its broader failure branches and returns the exact `403 forbidden` problem object through `no_store_problem_response(...)`.
+- **Observed GREEN:** Re-ran `env -u PYTHONPATH uv run pytest tests/integration/api/test_staff_employer_reads.py::test_denied_search_precedes_cursor_and_sql_and_headers_cannot_elevate -v` after sourcing `.env.test`; result was `1 passed, 1 warning`. The test confirmed denied search returned the safe `403` object with `Cache-Control: no-store`, forged authority headers did not elevate access, the cursor-decode probe remained untouched, and the SQL probe observed zero statements.
+- **Scope check:** This cycle added only search-route-local `403` mapping for denied reads so the search route no longer masks authorization failures as `500`; no new grant path, cursor behavior, or SQL behavior was introduced.
+
+## 2026-08-05 — Task 5 regression 4 reclassified as GREEN regression
+- **Observed result:** After extending `tests/integration/api/test_staff_employer_reads.py::test_detail_and_search_leave_authoritative_row_counts_unchanged`, `env -u PYTHONPATH uv run pytest tests/integration/api/test_staff_employer_reads.py::test_detail_and_search_leave_authoritative_row_counts_unchanged -v` passed immediately with `1 passed, 1 warning` after sourcing `.env.test`.
+- **Interpretation:** The planned RED did not materialize because the existing detail/search HTTP routes already delegate to SELECT-only application queries. After seeding two fictional employers through the authoritative POST command, one detail GET and one search POST left `employers`, `command_receipts`, and `audit_events` row counts unchanged.
+- **Scope check:** Reclassified as a GREEN regression rather than fabricating a failure; no production change was required.
+
+## 2026-08-05 — Task 5 regression 5 reclassified as GREEN regression
+- **Observed result:** After extending `tests/integration/api/test_staff_employer_reads.py::test_openapi_exposes_only_approved_staff_employer_routes`, `env -u PYTHONPATH uv run pytest tests/integration/api/test_staff_employer_reads.py::test_openapi_exposes_only_approved_staff_employer_routes -v` passed immediately with `1 passed, 1 warning` after sourcing `.env.test`.
+- **Interpretation:** The planned RED did not materialize because the current OpenAPI surface is already limited to the approved staff-employer routes: `POST /api/staff/v1/employers`, `POST /api/staff/v1/employers/search`, and `GET /api/staff/v1/employers/{employer_id}`. No list-all, export, or public employer route appeared.
+- **Scope check:** Reclassified as a GREEN regression rather than fabricating a failure; no production change was required.
+
+## 2026-08-05 — Task 5 regression 6 reclassified as GREEN regression
+- **Observed result:** After extending `tests/integration/api/test_staff_employer_reads.py::test_search_logs_do_not_include_body_cursor_filter_sql_url_actor_or_exception`, `env -u PYTHONPATH uv run pytest tests/integration/api/test_staff_employer_reads.py::test_search_logs_do_not_include_body_cursor_filter_sql_url_actor_or_exception -v` passed immediately with `1 passed, 1 warning` after sourcing `.env.test`.
+- **Interpretation:** The planned RED did not materialize because the search path still emits no reflective logging. Even when the route-level `search_employers` import was monkeypatched to raise a runtime error containing synthetic filter/SQL/URL/actor/exception markers, the response stayed the safe `500` problem object with `Cache-Control: no-store` and `caplog` captured none of the submitted markers from the body, cursor, header, or exception text.
+- **Scope check:** Reclassified as a GREEN regression rather than fabricating a failure; no production change was required.
+
+## 2026-08-05 — Task 5 preservation regression 1 reclassified as GREEN regression
+- **Observed result:** Re-ran `env -u PYTHONPATH uv run pytest tests/integration/api/test_staff_employers.py::test_post_staff_employers_returns_201_and_exact_body_for_permitted_request -v` after the read-route additions; result was `1 passed, 1 warning` after sourcing `.env.test`.
+- **Interpretation:** The create route's core success contract remained stable. `POST /api/staff/v1/employers` still returned `201` with the exact draft-employer body and no retrieval `Location` header despite the added search/detail routes and route-local no-store problem handling.
+- **Scope check:** Reclassified as a GREEN preservation regression; no production change was required.
+
+## 2026-08-05 — Task 5 preservation regression 2 RED observed
+- **Observed RED:** Re-ran `env -u PYTHONPATH uv run pytest tests/integration/api/test_staff_employers.py::test_openapi_exposes_only_intended_staff_route -v` after the read-route additions and the node failed because the legacy preservation assertion still expected `"/api/staff/v1/employers/{employer_id}" not in paths`.
+- **Interpretation:** This was a test-surface drift failure, not a product defect: the create-route preservation assertion had not been updated to reflect the now-approved expanded OpenAPI surface that legitimately includes `POST /search` and `GET /{employer_id}`.
+- **Minimal GREEN checkpoint:** Update only the preservation OpenAPI assertion so it preserves the create route while asserting the exact approved three-route staff-employer surface and methods.
+
+## 2026-08-05 — Task 5 preservation regression 2 GREEN observed
+- **Implemented checkpoint:** Updated `tests/integration/api/test_staff_employers.py::test_openapi_exposes_only_intended_staff_route` to assert the exact approved staff-employer OpenAPI path set and per-path methods: `POST /api/staff/v1/employers`, `POST /api/staff/v1/employers/search`, and `GET /api/staff/v1/employers/{employer_id}`.
+- **Observed GREEN:** Re-ran `env -u PYTHONPATH uv run pytest tests/integration/api/test_staff_employers.py::test_openapi_exposes_only_intended_staff_route -v` after sourcing `.env.test`; result was `1 passed, 1 warning`.
+- **Scope check:** This cycle updated only the preservation assertion to match the approved expanded route surface; no production code changed.
+
+## 2026-08-05 — Task 5 focused API regression pass passed
+- **Observed result:** Ran `env -u PYTHONPATH uv run pytest tests/integration/api/test_staff_employer_reads.py tests/integration/api/test_staff_employers.py -v` after sourcing `.env.test`. Result: `24 passed, 1 warning in 1.23s`.
+- **Coverage of the pass:** The focused API pass included all read-route regressions in `test_staff_employer_reads.py` plus the preserved create-route/API assertions in `test_staff_employers.py`, including exact create-body behavior, idempotency handling, denied/header non-escalation, safe 400/403/409/422/503/500 mappings, approved OpenAPI surface, read-route no-write invariants, and search log-hygiene checks.
+- **Warning note:** The only warning remained the existing upstream `StarletteDeprecationWarning` from `fastapi.testclient`; no slice-local warnings or failures appeared.
+
+## 2026-08-05 — Task 6 quality/security verification pass
+- **Runtime prerequisite:** `docker compose --env-file .env.test ps postgres-test` confirmed the synthetic PostgreSQL service was still `Up` and `healthy` on loopback `127.0.0.1:55432` before the gate run.
+- **Observed first gate failure:** The first workflow-order pass stopped at `uv run ruff format --check .` because six files required formatting. After `uv run ruff format .`, the next pass stopped at `uv run ruff check .` with eight import-order findings auto-fixable by Ruff; `uv run ruff check . --fix` resolved them.
+- **Observed second gate failure:** The next pass stopped at `uv run mypy src tests` with three stale imports still referencing `SafePersistenceError` from `golden_rose.application.create_draft_employer`. The fix was limited to import sites in `src/golden_rose/api/errors.py`, `tests/integration/application/test_create_draft_employer.py`, and `tests/integration/api/test_staff_employers.py`, switching them to the shared `golden_rose.application.errors` module already introduced by this slice.
+- **Observed green gate sequence:** After those narrow fixes, the workflow-order pass completed successfully: Ruff format/check, mypy, Bandit, `alembic upgrade head`, full pytest with coverage, `alembic downgrade base`, `alembic upgrade head`, `pip-audit --skip-editable`, and CycloneDX SBOM generation.
+- **Verification evidence:** `pytest --cov=golden_rose --cov-report=term-missing --cov-fail-under=95` reported `97 passed, 1 warning in 3.45s` with total coverage `96.67%`; the only warning remained the upstream `StarletteDeprecationWarning` from `fastapi.testclient`. `pip-audit --skip-editable` reported no known vulnerabilities. Local SBOM validation showed `build/backend-sbom.cdx.json` exists with `bomFormat='CycloneDX'` and `specVersion='1.6'`.
+- **Range/hygiene evidence:** `git diff --check origin/develop...HEAD` passed with no output. `git diff --name-status origin/develop...HEAD` also produced no committed range delta, and `git rev-list --count origin/develop..HEAD` returned `0`, confirming the branch still has uncommitted working-tree changes rather than ahead commits. Exact-range Gitleaks over `origin/develop..HEAD` scanned `0 commits` / `0 bytes` and reported no leaks. `git status --short` still shows the active uncommitted slice surface. Content searches found no `SELECT *` usage and no Python `logging`/`logger` calls under `src/` for this slice.
+
+## 2026-08-05 — Task 7 review handoff packet created
+- **Artifact created:** Added `docs/review-handoffs/2026-08-05-phase-1-employer-read-search-review-handoff.md` for the independent code review/security review session that must inspect the local branch before any PR to `develop` is opened.
+- **Recorded posture:** The packet states the review surface is the uncommitted `feat/staff-employer-read-search` working tree against merged planning base `bde9143`, with `git rev-list --count origin/develop..HEAD = 0`, so the reviewer must inspect the local diff rather than a pushed commit range.
+- **Evidence summarized:** The handoff captures the approved scope/non-scope, key implementation paths, focused Task 5 regression result (`24 passed, 1 warning`), Task 6 verification result (`97 passed, 1 warning`, `96.67%` coverage, no known vulnerabilities, CycloneDX SBOM), range-hygiene caveat, and the exact High/Blocker stop boundary before PR opening.
+- **Living-doc rebaseline:** `CURRENT_WORK.md` and `ROADMAP.md` now point to independent review/handoff as the immediate next step instead of ongoing RED → GREEN implementation.
+
+## 2026-08-05 — Task 8 review-remediation pass for employer read/search tracer
+- **Review verdict received:** Independent review returned **Changes requested / not PR-ready yet** on the uncommitted `feat/staff-employer-read-search` working tree, citing two High blockers and two Medium drifts. The actionable issues were: missing create-path NFC normalization before idempotency fingerprinting/insertion; missing `Cache-Control: no-store` on several detail-route problem responses; generic detail 404 problem type; and incomplete read-side data minimization behind the application boundary.
+- **Implementation remediation applied:** `src/golden_rose/application/create_draft_employer.py` now normalizes `display_name` via `normalize_employer_text(...)` before fingerprinting and insert, while replay now reloads the authoritative create record through a new `get_authoritative_employer_by_id(...)`. `src/golden_rose/api/errors.py` now makes the installed `400/403/409/422/500/503` problem handlers emit `no_store_problem_response(...)`. `src/golden_rose/api/staff/employers.py` now returns the employer-specific 404 type `https://golden-rose.local/problems/employer-not-found`. `src/golden_rose/persistence/employers.py`, `src/golden_rose/application/get_employer.py`, and `src/golden_rose/application/search_employers.py` now separate authoritative create records from minimized read-side detail/search records so `created_by` and other extra create-only fields do not ride the read path.
+- **New regression coverage:** Added/updated focused checks proving NFC normalization and composed/decomposed replay equivalence in `tests/integration/application/test_create_draft_employer.py`; proving minimized read-side shapes in `tests/integration/application/test_get_employer.py` and `tests/integration/application/test_search_employers.py`; and proving detail-route 403/404/422/503 responses all remain safe/no-store with the employer-specific 404 type in `tests/integration/api/test_staff_employer_reads.py`.
+- **Focused remediation verification:** Ran exact rereview nodes for the reported findings and their blast radius: `uv run pytest` over 7 targeted nodes covering create normalization/replay, minimized detail/search shapes, absent/denied detail, and detail validation/safe-persistence mapping. Observed result: `7 passed, 1 warning in 0.68s` with only the pre-existing upstream `StarletteDeprecationWarning` from `fastapi.testclient`.
+- **Broader rereview subset:** Ran `uv run ruff check` over the touched source/test files, `uv run mypy src tests`, and `uv run pytest tests/integration/application/test_create_draft_employer.py tests/integration/application/test_get_employer.py tests/integration/application/test_search_employers.py tests/integration/api/test_staff_employer_reads.py -v`. Observed results: Ruff clean, mypy clean (`Success: no issues found in 44 source files`), and targeted rereview suite `32 passed, 1 warning in 1.08s`.
+- **Continuity/handoff update:** Refreshed `docs/review-handoffs/2026-08-05-phase-1-employer-read-search-review-handoff.md`, `CURRENT_WORK.md`, and `ROADMAP.md` so the next independent review session sees the reported blockers, exact remediations, green rereview evidence, and the unchanged stop boundary: no PR to `develop` until rereview clears the local working tree.
+
 ## Updating this file
 Add a short dated entry after a material planning, implementation, test, security, or release event. Link detailed evidence rather than duplicating it. Record commands and results only when they were actually run.

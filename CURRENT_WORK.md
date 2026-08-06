@@ -2,7 +2,7 @@
 
 **Updated:** 2026-08-06
 **Lane:** Phase 1 coding — Employer detail and bounded search tracer
-**Overall status:** PR #8 merged the reviewed synthetic/local staff draft-employer tracer into `develop` at `0938c17`. PR #9 merged the solo-maintainer governance/application-check closeout at `80f4505`; the reviewed policy has been applied and verified, and live `develop`/`main` now require `enforce`, `check`, and `application`. PR #10 merged ADR-0004 plus `.hermes/plans/2026-08-04_phase-1-employer-read-search-plan.md` into `develop` at `bde9143`. The implementation lane on `feat/staff-employer-read-search` completed the Task 5 API regression pass and Task 6 quality/security verification, underwent independent review, remediated the reported blockers/drifts, and then passed independent rereview. The remediated local slice now has green rereview evidence for create-path NFC normalization, detail-route no-store/problem typing, employer-specific 404 behavior, and read-side minimization. The branch is ready for final-head commit/push/PR execution to `develop`; infrastructure provisioning, public release, live integrations, real identity, and client/production-data use remain unauthorized.
+**Overall status:** PR #8 merged the reviewed synthetic/local staff draft-employer tracer into `develop` at `0938c17`. PR #9 merged the solo-maintainer governance/application-check closeout at `80f4505`; the reviewed policy has been applied and verified, and live `develop`/`main` now require `enforce`, `check`, and `application`. PR #10 merged ADR-0004 plus `.hermes/plans/2026-08-04_phase-1-employer-read-search-plan.md` into `develop` at `bde9143`. The implementation lane on `feat/staff-employer-read-search` completed the Task 5 API regression pass and Task 6 quality/security verification, underwent independent review, remediated the reported blockers/drifts, passed independent rereview, and then completed final-head commit/push/PR preparation. PR #11 is now open from `feat/staff-employer-read-search` to protected `develop`; the committed branch head passed `git diff --check origin/develop...HEAD`, exact-range Gitleaks on `origin/develop..HEAD`, focused `ruff check`, `mypy src tests`, and the 32-test affected integration rereview subset before push. Infrastructure provisioning, public release, live integrations, real identity, and client/production-data use remain unauthorized.
 
 ## Active objective
 Turn the completed initial discovery baseline into an approved, narrow first delivery: an agency-staff pilot for employer demand entry and retrieval, followed by a governed dashboard and transparent worker/employer comparison aid.
@@ -29,10 +29,10 @@ Turn the completed initial discovery baseline into an approved, narrow first del
 - Accepted correction/audit baseline: PostgreSQL domain rows hold current operational truth; append-only `AuditEvent` records preserve material history through atomic expected-version/idempotent commands; restricted prior/new values remain field-authorized; and derived projections are disposable rather than competing record stores. `docs/planning/phase-1-correction-audit-event-contract.md` is authoritative.
 
 ## Immediate next steps
-1. Commit the remediated `feat/staff-employer-read-search` slice, rerun the final-head verification subset on the committed range, and confirm exact-range hygiene.
-2. Push the branch to `origin` and open the feature PR to `develop` with the approved scope, verification evidence, rereview outcome, and stop boundaries.
-3. Monitor the protected `application`, `check`, and `enforce` statuses on the new PR and remediate only in-scope failures if any appear.
-4. Do not widen scope into frontend, real identity, unfiltered listing/counts/exports, mutations/audit events, contact/worksite/request/shift, schema/dependency/CI/policy expansion, cloud, public routes, or live/client data during PR preparation.
+1. Monitor PR #11 (`feat/staff-employer-read-search` → `develop`) until the protected `application`, `check`, and `enforce` statuses finish.
+2. If CI or review feedback appears, remediate only in-scope findings for the approved ADR-0004 slice and preserve the verified read/search boundaries.
+3. Keep the branch limited to employer read/search tracer scope; do not widen into frontend, real identity, exports/counts, mutations/audit events, adjacent entities, schema/dependency/CI/policy expansion, cloud, public routes, or live/client data while PR #11 is under review.
+4. After PR #11 merges, rebaseline from `develop` before any later Phase 1 slice begins.
 
 ## Gate classification
 

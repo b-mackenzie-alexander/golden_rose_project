@@ -7,6 +7,8 @@ from uuid import UUID
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from golden_rose.application.employer_text import normalize_employer_text
+from golden_rose.application.errors import SafePersistenceError
 from golden_rose.auth.permissions import can_create_draft_employer
 from golden_rose.auth.principal import StaffPrincipal
 from golden_rose.clock import Clock
@@ -18,7 +20,7 @@ from golden_rose.persistence.command_receipts import (
 )
 from golden_rose.persistence.employers import (
     EmployerRecord,
-    get_employer_by_id,
+    get_authoritative_employer_by_id,
     insert_draft_employer,
 )
 
@@ -27,10 +29,6 @@ from golden_rose.persistence.employers import (
 class CreateDraftEmployerResult:
     employer: EmployerRecord
     replayed: bool
-
-
-class SafePersistenceError(RuntimeError):
-    pass
 
 
 class IdempotencyConflictError(RuntimeError):
@@ -51,12 +49,13 @@ def create_draft_employer(
         msg = "principal lacks employer:draft:create"
         raise PermissionError(msg)
 
+    normalized_display_name = normalize_employer_text(display_name)
     now = clock.now()
     employer_id = identifiers.new_uuid4()
     audit_event_id = identifiers.new_uuid4()
     request_fingerprint = _build_request_fingerprint(
         employer_type=employer_type,
-        display_name=display_name,
+        display_name=normalized_display_name,
     )
 
     try:
@@ -78,7 +77,7 @@ def create_draft_employer(
                 or existing_receipt.request_fingerprint != request_fingerprint
             ):
                 raise IdempotencyConflictError("idempotency conflict")
-            employer = get_employer_by_id(
+            employer = get_authoritative_employer_by_id(
                 session=session, employer_id=existing_receipt.result_entity_id
             )
             session.rollback()
@@ -87,7 +86,7 @@ def create_draft_employer(
             session=session,
             employer_id=employer_id,
             employer_type=employer_type,
-            display_name=display_name,
+            display_name=normalized_display_name,
             created_by=principal.actor_id,
             created_at=now,
         )

@@ -2,10 +2,8 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from golden_rose.application.create_draft_employer import (
-    IdempotencyConflictError,
-    SafePersistenceError,
-)
+from golden_rose.application.create_draft_employer import IdempotencyConflictError
+from golden_rose.application.errors import SafePersistenceError
 
 
 class InvalidIdempotencyKeyError(ValueError):
@@ -24,12 +22,25 @@ def problem_response(*, status_code: int, title: str, detail: str, type_: str) -
     )
 
 
+def no_store_problem_response(
+    *, status_code: int, title: str, detail: str, type_: str
+) -> JSONResponse:
+    response = problem_response(
+        status_code=status_code,
+        title=title,
+        detail=detail,
+        type_=type_,
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 def install_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(InvalidIdempotencyKeyError)
     async def handle_invalid_idempotency_key(
         request: Request, exc: InvalidIdempotencyKeyError
     ) -> JSONResponse:
-        return problem_response(
+        return no_store_problem_response(
             status_code=400,
             title="Bad Request",
             detail="invalid idempotency key",
@@ -40,7 +51,7 @@ def install_exception_handlers(app: FastAPI) -> None:
     async def handle_idempotency_conflict(
         request: Request, exc: IdempotencyConflictError
     ) -> JSONResponse:
-        return problem_response(
+        return no_store_problem_response(
             status_code=409,
             title="Conflict",
             detail=str(exc),
@@ -49,7 +60,7 @@ def install_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(PermissionError)
     async def handle_permission_error(request: Request, exc: PermissionError) -> JSONResponse:
-        return problem_response(
+        return no_store_problem_response(
             status_code=403,
             title="Forbidden",
             detail="forbidden",
@@ -60,7 +71,7 @@ def install_exception_handlers(app: FastAPI) -> None:
     async def handle_safe_persistence_error(
         request: Request, exc: SafePersistenceError
     ) -> JSONResponse:
-        return problem_response(
+        return no_store_problem_response(
             status_code=503,
             title="Service Unavailable",
             detail="service unavailable",
@@ -71,7 +82,7 @@ def install_exception_handlers(app: FastAPI) -> None:
     async def handle_request_validation_error(
         request: Request, exc: RequestValidationError
     ) -> JSONResponse:
-        return problem_response(
+        return no_store_problem_response(
             status_code=422,
             title="Unprocessable Entity",
             detail="request validation failed",
@@ -80,7 +91,7 @@ def install_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
-        return problem_response(
+        return no_store_problem_response(
             status_code=500,
             title="Internal Server Error",
             detail="internal server error",

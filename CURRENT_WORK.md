@@ -1,8 +1,8 @@
 # Current Work — Golden Rose Operations Platform
 
-**Updated:** 2026-08-04
-**Lane:** Next Phase 1 planning — Employer detail and bounded search
-**Overall status:** PR #8 merged the reviewed synthetic/local staff draft-employer tracer into `develop` at `0938c17`. PR #9 merged the solo-maintainer governance/application-check closeout at `80f4505`; the reviewed policy has been applied and verified, and live `develop`/`main` now require `enforce`, `check`, and `application`. The proposed next product slice is an authorization-scoped Employer detail/search tracer governed by ADR-0004 and `.hermes/plans/2026-08-04_phase-1-employer-read-search-plan.md`. It remains planning-only until reviewed and merged. Infrastructure provisioning, public release, live integrations, real identity, and client/production-data use remain unauthorized.
+**Updated:** 2026-08-06
+**Lane:** Phase 1 coding — Employer detail and bounded search tracer
+**Overall status:** PR #8 merged the reviewed synthetic/local staff draft-employer tracer into `develop` at `0938c17`. PR #9 merged the solo-maintainer governance/application-check closeout at `80f4505`; the reviewed policy has been applied and verified, and live `develop`/`main` now require `enforce`, `check`, and `application`. PR #10 merged ADR-0004 plus `.hermes/plans/2026-08-04_phase-1-employer-read-search-plan.md` into `develop` at `bde9143`. The implementation lane on `feat/staff-employer-read-search` completed the Task 5 API regression pass and Task 6 quality/security verification, underwent independent review, remediated the reported blockers/drifts, passed independent rereview, and then completed final-head commit/push/PR preparation. PR #11 is now open from `feat/staff-employer-read-search` to protected `develop`; the committed branch head passed `git diff --check origin/develop...HEAD`, exact-range Gitleaks on `origin/develop..HEAD`, focused `ruff check`, `mypy src tests`, and the 32-test affected integration rereview subset before push. Infrastructure provisioning, public release, live integrations, real identity, and client/production-data use remain unauthorized.
 
 ## Active objective
 Turn the completed initial discovery baseline into an approved, narrow first delivery: an agency-staff pilot for employer demand entry and retrieval, followed by a governed dashboard and transparent worker/employer comparison aid.
@@ -29,15 +29,15 @@ Turn the completed initial discovery baseline into an approved, narrow first del
 - Accepted correction/audit baseline: PostgreSQL domain rows hold current operational truth; append-only `AuditEvent` records preserve material history through atomic expected-version/idempotent commands; restricted prior/new values remain field-authorized; and derived projections are disposable rather than competing record stores. `docs/planning/phase-1-correction-audit-event-contract.md` is authoritative.
 
 ## Immediate next steps
-1. Independently review and merge ADR-0004 plus the Employer detail/bounded-search implementation plan before coding.
-2. Start implementation only in a fresh coding session from the exact merged `origin/develop` tip, using `feat/staff-employer-read-search` and strict RED → GREEN → REFACTOR sequencing.
-3. Keep the slice limited to `employer:read`, exact UUID detail, privacy-conscious POST search, literal bounded filters, and filter-bound keyset pagination over accepted Employer fields.
-4. Do not add frontend, real identity, unfiltered listing/counts/exports, mutations/audit events, contact/worksite/request/shift, schema/dependency changes, cloud, public routes, or live/client data.
+1. Monitor PR #11 (`feat/staff-employer-read-search` → `develop`) until the protected `application`, `check`, and `enforce` statuses finish.
+2. If CI or review feedback appears, remediate only in-scope findings for the approved ADR-0004 slice and preserve the verified read/search boundaries.
+3. Keep the branch limited to employer read/search tracer scope; do not widen into frontend, real identity, exports/counts, mutations/audit events, adjacent entities, schema/dependency/CI/policy expansion, cloud, public routes, or live/client data while PR #11 is under review.
+4. After PR #11 merges, rebaseline from `develop` before any later Phase 1 slice begins.
 
 ## Gate classification
 
 ### Required before the affected synthetic/local implementation slice
-- Reviewed and merged narrow implementation plan. The first-tracer stack/toolchain and request requiredness are accepted in ADR-0002/ADR-0003; later slices still require their own affected decisions.
+- Reviewed and merged narrow implementation plan. This gate is now satisfied by PR #10 for the Employer detail/search tracer. The first-tracer stack/toolchain and request requiredness remain accepted in ADR-0002/ADR-0003; later slices still require their own affected decisions.
 - For this tracer, only `employer_type` and bounded `display_name` are client supplied; the server controls draft state, staff-entry source, identifiers, timestamps, actor, and version. Do not generalize these values into later lifecycle/intake policy.
 - Slice-specific data classification, synthetic-fixture procedure, acceptance owner, test/CI evidence, and rollback/forward-recovery posture.
 

@@ -10,9 +10,9 @@ from sqlalchemy.orm import Session
 
 from golden_rose.application.create_draft_employer import (
     IdempotencyConflictError,
-    SafePersistenceError,
     create_draft_employer,
 )
+from golden_rose.application.errors import SafePersistenceError
 from golden_rose.auth.principal import StaffPrincipal
 
 
@@ -365,6 +365,83 @@ def test_create_draft_employer_identical_replay_returns_original_result_without_
     assert employer_count == 1
     assert command_receipt_count == 1
     assert audit_event_count == 1
+
+
+def test_create_normalizes_display_name_before_fingerprint_and_insert(
+    session,
+    clean_tables,
+) -> None:
+    principal = StaffPrincipal(
+        actor_id=UUID("abababab-abab-4bab-8bab-abababababab"),
+        role_name="operations_staff",
+        permissions=frozenset({"employer:draft:create"}),
+    )
+    command_id = UUID("bcbcbcbc-bcbc-4cbc-8cbc-bcbcbcbcbcbc")
+    employer_id = UUID("cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd")
+    audit_event_id = UUID("dededede-dede-4ede-8ede-dededededede")
+
+    result = create_draft_employer(
+        session=session,
+        principal=principal,
+        command_id=command_id,
+        employer_type="business",
+        display_name="Cafe\u0301 Rose",
+        clock=FixedClock(datetime(2026, 8, 6, 0, 5, 0, tzinfo=UTC)),
+        identifiers=FixedIdentifierFactory(employer_id, audit_event_id),
+    )
+
+    stored_display_name = session.execute(
+        text("SELECT display_name FROM employers WHERE employer_id = :employer_id"),
+        {"employer_id": employer_id},
+    ).scalar_one()
+
+    assert result.employer.display_name == "Café Rose"
+    assert stored_display_name == "Café Rose"
+
+
+def test_replay_treats_composed_and_decomposed_names_as_same_payload(
+    session,
+    clean_tables,
+) -> None:
+    principal = StaffPrincipal(
+        actor_id=UUID("efefefef-efef-4fef-8fef-efefefefefef"),
+        role_name="operations_staff",
+        permissions=frozenset({"employer:draft:create"}),
+    )
+    command_id = UUID("f0f0f0f0-f0f0-40f0-80f0-f0f0f0f0f0f0")
+    employer_id = UUID("f1f1f1f1-f1f1-41f1-81f1-f1f1f1f1f1f1")
+    audit_event_id = UUID("f2f2f2f2-f2f2-42f2-82f2-f2f2f2f2f2f2")
+    fixed_now = datetime(2026, 8, 6, 0, 10, 0, tzinfo=UTC)
+
+    first_result = create_draft_employer(
+        session=session,
+        principal=principal,
+        command_id=command_id,
+        employer_type="business",
+        display_name="Cafe\u0301 Rose",
+        clock=FixedClock(fixed_now),
+        identifiers=FixedIdentifierFactory(employer_id, audit_event_id),
+    )
+    second_result = create_draft_employer(
+        session=session,
+        principal=principal,
+        command_id=command_id,
+        employer_type="business",
+        display_name="Café Rose",
+        clock=FixedClock(datetime(2026, 8, 6, 0, 11, 0, tzinfo=UTC)),
+        identifiers=FixedIdentifierFactory(
+            UUID("f3f3f3f3-f3f3-43f3-83f3-f3f3f3f3f3f3"),
+            UUID("f4f4f4f4-f4f4-44f4-84f4-f4f4f4f4f4f4"),
+        ),
+    )
+
+    employer_count = session.execute(text("SELECT COUNT(*) FROM employers")).scalar_one()
+
+    assert first_result.replayed is False
+    assert second_result.replayed is True
+    assert second_result.employer == first_result.employer
+    assert second_result.employer.display_name == "Café Rose"
+    assert employer_count == 1
 
 
 def test_create_draft_employer_conflicting_replay_raises_without_disclosing_resource(

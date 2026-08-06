@@ -4,9 +4,11 @@
 **Branch:** `feat/staff-employer-read-search`
 **Target PR base:** `develop`
 **Planning base:** `origin/develop` at merged planning tip `bde9143` (`docs: plan employer detail and bounded search (#10)`)
-**Review surface:** original independent-review handoff for the local branch candidate against `origin/develop`
+**Review surface:** historical independent-review handoff for the branch that was remediated, reviewed, and merged by PR #11
 **Ahead commits vs `origin/develop` at handoff creation:** `0` (`git rev-list --count origin/develop..HEAD`)
-**PR status:** no PR opened yet; this handoff is for pre-PR independent code/security review.
+**PR status:** historical closeout; PR #11 merged to `develop` at `b9eaee6` on 2026-08-06. Do not execute this handoff or use its branch as the base for later work.
+
+All present-tense reviewer instructions below are preserved only as evidence of the pre-PR review state. They were completed/superseded by remediation, final verification, protected PR #11, and merge commit `b9eaee6`; no step in this historical packet remains actionable.
 
 ## Review round 1 outcome and remediation status
 
@@ -83,7 +85,7 @@ Observed result:
 - `mypy src tests`: success, no issues in 44 source files
 - targeted rereview suite: `32 passed, 1 warning in 1.08s`
 
-Reviewer for round 2 should verify the reported blockers are now actually closed, not just covered by tests.
+At the time of this handoff, round 2 was asked to verify that the reported blockers were closed rather than merely covered by tests. That review/remediation cycle is complete and historical.
 
 ## 1. What changed
 
@@ -243,16 +245,18 @@ Observed results:
 - `git rev-list --count origin/develop..HEAD`: `0`
 - Gitleaks scanned `0 commits` / `0 bytes` and reported no leaks
 
-Interpretation:
-- this review surface is **not yet a committed PR candidate**; it is a local working-tree candidate and must be inspected as such.
+Historical interpretation at handoff creation:
+- the surface was **not yet a committed PR candidate**; this state was superseded when the remediated branch was committed, pushed, reviewed in PR #11, and merged at `b9eaee6`.
 
-## 6. Known reviewer-facing caveats
+## 6. Historical reviewer-facing caveats — resolved
 
-- Because `HEAD` is not ahead of `origin/develop`, exact-range PR-style hygiene is limited until the slice is committed.
-- `git status --short` still shows the active local slice surface; the reviewer should inspect the working tree directly, not assume a pushed diff exists.
-- No service teardown evidence has been captured yet because review is happening before PR open; if runtime teardown is required for closeout, capture it after review/remediation and before final handoff/push.
+- At handoff creation, `HEAD` was not ahead of `origin/develop`, so exact-range PR-style hygiene was limited until commit.
+- At handoff creation, `git status --short` showed the local slice and review used the working tree directly.
+- These caveats no longer describe an active lane; PR #11 merged and later work must re-baseline from current `origin/develop`.
 
-## 7. Suggested reviewer procedure
+## 7. Archived reviewer procedure — completed; do not execute
+
+The following records the procedure requested at the time; it is not a current instruction:
 
 1. Inspect the local diff on `feat/staff-employer-read-search` against `origin/develop`.
 2. Re-run the focused API pass first if a quick regression sanity check is needed.
@@ -264,9 +268,9 @@ Interpretation:
 5. If findings are clear or only non-blocking, return a PR-ready review verdict for a follow-up commit/push/PR step.
 6. If High/Blocker findings exist, return them with exact file/line references and blast radius before any PR is opened.
 
-## 8. Stop boundary for this handoff
+## 8. Historical stop boundary — completed
 
-This handoff does **not** authorize opening the PR yet. The next session should:
+At creation, this handoff did **not** authorize opening the PR. The subsequent session completed the following steps, opened PR #11, and merged it; do not repeat them from this packet:
 
 - review the local working tree
 - remediate in-scope findings only

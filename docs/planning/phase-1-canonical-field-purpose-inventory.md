@@ -253,7 +253,7 @@ These concerns require their own approved inventories before implementation.
 ## Implementation constraints
 
 - Database/API/UI names may refine these labels only if the purpose and boundary remain traceable to this document.
-- Migrations and fixtures must use synthetic/de-identified data until a production-data gate is approved.
+- Migrations and fixtures must use wholly fictional synthetic data by default; de-identified, transformed, hashed, or otherwise client/live-derived values require a separately approved test-data procedure and cannot enter merely because a production-data gate is pending.
 - Tests must prove separation of exact address from service zone, restriction of sensitive free text/history, atomic attributable corrections, append-only audit behavior, and rejection of prohibited automatic-decision uses.
 - The accepted request/shift state model, `docs/planning/phase-1-staff-permission-matrix.md`, and `docs/planning/phase-1-correction-audit-event-contract.md` bind requiredness, access, correction, and history before the first functional implementation plan is accepted.
 

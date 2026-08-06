@@ -108,4 +108,4 @@ documented solo-maintainer mode, not evidence that review or validation may be
 skipped.
 
 ## Sensitive-data and artifact hygiene
-Never commit credentials, `.env` files, client records, legacy exports, raw personal data, production backups, unapproved generated reports, or unmanaged cloud state. Commit only reviewed source, non-secret configuration/templates, tests with synthetic/de-identified fixtures, documentation, and approved infrastructure definitions.
+Never commit credentials, `.env` files, client records, legacy exports, raw personal data, production backups, unapproved generated reports, or unmanaged cloud state. Commit only reviewed source, non-secret configuration/templates, tests with wholly fictional synthetic fixtures unless a separate test-data procedure explicitly approves otherwise, documentation, and approved infrastructure definitions.

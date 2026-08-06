@@ -15,6 +15,8 @@ Use `ADR-NNNN-short-title.md`, with monotonic numbers. Never renumber an existin
 - `ADR-0001-protected-integration-and-promotion-branches.md` — accepted protected-branch and promotion topology.
 - `ADR-0002-first-phase-1-slice-and-synthetic-data-boundary.md` — accepted first tracer scope, synthetic-data boundary, and planning/coding/review handoff.
 - `ADR-0003-phase-1-backend-toolchain.md` — accepted Python/FastAPI/PostgreSQL synchronous backend toolchain for the first slice.
+- `ADR-0004-phase-1-employer-read-search-boundary.md` — accepted and implemented synthetic/local Employer detail and bounded-search boundary.
+- `ADR-0005-phase-1-employer-workspace-frontend-boundary.md` — accepted first browser-workspace and create-response cache-hardening planning boundary; not implementation authorization until the reviewed planning packet merges, a fresh session rebaselines, and repository/service operations are separately approved.
 
 ## Required sections
 - Status and date

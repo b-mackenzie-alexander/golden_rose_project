@@ -1,6 +1,6 @@
 # ADR-0004: Phase 1 Employer Read and Search Boundary
 
-**Status:** Proposed for planning review
+**Status:** Accepted and implemented by PR #11 (`b9eaee6`)
 **Date:** 2026-08-04
 
 ## Context and evidence posture
@@ -107,6 +107,6 @@ Ordinary authorized reads, searches, and projection rendering do not produce dom
 
 ## Approval, handoff, and revisit triggers
 
-This ADR becomes accepted only after the planning packet is reviewed and merged into `develop`. A fresh coding session may implement only the merged plan under strict RED → GREEN → REFACTOR sequencing. A separate review session must independently assess authorization-before-query, search privacy, cursor/filter correctness, PostgreSQL semantics, error/log redaction, route ordering, regression safety, and scope.
+The planning packet was reviewed and merged by PR #10; the implementation was independently reviewed, remediated, and merged by PR #11 at `b9eaee6`. The historical implementation remained subject to strict RED → GREEN → REFACTOR sequencing and independent assessment of authorization-before-query, search privacy, cursor/filter correctness, PostgreSQL semantics, error/log redaction, route ordering, regression safety, and scope.
 
 Revisit before adding record-scope/tenant authorization, unfiltered browsing, counts/aggregates, exports, fuzzy/full-text/relevance search, new Employer fields or mutations, contact/worksite/request/shift search, audit history retrieval, real identity, frontend/public access, live data, schema/index changes, or any cursor that carries raw sensitive fields, authoritative state, or authorization semantics.

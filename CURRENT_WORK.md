@@ -1,8 +1,8 @@
 # Current Work — Golden Rose Operations Platform
 
 **Updated:** 2026-08-06
-**Lane:** Phase 1 coding — Employer detail and bounded search tracer
-**Overall status:** PR #8 merged the reviewed synthetic/local staff draft-employer tracer into `develop` at `0938c17`. PR #9 merged the solo-maintainer governance/application-check closeout at `80f4505`; the reviewed policy has been applied and verified, and live `develop`/`main` now require `enforce`, `check`, and `application`. PR #10 merged ADR-0004 plus `.hermes/plans/2026-08-04_phase-1-employer-read-search-plan.md` into `develop` at `bde9143`. The implementation lane on `feat/staff-employer-read-search` completed the Task 5 API regression pass and Task 6 quality/security verification, underwent independent review, remediated the reported blockers/drifts, passed independent rereview, and then completed final-head commit/push/PR preparation. PR #11 is now open from `feat/staff-employer-read-search` to protected `develop`; the committed branch head passed `git diff --check origin/develop...HEAD`, exact-range Gitleaks on `origin/develop..HEAD`, focused `ruff check`, `mypy src tests`, and the 32-test affected integration rereview subset before push. Infrastructure provisioning, public release, live integrations, real identity, and client/production-data use remain unauthorized.
+**Lane:** Phase 1 planning — Employer workspace frontend tracer
+**Overall status:** PR #11 merged the reviewed synthetic/local Employer detail and bounded-search tracer into `develop` at `b9eaee6`. A post-merge rebaseline on 2026-08-06 fast-forwarded local `develop` to exact `origin/develop` commit `b9eaee60392855e519e60e52ed95736752852de4`; the worktree was clean and the database-free unit baseline returned `48 passed`. The next bounded direction is a first local/synthetic staff browser workspace over the existing Employer create/search/detail status/body/schema/authority contracts, with one prerequisite test-first `Cache-Control: no-store` header on fresh and replayed create successes. Independent architecture/TDD, security/supply-chain, and product/accessibility/localization review rounds remediated all reported Blocker/High/Medium findings; the final focused rereviews are clear. Beatrice accepted the product/architecture direction on 2026-08-06, and ADR-0005 plus `.hermes/plans/2026-08-06_115420-phase-1-employer-workspace-frontend-plan.md` are Accepted locally on `docs/phase-1-employer-workspace-plan`. Coding remains unauthorized until this exact planning packet passes protected PR/CI, merges to `develop`, a fresh session rebaselines from that merged tip, and implementation operations are separately approved. GCP planning is handled separately. Infrastructure provisioning, public release, live integrations, real identity, and client/production-data use remain unauthorized.
 
 ## Active objective
 Turn the completed initial discovery baseline into an approved, narrow first delivery: an agency-staff pilot for employer demand entry and retrieval, followed by a governed dashboard and transparent worker/employer comparison aid.
@@ -29,15 +29,15 @@ Turn the completed initial discovery baseline into an approved, narrow first del
 - Accepted correction/audit baseline: PostgreSQL domain rows hold current operational truth; append-only `AuditEvent` records preserve material history through atomic expected-version/idempotent commands; restricted prior/new values remain field-authorized; and derived projections are disposable rather than competing record stores. `docs/planning/phase-1-correction-audit-event-contract.md` is authoritative.
 
 ## Immediate next steps
-1. Monitor PR #11 (`feat/staff-employer-read-search` → `develop`) until the protected `application`, `check`, and `enforce` statuses finish.
-2. If CI or review feedback appears, remediate only in-scope findings for the approved ADR-0004 slice and preserve the verified read/search boundaries.
-3. Keep the branch limited to employer read/search tracer scope; do not widen into frontend, real identity, exports/counts, mutations/audit events, adjacent entities, schema/dependency/CI/policy expansion, cloud, public routes, or live/client data while PR #11 is under review.
-4. After PR #11 merges, rebaseline from `develop` before any later Phase 1 slice begins.
+1. Preserve the current Accepted, independently audited planning tree without implementation work; local closeout is ready but intentionally uncommitted/unpushed.
+2. Obtain explicit approval before committing, pushing, or opening the planning-only PR to protected `develop`.
+3. Merge only after required review/CI on the exact planning head; any finding that changes the packet requires affected verification and review again.
+4. After that planning PR merges, start a fresh coding session from exact current `origin/develop`; do not branch implementation from this planning branch, and obtain separate implementation-operation approval.
 
 ## Gate classification
 
 ### Required before the affected synthetic/local implementation slice
-- Reviewed and merged narrow implementation plan. This gate is now satisfied by PR #10 for the Employer detail/search tracer. The first-tracer stack/toolchain and request requiredness remain accepted in ADR-0002/ADR-0003; later slices still require their own affected decisions.
+- Explicitly accepted, reviewed, and merged narrow implementation plan. PR #10 satisfied this gate for the implemented Employer detail/search tracer. Beatrice has accepted the independently cleared ADR-0005 direction locally, but no frontend implementation is authorized until the planning packet passes protected PR/CI and merges, a fresh session rebaselines from the merged tip, and implementation operations are separately approved.
 - For this tracer, only `employer_type` and bounded `display_name` are client supplied; the server controls draft state, staff-entry source, identifiers, timestamps, actor, and version. Do not generalize these values into later lifecycle/intake policy.
 - Slice-specific data classification, synthetic-fixture procedure, acceptance owner, test/CI evidence, and rollback/forward-recovery posture.
 
@@ -68,6 +68,7 @@ The complete discovery inventory and evidence rules are in `docs/planning/phase-
 - PR #7 merged the reviewed first-slice planning packet into `develop`.
 - PR #8 merged the reviewed draft-employer tracer into `develop` at `0938c17`; its remote feature branch is retired.
 - PR #9 merged the reviewed solo-maintainer governance and required-`application` policy at `80f4505`. The committed policy was then applied under explicit approval; `infra/github/verify-repo-policy.sh` reported no drift and direct GitHub queries confirmed all three required contexts on both protected branches.
+- PR #11 merged the independently reviewed and remediated Employer detail/bounded-search tracer into `develop` at `b9eaee6`; its feature branch is historical and not a base for later work.
 
 ## Repository bootstrap state
 - The initial tracked baseline contains the living documents, ADR convention, and a protective `.gitignore`.

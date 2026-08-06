@@ -47,7 +47,7 @@ The accepted Phase 1 structural source of truth is `Employer → EmployerContact
 Material operational changes preserve the accepted event envelope, changed-field evidence, actor, server time, reason where applicable, source/reference, and relationship to prior record/event. Required domain changes and audit inserts commit atomically through one reviewed authority boundary; stale writes are rejected. Corrections, cancellations, replacements, and supersessions are linked actions rather than silent overwrites. Projection failure never rolls back committed truth or becomes a false empty result.
 
 ## Accepted and proposed technology direction
-- React + TypeScript remains the proposed browser-UI direction; exact frontend tooling is selected with the first frontend slice rather than added to the backend tracer.
+- ADR-0005 accepts React 19, TypeScript 5.9, Vite 8, npm, Vitest/Testing Library, plain CSS, and a typed English/Spanish catalog for the first local/synthetic staff browser slice. It remains unimplemented pending protected planning-PR merge, a fresh merged-tip rebaseline, and separate implementation-operation approval.
 - ADR-0003 accepts Python 3.12, uv, FastAPI/Pydantic v2, synchronous SQLAlchemy 2/psycopg 3, Alembic, and PostgreSQL 16 for the first backend slice.
 - GCP is the selected platform. Cloud Run + Cloud SQL is the managed-container/database baseline; private Cloud Storage, Secret Manager, Artifact Registry, Cloud Logging/Monitoring, and GitHub Actions with Workload Identity Federation are the proposed supporting services. Exact region, account/billing topology, identity, network, recovery, and service configuration remain separately gated. `us-east4` is the current East-US/NYC-area-friendly region candidate pending exact service, cost, and recovery validation; EU primary, active-secondary, or default-backup placement is not proposed.
 - GitHub-based CI/CD and repository governance as code; exact provider/account configuration remains unapproved.
@@ -59,7 +59,7 @@ See `TECHNOLOGY_DECISIONS.md` for rationale and `docs/adr/` for durable decision
 - Keep exact worksite/household address internal by default; use least-precise location outside approved workflows.
 - Store documents outside database rows with private, controlled access only after document-ingestion qualification.
 - Keep secrets out of Git, logs, client builds, and ordinary operational records.
-- Use synthetic/de-identified data in development until an approved test-data procedure exists.
+- Use wholly fictional synthetic data in development until a separately approved test-data procedure exists; de-identified, transformed, hashed, or otherwise client/live-derived values are not allowed by default.
 
 ## Environment and promotion model
 ```text
@@ -72,7 +72,9 @@ main artifact → protected explicit production promotion
 
 The first implementation slice is narrower than this eventual environment model. ADR-0002 permits one local/test-only staff route, synthetic configuration-supplied principal, security-internal transactional `CommandReceipt`, draft `Employer` insert, and atomic creation `AuditEvent`; it creates no deployment, public plane, real identity, or live-data path.
 
-ADR-0004 proposes the next bounded local/test slice: one `employer:read` permission, exact current-Employer detail, and privacy-conscious POST search over accepted Employer fields. Search remains a bounded query over authoritative PostgreSQL rows—not a second store or durable projection—and ordinary reads append no domain audit event. Filter-required literal matching, deterministic keyset pagination, minimized responses, no-store caching, and authorization before lookup/result derivation define the boundary. No schema, index, dependency, mutation, adjacent domain entity, real identity, frontend, public route, or live-data path is added. This paragraph is planning direction, not implemented behavior, until ADR-0004 and its plan are reviewed, merged, coded, and verified.
+ADR-0004 controls the implemented second bounded local/test slice: one `employer:read` permission, exact current-Employer detail, and privacy-conscious POST search over accepted Employer fields. Search remains a bounded query over authoritative PostgreSQL rows—not a second store or durable projection—and ordinary reads append no domain audit event. Filter-required literal matching, deterministic keyset pagination, minimized responses, no-store caching, and authorization before lookup/result derivation define the boundary.
+
+ADR-0005 accepts the first standalone staff browser application boundary under `apps/web/`. Before browser consumption it adds `Cache-Control: no-store` to fresh and replayed create successes without changing status, body, authority, idempotency, persistence, route, or schema. It then consumes the Employer create/search/detail contracts through relative staff API paths, keeps Employer/search/command state in memory rather than URLs or browser persistence, and requires English/Spanish parity plus accessibility and frontend quality/security evidence. It does not otherwise alter backend authority, identity, schema, CORS, deployment, public routes, adjacent entities, or live-data admission, and remains unimplemented until the accepted packet merges and implementation is separately authorized.
 
 ## Interim infrastructure billing and handoff
 - **Accepted contractual constraint:** Beatrice is responsible for paying approved cloud-infrastructure charges until the final payment for the engagement has been rendered. Billing responsibility then transfers to the client through a documented handoff.

@@ -203,6 +203,17 @@ def test_display_name_longer_than_200_characters_is_rejected() -> None:
     assert exc_info.value.errors()[0]["type"] == "value_error"
 
 
+def test_display_name_of_exactly_200_unicode_code_points_is_accepted() -> None:
+    display_name = "x" * 200
+
+    request = CreateDraftEmployerRequest(
+        employer_type="household",
+        display_name=display_name,
+    )
+
+    assert request.display_name == display_name
+
+
 def test_display_name_with_control_characters_is_rejected() -> None:
     with pytest.raises(ValidationError) as exc_info:
         CreateDraftEmployerRequest(

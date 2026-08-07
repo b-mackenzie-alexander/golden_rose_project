@@ -69,6 +69,7 @@ def test_post_staff_employers_returns_201_and_exact_body_for_permitted_request(
         "received_at": "2026-08-05T00:10:45Z",
         "created_at": "2026-08-05T00:10:45Z",
     }
+    assert response.headers["Cache-Control"] == "no-store"
     assert "location" not in {key.lower() for key in response.headers}
 
 
@@ -111,6 +112,8 @@ def test_post_staff_employers_identical_replay_returns_same_resource_with_replay
 
     assert first_response.status_code == 201
     assert second_response.status_code == 201
+    assert first_response.headers["Cache-Control"] == "no-store"
+    assert second_response.headers["Cache-Control"] == "no-store"
     assert second_response.json() == first_response.json()
     assert second_response.headers["Idempotency-Replayed"] == "true"
 

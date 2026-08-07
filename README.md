@@ -18,8 +18,9 @@ automated hiring, matching, ranking, eligibility, or referral system.
 - Uses fictional/synthetic fixtures only. Do not use client, live, or
   production data.
 - ADR-0005 accepts a standalone `apps/web/` frontend boundary over only these
-  contracts; implementation remains unauthorized until the planning packet
-  merges and a fresh session receives separate implementation approval.
+  contracts; PR #12 merged that planning packet, and implementation now
+  proceeds from a fresh merged-tip coding branch with separate scoped approval
+  still required for service starts.
 
 ## Local verification
 

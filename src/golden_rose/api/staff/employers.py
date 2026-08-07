@@ -50,6 +50,7 @@ def post_staff_employer(
         clock=clock,
         identifiers=identifiers,
     )
+    response.headers["Cache-Control"] = "no-store"
     if result.replayed:
         response.headers["Idempotency-Replayed"] = "true"
     return DraftEmployerResponse.model_validate(result.employer)

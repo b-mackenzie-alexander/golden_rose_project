@@ -1,6 +1,6 @@
 # Technical Requirements — Golden Rose Operations Platform
 
-**Status:** Phase 1 technical planning baseline. The map and staff-role requirements are client-accepted; ADR-0002/ADR-0003 and ADR-0004 control the two implemented synthetic backend tracers. Beatrice accepted ADR-0005's independently cleared first local/synthetic Employer workspace frontend direction on 2026-08-06; it remains unimplemented pending protected planning-PR merge, fresh merged-tip rebaseline, and separate implementation-operation approval. Later choices and slices still require their applicable approvals, acceptance evidence, data classification, and live-use gates below.
+**Status:** Phase 1 technical implementation baseline. The map and staff-role requirements are client-accepted; ADR-0002/ADR-0003 and ADR-0004 control the two implemented synthetic backend tracers. PR #12 merged ADR-0005's independently cleared first local/synthetic Employer workspace frontend direction into `develop`, and this slice is now being implemented from a fresh merged-tip coding branch. Later choices and slices still require their applicable approvals, acceptance evidence, data classification, live-use gates below, and separate scoped approval for any service start.
 
 ## Product outcome
 Provide agency staff a reliable browser-based operations workspace that replaces fragmented paper/form/spreadsheet employer-demand handling, supports governed operational reporting, and later supports transparent staff review of worker-to-employer/job compatibility.

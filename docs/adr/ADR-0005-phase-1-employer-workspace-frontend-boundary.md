@@ -17,7 +17,7 @@ Use:
 
 - Node.js 22.22.3, npm 10.9.8, exact engine/package-manager constraints, and an exact committed lockfile;
 - React 19.2.8 and React DOM 19.2.8;
-- React Router DOM 7.18.2 with `/employers` as the sole product route and `/` redirecting to it;
+- React Router 8.3.0 with `/employers` as the sole product route and `/` redirecting to it;
 - TypeScript 5.9.3 rather than TypeScript 7 because the selected `typescript-eslint` line declares support below TypeScript 6.1;
 - Vite 8.2.1 and `@vitejs/plugin-react` 6.0.5 for local development and production build verification;
 - Vitest, jsdom, Testing Library, `axe-core`, ESLint, and V8 coverage for focused frontend quality evidence;
@@ -87,6 +87,7 @@ Any apparent need for those items stops implementation and returns to planning.
 - **Expose an Employer audit timeline next:** deferred because the current Employer has only its creation event, staff-facing actor/audit-field authorization remains separately bounded, and a timeline does not establish the first browser create/find/detail product loop.
 - **Add only a read-only search UI:** rejected because the backend already proves safe creation and the smallest useful staff Employer workspace is create plus find/detail. The create behavior remains exactly bounded to two accepted fields and existing server authority.
 - **Use Next.js or another server-rendered framework:** rejected because no server-rendering, SEO, public route, or frontend backend-for-frontend need is approved.
+- **Keep React Router DOM 7.18.2 exactly as first planned:** rejected after Task 12 CI-parity qualification because the required locked-tree frontend audit surfaced `GHSA-qwww-vcr4-c8h2` on the `react-router-dom`/`react-router` chain while no published `react-router-dom` 8.3.0 package existed to satisfy the workflow's High-severity audit gate. The approved mitigation candidate keeps the single-route declarative browser surface but switches to `react-router` 8.3.0 directly, which exports the exact BrowserRouter/NavLink/Routes/Route/Navigate/Outlet/MemoryRouter surface this tracer uses and clears the required audit gate.
 - **Use Tailwind/component library/global state/i18n framework/OpenAPI code generation:** deferred under YAGNI for one route and three existing operations. Revisit only after a concrete second-slice need.
 - **Serve the frontend from FastAPI:** deferred because it would couple local UI work to deployment architecture and change the backend/runtime boundary owned by another lane.
 - **Put search state in URL or browser storage:** rejected because Employer names may identify households/people and need not enter history, logs, referrers, persistence, or copied links.
@@ -103,6 +104,6 @@ Any apparent need for those items stops implementation and returns to planning.
 
 ## Approval and revisit trigger
 
-Beatrice accepted this ADR's bounded product/architecture direction on 2026-08-06 after independent planning rereviews reported no remaining Blocker, High, or Medium finding. The decision becomes an implementation baseline only after this exact planning packet passes protected PR/CI and merges to `develop`; implementation operations and all service starts remain separately approved.
+Beatrice accepted this ADR's bounded product/architecture direction on 2026-08-06 after independent planning rereviews reported no remaining Blocker, High, or Medium finding. PR #12 merged this exact planning packet into `develop` at `b06923a`, so the ADR is now the implementation baseline for the active coding lane. Implementation repository operations are approved in that lane; all service starts remain separately approved.
 
 Revisit before adding a second domain route/entity, identity/session handling, browser persistence, URL-carried record/search state, a new third-party runtime service, production serving/deployment, client branding, legal content, real data, or any backend contract/schema/permission change beyond the explicit create-success `no-store` hardening. The exact execution nodes and gates are controlled by `.hermes/plans/2026-08-06_115420-phase-1-employer-workspace-frontend-plan.md`.

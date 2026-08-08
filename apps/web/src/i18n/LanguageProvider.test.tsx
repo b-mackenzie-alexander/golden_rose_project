@@ -61,6 +61,12 @@ describe('LanguageProvider', () => {
 
     expect(spanishKeys).toEqual(englishKeys);
     expect(spanishMessages.employerSearchInstructions).toContain('sintética');
+    expect(englishMessages.employerCreateValidationFailureHeading).toBe('Create draft employer could not be completed');
+    expect(englishMessages.employerCreateForbiddenFailureHeading).toBe(
+      'Create draft employer is not available for this staff session',
+    );
+    expect(spanishMessages.employerCreateValidationFailureHeading).toContain('creación');
+    expect(spanishMessages.employerCreateForbiddenFailureBody).toContain('permiso');
 
     for (const [messageKey, messageValue] of Object.entries(spanishMessages)) {
       expect(messageValue).not.toBe(messageKey);

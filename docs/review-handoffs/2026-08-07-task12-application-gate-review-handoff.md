@@ -8,6 +8,16 @@
 **Ahead commits vs `origin/develop` at handoff creation:** `0` (`git rev-list --count origin/develop..HEAD`)
 **PR status:** no PR yet; review/remediation must complete before any commit/push/PR-open step
 
+## Historical status
+
+This handoff is now **historical/superseded review evidence**.
+
+- PR #13 later merged the bounded Employer workspace implementation into `develop` at `f8236e6`.
+- PR #14 merged the post-merge closeout plan into `develop` at `b0a459b`; accepted ADR-0006 remains pending durable merge with the implementation closeout.
+- Use ADR-0006 and `.hermes/plans/2026-08-07_145911-phase-1-employer-workspace-closeout-plan.md` for the active remediation lane; do not treat this packet as the current review target.
+
+The observed commands and results below are preserved as contemporaneous Task 12 evidence only.
+
 ## Update — remediation round after independent review
 
 Independent review returned **Changes requested** on the local uncommitted working tree and identified three frontend safety-boundary issues:

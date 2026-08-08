@@ -16,7 +16,8 @@ Use `ADR-NNNN-short-title.md`, with monotonic numbers. Never renumber an existin
 - `ADR-0002-first-phase-1-slice-and-synthetic-data-boundary.md` — accepted first tracer scope, synthetic-data boundary, and planning/coding/review handoff.
 - `ADR-0003-phase-1-backend-toolchain.md` — accepted Python/FastAPI/PostgreSQL synchronous backend toolchain for the first slice.
 - `ADR-0004-phase-1-employer-read-search-boundary.md` — accepted and implemented synthetic/local Employer detail and bounded-search boundary.
-- `ADR-0005-phase-1-employer-workspace-frontend-boundary.md` — accepted first browser-workspace and create-response cache-hardening boundary; PR #12 merged the planning packet, and the active coding lane now executes it from a fresh rebaseline with separate service-start approvals still required.
+- `ADR-0005-phase-1-employer-workspace-frontend-boundary.md` — accepted and implemented first browser-workspace and create-response cache-hardening boundary; PR #12 merged the planning packet and PR #13 merged the bounded implementation.
+- `ADR-0006-phase-1-employer-workspace-post-merge-closeout.md` — accepted post-merge closeout decision for PR #13 defects, deferred human qualification gates, and the bounded remediation lane before any next-slice planning; PR #14 merged its paired plan only, and this ADR remains part of the implementation-closeout candidate until that PR merges.
 
 ## Required sections
 - Status and date

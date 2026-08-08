@@ -79,23 +79,15 @@ jobs:
           test "$(npm --userconfig apps/web/.npmrc config get ignore-scripts)" = "true"
           node --test apps/web/scripts/validate-lockfile.test.mjs
           node apps/web/scripts/validate-lockfile.mjs apps/web/package-lock.json
+          uv lock --check
+          uv sync --locked --all-groups
           npm --userconfig apps/web/.npmrc ci --ignore-scripts --prefix apps/web
           npm --prefix apps/web run verify
           npm --prefix apps/web ls --all
           npm --userconfig apps/web/.npmrc --prefix apps/web audit --audit-level=high
           mkdir -p build
           npm --userconfig apps/web/.npmrc --prefix apps/web sbom --sbom-format cyclonedx --sbom-type application > build/frontend-sbom.cdx.json
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          sbom_path = Path('build/frontend-sbom.cdx.json')
-          document = json.loads(sbom_path.read_text())
-          assert document['bomFormat'] == 'CycloneDX'
-          assert 'specVersion' in document
-          PY
-          uv lock --check
-          uv sync --locked --all-groups
+          uv run python scripts/validate_sbom.py build/frontend-sbom.cdx.json --spec 1.5 --name web --version 0.0.0 --purl 'pkg:npm/%40golden-rose/web@0.0.0'
           uv run ruff format --check .
           uv run ruff check .
           uv run mypy src tests
@@ -107,15 +99,7 @@ jobs:
           uv run pip-audit --skip-editable
           mkdir -p build
           uv run cyclonedx-py environment --pyproject pyproject.toml --output-reproducible --of JSON -o build/backend-sbom.cdx.json
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          sbom_path = Path('build/backend-sbom.cdx.json')
-          document = json.loads(sbom_path.read_text())
-          assert document['bomFormat'] == 'CycloneDX'
-          assert 'specVersion' in document
-          PY
+          uv run python scripts/validate_sbom.py build/backend-sbom.cdx.json --spec 1.6 --name golden-rose --version 0.1.0
 
       - name: Upload backend SBOM evidence
         if: always()

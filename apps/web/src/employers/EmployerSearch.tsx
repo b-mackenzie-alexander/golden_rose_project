@@ -14,15 +14,15 @@ import { EmployerDetail } from './EmployerDetail';
 type SearchUiState = 'idle' | 'empty' | 'results' | 'failure';
 
 type SearchFailureState = {
-  kind: Extract<ApiFailureKind, 'validation' | 'forbidden' | 'unavailable' | 'unexpected'>;
+  kind: Extract<ApiFailureKind, 'validation' | 'forbidden' | 'conflict' | 'unavailable' | 'unexpected'>;
 };
 
 type PaginationFailureState = {
-  kind: Extract<ApiFailureKind, 'unavailable'>;
+  kind: Extract<ApiFailureKind, 'validation' | 'forbidden' | 'conflict' | 'unavailable' | 'unexpected'>;
 };
 
 type DetailFailureState = {
-  kind: Extract<ApiFailureKind, 'not_found' | 'forbidden' | 'unavailable'>;
+  kind: Extract<ApiFailureKind, 'validation' | 'not_found' | 'forbidden' | 'conflict' | 'unavailable' | 'unexpected'>;
 };
 
 function isValidName(value: string) {
@@ -103,6 +103,12 @@ export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
           body: messages.employerSearchForbiddenFailureBody,
           retryable: false,
         };
+      case 'conflict':
+        return {
+          heading: messages.employerSearchConflictFailureHeading,
+          body: messages.employerSearchConflictFailureBody,
+          retryable: false,
+        };
       case 'unavailable':
         return {
           heading: messages.employerSearchUnavailableFailureHeading,
@@ -117,6 +123,45 @@ export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
         };
     }
   }, [failureState, messages]);
+
+  const paginationFailureCopy = useMemo(() => {
+    if (paginationFailureState === null) {
+      return null;
+    }
+
+    switch (paginationFailureState.kind) {
+      case 'validation':
+        return {
+          heading: messages.employerSearchPageValidationFailureHeading,
+          body: messages.employerSearchPageValidationFailureBody,
+          retryable: false,
+        };
+      case 'forbidden':
+        return {
+          heading: messages.employerSearchPageForbiddenFailureHeading,
+          body: messages.employerSearchPageForbiddenFailureBody,
+          retryable: false,
+        };
+      case 'conflict':
+        return {
+          heading: messages.employerSearchPageConflictFailureHeading,
+          body: messages.employerSearchPageConflictFailureBody,
+          retryable: false,
+        };
+      case 'unavailable':
+        return {
+          heading: messages.employerSearchPageUnavailableFailureHeading,
+          body: messages.employerSearchPageUnavailableBody,
+          retryable: true,
+        };
+      case 'unexpected':
+        return {
+          heading: messages.employerSearchPageUnexpectedFailureHeading,
+          body: messages.employerSearchPageUnexpectedFailureBody,
+          retryable: false,
+        };
+    }
+  }, [messages, paginationFailureState]);
 
   useEffect(() => {
     if (searchState === 'empty') {
@@ -262,13 +307,12 @@ export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
       if (
         result.failure.kind === 'validation' ||
         result.failure.kind === 'forbidden' ||
+        result.failure.kind === 'conflict' ||
         result.failure.kind === 'unavailable' ||
         result.failure.kind === 'unexpected'
       ) {
         if (isPaginationRequest) {
-          if (result.failure.kind === 'unavailable') {
-            setPaginationFailureState({ kind: 'unavailable' });
-          }
+          setPaginationFailureState({ kind: result.failure.kind });
           return;
         }
 
@@ -360,7 +404,12 @@ export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
         setDetail(result.value);
       } else if (
         !result.ok &&
-        (result.failure.kind === 'not_found' || result.failure.kind === 'forbidden' || result.failure.kind === 'unavailable')
+        (result.failure.kind === 'validation' ||
+          result.failure.kind === 'not_found' ||
+          result.failure.kind === 'forbidden' ||
+          result.failure.kind === 'conflict' ||
+          result.failure.kind === 'unavailable' ||
+          result.failure.kind === 'unexpected')
       ) {
         setDetailFailureState({ kind: result.failure.kind });
       }
@@ -465,15 +514,18 @@ export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
               </li>
             ))}
           </ul>
-          {paginationFailureState?.kind !== 'unavailable' ? null : (
+          {paginationFailureCopy === null ? null : (
             <div aria-live="assertive">
-              <p>{messages.employerSearchPageUnavailableBody}</p>
-              <button className="focus-ring" onClick={handleRetryLoadMore} type="button">
-                {messages.employerSearchRetryLoadMore}
-              </button>
+              <h4>{paginationFailureCopy.heading}</h4>
+              <p>{paginationFailureCopy.body}</p>
+              {paginationFailureCopy.retryable ? (
+                <button className="focus-ring" onClick={handleRetryLoadMore} type="button">
+                  {messages.employerSearchRetryLoadMore}
+                </button>
+              ) : null}
             </div>
           )}
-          {nextCursor === null ? null : (
+          {nextCursor === null || paginationFailureCopy !== null ? null : (
             <button className="focus-ring" disabled={isLoadingMore} onClick={handleLoadMore} type="button">
               {messages.employerSearchLoadMore}
             </button>

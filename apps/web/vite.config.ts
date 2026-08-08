@@ -1,6 +1,9 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
+const isFocusedEmployerClientCoverage =
+  process.argv.includes('--coverage') && process.argv.some((argument) => argument.includes('src/api/employerClient.test.ts'));
+
 export default defineConfig({
   plugins: [react()],
   server: {
@@ -37,13 +40,19 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     coverage: {
       provider: 'v8',
-      include: ['src/**/*.{ts,tsx}'],
+      include: isFocusedEmployerClientCoverage ? ['src/api/employerClient.ts'] : ['src/**/*.{ts,tsx}'],
       exclude: ['src/main.tsx', 'src/test/**', '**/*.d.ts', 'src/api/employerContracts.ts'],
       thresholds: {
         statements: 90,
         lines: 90,
         functions: 90,
         branches: 85,
+        'src/api/employerClient.ts': {
+          statements: 91,
+          lines: 95,
+          functions: 95,
+          branches: 90,
+        },
       },
     },
   },

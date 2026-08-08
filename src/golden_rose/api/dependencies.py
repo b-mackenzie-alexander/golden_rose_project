@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID, uuid4
 
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Request
 from sqlalchemy.orm import Session
 
 from golden_rose.api.errors import InvalidIdempotencyKeyError
@@ -13,7 +13,6 @@ from golden_rose.auth.permissions import (
 )
 from golden_rose.auth.principal import StaffPrincipal
 from golden_rose.config import Settings
-from golden_rose.database import create_database_engine
 
 
 class SystemClock:
@@ -30,8 +29,11 @@ def get_settings() -> Settings:
     return Settings()  # type: ignore[call-arg]
 
 
-def get_db_session() -> Iterator[Session]:
-    engine = create_database_engine()
+def get_db_session(request: Request) -> Iterator[Session]:
+    engine = getattr(request.app.state, "db_engine", None)
+    if engine is None:
+        msg = "application database engine is not initialized"
+        raise RuntimeError(msg)
     with Session(engine) as session:
         yield session
 

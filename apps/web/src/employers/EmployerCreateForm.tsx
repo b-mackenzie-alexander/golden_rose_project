@@ -23,15 +23,21 @@ type EmployerCreateFormProps = {
   resetSignal?: number;
 };
 
+type CreateFailureKind = 'validation' | 'forbidden';
+
 export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: EmployerCreateFormProps) {
   const { messages } = useLanguage();
   const typeSelectRef = useRef<HTMLSelectElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const successHeadingRef = useRef<HTMLHeadingElement>(null);
+  const createFailureHeadingRef = useRef<HTMLHeadingElement>(null);
   const previousResetSignalRef = useRef(resetSignal);
+  const operationGenerationRef = useRef(0);
+  const authorityOperationLockRef = useRef(false);
   const [employerType, setEmployerType] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  const [createFailure, setCreateFailure] = useState<CreateFailureKind | null>(null);
   const [createdDetail, setCreatedDetail] = useState<EmployerDetail | null>(null);
   const [unknownAttempt, setUnknownAttempt] = useState<CreateEmployerInput | null>(null);
   const [conflictAttempt, setConflictAttempt] = useState<CreateEmployerInput | null>(null);
@@ -48,6 +54,24 @@ export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: Employe
       successHeadingRef.current?.focus();
     }
   }, [createdDetail]);
+
+  useEffect(() => {
+    if (createFailure !== null) {
+      createFailureHeadingRef.current?.focus();
+    }
+  }, [createFailure]);
+
+  useEffect(() => {
+    function retireCreateAuthority() {
+      operationGenerationRef.current += 1;
+      authorityOperationLockRef.current = false;
+    }
+
+    window.addEventListener('pagehide', retireCreateAuthority);
+    return () => {
+      window.removeEventListener('pagehide', retireCreateAuthority);
+    };
+  }, []);
 
   useEffect(() => {
     if (pendingAttempt === null && unknownAttempt === null) {
@@ -73,9 +97,12 @@ export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: Employe
     }
 
     previousResetSignalRef.current = resetSignal;
+    operationGenerationRef.current += 1;
+    authorityOperationLockRef.current = false;
     setEmployerType('');
     setDisplayName('');
     setFormError(null);
+    setCreateFailure(null);
     setCreatedDetail(null);
     setUnknownAttempt(null);
     setConflictAttempt(null);
@@ -90,6 +117,9 @@ export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: Employe
     }
     setEmployerType(event.target.value);
     setAbandonSearchFailure(null);
+    if (createFailure !== null) {
+      setCreateFailure(null);
+    }
     if (formError !== null) {
       setFormError(null);
     }
@@ -101,18 +131,34 @@ export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: Employe
     }
     setDisplayName(event.target.value);
     setAbandonSearchFailure(null);
+    if (createFailure !== null) {
+      setCreateFailure(null);
+    }
     if (formError !== null) {
       setFormError(null);
     }
   }
 
   async function submitAttempt(attempt: CreateEmployerInput) {
+    if (authorityOperationLockRef.current) {
+      return;
+    }
+
+    authorityOperationLockRef.current = true;
+    const operationGeneration = operationGenerationRef.current + 1;
+    operationGenerationRef.current = operationGeneration;
     setPendingAttempt(attempt);
     setAbandonSearchFailure(null);
+    setCreateFailure(null);
 
     try {
       const result = await createEmployer(attempt);
+      if (operationGeneration !== operationGenerationRef.current) {
+        return;
+      }
+
       if (result.ok) {
+        setCreateFailure(null);
         setConflictAttempt(null);
         setUnknownAttempt(null);
         setIsAbandonSearchPending(false);
@@ -125,22 +171,41 @@ export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: Employe
       }
 
       if (result.failure.kind === 'unknown_outcome') {
+        setCreateFailure(null);
         setEmployerType('');
         setDisplayName('');
         setConflictAttempt(null);
         setUnknownAttempt(attempt);
       } else if (result.failure.kind === 'conflict') {
+        setCreateFailure(null);
         setEmployerType('');
         setDisplayName('');
         setUnknownAttempt(null);
         setConflictAttempt(attempt);
+      } else if (result.failure.kind === 'validation' || result.failure.kind === 'forbidden') {
+        setCreatedDetail(null);
+        setUnknownAttempt(null);
+        setConflictAttempt(null);
+        setIsAbandonSearchPending(false);
+        setAbandonSearchFailure(null);
+        setCreateFailure(result.failure.kind);
       }
     } finally {
-      setPendingAttempt(null);
+      if (operationGeneration === operationGenerationRef.current) {
+        setPendingAttempt(null);
+        authorityOperationLockRef.current = false;
+      }
     }
   }
 
   async function completeAbandonSearch(attempt: CreateEmployerInput, clearAttempt: () => void) {
+    if (authorityOperationLockRef.current) {
+      return;
+    }
+
+    authorityOperationLockRef.current = true;
+    const operationGeneration = operationGenerationRef.current + 1;
+    operationGenerationRef.current = operationGeneration;
     setIsAbandonSearchPending(true);
     setAbandonSearchFailure(null);
 
@@ -150,6 +215,10 @@ export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: Employe
         employerType: undefined,
         cursor: null,
       });
+
+      if (operationGeneration !== operationGenerationRef.current) {
+        return;
+      }
 
       if (result === null || !result.ok) {
         setAbandonSearchFailure(messages.employerCreateAbandonSearchFailure);
@@ -161,12 +230,15 @@ export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: Employe
       setDisplayName('');
       setAbandonSearchFailure(null);
     } finally {
-      setIsAbandonSearchPending(false);
+      if (operationGeneration === operationGenerationRef.current) {
+        setIsAbandonSearchPending(false);
+        authorityOperationLockRef.current = false;
+      }
     }
   }
 
   async function handleAbandonUnknownAttempt() {
-    if (unknownAttempt === null || isAbandonSearchPending) {
+    if (unknownAttempt === null || pendingAttempt !== null || isAbandonSearchPending || authorityOperationLockRef.current) {
       return;
     }
 
@@ -180,7 +252,7 @@ export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: Employe
   }
 
   async function handleAbandonConflictAttempt() {
-    if (conflictAttempt === null || isAbandonSearchPending) {
+    if (conflictAttempt === null || pendingAttempt !== null || isAbandonSearchPending || authorityOperationLockRef.current) {
       return;
     }
 
@@ -243,6 +315,21 @@ export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: Employe
         </section>
       )}
 
+      {createFailure === null ? null : (
+        <section aria-label={messages.employerCreateHeading} aria-live="assertive">
+          <h3 ref={createFailureHeadingRef} tabIndex={-1}>
+            {createFailure === 'validation'
+              ? messages.employerCreateValidationFailureHeading
+              : messages.employerCreateForbiddenFailureHeading}
+          </h3>
+          <p>
+            {createFailure === 'validation'
+              ? messages.employerCreateValidationFailureBody
+              : messages.employerCreateForbiddenFailureBody}
+          </p>
+        </section>
+      )}
+
       <div>
         <label htmlFor="create-employer-type">{messages.employerCreateTypeLabel}</label>
         <select
@@ -292,7 +379,7 @@ export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: Employe
           <p>{messages.employerCreateAbandonBody}</p>
           <button
             className="focus-ring"
-            disabled={isAbandonSearchPending}
+            disabled={pendingAttempt !== null || isAbandonSearchPending}
             onClick={() => {
               void handleAbandonConflictAttempt();
             }}
@@ -309,8 +396,11 @@ export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: Employe
           <p>{messages.employerCreateUnknownBody}</p>
           <button
             className="focus-ring"
-            disabled={isAbandonSearchPending}
+            disabled={pendingAttempt !== null || isAbandonSearchPending}
             onClick={() => {
+              if (pendingAttempt !== null || isAbandonSearchPending) {
+                return;
+              }
               void submitAttempt(unknownAttempt);
             }}
             type="button"
@@ -320,7 +410,7 @@ export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: Employe
           <p>{messages.employerCreateAbandonBody}</p>
           <button
             className="focus-ring"
-            disabled={isAbandonSearchPending}
+            disabled={pendingAttempt !== null || isAbandonSearchPending}
             onClick={() => {
               void handleAbandonUnknownAttempt();
             }}

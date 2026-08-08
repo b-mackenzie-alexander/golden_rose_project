@@ -5,7 +5,7 @@ import { useLanguage } from '../i18n/LanguageProvider';
 
 type EmployerDetailProps = {
   detail: EmployerDetailRecord | null;
-  failureKind: 'not_found' | 'forbidden' | 'unavailable' | null;
+  failureKind: 'validation' | 'not_found' | 'forbidden' | 'conflict' | 'unavailable' | 'unexpected' | null;
   isLoading: boolean;
 };
 
@@ -41,20 +41,35 @@ export function EmployerDetail({ detail, failureKind, isLoading }: EmployerDetai
     }
 
     const failureCopy =
-      failureKind === 'not_found'
+      failureKind === 'validation'
         ? {
-            heading: messages.employerDetailNotFoundHeading,
-            body: messages.employerDetailNotFoundBody,
+            heading: messages.employerDetailValidationHeading,
+            body: messages.employerDetailValidationBody,
           }
-        : failureKind === 'forbidden'
+        : failureKind === 'not_found'
           ? {
-              heading: messages.employerDetailForbiddenHeading,
-              body: messages.employerDetailForbiddenBody,
+              heading: messages.employerDetailNotFoundHeading,
+              body: messages.employerDetailNotFoundBody,
             }
-          : {
-              heading: messages.employerDetailUnavailableHeading,
-              body: messages.employerDetailUnavailableBody,
-            };
+          : failureKind === 'forbidden'
+            ? {
+                heading: messages.employerDetailForbiddenHeading,
+                body: messages.employerDetailForbiddenBody,
+              }
+            : failureKind === 'conflict'
+              ? {
+                  heading: messages.employerDetailConflictHeading,
+                  body: messages.employerDetailConflictBody,
+                }
+              : failureKind === 'unavailable'
+                ? {
+                    heading: messages.employerDetailUnavailableHeading,
+                    body: messages.employerDetailUnavailableBody,
+                  }
+                : {
+                    heading: messages.employerDetailUnexpectedHeading,
+                    body: messages.employerDetailUnexpectedBody,
+                  };
 
     return (
       <section aria-live="assertive">

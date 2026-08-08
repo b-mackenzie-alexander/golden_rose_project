@@ -40,20 +40,51 @@ function isValidTimestamp(value: unknown): value is string {
   if (!match) {
     return false;
   }
-  const [, year, month, day, hour, minute, second] = match;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
+  const [, year, month, day, hour, minute, second, , matchedTimezone] = match;
+  const timezone = matchedTimezone ?? '';
+  const numericYear = Number(year);
+  const numericMonth = Number(month);
+  const numericDay = Number(day);
+  const numericHour = Number(hour);
+  const numericMinute = Number(minute);
+  const numericSecond = Number(second);
+
+  if (numericYear < 1 || numericMonth < 1 || numericMonth > 12) {
     return false;
   }
-  const isoLike = parsed.toISOString();
-  return (
-    isoLike.slice(0, 4) === year &&
-    isoLike.slice(5, 7) === month &&
-    isoLike.slice(8, 10) === day &&
-    isoLike.slice(11, 13) === hour &&
-    isoLike.slice(14, 16) === minute &&
-    isoLike.slice(17, 19) === second
-  );
+
+  if (numericHour > 23 || numericMinute > 59 || numericSecond > 59) {
+    return false;
+  }
+
+  if (timezone !== 'Z') {
+    const offsetMatch = timezone.match(/^([+-])(\d{2}):(\d{2})$/);
+    if (!offsetMatch) {
+      return false;
+    }
+
+    const [, , offsetHour, offsetMinute] = offsetMatch;
+    if (Number(offsetHour) > 23 || Number(offsetMinute) > 59) {
+      return false;
+    }
+  }
+
+  const calendarCheck = new Date(0);
+  calendarCheck.setUTCFullYear(numericYear, numericMonth - 1, numericDay);
+  calendarCheck.setUTCHours(numericHour, numericMinute, numericSecond, 0);
+  if (
+    calendarCheck.getUTCFullYear() !== numericYear ||
+    calendarCheck.getUTCMonth() !== numericMonth - 1 ||
+    calendarCheck.getUTCDate() !== numericDay ||
+    calendarCheck.getUTCHours() !== numericHour ||
+    calendarCheck.getUTCMinutes() !== numericMinute ||
+    calendarCheck.getUTCSeconds() !== numericSecond
+  ) {
+    return false;
+  }
+
+  const parsed = new Date(value);
+  return !Number.isNaN(parsed.getTime());
 }
 
 function isJsonResponse(response: Response) {
@@ -64,7 +95,8 @@ function isJsonResponse(response: Response) {
 function isAbortError(error: unknown) {
   return (
     (typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError') ||
-    (error instanceof Error && error.name === 'AbortError')
+    (error instanceof Error && error.name === 'AbortError') ||
+    (typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError')
   );
 }
 
@@ -181,7 +213,10 @@ export async function searchEmployers(input: SearchEmployersInput): Promise<ApiR
     const payload: unknown = await response.json();
     const parsed = parseSearchResult(payload);
     return parsed ? { ok: true, value: parsed } : unexpected();
-  } catch {
+  } catch (error) {
+    if (isAbortError(error)) {
+      return null;
+    }
     return unexpected();
   }
 }
@@ -249,7 +284,10 @@ export async function getEmployer(
     const payload: unknown = await response.json();
     const parsed = parseEmployerDetail(payload, employerId);
     return parsed ? { ok: true, value: parsed } : unexpected();
-  } catch {
+  } catch (error) {
+    if (isAbortError(error)) {
+      return null;
+    }
     return unexpected();
   }
 }

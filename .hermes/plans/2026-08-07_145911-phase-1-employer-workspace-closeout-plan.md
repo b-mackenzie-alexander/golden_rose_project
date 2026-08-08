@@ -625,7 +625,8 @@ Expected: FAIL because no validator exists.
 
 - Use `cyclonedx.validation.json.JsonStrictValidator` and the already direct-pinned `cyclonedx-python-lib[json-validation]==11.11.0`; add no new dependency.
 - Select schema from the document’s exact supported spec version.
-- Validate the full JSON string, then assert root component identity, application type, expected version, nonempty components/dependencies, and tool metadata.
+- Before compatibility canonicalization, reject unknown dependency-object keys, malformed present `dependsOn`, exact duplicate components, and conflicting component identity/evidence. Canonicalize only the locked generators' evidenced quirks: exact/divergent same-ref dependency rows, omitted backend `dependsOn`, and differing `properties` on otherwise-identical npm components.
+- Strict-validate the full canonical JSON string, then assert root component identity, application type, expected version, nonempty components/dependencies, resolvable references, and tool metadata. Do not require every environment package to be root-reachable; the backend environment generator legitimately includes schema-valid isolated package nodes.
 - Accept explicit CLI arguments for expected name/version/spec so one script validates both applications.
 - Emit value-free pass/fail text only; do not print the document or component inventory on failure.
 
@@ -723,15 +724,21 @@ Stop if the listener is not bound only to `127.0.0.1:55432` or health does not b
 **Step 2: Run the exact workflow-order gate**
 
 ```bash
+test "$(node --version)" = "v22.22.3"
+test "$(npm --version)" = "10.9.8"
+test "$(npm --userconfig apps/web/.npmrc config get registry)" = "https://registry.npmjs.org/"
+test "$(npm --userconfig apps/web/.npmrc config get ignore-scripts)" = "true"
 node --test apps/web/scripts/validate-lockfile.test.mjs
 node apps/web/scripts/validate-lockfile.mjs apps/web/package-lock.json
+env -u PYTHONPATH uv lock --check
+env -u PYTHONPATH uv sync --locked --all-groups
 npm --userconfig apps/web/.npmrc ci --ignore-scripts --prefix apps/web
 npm --prefix apps/web run verify
 npm --prefix apps/web ls --all
 npm --userconfig apps/web/.npmrc --prefix apps/web audit --audit-level=high
+mkdir -p build
 npm --userconfig apps/web/.npmrc --prefix apps/web sbom --sbom-format cyclonedx --sbom-type application > build/frontend-sbom.cdx.json
-env -u PYTHONPATH uv lock --check
-env -u PYTHONPATH uv sync --locked --all-groups
+env -u PYTHONPATH uv run python scripts/validate_sbom.py build/frontend-sbom.cdx.json --spec 1.5 --name web --version 0.0.0 --purl 'pkg:npm/%40golden-rose/web@0.0.0'
 env -u PYTHONPATH uv run ruff format --check .
 env -u PYTHONPATH uv run ruff check .
 env -u PYTHONPATH uv run mypy src tests
@@ -742,8 +749,8 @@ env -u PYTHONPATH uv run pytest --cov=golden_rose --cov-report=term-missing --co
 env -u PYTHONPATH uv run alembic downgrade base
 env -u PYTHONPATH uv run alembic upgrade head
 env -u PYTHONPATH uv run pip-audit --skip-editable
+mkdir -p build
 env -u PYTHONPATH uv run cyclonedx-py environment --pyproject pyproject.toml --output-reproducible --of JSON -o build/backend-sbom.cdx.json
-env -u PYTHONPATH uv run python scripts/validate_sbom.py build/frontend-sbom.cdx.json --spec 1.5 --name web --version 0.0.0 --purl 'pkg:npm/%40golden-rose/web@0.0.0'
 env -u PYTHONPATH uv run python scripts/validate_sbom.py build/backend-sbom.cdx.json --spec 1.6 --name golden-rose --version 0.1.0
 git diff --check
 ```

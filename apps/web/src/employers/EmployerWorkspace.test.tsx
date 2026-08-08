@@ -5,8 +5,10 @@ import { vi } from 'vitest';
 
 import { createEmployer, getEmployer, searchEmployers } from '../api/employerClient';
 import { App, AppRoutes } from '../app/App';
+import { EmployerCreateForm } from './EmployerCreateForm';
 import { EmployerWorkspace } from './EmployerWorkspace';
 import { LanguageProvider } from '../i18n/LanguageProvider';
+import { VALUE_SAFE_TESTING_LIBRARY_MESSAGE } from '../test/valueSafeDiagnostics';
 
 vi.mock('../api/employerClient', () => ({
   createEmployer: vi.fn(),
@@ -30,7 +32,7 @@ describe('EmployerWorkspace', () => {
   it('resets state on page hide without requiring a persisted-restore callback', () => {
     render(
       <LanguageProvider>
-        <EmployerWorkspace />
+        <EmployerWorkspace onPersistedRestore={() => {}} />
       </LanguageProvider>,
     );
 
@@ -42,6 +44,123 @@ describe('EmployerWorkspace', () => {
     expect(screen.getByRole('region', { name: 'Employers workspace' })).toBeInTheDocument();
     expect(screen.getByRole('form', { name: 'Create a draft employer' })).toBeInTheDocument();
     expect(screen.getByRole('form', { name: 'Employer search' })).toBeInTheDocument();
+  });
+
+  it('does not restore created detail or form state when create success resolves after pagehide', async () => {
+    const user = userEvent.setup();
+    const deferredCreate = createDeferredPromise<Awaited<ReturnType<typeof createEmployer>>>();
+    const createEmployerMock = vi.mocked(createEmployer);
+    createEmployerMock.mockReset();
+    createEmployerMock.mockReturnValueOnce(deferredCreate.promise);
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.selectOptions(screen.getByLabelText('Create employer type'), 'business');
+    await user.type(screen.getByLabelText('Create employer name'), 'Late Success Rose');
+    await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
+
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+
+    expect(screen.getByLabelText('Create employer name')).toHaveValue('');
+
+    await act(async () => {
+      deferredCreate.resolve({
+        ok: true,
+        value: {
+          employerId: '61616161-6161-4161-8161-616161616161',
+          employerType: 'business',
+          displayName: 'Late Success Rose',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+        },
+      });
+      await deferredCreate.promise;
+    });
+
+    expect(screen.queryByRole('heading', { name: 'Draft employer created' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Create employer name')).toHaveValue('');
+    expect(screen.queryByDisplayValue('Late Success Rose')).not.toBeInTheDocument();
+  });
+
+  it('does not restore unknown create authority after pagehide when a late completion resolves', async () => {
+    const user = userEvent.setup();
+    const deferredCreate = createDeferredPromise<Awaited<ReturnType<typeof createEmployer>>>();
+    const createEmployerMock = vi.mocked(createEmployer);
+    createEmployerMock.mockReset();
+    createEmployerMock.mockReturnValueOnce(deferredCreate.promise);
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.selectOptions(screen.getByLabelText('Create employer type'), 'business');
+    await user.type(screen.getByLabelText('Create employer name'), 'Late Unknown Rose');
+    await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
+
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+
+    expect(screen.queryByRole('heading', { name: 'Create outcome is unknown' })).not.toBeInTheDocument();
+
+    await act(async () => {
+      deferredCreate.resolve({ ok: false, failure: { kind: 'unknown_outcome' } });
+      await deferredCreate.promise;
+    });
+
+    expect(screen.queryByRole('heading', { name: 'Create outcome is unknown' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry same create attempt' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Create employer name')).toHaveValue('');
+  });
+
+  it('retires create authority synchronously on pagehide before parent reset effects', async () => {
+    const user = userEvent.setup();
+    const deferredCreate = createDeferredPromise<Awaited<ReturnType<typeof createEmployer>>>();
+    const createEmployerMock = vi.mocked(createEmployer);
+    const onCreateSuccess = vi.fn();
+    createEmployerMock.mockReset();
+    createEmployerMock.mockReturnValueOnce(deferredCreate.promise);
+
+    render(
+      <LanguageProvider>
+        <EmployerCreateForm onCreateSuccess={onCreateSuccess} />
+      </LanguageProvider>,
+    );
+
+    await user.selectOptions(screen.getByLabelText('Create employer type'), 'business');
+    await user.type(screen.getByLabelText('Create employer name'), 'Synchronous Pagehide Rose');
+    await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
+
+    window.dispatchEvent(new Event('pagehide'));
+
+    await act(async () => {
+      deferredCreate.resolve({
+        ok: true,
+        value: {
+          employerId: '91919191-9191-4191-8191-919191919191',
+          employerType: 'business',
+          displayName: 'Synchronous Pagehide Rose',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+        },
+      });
+      await deferredCreate.promise;
+    });
+
+    expect(onCreateSuccess).not.toHaveBeenCalled();
+    expect(screen.queryByRole('heading', { name: 'Draft employer created' })).not.toBeInTheDocument();
   });
 
   it('shows search instructions without fetching on mount', () => {
@@ -257,6 +376,7 @@ describe('EmployerWorkspace', () => {
     searchEmployersMock
       .mockResolvedValueOnce({ ok: false, failure: { kind: 'validation' } })
       .mockResolvedValueOnce({ ok: false, failure: { kind: 'forbidden' } })
+      .mockResolvedValueOnce({ ok: false, failure: { kind: 'conflict' } })
       .mockResolvedValueOnce({ ok: false, failure: { kind: 'unavailable' } })
       .mockResolvedValueOnce({ ok: false, failure: { kind: 'unavailable' } })
       .mockResolvedValueOnce({ ok: false, failure: { kind: 'unexpected' } });
@@ -288,6 +408,13 @@ describe('EmployerWorkspace', () => {
 
     await user.click(submitButton);
 
+    failureHeading = await screen.findByRole('heading', { name: 'Search requires a fresh staff action' });
+    expect(failureHeading).toHaveFocus();
+    expect(screen.getByText('Run the employer search again before continuing from this workspace state.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry search' })).not.toBeInTheDocument();
+
+    await user.click(submitButton);
+
     failureHeading = await screen.findByRole('heading', { name: 'Search is temporarily unavailable' });
     expect(failureHeading).toHaveFocus();
     expect(screen.getByText('Retry the same employer search when the service becomes available.')).toBeInTheDocument();
@@ -296,7 +423,7 @@ describe('EmployerWorkspace', () => {
     await user.click(retryButton);
 
     expect(searchEmployersMock).toHaveBeenNthCalledWith(
-      4,
+      5,
       expect.objectContaining({
         displayNameQuery: 'Rose',
         employerType: undefined,
@@ -459,7 +586,7 @@ describe('EmployerWorkspace', () => {
       redactedDiagnostic = error instanceof Error ? error.message : String(error);
     }
 
-    expect(redactedDiagnostic).toContain('[REDACTED]');
+    expect(redactedDiagnostic).toContain(VALUE_SAFE_TESTING_LIBRARY_MESSAGE);
     expect(redactedDiagnostic).not.toContain('SYNTHETIC_EMPLOYER_SECRET');
     expect(redactedDiagnostic).not.toContain('SYNTHETIC_API_CURSOR');
   });
@@ -760,7 +887,7 @@ describe('EmployerWorkspace', () => {
     });
 
     expect(screen.getByRole('button', { name: 'Synthetic Rose Page One' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Load more employers' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load more employers' })).not.toBeInTheDocument();
 
     const retryPageButton = screen.getByRole('button', { name: 'Retry loading more employers' });
     expect(retryPageButton).toBeInTheDocument();
@@ -796,6 +923,97 @@ describe('EmployerWorkspace', () => {
 
     expect(screen.getByRole('button', { name: 'Recovered Page Result' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Retry loading more employers' })).not.toBeInTheDocument();
+  });
+
+  it('keeps accepted results while mapping pagination failures by classification', async () => {
+    const user = userEvent.setup();
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    searchEmployersMock.mockReset();
+    const firstPage = {
+      ok: true as const,
+      value: {
+        items: [
+          {
+            employerId: '21212121-2121-4212-8212-212121212121',
+            employerType: 'business' as const,
+            displayName: 'Pagination Anchor',
+            lifecycleStatus: 'draft' as const,
+          },
+        ],
+        nextCursor: 'opaque-cursor-008',
+      },
+    };
+
+    searchEmployersMock
+      .mockResolvedValueOnce(firstPage)
+      .mockResolvedValueOnce({ ok: false, failure: { kind: 'validation' } })
+      .mockResolvedValueOnce(firstPage)
+      .mockResolvedValueOnce({ ok: false, failure: { kind: 'forbidden' } })
+      .mockResolvedValueOnce(firstPage)
+      .mockResolvedValueOnce({ ok: false, failure: { kind: 'conflict' } })
+      .mockResolvedValueOnce(firstPage)
+      .mockResolvedValueOnce({ ok: false, failure: { kind: 'unavailable' } })
+      .mockResolvedValueOnce(firstPage)
+      .mockResolvedValueOnce({ ok: false, failure: { kind: 'unexpected' } });
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(screen.getByLabelText('Employer name'), 'Rose');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await screen.findByRole('heading', { name: 'Search results' });
+
+    const loadMore = screen.getByRole('button', { name: 'Load more employers' });
+
+    await user.click(loadMore);
+    let pageFailureHeading = await screen.findByRole('heading', { name: 'More employers could not load' });
+    expect(pageFailureHeading).toBeInTheDocument();
+    expect(screen.getByText('Run the employer search again before loading more employers.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pagination Anchor' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry loading more employers' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load more employers' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await screen.findByRole('heading', { name: 'Search results' });
+    await user.click(screen.getByRole('button', { name: 'Load more employers' }));
+    pageFailureHeading = await screen.findByRole('heading', { name: 'More employers are not available for this staff session' });
+    expect(pageFailureHeading).toBeInTheDocument();
+    expect(screen.getByText('This staff session is not allowed to load more employers for the current search.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pagination Anchor' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry loading more employers' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await screen.findByRole('heading', { name: 'Search results' });
+    await user.click(screen.getByRole('button', { name: 'Load more employers' }));
+    pageFailureHeading = await screen.findByRole('heading', { name: 'More employers require a fresh search' });
+    expect(pageFailureHeading).toBeInTheDocument();
+    expect(screen.getByText('Run the employer search again before loading more employers.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pagination Anchor' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry loading more employers' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await screen.findByRole('heading', { name: 'Search results' });
+    await user.click(screen.getByRole('button', { name: 'Load more employers' }));
+    pageFailureHeading = await screen.findByRole('heading', { name: 'More employers are temporarily unavailable' });
+    expect(pageFailureHeading).toBeInTheDocument();
+    expect(screen.getByText('Retry loading more employers when the service becomes available.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry loading more employers' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pagination Anchor' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await screen.findByRole('heading', { name: 'Search results' });
+    await user.click(screen.getByRole('button', { name: 'Load more employers' }));
+    pageFailureHeading = await screen.findByRole('heading', { name: 'More employers response could not be used' });
+    expect(pageFailureHeading).toBeInTheDocument();
+    expect(screen.getByText('Run the employer search again before loading more employers.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pagination Anchor' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry loading more employers' })).not.toBeInTheDocument();
+    expect(screen.queryByText('503 database offline')).not.toBeInTheDocument();
   });
 
   it('loads one exact detail for the selected result', async () => {
@@ -1135,9 +1353,12 @@ describe('EmployerWorkspace', () => {
           sourceChannel: 'staff_entry',
         },
       })
+      .mockResolvedValueOnce({ ok: false, failure: { kind: 'validation' } })
       .mockResolvedValueOnce({ ok: false, failure: { kind: 'not_found' } })
       .mockResolvedValueOnce({ ok: false, failure: { kind: 'forbidden' } })
-      .mockResolvedValueOnce({ ok: false, failure: { kind: 'unavailable' } });
+      .mockResolvedValueOnce({ ok: false, failure: { kind: 'conflict' } })
+      .mockResolvedValueOnce({ ok: false, failure: { kind: 'unavailable' } })
+      .mockResolvedValueOnce({ ok: false, failure: { kind: 'unexpected' } });
 
     render(
       <LanguageProvider>
@@ -1157,7 +1378,15 @@ describe('EmployerWorkspace', () => {
 
     await user.click(selectButton);
 
-    let failureHeading = await screen.findByRole('heading', { name: 'Employer detail is no longer available' });
+    let failureHeading = await screen.findByRole('heading', { name: 'Employer detail could not be displayed' });
+    expect(failureHeading).toHaveFocus();
+    expect(screen.getByText('Select the employer again from the current search results.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Failure Mapping Anchor' })).toBeInTheDocument();
+    expect(screen.queryByText('Previously Visible Detail')).not.toBeInTheDocument();
+
+    await user.click(selectButton);
+
+    failureHeading = await screen.findByRole('heading', { name: 'Employer detail is no longer available' });
     expect(failureHeading).toHaveFocus();
     expect(screen.getByText('The selected employer detail could not be found for this staff workspace.')).toBeInTheDocument();
     expect(screen.queryByText('Previously Visible Detail')).not.toBeInTheDocument();
@@ -1171,9 +1400,24 @@ describe('EmployerWorkspace', () => {
 
     await user.click(selectButton);
 
+    failureHeading = await screen.findByRole('heading', { name: 'Employer detail requires a fresh search' });
+    expect(failureHeading).toHaveFocus();
+    expect(screen.getByText('Run the employer search again before reopening employer detail.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Failure Mapping Anchor' })).toBeInTheDocument();
+
+    await user.click(selectButton);
+
     failureHeading = await screen.findByRole('heading', { name: 'Employer detail is temporarily unavailable' });
     expect(failureHeading).toHaveFocus();
     expect(screen.getByText('Retry selecting the employer detail when the service becomes available.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Failure Mapping Anchor' })).toBeInTheDocument();
+
+    await user.click(selectButton);
+
+    failureHeading = await screen.findByRole('heading', { name: 'Employer detail response could not be used' });
+    expect(failureHeading).toHaveFocus();
+    expect(screen.getByText('Select the employer again or run the search again before reopening employer detail.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Failure Mapping Anchor' })).toBeInTheDocument();
     expect(screen.queryByText('404 hidden existence')).not.toBeInTheDocument();
     expect(screen.queryByText('403 session denied')).not.toBeInTheDocument();
     expect(screen.queryByText('503 database offline')).not.toBeInTheDocument();
@@ -1510,6 +1754,88 @@ describe('EmployerWorkspace', () => {
     randomUuidSpy.mockRestore();
   });
 
+  it('serializes unknown create retry authority', async () => {
+    const user = userEvent.setup();
+    const createEmployerMock = vi.mocked(createEmployer);
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    createEmployerMock.mockReset();
+    searchEmployersMock.mockReset();
+
+    const deferredRetry = createDeferredPromise<Awaited<ReturnType<typeof createEmployer>>>();
+    const deferredAbandonmentSearch = createDeferredPromise<Awaited<ReturnType<typeof searchEmployers>>>();
+
+    createEmployerMock
+      .mockResolvedValueOnce({ ok: false, failure: { kind: 'unknown_outcome' } })
+      .mockReturnValueOnce(deferredRetry.promise);
+    searchEmployersMock.mockReturnValueOnce(deferredAbandonmentSearch.promise);
+
+    const randomUuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('acacacac-acac-4cac-8cac-acacacacacac');
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.selectOptions(screen.getByLabelText('Create employer type'), 'business');
+    await user.type(screen.getByLabelText('Create employer name'), 'Serialized Unknown Rose');
+    await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
+
+    const warningHeading = await screen.findByRole('heading', { name: 'Create outcome is unknown' });
+    const warningRegion = warningHeading.closest('section');
+    expect(warningRegion).not.toBeNull();
+
+    const retryButton = within(warningRegion as HTMLElement).getByRole('button', {
+      name: 'Retry same create attempt',
+    });
+    const abandonButton = within(warningRegion as HTMLElement).getByRole('button', {
+      name: 'Abandon unknown create and search',
+    });
+
+    fireEvent.click(retryButton);
+    fireEvent.click(retryButton);
+
+    expect(createEmployerMock).toHaveBeenCalledTimes(2);
+    expect(createEmployerMock).toHaveBeenNthCalledWith(2, {
+      commandId: 'acacacac-acac-4cac-8cac-acacacacacac',
+      employerType: 'business',
+      displayName: 'Serialized Unknown Rose',
+    });
+    expect(retryButton).toBeDisabled();
+    expect(abandonButton).toBeDisabled();
+
+    await user.click(abandonButton);
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(searchEmployersMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      deferredRetry.resolve({
+        ok: true,
+        value: {
+          employerId: 'adadadad-adad-4dad-8dad-adadadadadad',
+          employerType: 'business',
+          displayName: 'Serialized Unknown Rose',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+        },
+      });
+      await deferredRetry.promise;
+    });
+
+    expect(await screen.findByRole('heading', { name: 'Draft employer created' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Create outcome is unknown' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry same create attempt' })).not.toBeInTheDocument();
+
+    fireEvent.click(abandonButton);
+    expect(searchEmployersMock).not.toHaveBeenCalled();
+
+    randomUuidSpy.mockRestore();
+    confirmSpy.mockRestore();
+  });
+
   it('warns before unload while a create request is still pending', async () => {
     const user = userEvent.setup();
     const createEmployerMock = vi.mocked(createEmployer);
@@ -1538,6 +1864,57 @@ describe('EmployerWorkspace', () => {
       deferredCreate.resolve({ ok: false, failure: { kind: 'unknown_outcome' } });
       await deferredCreate.promise;
     });
+  });
+
+  it('does not restore abandonment search recovery state after pagehide', async () => {
+    const user = userEvent.setup();
+    const createEmployerMock = vi.mocked(createEmployer);
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    const deferredSearch = createDeferredPromise<Awaited<ReturnType<typeof searchEmployers>>>();
+    createEmployerMock.mockReset();
+    searchEmployersMock.mockReset();
+    createEmployerMock.mockResolvedValue({ ok: false, failure: { kind: 'unknown_outcome' } });
+    searchEmployersMock.mockReturnValueOnce(deferredSearch.promise);
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.selectOptions(screen.getByLabelText('Create employer type'), 'business');
+    await user.type(screen.getByLabelText('Create employer name'), 'Late Abandonment Rose');
+    await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
+
+    const warningHeading = await screen.findByRole('heading', { name: 'Create outcome is unknown' });
+    const warningRegion = warningHeading.closest('section');
+    expect(warningRegion).not.toBeNull();
+
+    await user.click(within(warningRegion as HTMLElement).getByRole('button', { name: 'Abandon unknown create and search' }));
+    expect(searchEmployersMock).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+
+    await act(async () => {
+      deferredSearch.resolve({ ok: false, failure: { kind: 'unavailable' } });
+      await deferredSearch.promise;
+    });
+
+    expect(screen.queryByRole('heading', { name: 'Create outcome is unknown' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        'The required follow-up search could not complete. Retry the search before starting a changed create attempt.',
+      ),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Create employer name')).toHaveValue('');
+
+    confirmSpy.mockRestore();
   });
 
   it('keeps unknown create authority frozen when the required abandonment search fails', async () => {
@@ -1749,6 +2126,155 @@ describe('EmployerWorkspace', () => {
     confirmSpy.mockRestore();
   });
 
+  it('renders bounded create validation guidance and releases the old command identity', async () => {
+    const user = userEvent.setup();
+    const createEmployerMock = vi.mocked(createEmployer);
+    createEmployerMock.mockReset();
+    createEmployerMock
+      .mockResolvedValueOnce({ ok: false, failure: { kind: 'validation' } })
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          employerId: '51515151-5151-4515-8515-515151515151',
+          employerType: 'business',
+          displayName: 'Corrected Rose',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+        },
+      });
+
+    const randomUuidSpy = vi
+      .spyOn(globalThis.crypto, 'randomUUID')
+      .mockReturnValueOnce('44444444-4444-4444-8444-444444444444')
+      .mockReturnValueOnce('55555555-5555-4555-8555-555555555555');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    const typeSelect = screen.getByLabelText('Create employer type');
+    const nameInput = screen.getByLabelText('Create employer name');
+    const submitButton = screen.getByRole('button', { name: 'Create draft employer' });
+
+    await user.selectOptions(typeSelect, 'business');
+    await user.type(nameInput, 'Validation Rose');
+    await user.click(submitButton);
+
+    const validationHeading = await screen.findByRole('heading', { name: 'Create draft employer could not be completed' });
+    expect(validationHeading).toHaveFocus();
+    const validationRegion = validationHeading.closest('section');
+    expect(validationRegion).not.toBeNull();
+    expect(validationRegion).toHaveAttribute('aria-live', 'assertive');
+    expect(within(validationRegion as HTMLElement).getByText(
+      'Review the employer type or employer name and correct the draft employer before trying again.',
+    )).toBeInTheDocument();
+    expect(typeSelect).toHaveValue('business');
+    expect(nameInput).toHaveValue('Validation Rose');
+    expect(typeSelect).not.toBeDisabled();
+    expect(nameInput).not.toBeDisabled();
+    expect(submitButton).not.toBeDisabled();
+    expect(document.body.textContent).not.toContain('44444444-4444-4444-8444-444444444444');
+    expect(screen.queryByRole('heading', { name: 'Create outcome is unknown' })).not.toBeInTheDocument();
+
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Corrected Rose');
+    await user.click(submitButton);
+
+    expect(createEmployerMock).toHaveBeenNthCalledWith(1, {
+      commandId: '44444444-4444-4444-8444-444444444444',
+      employerType: 'business',
+      displayName: 'Validation Rose',
+    });
+    expect(createEmployerMock).toHaveBeenNthCalledWith(2, {
+      commandId: '55555555-5555-4555-8555-555555555555',
+      employerType: 'business',
+      displayName: 'Corrected Rose',
+    });
+    expect(await screen.findByRole('heading', { name: 'Draft employer created' })).toBeInTheDocument();
+
+    randomUuidSpy.mockRestore();
+  });
+
+  it('renders bounded create forbidden guidance and releases the old command identity', async () => {
+    const user = userEvent.setup();
+    const createEmployerMock = vi.mocked(createEmployer);
+    createEmployerMock.mockReset();
+    createEmployerMock
+      .mockResolvedValueOnce({ ok: false, failure: { kind: 'forbidden' } })
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          employerId: '62626262-6262-4626-8626-626262626262',
+          employerType: 'household',
+          displayName: 'Authorized Rose',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+        },
+      });
+
+    const randomUuidSpy = vi
+      .spyOn(globalThis.crypto, 'randomUUID')
+      .mockReturnValueOnce('66666666-6666-4666-8666-666666666666')
+      .mockReturnValueOnce('77777777-7777-4777-8777-777777777777');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    const typeSelect = screen.getByLabelText('Create employer type');
+    const nameInput = screen.getByLabelText('Create employer name');
+    const submitButton = screen.getByRole('button', { name: 'Create draft employer' });
+
+    await user.selectOptions(typeSelect, 'household');
+    await user.type(nameInput, 'Forbidden Rose');
+    await user.click(submitButton);
+
+    const forbiddenHeading = await screen.findByRole('heading', {
+      name: 'Create draft employer is not available for this staff session',
+    });
+    expect(forbiddenHeading).toHaveFocus();
+    const forbiddenRegion = forbiddenHeading.closest('section');
+    expect(forbiddenRegion).not.toBeNull();
+    expect(forbiddenRegion).toHaveAttribute('aria-live', 'assertive');
+    expect(within(forbiddenRegion as HTMLElement).getByText(
+      'This staff session is not allowed to create draft employers.',
+    )).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('403');
+    expect(document.body.textContent).not.toContain('Forbidden Rose');
+    expect(document.body.textContent).not.toContain('66666666-6666-4666-8666-666666666666');
+    expect(typeSelect).toHaveValue('household');
+    expect(nameInput).toHaveValue('Forbidden Rose');
+    expect(typeSelect).not.toBeDisabled();
+    expect(nameInput).not.toBeDisabled();
+    expect(submitButton).not.toBeDisabled();
+
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Authorized Rose');
+    await user.click(submitButton);
+
+    expect(createEmployerMock).toHaveBeenNthCalledWith(1, {
+      commandId: '66666666-6666-4666-8666-666666666666',
+      employerType: 'household',
+      displayName: 'Forbidden Rose',
+    });
+    expect(createEmployerMock).toHaveBeenNthCalledWith(2, {
+      commandId: '77777777-7777-4777-8777-777777777777',
+      employerType: 'household',
+      displayName: 'Authorized Rose',
+    });
+    expect(await screen.findByRole('heading', { name: 'Draft employer created' })).toBeInTheDocument();
+
+    randomUuidSpy.mockRestore();
+  });
+
   it('keeps conflict create authority frozen when the required abandonment search cannot complete', async () => {
     const user = userEvent.setup();
     const createEmployerMock = vi.mocked(createEmployer);
@@ -1873,7 +2399,7 @@ describe('EmployerWorkspace', () => {
       redactedDiagnostic = error instanceof Error ? error.message : String(error);
     }
 
-    expect(redactedDiagnostic).toContain('[REDACTED]');
+    expect(redactedDiagnostic).toContain(VALUE_SAFE_TESTING_LIBRARY_MESSAGE);
     expect(redactedDiagnostic).not.toContain('SYNTHETIC_EMPLOYER_SECRET');
     expect(redactedDiagnostic).not.toContain('SYNTHETIC_API_CURSOR');
     expect(redactedDiagnostic).not.toContain('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
@@ -2178,6 +2704,31 @@ describe('EmployerWorkspace', () => {
       });
       await deferredDetail.promise;
     });
+  });
+
+  it('keeps workspace query failures value-independent', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(screen.getByLabelText('Employer name'), 'Golden Lantern Staffing');
+
+    try {
+      screen.getByText('Missing workspace diagnostic anchor');
+    } catch (error) {
+      const diagnosticError = error as Error;
+      expect(diagnosticError.message).toContain(VALUE_SAFE_TESTING_LIBRARY_MESSAGE);
+      expect(diagnosticError.message).not.toContain('Golden Lantern Staffing');
+      return;
+    }
+
+    throw new Error('Expected workspace query failure');
   });
 
   it('honors reduced motion and narrow single-column structure', () => {

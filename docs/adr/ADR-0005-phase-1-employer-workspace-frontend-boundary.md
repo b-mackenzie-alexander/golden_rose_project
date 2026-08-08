@@ -9,6 +9,12 @@ PR #11 merged the synthetic/local staff Employer detail and bounded-search trace
 
 The next increment should add product feedback without collecting stronger personal/location data, changing backend authority, selecting production hosting, or coupling this lane to separate GCP planning. After independent architecture/TDD, security/supply-chain, and product/accessibility/localization review cleared all Blocker/High/Medium findings, Beatrice accepted this frontend-tracer product/architecture direction on 2026-08-06. Acceptance does not authorize implementation from this planning branch: the planning packet must first merge to protected `develop`, a fresh implementation session must rebaseline from that merged tip, and implementation repository/service operations remain separately approved.
 
+## Post-merge closeout correction
+
+PR #13 later merged the first local/synthetic Employer workspace implementation into `develop`. Independent post-merge review then identified immediate closeout defects in browser BFCache wiring, late async invalidation, retry/abandon authority, operation-specific failure handling, database authority correspondence, SQLAlchemy lifecycle ownership, SBOM validation integrity, and privacy-safe test diagnostics. ADR-0006 supersedes ADR-0005 as the active execution authority for that closeout work only.
+
+This ADR still governs the bounded browser/workspace product contract and its non-scope. It does **not** mean human browser/manual accessibility/fluent-language qualification already occurred. Those human gates remain deferred until a shared deployed `develop` target exists and block later promotion/client acceptance rather than the current local closeout remediation lane.
+
 ## Decision
 
 Add one standalone frontend under `apps/web/` for the existing staff Employer API only. Before browser consumption, close the observed response-cache gap by adding `Cache-Control: no-store` to both fresh and idempotently replayed create successes. This header-only hardening does not change create status, body, authorization, idempotency, persistence, schema, or route shape.

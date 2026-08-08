@@ -5,7 +5,7 @@ import { EmployerSearch } from './EmployerSearch';
 import { useLanguage } from '../i18n/LanguageProvider';
 
 type EmployerWorkspaceProps = {
-  onPersistedRestore?: () => void;
+  onPersistedRestore: () => void;
 };
 
 export function EmployerWorkspace({ onPersistedRestore }: EmployerWorkspaceProps) {
@@ -21,7 +21,7 @@ export function EmployerWorkspace({ onPersistedRestore }: EmployerWorkspaceProps
 
     function handlePageShow(event: Event) {
       if ((event as Event & { persisted?: boolean }).persisted === true) {
-        onPersistedRestore?.();
+        onPersistedRestore();
       }
     }
 

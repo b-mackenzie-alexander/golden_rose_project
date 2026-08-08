@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 
 import { AppShell } from './AppShell';
 import { NotFoundPage } from './NotFoundPage';
+import { reloadCanonicalDocument } from '../browser/privacyLifecycle';
 import { EmployerWorkspace } from '../employers/EmployerWorkspace';
 
 export function AppRoutes() {
@@ -9,7 +10,7 @@ export function AppRoutes() {
     <Routes>
       <Route path="/" element={<AppShell />}>
         <Route index element={<Navigate to="/employers" replace />} />
-        <Route path="employers" element={<EmployerWorkspace />} />
+        <Route path="employers" element={<EmployerWorkspace onPersistedRestore={reloadCanonicalDocument} />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

@@ -1,8 +1,9 @@
 # Golden Rose Operations Platform
 
-This repository contains bounded synthetic/local backend tracers for the Golden
-Rose staff employer-demand workflow. A first staff Employer browser workspace
-is proposed but not yet implemented. This is not a public portal, production deployment, or
+This repository contains bounded synthetic/local tracers for the Golden Rose
+staff employer-demand workflow. A first staff Employer browser workspace has
+merged locally into `develop`, but post-merge closeout is still in progress.
+This is not a public portal, production deployment, or
 automated hiring, matching, ranking, eligibility, or referral system.
 
 ## Current tracer boundary
@@ -17,10 +18,14 @@ automated hiring, matching, ranking, eligibility, or referral system.
   `AuditEvent` atomically in PostgreSQL.
 - Uses fictional/synthetic fixtures only. Do not use client, live, or
   production data.
-- ADR-0005 accepts a standalone `apps/web/` frontend boundary over only these
-  contracts; PR #12 merged that planning packet, and implementation now
-  proceeds from a fresh merged-tip coding branch with separate scoped approval
-  still required for service starts.
+- ADR-0005 accepted a standalone `apps/web/` frontend boundary over only these
+  contracts, and PR #13 merged the initial local/synthetic Employer workspace.
+- ADR-0006 and `.hermes/plans/2026-08-07_145911-phase-1-employer-workspace-closeout-plan.md`
+  now govern the active closeout lane for post-merge browser/runtime/database/CI
+  defects before any draft-Employer revision slice is planned.
+- Automated frontend parity/accessibility evidence exists locally, but human
+  browser/manual accessibility/fluent-language qualification remains deferred
+  until a shared deployed `develop` target exists.
 
 ## Local verification
 
@@ -39,6 +44,11 @@ uv run ruff check .
 uv run mypy src tests
 uv run bandit -q -r src
 uv run pip-audit --skip-editable
+mkdir -p build
+npm --userconfig apps/web/.npmrc --prefix apps/web sbom --sbom-format cyclonedx --sbom-type application > build/frontend-sbom.cdx.json
+uv run python scripts/validate_sbom.py build/frontend-sbom.cdx.json --spec 1.5 --name web --version 0.0.0 --purl 'pkg:npm/%40golden-rose/web@0.0.0'
+uv run cyclonedx-py environment --pyproject pyproject.toml --output-reproducible --of JSON -o build/backend-sbom.cdx.json
+uv run python scripts/validate_sbom.py build/backend-sbom.cdx.json --spec 1.6 --name golden-rose --version 0.1.0
 ```
 
 The application must not be started against production settings with synthetic

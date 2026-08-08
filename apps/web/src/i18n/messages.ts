@@ -26,13 +26,24 @@ export type MessageCatalog = {
   employerSearchValidationFailureBody: string;
   employerSearchForbiddenFailureHeading: string;
   employerSearchForbiddenFailureBody: string;
+  employerSearchConflictFailureHeading: string;
+  employerSearchConflictFailureBody: string;
   employerSearchUnavailableFailureHeading: string;
   employerSearchUnavailableFailureBody: string;
   employerSearchUnexpectedFailureHeading: string;
   employerSearchUnexpectedFailureBody: string;
   employerSearchRetry: string;
   employerSearchLoadMore: string;
+  employerSearchPageValidationFailureHeading: string;
+  employerSearchPageValidationFailureBody: string;
+  employerSearchPageForbiddenFailureHeading: string;
+  employerSearchPageForbiddenFailureBody: string;
+  employerSearchPageConflictFailureHeading: string;
+  employerSearchPageConflictFailureBody: string;
+  employerSearchPageUnavailableFailureHeading: string;
   employerSearchPageUnavailableBody: string;
+  employerSearchPageUnexpectedFailureHeading: string;
+  employerSearchPageUnexpectedFailureBody: string;
   employerSearchRetryLoadMore: string;
   employerDetailLoadingHeading: string;
   employerDetailLoadingBody: string;
@@ -43,10 +54,16 @@ export type MessageCatalog = {
   employerSourceStaffEntry: string;
   employerDetailNotFoundHeading: string;
   employerDetailNotFoundBody: string;
+  employerDetailValidationHeading: string;
+  employerDetailValidationBody: string;
   employerDetailForbiddenHeading: string;
   employerDetailForbiddenBody: string;
+  employerDetailConflictHeading: string;
+  employerDetailConflictBody: string;
   employerDetailUnavailableHeading: string;
   employerDetailUnavailableBody: string;
+  employerDetailUnexpectedHeading: string;
+  employerDetailUnexpectedBody: string;
   employerCreateHeading: string;
   employerCreateWarning: string;
   employerCreateTypeLabel: string;
@@ -54,6 +71,10 @@ export type MessageCatalog = {
   employerCreateSubmit: string;
   employerCreateNameError: string;
   employerCreateTypeError: string;
+  employerCreateValidationFailureHeading: string;
+  employerCreateValidationFailureBody: string;
+  employerCreateForbiddenFailureHeading: string;
+  employerCreateForbiddenFailureBody: string;
   employerCreateSuccessHeading: string;
   employerCreateUnknownHeading: string;
   employerCreateUnknownBody: string;
@@ -95,13 +116,24 @@ export const englishMessages: MessageCatalog = {
   employerSearchValidationFailureBody: 'Review the employer name fragment or employer type and try again.',
   employerSearchForbiddenFailureHeading: 'Search is not available for this staff session',
   employerSearchForbiddenFailureBody: 'This staff session is not allowed to run employer searches.',
+  employerSearchConflictFailureHeading: 'Search requires a fresh staff action',
+  employerSearchConflictFailureBody: 'Run the employer search again before continuing from this workspace state.',
   employerSearchUnavailableFailureHeading: 'Search is temporarily unavailable',
   employerSearchUnavailableFailureBody: 'Retry the same employer search when the service becomes available.',
   employerSearchUnexpectedFailureHeading: 'Search response could not be used',
   employerSearchUnexpectedFailureBody: 'Retry the search or change the filters before trying again.',
   employerSearchRetry: 'Retry search',
   employerSearchLoadMore: 'Load more employers',
+  employerSearchPageValidationFailureHeading: 'More employers could not load',
+  employerSearchPageValidationFailureBody: 'Run the employer search again before loading more employers.',
+  employerSearchPageForbiddenFailureHeading: 'More employers are not available for this staff session',
+  employerSearchPageForbiddenFailureBody: 'This staff session is not allowed to load more employers for the current search.',
+  employerSearchPageConflictFailureHeading: 'More employers require a fresh search',
+  employerSearchPageConflictFailureBody: 'Run the employer search again before loading more employers.',
+  employerSearchPageUnavailableFailureHeading: 'More employers are temporarily unavailable',
   employerSearchPageUnavailableBody: 'Retry loading more employers when the service becomes available.',
+  employerSearchPageUnexpectedFailureHeading: 'More employers response could not be used',
+  employerSearchPageUnexpectedFailureBody: 'Run the employer search again before loading more employers.',
   employerSearchRetryLoadMore: 'Retry loading more employers',
   employerDetailLoadingHeading: 'Employer detail',
   employerDetailLoadingBody: 'Loading employer detail.',
@@ -112,10 +144,16 @@ export const englishMessages: MessageCatalog = {
   employerSourceStaffEntry: 'Staff entry',
   employerDetailNotFoundHeading: 'Employer detail is no longer available',
   employerDetailNotFoundBody: 'The selected employer detail could not be found for this staff workspace.',
+  employerDetailValidationHeading: 'Employer detail could not be displayed',
+  employerDetailValidationBody: 'Select the employer again from the current search results.',
   employerDetailForbiddenHeading: 'Employer detail is not available for this staff session',
   employerDetailForbiddenBody: 'This staff session is not allowed to view the selected employer detail.',
+  employerDetailConflictHeading: 'Employer detail requires a fresh search',
+  employerDetailConflictBody: 'Run the employer search again before reopening employer detail.',
   employerDetailUnavailableHeading: 'Employer detail is temporarily unavailable',
   employerDetailUnavailableBody: 'Retry selecting the employer detail when the service becomes available.',
+  employerDetailUnexpectedHeading: 'Employer detail response could not be used',
+  employerDetailUnexpectedBody: 'Select the employer again or run the search again before reopening employer detail.',
   employerCreateHeading: 'Create a draft employer',
   employerCreateWarning: 'Create only fictional synthetic draft employers in this local staff workspace.',
   employerCreateTypeLabel: 'Create employer type',
@@ -123,6 +161,10 @@ export const englishMessages: MessageCatalog = {
   employerCreateSubmit: 'Create draft employer',
   employerCreateNameError: 'Enter 1 to 200 visible characters for the employer name.',
   employerCreateTypeError: 'Select either Business or Household before creating a draft employer.',
+  employerCreateValidationFailureHeading: 'Create draft employer could not be completed',
+  employerCreateValidationFailureBody: 'Review the employer type or employer name and correct the draft employer before trying again.',
+  employerCreateForbiddenFailureHeading: 'Create draft employer is not available for this staff session',
+  employerCreateForbiddenFailureBody: 'This staff session is not allowed to create draft employers.',
   employerCreateSuccessHeading: 'Draft employer created',
   employerCreateUnknownHeading: 'Create outcome is unknown',
   employerCreateUnknownBody: 'Retry the same create attempt because it may already have succeeded.',
@@ -166,13 +208,24 @@ export const spanishMessages: MessageCatalog = {
   employerSearchValidationFailureBody: 'Revise el fragmento del nombre del empleador o el tipo de empleador e inténtelo de nuevo.',
   employerSearchForbiddenFailureHeading: 'La búsqueda no está disponible para esta sesión del personal',
   employerSearchForbiddenFailureBody: 'Esta sesión del personal no puede ejecutar búsquedas de empleadores.',
+  employerSearchConflictFailureHeading: 'La búsqueda requiere una acción nueva del personal',
+  employerSearchConflictFailureBody: 'Ejecute la búsqueda del empleador de nuevo antes de continuar desde este estado del espacio de trabajo.',
   employerSearchUnavailableFailureHeading: 'La búsqueda no está disponible temporalmente',
   employerSearchUnavailableFailureBody: 'Vuelva a intentar la misma búsqueda de empleadores cuando el servicio esté disponible.',
   employerSearchUnexpectedFailureHeading: 'La respuesta de la búsqueda no pudo usarse',
   employerSearchUnexpectedFailureBody: 'Vuelva a intentar la búsqueda o cambie los filtros antes de intentarlo de nuevo.',
   employerSearchRetry: 'Reintentar búsqueda',
   employerSearchLoadMore: 'Cargar más empleadores',
+  employerSearchPageValidationFailureHeading: 'No se pudieron cargar más empleadores',
+  employerSearchPageValidationFailureBody: 'Ejecute la búsqueda del empleador de nuevo antes de cargar más empleadores.',
+  employerSearchPageForbiddenFailureHeading: 'Más empleadores no están disponibles para esta sesión del personal',
+  employerSearchPageForbiddenFailureBody: 'Esta sesión del personal no tiene permiso para cargar más empleadores para la búsqueda actual.',
+  employerSearchPageConflictFailureHeading: 'Más empleadores requieren una búsqueda nueva',
+  employerSearchPageConflictFailureBody: 'Ejecute la búsqueda del empleador de nuevo antes de cargar más empleadores.',
+  employerSearchPageUnavailableFailureHeading: 'Más empleadores no están disponibles temporalmente',
   employerSearchPageUnavailableBody: 'Vuelva a intentar cargar más empleadores cuando el servicio esté disponible.',
+  employerSearchPageUnexpectedFailureHeading: 'La respuesta de más empleadores no pudo usarse',
+  employerSearchPageUnexpectedFailureBody: 'Ejecute la búsqueda del empleador de nuevo antes de cargar más empleadores.',
   employerSearchRetryLoadMore: 'Reintentar cargar más empleadores',
   employerDetailLoadingHeading: 'Detalle del empleador',
   employerDetailLoadingBody: 'Cargando el detalle del empleador.',
@@ -183,10 +236,16 @@ export const spanishMessages: MessageCatalog = {
   employerSourceStaffEntry: 'Registro del personal',
   employerDetailNotFoundHeading: 'El detalle del empleador ya no está disponible',
   employerDetailNotFoundBody: 'No se pudo encontrar el detalle del empleador seleccionado para este espacio de trabajo del personal.',
+  employerDetailValidationHeading: 'No se pudo mostrar el detalle del empleador',
+  employerDetailValidationBody: 'Seleccione el empleador de nuevo desde los resultados actuales de la búsqueda.',
   employerDetailForbiddenHeading: 'El detalle del empleador no está disponible para esta sesión del personal',
   employerDetailForbiddenBody: 'Esta sesión del personal no tiene permiso para ver el detalle del empleador seleccionado.',
+  employerDetailConflictHeading: 'El detalle del empleador requiere una búsqueda nueva',
+  employerDetailConflictBody: 'Ejecute la búsqueda del empleador de nuevo antes de volver a abrir el detalle del empleador.',
   employerDetailUnavailableHeading: 'El detalle del empleador no está disponible temporalmente',
   employerDetailUnavailableBody: 'Vuelva a seleccionar el detalle del empleador cuando el servicio esté disponible.',
+  employerDetailUnexpectedHeading: 'La respuesta del detalle del empleador no pudo usarse',
+  employerDetailUnexpectedBody: 'Seleccione el empleador de nuevo o ejecute la búsqueda otra vez antes de volver a abrir el detalle del empleador.',
   employerCreateHeading: 'Crear un empleador en borrador',
   employerCreateWarning: 'Cree solo empleadores en borrador ficticios y sintéticos en este espacio de trabajo local del personal.',
   employerCreateTypeLabel: 'Tipo de empleador para crear',
@@ -194,6 +253,10 @@ export const spanishMessages: MessageCatalog = {
   employerCreateSubmit: 'Crear empleador en borrador',
   employerCreateNameError: 'Ingrese entre 1 y 200 caracteres visibles para el nombre del empleador.',
   employerCreateTypeError: 'Seleccione Business o Household antes de crear un empleador en borrador.',
+  employerCreateValidationFailureHeading: 'No se pudo completar la creación del empleador en borrador',
+  employerCreateValidationFailureBody: 'Revise el tipo o el nombre del empleador y corrija el empleador en borrador antes de intentarlo de nuevo.',
+  employerCreateForbiddenFailureHeading: 'La creación del empleador en borrador no está disponible para esta sesión del personal',
+  employerCreateForbiddenFailureBody: 'Esta sesión del personal no tiene permiso para crear empleadores en borrador.',
   employerCreateSuccessHeading: 'Empleador en borrador creado',
   employerCreateUnknownHeading: 'El resultado de la creación es desconocido',
   employerCreateUnknownBody: 'Vuelva a intentar la misma creación porque puede que ya se haya realizado con éxito.',

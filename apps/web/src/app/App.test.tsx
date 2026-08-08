@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router';
 import { vi } from 'vitest';
 
 import { createEmployer, getEmployer, searchEmployers } from '../api/employerClient';
+import { reloadCanonicalDocument } from '../browser/privacyLifecycle';
 import { AppRoutes } from './App';
 import { LanguageProvider } from '../i18n/LanguageProvider';
 import { runAxe } from '../test/axe';
@@ -14,7 +15,30 @@ vi.mock('../api/employerClient', () => ({
   searchEmployers: vi.fn(),
 }));
 
+vi.mock(
+  '../browser/privacyLifecycle',
+  () => ({
+    reloadCanonicalDocument: vi.fn(),
+  }),
+);
+
 describe('App', () => {
+  it('reloads the canonical document after a persisted restore', () => {
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    const pageShowEvent = new Event('pageshow');
+    Object.defineProperty(pageShowEvent, 'persisted', { configurable: true, value: true });
+    window.dispatchEvent(pageShowEvent);
+
+    expect(reloadCanonicalDocument).toHaveBeenCalledTimes(1);
+  });
+
   it('provides focus hooks for every interactive control', async () => {
     const user = userEvent.setup();
     vi.mocked(searchEmployers).mockResolvedValue({

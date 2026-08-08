@@ -2,6 +2,7 @@ from sqlalchemy import (
     CheckConstraint,
     Column,
     ForeignKey,
+    ForeignKeyConstraint,
     Integer,
     MetaData,
     String,
@@ -52,6 +53,21 @@ command_receipts = Table(
         "octet_length(request_fingerprint) = 32", name="ck_command_receipts_request_fingerprint_len"
     ),
     CheckConstraint("result_entity_type = 'employer'", name="ck_command_receipts_entity_type"),
+    ForeignKeyConstraint(
+        ["result_entity_id"],
+        ["employers.employer_id"],
+        name="fk_command_receipts_result_employer",
+        deferrable=True,
+        initially="DEFERRED",
+    ),
+    ForeignKeyConstraint(
+        ["command_id", "result_entity_id"],
+        ["audit_events.command_id", "audit_events.entity_id"],
+        name="fk_command_receipts_creation_event",
+        deferrable=True,
+        initially="DEFERRED",
+    ),
+    UniqueConstraint("command_id", "result_entity_id", name="uq_command_receipts_command_result"),
 )
 
 audit_events = Table(
@@ -85,6 +101,8 @@ audit_events = Table(
     UniqueConstraint(
         "entity_type", "entity_id", "entity_sequence", name="uq_audit_events_entity_sequence"
     ),
+    UniqueConstraint("command_id", "entity_id", name="uq_audit_events_command_entity"),
+    UniqueConstraint("command_id", "event_type", name="uq_audit_events_command_event_type"),
     CheckConstraint("event_schema_name = 'employer.created'", name="ck_audit_events_schema_name"),
     CheckConstraint("event_schema_version = 1", name="ck_audit_events_schema_version"),
     CheckConstraint("event_type = 'employer.created'", name="ck_audit_events_event_type"),
@@ -94,5 +112,10 @@ audit_events = Table(
     CheckConstraint(
         "payload_classification = 'sensitive_operational'",
         name="ck_audit_events_payload_classification",
+    ),
+    ForeignKeyConstraint(
+        ["command_id", "entity_id"],
+        ["command_receipts.command_id", "command_receipts.result_entity_id"],
+        name="fk_audit_events_command_result",
     ),
 )

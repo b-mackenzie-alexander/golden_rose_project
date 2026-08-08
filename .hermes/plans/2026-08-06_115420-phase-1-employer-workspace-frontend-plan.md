@@ -10,6 +10,16 @@
 
 ---
 
+## 0. Post-merge disposition (2026-08-07)
+
+- **Observed:** PR #13 merged the first local/synthetic Employer workspace implementation into protected `develop` at `f8236e6`.
+- **Observed:** Independent post-merge review found immediate closeout defects in browser BFCache wiring, late async invalidation, retry/abandon authority, operation-specific failure handling, database authority correspondence, SQLAlchemy engine lifecycle ownership, SBOM validation integrity, and privacy-safe test diagnostics.
+- **Accepted correction:** `.hermes/plans/2026-08-07_145911-phase-1-employer-workspace-closeout-plan.md` and ADR-0006 now control the remediation lane. Do not treat this packet as the active execution authority for those fixes.
+- **Deferred human qualification:** The human-browser/manual accessibility/contrast/zoom/reflow/reduced-motion and fluent English/Spanish portions of this packet's later walkthrough-oriented tasks remain deferred until a shared deployed `develop` environment exists. No repository evidence claims they have occurred.
+- **Historical note:** Preserve the task sequence below as the planning and implementation authority that led to PR #13. Do not rewrite this record to imply the closeout defects were known and accepted at the time.
+
+---
+
 ## 0. Authority, baseline, and status
 
 ### 0.1 Authoritative baseline

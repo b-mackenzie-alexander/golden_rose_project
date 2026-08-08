@@ -2,6 +2,35 @@ import { afterEach, expect, it, vi } from 'vitest';
 
 import { createEmployer, getEmployer, searchEmployers } from './employerClient';
 
+const VALID_OFFSET_TIMESTAMPS = [
+  '0001-01-01T00:00:00Z',
+  '0099-12-31T23:59:59+00:00',
+  '2026-08-05T08:00:00Z',
+  '2026-08-05T08:00:00+00:00',
+  '2026-08-05T08:00:00.123+00:00',
+  '2026-08-05T08:00:00+05:30',
+  '2026-08-05T08:00:00-04:00',
+  '2028-02-29T23:59:59-05:00',
+  '2026-08-05T23:30:00-02:00',
+] as const;
+
+const INVALID_TIMESTAMPS = [
+  '2026-02-31T08:00:00Z',
+  '2025-02-29T08:00:00Z',
+  '2026-13-01T08:00:00Z',
+  '2026-08-05T24:00:00Z',
+  '2026-08-05T08:60:00Z',
+  '2026-08-05T08:00:60Z',
+  '2026-08-05T08:00:00+24:00',
+  '2026-08-05T08:00:00+00:60',
+  '2026-08-05T08:00:00+0:00',
+  '2026-08-05T08:00:00',
+  '2026-08-05',
+  '2026-08-05 08:00:00Z',
+  '2026-08-05T08:00:00Z trailing',
+  '2026-08-05T08:00:00Z\u0007',
+] as const;
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -181,6 +210,185 @@ it('rejects contract-invalid search responses', async () => {
       ok: false,
       failure: { kind: 'unexpected' },
     });
+  }
+});
+
+it('accepts valid RFC3339 offsets across search detail and create payloads', async () => {
+  for (const timestamp of VALID_OFFSET_TIMESTAMPS) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            items: [
+              {
+                employer_id: '11111111-1111-4111-8111-111111111111',
+                employer_type: 'business',
+                display_name: 'Offset Search Rose',
+                lifecycle_status: 'draft',
+                version: 1,
+                received_at: timestamp,
+              },
+            ],
+            next_cursor: null,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    );
+    expect(await searchEmployers({ displayNameQuery: 'rose' }), timestamp).toEqual({
+      ok: true,
+      value: {
+        items: [
+          {
+            employerId: '11111111-1111-4111-8111-111111111111',
+            employerType: 'business',
+            displayName: 'Offset Search Rose',
+            lifecycleStatus: 'draft',
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            employer_id: '22222222-2222-4222-8222-222222222222',
+            employer_type: 'household',
+            display_name: 'Offset Detail Rose',
+            lifecycle_status: 'draft',
+            source_channel: 'staff_entry',
+            version: 1,
+            received_at: timestamp,
+            created_at: timestamp,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    );
+    expect(await getEmployer('22222222-2222-4222-8222-222222222222'), timestamp).toEqual({
+      ok: true,
+      value: {
+        employerId: '22222222-2222-4222-8222-222222222222',
+        employerType: 'household',
+        displayName: 'Offset Detail Rose',
+        lifecycleStatus: 'draft',
+        sourceChannel: 'staff_entry',
+      },
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            employer_id: '33333333-3333-4333-8333-333333333333',
+            employer_type: 'business',
+            display_name: 'Offset Create Rose',
+            lifecycle_status: 'draft',
+            source_channel: 'staff_entry',
+            version: 1,
+            received_at: timestamp,
+            created_at: timestamp,
+          }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    );
+    expect(
+      await createEmployer({
+        commandId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        employerType: 'business',
+        displayName: 'Offset Create Rose',
+      }),
+      timestamp,
+    ).toEqual({
+      ok: true,
+      value: {
+        employerId: '33333333-3333-4333-8333-333333333333',
+        employerType: 'business',
+        displayName: 'Offset Create Rose',
+        lifecycleStatus: 'draft',
+        sourceChannel: 'staff_entry',
+      },
+    });
+  }
+});
+
+it('rejects invalid RFC3339 timestamps across search detail and create payloads', async () => {
+  for (const timestamp of INVALID_TIMESTAMPS) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            items: [
+              {
+                employer_id: '11111111-1111-4111-8111-111111111111',
+                employer_type: 'business',
+                display_name: 'Invalid Timestamp Rose',
+                lifecycle_status: 'draft',
+                version: 1,
+                received_at: timestamp,
+              },
+            ],
+            next_cursor: null,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    );
+    expect(await searchEmployers({ displayNameQuery: 'rose' }), timestamp).toEqual({ ok: false, failure: { kind: 'unexpected' } });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            employer_id: '22222222-2222-4222-8222-222222222222',
+            employer_type: 'household',
+            display_name: 'Invalid Detail Rose',
+            lifecycle_status: 'draft',
+            source_channel: 'staff_entry',
+            version: 1,
+            received_at: timestamp,
+            created_at: timestamp,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    );
+    expect(await getEmployer('22222222-2222-4222-8222-222222222222'), timestamp).toEqual({ ok: false, failure: { kind: 'unexpected' } });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            employer_id: '33333333-3333-4333-8333-333333333333',
+            employer_type: 'business',
+            display_name: 'Invalid Create Rose',
+            lifecycle_status: 'draft',
+            source_channel: 'staff_entry',
+            version: 1,
+            received_at: timestamp,
+            created_at: timestamp,
+          }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    );
+    expect(
+      await createEmployer({
+        commandId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        employerType: 'business',
+        displayName: 'Invalid Create Rose',
+      }),
+      timestamp,
+    ).toEqual({ ok: false, failure: { kind: 'unknown_outcome' } });
   }
 });
 
@@ -391,10 +599,22 @@ it('maps failures and disposes unread bodies without reflection', async () => {
 
   const failureStatuses = [
     {
+      label: 'search validation',
+      call: () => searchEmployers({ displayNameQuery: 'rose' }),
+      response: mockResponse({ status: 400, contentType: 'application/json' }),
+      expected: { ok: false, failure: { kind: 'validation' } },
+    },
+    {
       label: 'search forbidden',
       call: () => searchEmployers({ displayNameQuery: 'rose' }),
       response: mockResponse({ status: 403, contentType: 'application/json' }),
       expected: { ok: false, failure: { kind: 'forbidden' } },
+    },
+    {
+      label: 'search conflict',
+      call: () => searchEmployers({ displayNameQuery: 'rose' }),
+      response: mockResponse({ status: 409, contentType: 'application/json' }),
+      expected: { ok: false, failure: { kind: 'conflict' } },
     },
     {
       label: 'search unavailable',
@@ -411,6 +631,42 @@ it('maps failures and disposes unread bodies without reflection', async () => {
     {
       label: 'search wrong media type',
       call: () => searchEmployers({ displayNameQuery: 'rose' }),
+      response: mockResponse({ status: 200, contentType: 'text/html', jsonValue: { secret: 'nope' } }),
+      expected: { ok: false, failure: { kind: 'unexpected' } },
+    },
+    {
+      label: 'detail validation',
+      call: () => getEmployer('12345678-1234-4234-8234-123456789abc'),
+      response: mockResponse({ status: 422, contentType: 'application/json' }),
+      expected: { ok: false, failure: { kind: 'validation' } },
+    },
+    {
+      label: 'detail forbidden',
+      call: () => getEmployer('12345678-1234-4234-8234-123456789abc'),
+      response: mockResponse({ status: 403, contentType: 'application/json' }),
+      expected: { ok: false, failure: { kind: 'forbidden' } },
+    },
+    {
+      label: 'detail not found',
+      call: () => getEmployer('12345678-1234-4234-8234-123456789abc'),
+      response: mockResponse({ status: 404, contentType: 'application/json' }),
+      expected: { ok: false, failure: { kind: 'not_found' } },
+    },
+    {
+      label: 'detail conflict',
+      call: () => getEmployer('12345678-1234-4234-8234-123456789abc'),
+      response: mockResponse({ status: 409, contentType: 'application/json' }),
+      expected: { ok: false, failure: { kind: 'conflict' } },
+    },
+    {
+      label: 'detail unavailable',
+      call: () => getEmployer('12345678-1234-4234-8234-123456789abc'),
+      response: mockResponse({ status: 503, contentType: 'application/json' }),
+      expected: { ok: false, failure: { kind: 'unavailable' } },
+    },
+    {
+      label: 'detail wrong media type',
+      call: () => getEmployer('12345678-1234-4234-8234-123456789abc'),
       response: mockResponse({ status: 200, contentType: 'text/html', jsonValue: { secret: 'nope' } }),
       expected: { ok: false, failure: { kind: 'unexpected' } },
     },
@@ -436,6 +692,50 @@ it('maps failures and disposes unread bodies without reflection', async () => {
       response: mockResponse({ status: 201, contentType: 'text/plain', jsonValue: { detail: 'do not leak' } }),
       expected: { ok: false, failure: { kind: 'unknown_outcome' } },
     },
+    {
+      label: 'create validation',
+      call: () =>
+        createEmployer({
+          commandId: '88888888-8888-4888-8888-888888888888',
+          employerType: 'household',
+          displayName: 'Create Validation Rose',
+        }),
+      response: mockResponse({ status: 422, contentType: 'application/json' }),
+      expected: { ok: false, failure: { kind: 'validation' } },
+    },
+    {
+      label: 'create forbidden',
+      call: () =>
+        createEmployer({
+          commandId: '99999999-9999-4999-8999-999999999999',
+          employerType: 'business',
+          displayName: 'Create Forbidden Rose',
+        }),
+      response: mockResponse({ status: 403, contentType: 'application/json' }),
+      expected: { ok: false, failure: { kind: 'forbidden' } },
+    },
+    {
+      label: 'create conflict',
+      call: () =>
+        createEmployer({
+          commandId: '10101010-1010-4010-8010-101010101010',
+          employerType: 'business',
+          displayName: 'Create Conflict Rose',
+        }),
+      response: mockResponse({ status: 409, contentType: 'application/json' }),
+      expected: { ok: false, failure: { kind: 'conflict' } },
+    },
+    {
+      label: 'create unexpected 2xx',
+      call: () =>
+        createEmployer({
+          commandId: '12121212-1212-4212-8212-121212121212',
+          employerType: 'business',
+          displayName: 'Create Unexpected Two Hundred Two',
+        }),
+      response: mockResponse({ status: 202, contentType: 'application/json', jsonValue: { detail: 'do not leak' } }),
+      expected: { ok: false, failure: { kind: 'unknown_outcome' } },
+    },
   ];
 
   for (const scenario of failureStatuses) {
@@ -445,12 +745,24 @@ it('maps failures and disposes unread bodies without reflection', async () => {
   }
 
   expect(cancelledBodies).toEqual([
+    'status:400',
     'status:403',
+    'status:409',
     'status:503',
     'status:418',
     'status:200',
+    'status:422',
+    'status:403',
+    'status:404',
+    'status:409',
+    'status:503',
+    'status:200',
     'status:200',
     'status:201',
+    'status:422',
+    'status:403',
+    'status:409',
+    'status:202',
   ]);
   expect(consoleError).not.toHaveBeenCalled();
   expect(consoleWarn).not.toHaveBeenCalled();
@@ -470,6 +782,29 @@ it('classifies aborted reads silently', async () => {
   expect(searchResult).toBeNull();
   expect(detailResult).toBeNull();
   expect(consoleError).not.toHaveBeenCalled();
+
+  vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockRejectedValue({ name: 'AbortError' }));
+  const plainObjectAbort = await searchEmployers({ displayNameQuery: 'rose' });
+  expect(plainObjectAbort).toBeNull();
+});
+
+it('classifies response-body aborts silently', async () => {
+  const abortError = new DOMException('aborted', 'AbortError');
+  const abortingResponse = () =>
+    ({
+      status: 200,
+      headers: new Headers({ 'Content-Type': 'application/json' }),
+      json: vi.fn().mockRejectedValue(abortError),
+    }) as unknown as Response;
+
+  vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(abortingResponse()));
+  const searchResult = await searchEmployers({ displayNameQuery: 'rose' });
+
+  vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(abortingResponse()));
+  const detailResult = await getEmployer('88888888-8888-4888-8888-888888888888');
+
+  expect(searchResult).toBeNull();
+  expect(detailResult).toBeNull();
 });
 
 it('maps non-abort read transport failures to unavailable', async () => {
@@ -513,4 +848,30 @@ it('maps detail and create unreadable success payloads to bounded failures', asy
     displayName: 'Synthetic Invalid JSON 001',
   });
   expect(createUnreadable).toEqual({ ok: false, failure: { kind: 'unknown_outcome' } });
+});
+
+it('rejects detail ID mismatch in a 200 response', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn<typeof fetch>().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          employer_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          employer_type: 'business',
+          display_name: 'Wrong Detail Rose',
+          lifecycle_status: 'draft',
+          source_channel: 'staff_entry',
+          version: 1,
+          received_at: '2026-08-05T08:00:00Z',
+          created_at: '2026-08-05T08:00:00Z',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    ),
+  );
+
+  expect(await getEmployer('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')).toEqual({
+    ok: false,
+    failure: { kind: 'unexpected' },
+  });
 });

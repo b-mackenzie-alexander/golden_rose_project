@@ -1,8 +1,8 @@
 # Current Work — Golden Rose Operations Platform
 
 **Updated:** 2026-08-08
-**Lane:** Phase 1 coding — Employer workspace post-merge closeout
-**Overall status:** PR #13 merged the first local/synthetic Employer workspace implementation into protected `develop` at `f8236e6`. PR #14 then merged the reviewed closeout plan into `develop` at `b0a459b`. The active remediation branch remains `fix/employer-workspace-closeout`, recreated from that exact merged tip, and the closeout work remains an uncommitted working-tree review surface. Independent review found one frontend High plus frontend/backend Mediums; all reported findings and Lows have been remediated under exact RED → GREEN or focused PostgreSQL evidence. Frontend, backend, CI/SBOM/docs, and final delta rereviews now ACCEPT the exact uncommitted surface with no residual findings. The latest pre-commit non-service gate passes with `64` frontend tests, `78` backend unit tests, Ruff/mypy/Bandit, both hardened SBOM validators, and clean diff hygiene; focused PostgreSQL migration/create qualification passes with `25` tests and explicit teardown. Commit, complete final-head application qualification, exact-range Gitleaks, push, PR, protected-check verification, and merge remain outstanding. Human browser/manual accessibility/fluent-language qualification has not occurred and remains deferred until a shared deployed `develop` environment exists. Runtime-role immutability, connection-pool/load qualification, GCP work, live data, and next-slice implementation remain deferred. Infrastructure provisioning, public release, live integrations, real identity, and client/production-data use remain unauthorized.
+**Lane:** Phase 1 planning publication — bounded draft Employer revision
+**Overall status:** PR #15 merged the independently rereviewed and exact-head-qualified Employer workspace closeout into protected `develop` at `7ae448e`; required `application`, `check`, and `enforce` checks passed. The isolated `docs/draft-employer-revision-plan` branch is fast-forwarded to that exact merged tip and now reconciles accepted ADR-0007, its implementation plan, ADR/technology indexes, the correction-contract replay refinement, and living documents. Independent backend/database/API/TDD, frontend/browser, and governance reviews cleared the remediated planning content with zero remaining findings. This lane publishes planning only: no draft-revision product code, migration `0003`, service start, deployment, live data, or client data is authorized. Commit, exact planning-head qualification, exact-range Gitleaks, push, and planning-only PR remain outstanding. Human browser/manual accessibility/fluent-language qualification has not occurred and remains deferred until a shared deployed `develop` environment exists. Runtime-role immutability, connection-pool/load qualification, GCP work, public release, live integrations, real identity, and client/production-data use remain unauthorized.
 
 ## Active objective
 Turn the completed initial discovery baseline into an approved, narrow first delivery: an agency-staff pilot for employer demand entry and retrieval, followed by a governed dashboard and transparent worker/employer comparison aid.
@@ -29,10 +29,9 @@ Turn the completed initial discovery baseline into an approved, narrow first del
 - Accepted correction/audit baseline: PostgreSQL domain rows hold current operational truth; append-only `AuditEvent` records preserve material history through atomic expected-version/idempotent commands; restricted prior/new values remain field-authorized; and derived projections are disposable rather than competing record stores. `docs/planning/phase-1-correction-audit-event-contract.md` is authoritative.
 
 ## Immediate next steps
-1. Commit the exact rereview-cleared closeout surface.
-2. Rerun the complete PostgreSQL application gate on that committed head, scan exactly `origin/develop..HEAD` with Gitleaks, push, open the closeout PR, verify all protected checks, and merge to `develop`.
-3. Preserve the deferred-gate truth: human browser/manual accessibility/fluent-language review still waits for a shared deployed `develop` target, and runtime-role immutability/pool-load/GCP/live-data work remain out of scope for this lane.
-4. Do not begin draft Employer revision implementation from this branch; the separate candidate planning worktree may be rebaselined only after this closeout is merged.
+1. Commit only the reviewed documentation surface, run exact planning-head/path/node/diff checks, scan exactly `origin/develop..HEAD` with Gitleaks, push, and open a planning-only PR to `develop`.
+2. Preserve the deferred-gate truth: human browser/manual accessibility/fluent-language review still waits for a shared deployed `develop` target, and runtime-role immutability/pool-load/GCP/live-data work remain out of scope.
+3. Stop after planning publication. Do not add revision product code or create an implementation branch without a merged packet, exact merged-tip verification, and Beatrice's separate coding authorization.
 
 ## Gate classification
 
@@ -70,8 +69,9 @@ The complete discovery inventory and evidence rules are in `docs/planning/phase-
 - PR #9 merged the reviewed solo-maintainer governance and required-`application` policy at `80f4505`. The committed policy was then applied under explicit approval; `infra/github/verify-repo-policy.sh` reported no drift and direct GitHub queries confirmed all three required contexts on both protected branches.
 - PR #11 merged the independently reviewed and remediated Employer detail/bounded-search tracer into `develop` at `b9eaee6`; its feature branch is historical and not a base for later work.
 - PR #12 merged the independently reviewed Employer workspace frontend planning packet into `develop` at `b06923a`; its documentation branch is historical and not a base for implementation.
-- PR #13 merged the first local/synthetic Employer workspace implementation into `develop` at `f8236e6`; independent post-merge closeout is now required before next-slice planning.
-- PR #14 merged the independently reviewed closeout plan into `develop` at `b0a459b`; `fix/employer-workspace-closeout` is the active remediation lane, and accepted ADR-0006 remains pending durable merge with that implementation closeout.
+- PR #13 merged the first local/synthetic Employer workspace implementation into `develop` at `f8236e6`.
+- PR #14 merged the independently reviewed closeout plan into `develop` at `b0a459b`.
+- PR #15 merged the independently rereviewed and exact-head-qualified closeout plus ADR-0006 into `develop` at `7ae448e`; the retired closeout branch is historical, and the next active lane is planning-only publication of ADR-0007 and its paired plan.
 
 ## Repository bootstrap state
 - The initial tracked baseline contains the living documents, ADR convention, and a protective `.gitignore`.

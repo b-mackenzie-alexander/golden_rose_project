@@ -9,6 +9,8 @@
 **Behind commits vs `origin/develop` at handoff creation:** `0`
 **PR status:** no PR yet; commit/push/PR-open remain blocked on this rereview
 
+> **Historical closeout record:** This document preserves the exact uncommitted review surface and evidence available at handoff creation. Subsequent rereviews cleared all findings; commit `47fe45f` passed exact-head qualification and exact-range Gitleaks; protected checks passed; and PR #15 merged the closeout to `develop` at `7ae448e`. It is no longer the active review target.
+
 ## 1. Current branch truth
 
 This handoff covers the **exact uncommitted closeout working tree** only.

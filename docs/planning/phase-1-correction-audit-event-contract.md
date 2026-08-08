@@ -145,7 +145,9 @@ Every correction/material command requires:
 
 A stale version is rejected rather than resolved by last-write-wins or silent field merging. The user must review current truth and resubmit.
 
-Reusing an idempotency key with the same command payload returns the already committed result. Reusing it with a different payload is rejected as a conflict.
+Reusing an idempotency key with the same actor, command identity, target, schema version, and normalized payload returns the already committed **command outcome** without another domain or audit write. Reusing it with a different authority or payload is rejected as a conflict.
+
+For the bounded Employer create/revision command family, accepted ADR-0007 defines that committed outcome as immutable command identity plus the original committed `result_record_version`; replay transport returns that metadata alongside the **current authoritative minimized Employer representation**, not a retained historical response snapshot. The current body version may exceed, but never be lower than, the original command-result version. This command-family refinement does not authorize generic replay semantics for later entities and does not alter the rule that identical retries perform no additional write.
 
 ## Required audit-event envelope
 

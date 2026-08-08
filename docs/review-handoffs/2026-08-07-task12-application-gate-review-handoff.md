@@ -13,8 +13,9 @@
 This handoff is now **historical/superseded review evidence**.
 
 - PR #13 later merged the bounded Employer workspace implementation into `develop` at `f8236e6`.
-- PR #14 merged the post-merge closeout plan into `develop` at `b0a459b`; accepted ADR-0006 remains pending durable merge with the implementation closeout.
-- Use ADR-0006 and `.hermes/plans/2026-08-07_145911-phase-1-employer-workspace-closeout-plan.md` for the active remediation lane; do not treat this packet as the current review target.
+- At this handoff's historical PR #14 snapshot, the post-merge closeout plan was merged at `b0a459b` while accepted ADR-0006 remained pending durable merge with the implementation closeout.
+- At that snapshot, ADR-0006 and `.hermes/plans/2026-08-07_145911-phase-1-employer-workspace-closeout-plan.md` controlled the active remediation lane; this packet was not its review target.
+- PR #15 subsequently merged the exact-head-qualified implementation closeout plus ADR-0006 into `develop` at `7ae448e`; the closeout lane and this Task 12 handoff are now historical.
 
 The observed commands and results below are preserved as contemporaneous Task 12 evidence only.
 

@@ -17,7 +17,8 @@ Use `ADR-NNNN-short-title.md`, with monotonic numbers. Never renumber an existin
 - `ADR-0003-phase-1-backend-toolchain.md` — accepted Python/FastAPI/PostgreSQL synchronous backend toolchain for the first slice.
 - `ADR-0004-phase-1-employer-read-search-boundary.md` — accepted and implemented synthetic/local Employer detail and bounded-search boundary.
 - `ADR-0005-phase-1-employer-workspace-frontend-boundary.md` — accepted and implemented first browser-workspace and create-response cache-hardening boundary; PR #12 merged the planning packet and PR #13 merged the bounded implementation.
-- `ADR-0006-phase-1-employer-workspace-post-merge-closeout.md` — accepted post-merge closeout decision for PR #13 defects, deferred human qualification gates, and the bounded remediation lane before any next-slice planning; PR #14 merged its paired plan only, and this ADR remains part of the implementation-closeout candidate until that PR merges.
+- `ADR-0006-phase-1-employer-workspace-post-merge-closeout.md` — accepted and implemented post-merge closeout decision for PR #13 defects, deferred human qualification gates, and the bounded remediation lane; PR #14 merged its paired plan and PR #15 merged the exact-head-qualified closeout plus this ADR at `7ae448e`.
+- `ADR-0007-phase-1-draft-employer-revision-boundary.md` — accepted planning boundary for revising only draft Employer `display_name` and `employer_type` with expected-version concurrency, command-bound idempotency, minimized audit authority, and localized browser recovery; publication does not authorize implementation.
 
 ## Required sections
 - Status and date

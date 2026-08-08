@@ -11,9 +11,9 @@ The next increment should add product feedback without collecting stronger perso
 
 ## Post-merge closeout correction
 
-PR #13 later merged the first local/synthetic Employer workspace implementation into `develop`. Independent post-merge review then identified immediate closeout defects in browser BFCache wiring, late async invalidation, retry/abandon authority, operation-specific failure handling, database authority correspondence, SQLAlchemy lifecycle ownership, SBOM validation integrity, and privacy-safe test diagnostics. ADR-0006 supersedes ADR-0005 as the active execution authority for that closeout work only.
+PR #13 later merged the first local/synthetic Employer workspace implementation into `develop`. Independent post-merge review then identified immediate closeout defects in browser BFCache wiring, late async invalidation, retry/abandon authority, operation-specific failure handling, database authority correspondence, SQLAlchemy lifecycle ownership, SBOM validation integrity, and privacy-safe test diagnostics. ADR-0006 controlled that bounded closeout, which PR #15 merged at `7ae448e`; ADR-0005 remains the implemented browser/workspace product contract.
 
-This ADR still governs the bounded browser/workspace product contract and its non-scope. It does **not** mean human browser/manual accessibility/fluent-language qualification already occurred. Those human gates remain deferred until a shared deployed `develop` target exists and block later promotion/client acceptance rather than the current local closeout remediation lane.
+This ADR still governs the bounded browser/workspace product contract and its non-scope. It does **not** mean human browser/manual accessibility/fluent-language qualification already occurred. Those human gates remain deferred until a shared deployed `develop` target exists and block later promotion/client acceptance. ADR-0007 is the next planning-only boundary; no draft-revision implementation is authorized by this record or the planning publication lane.
 
 ## Decision
 

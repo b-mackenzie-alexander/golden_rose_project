@@ -1,8 +1,8 @@
 # Golden Rose Operations Platform
 
 This repository contains bounded synthetic/local tracers for the Golden Rose
-staff employer-demand workflow. A first staff Employer browser workspace has
-merged locally into `develop`, but post-merge closeout is still in progress.
+staff employer-demand workflow. The first staff Employer browser workspace and
+its bounded post-merge closeout are merged into `develop`.
 This is not a public portal, production deployment, or
 automated hiring, matching, ranking, eligibility, or referral system.
 
@@ -21,8 +21,8 @@ automated hiring, matching, ranking, eligibility, or referral system.
 - ADR-0005 accepted a standalone `apps/web/` frontend boundary over only these
   contracts, and PR #13 merged the initial local/synthetic Employer workspace.
 - ADR-0006 and `.hermes/plans/2026-08-07_145911-phase-1-employer-workspace-closeout-plan.md`
-  now govern the active closeout lane for post-merge browser/runtime/database/CI
-  defects before any draft-Employer revision slice is planned.
+  govern the closeout merged by PR #15. ADR-0007 and its paired plan define the
+  next bounded planning direction, but no draft-revision coding is authorized.
 - Automated frontend parity/accessibility evidence exists locally, but human
   browser/manual accessibility/fluent-language qualification remains deferred
   until a shared deployed `develop` target exists.

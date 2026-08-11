@@ -216,7 +216,7 @@ def test_authorized_invalid_search_inputs_return_nonreflective_no_store_422(
         }
 
 
-def test_existing_search_failure_matrix_media_cache_body_headers_and_read_only_contract_remains_exact(
+def test_existing_search_failure_matrix_media_cache_body_headers_and_read_only_contract_remains_exact(  # noqa: E501
     clean_tables,
     monkeypatch,
     session,
@@ -345,7 +345,9 @@ def test_existing_search_failure_matrix_media_cache_body_headers_and_read_only_c
         assert "Synthetic Search" not in response.text
 
     employer_count = session.execute(text("SELECT COUNT(*) FROM employers")).scalar_one()
-    command_receipt_count = session.execute(text("SELECT COUNT(*) FROM command_receipts")).scalar_one()
+    command_receipt_count = session.execute(
+        text("SELECT COUNT(*) FROM command_receipts")
+    ).scalar_one()
     audit_event_count = session.execute(text("SELECT COUNT(*) FROM audit_events")).scalar_one()
 
     assert sql_statements == []
@@ -638,7 +640,7 @@ def test_detail_validation_and_failures_map_to_safe_no_store_problems(
         }
 
 
-def test_existing_detail_failure_matrix_media_cache_body_headers_and_read_only_contract_remains_exact(
+def test_existing_detail_failure_matrix_media_cache_body_headers_and_read_only_contract_remains_exact(  # noqa: E501
     clean_tables,
     monkeypatch,
     session,
@@ -780,7 +782,9 @@ def test_existing_detail_failure_matrix_media_cache_body_headers_and_read_only_c
         assert "52525252" not in response.text
 
     employer_count = session.execute(text("SELECT COUNT(*) FROM employers")).scalar_one()
-    command_receipt_count = session.execute(text("SELECT COUNT(*) FROM command_receipts")).scalar_one()
+    command_receipt_count = session.execute(
+        text("SELECT COUNT(*) FROM command_receipts")
+    ).scalar_one()
     audit_event_count = session.execute(text("SELECT COUNT(*) FROM audit_events")).scalar_one()
 
     assert sql_statements == []

@@ -8,14 +8,15 @@ from uuid import UUID
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from golden_rose.application.create_draft_employer import (
     IdempotencyConflictError,
     create_draft_employer,
 )
-from golden_rose.application.revise_draft_employer import revise_draft_employer
 from golden_rose.application.errors import SafePersistenceError
+from golden_rose.application.revise_draft_employer import revise_draft_employer
 from golden_rose.auth.principal import StaffPrincipal
 
 
@@ -533,57 +534,44 @@ def test_replay_rejects_authority_state_where_current_version_precedes_receipt_r
             "command_id": command_id,
         },
     )
-    session.execute(
-        text(
-            """
-            INSERT INTO command_receipts (
-                command_id,
-                command_schema_version,
-                command_type,
-                actor_id,
-                request_fingerprint,
-                result_entity_type,
-                result_entity_id,
-                result_record_version,
-                result_event_type,
-                created_at
-            ) VALUES (
-                :command_id,
-                1,
-                'create_draft_employer',
-                :actor_id,
-                :request_fingerprint,
-                'employer',
-                :result_entity_id,
-                2,
-                'employer.created',
-                :created_at
-            )
-            """
-        ),
-        {
-            "command_id": command_id,
-            "actor_id": principal.actor_id,
-            "request_fingerprint": request_fingerprint,
-            "result_entity_id": employer_id,
-            "created_at": fixed_now,
-        },
-    )
-    session.commit()
-
-    with pytest.raises(SafePersistenceError, match="persistence operation failed"):
-        create_draft_employer(
-            session=session,
-            principal=principal,
-            command_id=command_id,
-            employer_type="household",
-            display_name="Synthetic Corrupted Replay Employer",
-            clock=FixedClock(fixed_now),
-            identifiers=FixedIdentifierFactory(
-                UUID("42424242-4242-4242-8242-424242424242"),
-                UUID("43434343-4343-4343-8343-434343434343"),
+    with pytest.raises(IntegrityError, match="ck_command_receipts_result_authority_shape"):
+        session.execute(
+            text(
+                """
+                INSERT INTO command_receipts (
+                    command_id,
+                    command_schema_version,
+                    command_type,
+                    actor_id,
+                    request_fingerprint,
+                    result_entity_type,
+                    result_entity_id,
+                    result_record_version,
+                    result_event_type,
+                    created_at
+                ) VALUES (
+                    :command_id,
+                    1,
+                    'create_draft_employer',
+                    :actor_id,
+                    :request_fingerprint,
+                    'employer',
+                    :result_entity_id,
+                    2,
+                    'employer.created',
+                    :created_at
+                )
+                """
             ),
+            {
+                "command_id": command_id,
+                "actor_id": principal.actor_id,
+                "request_fingerprint": request_fingerprint,
+                "result_entity_id": employer_id,
+                "created_at": fixed_now,
+            },
         )
+    session.rollback()
 
 
 def test_create_replay_rejects_inconsistent_result_version_event_type_or_target(
@@ -709,57 +697,44 @@ def test_create_replay_rejects_inconsistent_result_version_event_type_or_target(
             "command_id": command_id,
         },
     )
-    session.execute(
-        text(
-            """
-            INSERT INTO command_receipts (
-                command_id,
-                command_schema_version,
-                command_type,
-                actor_id,
-                request_fingerprint,
-                result_entity_type,
-                result_entity_id,
-                result_record_version,
-                result_event_type,
-                created_at
-            ) VALUES (
-                :command_id,
-                1,
-                'create_draft_employer',
-                :actor_id,
-                :request_fingerprint,
-                'employer',
-                :result_entity_id,
-                2,
-                'employer.created',
-                :created_at
-            )
-            """
-        ),
-        {
-            "command_id": command_id,
-            "actor_id": principal.actor_id,
-            "request_fingerprint": request_fingerprint,
-            "result_entity_id": employer_id,
-            "created_at": fixed_now,
-        },
-    )
-    session.commit()
-
-    with pytest.raises(SafePersistenceError, match="persistence operation failed"):
-        create_draft_employer(
-            session=session,
-            principal=principal,
-            command_id=command_id,
-            employer_type="household",
-            display_name="Synthetic Invalid Create Replay Metadata Employer",
-            clock=FixedClock(fixed_now),
-            identifiers=FixedIdentifierFactory(
-                UUID("48484848-4848-4848-8848-484848484848"),
-                UUID("49494949-4949-4949-8949-494949494949"),
+    with pytest.raises(IntegrityError, match="ck_command_receipts_result_authority_shape"):
+        session.execute(
+            text(
+                """
+                INSERT INTO command_receipts (
+                    command_id,
+                    command_schema_version,
+                    command_type,
+                    actor_id,
+                    request_fingerprint,
+                    result_entity_type,
+                    result_entity_id,
+                    result_record_version,
+                    result_event_type,
+                    created_at
+                ) VALUES (
+                    :command_id,
+                    1,
+                    'create_draft_employer',
+                    :actor_id,
+                    :request_fingerprint,
+                    'employer',
+                    :result_entity_id,
+                    2,
+                    'employer.created',
+                    :created_at
+                )
+                """
             ),
+            {
+                "command_id": command_id,
+                "actor_id": principal.actor_id,
+                "request_fingerprint": request_fingerprint,
+                "result_entity_id": employer_id,
+                "created_at": fixed_now,
+            },
         )
+    session.rollback()
 
 
 def test_create_draft_employer_audit_event_changed_fields_omits_display_name_value(

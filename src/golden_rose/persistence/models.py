@@ -58,10 +58,16 @@ command_receipts = Table(
         "octet_length(request_fingerprint) = 32", name="ck_command_receipts_request_fingerprint_len"
     ),
     CheckConstraint("result_entity_type = 'employer'", name="ck_command_receipts_entity_type"),
-    CheckConstraint("result_record_version >= 1", name="ck_command_receipts_result_record_version_positive"),
     CheckConstraint(
-        "((command_type = 'create_draft_employer' AND result_event_type = 'employer.created' AND result_record_version = 1) OR "
-        "(command_type = 'revise_draft_employer' AND result_event_type = 'employer.draft_revised' AND result_record_version >= 2))",
+        "result_record_version >= 1", name="ck_command_receipts_result_record_version_positive"
+    ),
+    CheckConstraint(
+        "((command_type = 'create_draft_employer' "
+        "AND result_event_type = 'employer.created' "
+        "AND result_record_version = 1) OR "
+        "(command_type = 'revise_draft_employer' "
+        "AND result_event_type = 'employer.draft_revised' "
+        "AND result_record_version >= 2))",
         name="ck_command_receipts_result_authority_shape",
     ),
     ForeignKeyConstraint(
@@ -79,7 +85,13 @@ command_receipts = Table(
         initially="DEFERRED",
     ),
     ForeignKeyConstraint(
-        ["command_id", "result_entity_id", "result_record_version", "result_event_type", "actor_id"],
+        [
+            "command_id",
+            "result_entity_id",
+            "result_record_version",
+            "result_event_type",
+            "actor_id",
+        ],
         [
             "audit_events.command_id",
             "audit_events.entity_id",
@@ -153,14 +165,22 @@ audit_events = Table(
     ),
     CheckConstraint("entity_type = 'employer'", name="ck_audit_events_entity_type"),
     CheckConstraint("actor_type = 'staff'", name="ck_audit_events_actor_type"),
-    CheckConstraint("correlation_id = command_id", name="ck_audit_events_correlation_matches_command"),
+    CheckConstraint(
+        "correlation_id = command_id", name="ck_audit_events_correlation_matches_command"
+    ),
     CheckConstraint("source_type = 'staff_api'", name="ck_audit_events_source_type"),
     CheckConstraint(
         "payload_classification = 'sensitive_operational'",
         name="ck_audit_events_payload_classification",
     ),
-    CheckConstraint("entity_sequence = new_record_version", name="ck_audit_events_entity_sequence_matches_new_record_version"),
-    CheckConstraint("new_record_version = prior_record_version + 1", name="ck_audit_events_one_step_version_advance"),
+    CheckConstraint(
+        "entity_sequence = new_record_version",
+        name="ck_audit_events_entity_sequence_matches_new_record_version",
+    ),
+    CheckConstraint(
+        "new_record_version = prior_record_version + 1",
+        name="ck_audit_events_one_step_version_advance",
+    ),
     ForeignKeyConstraint(
         ["command_id", "entity_id", "new_record_version", "event_type", "actor_id"],
         [

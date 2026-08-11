@@ -1,11 +1,11 @@
 from uuid import uuid4
 
 from golden_rose.auth.permissions import (
-    EMPLOYER_READ_PERMISSION,
     EMPLOYER_DRAFT_REVISE_PERMISSION,
+    EMPLOYER_READ_PERMISSION,
     can_create_draft_employer,
-    can_revise_draft_employer,
     can_read_employer,
+    can_revise_draft_employer,
 )
 from golden_rose.auth.principal import StaffPrincipal
 

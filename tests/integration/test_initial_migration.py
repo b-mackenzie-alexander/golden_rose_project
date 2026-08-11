@@ -330,17 +330,13 @@ def test_revision_migration_upgrades_existing_create_rows_and_receipts(engine) -
 
         with engine.connect() as upgraded_connection:
             inspector = inspect(upgraded_connection)
-            employer_columns = {
-                column["name"] for column in inspector.get_columns("employers")
-            }
+            employer_columns = {column["name"] for column in inspector.get_columns("employers")}
             command_receipt_columns = {
                 column["name"] for column in inspector.get_columns("command_receipts")
             }
 
             assert {"updated_at", "updated_by"}.issubset(employer_columns)
-            assert {"result_record_version", "result_event_type"}.issubset(
-                command_receipt_columns
-            )
+            assert {"result_record_version", "result_event_type"}.issubset(command_receipt_columns)
             upgraded_row = upgraded_connection.execute(
                 text(
                     """
@@ -446,9 +442,7 @@ def test_revision_migration_refuses_incomplete_existing_receipt_event_cardinalit
 
         with engine.connect() as failed_upgrade_connection:
             inspector = inspect(failed_upgrade_connection)
-            employer_columns = {
-                column["name"] for column in inspector.get_columns("employers")
-            }
+            employer_columns = {column["name"] for column in inspector.get_columns("employers")}
             command_receipt_columns = {
                 column["name"] for column in inspector.get_columns("command_receipts")
             }
@@ -458,8 +452,9 @@ def test_revision_migration_refuses_incomplete_existing_receipt_event_cardinalit
             assert "result_record_version" not in command_receipt_columns
             assert "result_event_type" not in command_receipt_columns
             assert (
-                failed_upgrade_connection.execute(text("SELECT version_num FROM alembic_version"))
-                .scalar_one()
+                failed_upgrade_connection.execute(
+                    text("SELECT version_num FROM alembic_version")
+                ).scalar_one()
                 == "0002_enforce_authority_links"
             )
     finally:
@@ -725,9 +720,7 @@ def test_revision_live_schema_enforces_one_step_event_version_authority(connecti
     }
 
     assert {"updated_at", "updated_by"}.issubset(employer_columns)
-    assert {"result_record_version", "result_event_type"}.issubset(
-        command_receipt_columns
-    )
+    assert {"result_record_version", "result_event_type"}.issubset(command_receipt_columns)
     assert "uq_command_receipts_result_authority" in command_receipt_unique_constraints
     assert "uq_audit_events_result_authority" in audit_event_unique_constraints
     assert command_receipt_foreign_keys["fk_command_receipts_result_audit_event"] == {
@@ -834,7 +827,8 @@ def test_revision_live_schema_rejects_mismatched_receipt_event_version(
                     '22222222-2222-4222-8222-222222222222', NULL, NOW(), NULL,
                     '33333333-3333-4333-8333-333333333333', '33333333-3333-4333-8333-333333333333',
                     NULL, NULL, 'staff_api', NULL, '[]'::jsonb,
-                    '{"field_names": ["employer_type", "display_name"]}'::jsonb, 'sensitive_operational'
+                    '{"field_names": ["employer_type", "display_name"]}'::jsonb,
+                    'sensitive_operational'
                 )
                 """
             )
@@ -946,12 +940,9 @@ def test_revision_empty_downgrade_restores_closeout_schema_and_guards(engine) ->
         with engine.connect() as downgraded_connection:
             inspector = inspect(downgraded_connection)
 
-            employer_columns = {
-                column["name"] for column in inspector.get_columns("employers")
-            }
+            employer_columns = {column["name"] for column in inspector.get_columns("employers")}
             command_receipt_columns = {
-                column["name"]
-                for column in inspector.get_columns("command_receipts")
+                column["name"] for column in inspector.get_columns("command_receipts")
             }
             audit_event_foreign_keys = {
                 foreign_key["name"]: foreign_key
@@ -1013,7 +1004,7 @@ def test_revision_empty_downgrade_restores_closeout_schema_and_guards(engine) ->
         command.upgrade(alembic_config, "head")
 
 
-def test_revision_populated_create_only_downgrade_preserves_rows_correspondence_constraints_and_guards(
+def test_revision_populated_create_only_downgrade_preserves_rows_correspondence_constraints_and_guards(  # noqa: E501
     engine,
 ) -> None:
     alembic_config = Config(str(PROJECT_ROOT / "alembic.ini"))
@@ -1090,12 +1081,9 @@ def test_revision_populated_create_only_downgrade_preserves_rows_correspondence_
         with engine.connect() as downgraded_connection:
             inspector = inspect(downgraded_connection)
 
-            employer_columns = {
-                column["name"] for column in inspector.get_columns("employers")
-            }
+            employer_columns = {column["name"] for column in inspector.get_columns("employers")}
             command_receipt_columns = {
-                column["name"]
-                for column in inspector.get_columns("command_receipts")
+                column["name"] for column in inspector.get_columns("command_receipts")
             }
             command_receipt_foreign_keys = {
                 foreign_key["name"]: foreign_key
@@ -1265,9 +1253,7 @@ def test_revision_populated_downgrade_fails_closed_and_preserves_schema_data_gua
         with engine.connect() as head_connection:
             inspector = inspect(head_connection)
 
-            employer_columns = {
-                column["name"] for column in inspector.get_columns("employers")
-            }
+            employer_columns = {column["name"] for column in inspector.get_columns("employers")}
             command_receipt_columns = {
                 column["name"] for column in inspector.get_columns("command_receipts")
             }
@@ -1309,9 +1295,7 @@ def test_revision_populated_downgrade_fails_closed_and_preserves_schema_data_gua
             ).one()
 
             assert {"updated_at", "updated_by"}.issubset(employer_columns)
-            assert {"result_record_version", "result_event_type"}.issubset(
-                command_receipt_columns
-            )
+            assert {"result_record_version", "result_event_type"}.issubset(command_receipt_columns)
             assert preserved_row.display_name == "Synthetic Refusal Employer"
             assert preserved_row.version == 2
             assert preserved_row.updated_actor_changed is True

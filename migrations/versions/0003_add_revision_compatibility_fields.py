@@ -84,8 +84,12 @@ REVISION_AUDIT_EVENT_TYPE_CONSTRAINT = (
 )
 
 RECEIPT_RESULT_AUTHORITY_SHAPE_CONSTRAINT = (
-    "((command_type = 'create_draft_employer' AND result_event_type = 'employer.created' AND result_record_version = 1) OR "
-    "(command_type = 'revise_draft_employer' AND result_event_type = 'employer.draft_revised' AND result_record_version >= 2))"
+    "((command_type = 'create_draft_employer' "
+    "AND result_event_type = 'employer.created' "
+    "AND result_record_version = 1) OR "
+    "(command_type = 'revise_draft_employer' "
+    "AND result_event_type = 'employer.draft_revised' "
+    "AND result_record_version >= 2))"
 )
 
 INCOMPLETE_CREATE_RESULT_AUTHORITY_PREFLIGHT = """
@@ -121,9 +125,7 @@ def upgrade() -> None:
         sa.text(INCOMPLETE_CREATE_RESULT_AUTHORITY_PREFLIGHT)
     ).scalar_one()
     if has_incomplete_create_result_authority:
-        raise RuntimeError(
-            "incomplete receipt/event authority blocks revision migration"
-        )
+        raise RuntimeError("incomplete receipt/event authority blocks revision migration")
 
     op.add_column(
         "employers",
@@ -201,12 +203,8 @@ def upgrade() -> None:
         "audit_events",
         ["command_id", "entity_id", "new_record_version", "event_type", "actor_id"],
     )
-    op.drop_constraint(
-        "audit_events_command_id_fkey", "audit_events", type_="foreignkey"
-    )
-    op.drop_constraint(
-        "fk_audit_events_command_result", "audit_events", type_="foreignkey"
-    )
+    op.drop_constraint("audit_events_command_id_fkey", "audit_events", type_="foreignkey")
+    op.drop_constraint("fk_audit_events_command_result", "audit_events", type_="foreignkey")
     op.create_foreign_key(
         "fk_audit_events_command_result",
         "audit_events",
@@ -226,7 +224,13 @@ def upgrade() -> None:
         "fk_command_receipts_result_audit_event",
         "command_receipts",
         "audit_events",
-        ["command_id", "result_entity_id", "result_record_version", "result_event_type", "actor_id"],
+        [
+            "command_id",
+            "result_entity_id",
+            "result_record_version",
+            "result_event_type",
+            "actor_id",
+        ],
         ["command_id", "entity_id", "new_record_version", "event_type", "actor_id"],
         deferrable=True,
         initially="DEFERRED",
@@ -271,21 +275,15 @@ def downgrade() -> None:
         sa.text(POPULATED_REVISION_STATE_DOWNGRADE_PREFLIGHT)
     ).scalar_one()
     if has_populated_revision_state:
-        raise RuntimeError(
-            "populated revision-state data blocks downgrade"
-        )
+        raise RuntimeError("populated revision-state data blocks downgrade")
 
     op.drop_constraint(
         "fk_command_receipts_result_audit_event",
         "command_receipts",
         type_="foreignkey",
     )
-    op.drop_constraint(
-        "fk_audit_events_command_result", "audit_events", type_="foreignkey"
-    )
-    op.execute(
-        "ALTER TABLE audit_events DROP CONSTRAINT IF EXISTS audit_events_command_id_fkey"
-    )
+    op.drop_constraint("fk_audit_events_command_result", "audit_events", type_="foreignkey")
+    op.execute("ALTER TABLE audit_events DROP CONSTRAINT IF EXISTS audit_events_command_id_fkey")
     op.create_foreign_key(
         "audit_events_command_id_fkey",
         "audit_events",
@@ -300,22 +298,23 @@ def downgrade() -> None:
         ["command_id", "entity_id"],
         ["command_id", "result_entity_id"],
     )
-    op.drop_constraint(
-        "uq_audit_events_result_authority", "audit_events", type_="unique"
-    )
+    op.drop_constraint("uq_audit_events_result_authority", "audit_events", type_="unique")
     op.drop_constraint(
         "uq_command_receipts_result_authority",
         "command_receipts",
         type_="unique",
     )
     op.execute(
-        "ALTER TABLE audit_events DROP CONSTRAINT IF EXISTS ck_audit_events_one_step_version_advance"
+        "ALTER TABLE audit_events DROP CONSTRAINT IF EXISTS "
+        "ck_audit_events_one_step_version_advance"
     )
     op.execute(
-        "ALTER TABLE audit_events DROP CONSTRAINT IF EXISTS ck_audit_events_entity_sequence_matches_new_record_version"
+        "ALTER TABLE audit_events DROP CONSTRAINT IF EXISTS "
+        "ck_audit_events_entity_sequence_matches_new_record_version"
     )
     op.execute(
-        "ALTER TABLE audit_events DROP CONSTRAINT IF EXISTS ck_audit_events_correlation_matches_command"
+        "ALTER TABLE audit_events DROP CONSTRAINT IF EXISTS "
+        "ck_audit_events_correlation_matches_command"
     )
     op.execute(
         "ALTER TABLE audit_events DROP CONSTRAINT IF EXISTS ck_audit_events_schema_matches_type"
@@ -337,10 +336,12 @@ def downgrade() -> None:
     op.execute(DROP_RECEIPT_COMPAT_FUNCTION)
     op.drop_constraint("ck_command_receipts_command_type", "command_receipts", type_="check")
     op.execute(
-        "ALTER TABLE command_receipts DROP CONSTRAINT IF EXISTS ck_command_receipts_result_authority_shape"
+        "ALTER TABLE command_receipts DROP CONSTRAINT IF EXISTS "
+        "ck_command_receipts_result_authority_shape"
     )
     op.execute(
-        "ALTER TABLE command_receipts DROP CONSTRAINT IF EXISTS ck_command_receipts_result_record_version_positive"
+        "ALTER TABLE command_receipts DROP CONSTRAINT IF EXISTS "
+        "ck_command_receipts_result_record_version_positive"
     )
     op.create_check_constraint(
         "ck_command_receipts_command_type",

@@ -74,7 +74,7 @@ def test_post_staff_employers_returns_201_and_exact_body_for_permitted_request(
         assert "location" not in {key.lower() for key in response.headers}
 
 
-def test_post_staff_employers_fresh_and_replay_emit_result_version_without_changing_create_status_or_body_contract(
+def test_post_staff_employers_fresh_and_replay_emit_result_version_without_changing_create_status_or_body_contract(  # noqa: E501
     clean_tables,
     monkeypatch,
 ) -> None:
@@ -132,7 +132,7 @@ def test_post_staff_employers_fresh_and_replay_emit_result_version_without_chang
         assert replay_response.json() == expected_body
 
 
-def test_post_staff_employers_replay_after_revision_returns_current_truth_and_original_result_version(
+def test_post_staff_employers_replay_after_revision_returns_current_truth_and_original_result_version(  # noqa: E501
     clean_tables,
     monkeypatch,
     session,
@@ -311,8 +311,12 @@ def test_post_staff_employer_revision_rejects_invalid_display_name_without_write
             },
         )
 
-        receipt_count_before = session.execute(text("SELECT COUNT(*) FROM command_receipts")).scalar_one()
-        audit_event_count_before = session.execute(text("SELECT COUNT(*) FROM audit_events")).scalar_one()
+        receipt_count_before = session.execute(
+            text("SELECT COUNT(*) FROM command_receipts")
+        ).scalar_one()
+        audit_event_count_before = session.execute(
+            text("SELECT COUNT(*) FROM audit_events")
+        ).scalar_one()
 
         response = client.post(
             f"/api/staff/v1/employers/{employer_id}/revisions",
@@ -338,8 +342,12 @@ def test_post_staff_employer_revision_rejects_invalid_display_name_without_write
             .mappings()
             .one()
         )
-        receipt_count_after = session.execute(text("SELECT COUNT(*) FROM command_receipts")).scalar_one()
-        audit_event_count_after = session.execute(text("SELECT COUNT(*) FROM audit_events")).scalar_one()
+        receipt_count_after = session.execute(
+            text("SELECT COUNT(*) FROM command_receipts")
+        ).scalar_one()
+        audit_event_count_after = session.execute(
+            text("SELECT COUNT(*) FROM audit_events")
+        ).scalar_one()
 
     assert create_response.status_code == 201
     assert response.status_code == 422
@@ -1040,9 +1048,7 @@ def test_post_staff_employer_revision_ignores_actor_role_permission_headers(
         )
 
         employer_actor_row = session.execute(
-            text(
-                "SELECT created_by, updated_by FROM employers WHERE employer_id = :employer_id"
-            ),
+            text("SELECT created_by, updated_by FROM employers WHERE employer_id = :employer_id"),
             {"employer_id": str(employer_id)},
         ).one()
         revision_audit_actor_id = session.execute(
@@ -1060,10 +1066,14 @@ def test_post_staff_employer_revision_ignores_actor_role_permission_headers(
         assert str(employer_actor_row.created_by) == str(synthetic_actor_id)
         assert str(employer_actor_row.updated_by) == str(synthetic_actor_id)
         assert str(revision_audit_actor_id) == str(synthetic_actor_id)
-        assert str(spoofed_actor_id) not in {str(employer_actor_row.created_by), str(employer_actor_row.updated_by), str(revision_audit_actor_id)}
+        assert str(spoofed_actor_id) not in {
+            str(employer_actor_row.created_by),
+            str(employer_actor_row.updated_by),
+            str(revision_audit_actor_id),
+        }
 
 
-def test_post_staff_employer_revision_replay_after_later_revision_returns_current_truth_and_original_result_version_without_writes(
+def test_post_staff_employer_revision_replay_after_later_revision_returns_current_truth_and_original_result_version_without_writes(  # noqa: E501
     clean_tables,
     monkeypatch,
     session,

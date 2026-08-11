@@ -1886,7 +1886,7 @@ def test_revision_replay_rejects_inconsistent_result_version_event_type_or_targe
         )
 
 
-def test_revision_replay_after_later_revision_returns_current_truth_and_original_result_version_without_writes(
+def test_revision_replay_after_later_revision_returns_current_truth_and_original_result_version_without_writes(  # noqa: E501
     session,
     clean_tables,
 ) -> None:

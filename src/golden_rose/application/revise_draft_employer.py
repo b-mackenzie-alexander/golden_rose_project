@@ -4,27 +4,28 @@ from dataclasses import dataclass
 from typing import Literal
 from uuid import NAMESPACE_URL, UUID, uuid5
 
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.exc import NoResultFound
 from sqlalchemy import select, update
+from sqlalchemy.exc import NoResultFound, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from golden_rose.application.employer_text import (
+    normalize_employer_text,
+    validate_employer_display_name,
+)
 from golden_rose.application.errors import (
     EmployerNotFoundError,
     EmployerVersionConflictError,
     SafePersistenceError,
 )
-from golden_rose.application.employer_text import (
-    normalize_employer_text,
-    validate_employer_display_name,
-)
 from golden_rose.auth.permissions import can_revise_draft_employer
 from golden_rose.auth.principal import StaffPrincipal
 from golden_rose.clock import Clock
 from golden_rose.persistence.audit_events import insert_employer_draft_revised_event
-from golden_rose.persistence.command_receipts import get_command_receipt, reserve_revision_command_receipt
-from golden_rose.persistence.employers import get_authoritative_employer_by_id
-from golden_rose.persistence.employers import EmployerRecord
+from golden_rose.persistence.command_receipts import (
+    get_command_receipt,
+    reserve_revision_command_receipt,
+)
+from golden_rose.persistence.employers import EmployerRecord, get_authoritative_employer_by_id
 from golden_rose.persistence.models import employers
 
 
@@ -136,7 +137,9 @@ def revise_draft_employer(
                 and existing_receipt.result_record_version == expected_version + 1
                 and existing_receipt.result_event_type == "employer.draft_revised"
             ):
-                employer = get_authoritative_employer_by_id(session=session, employer_id=employer_id)
+                employer = get_authoritative_employer_by_id(
+                    session=session, employer_id=employer_id
+                )
                 if employer.version < existing_receipt.result_record_version:
                     raise SafePersistenceError("persistence operation failed")
                 session.rollback()

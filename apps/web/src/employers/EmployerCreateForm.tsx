@@ -19,13 +19,20 @@ function createCommandId() {
 }
 
 type EmployerCreateFormProps = {
+  onAuthorityChange?: (state: { owner: 'create' | null; locked: boolean }) => void;
   onCreateSuccess?: () => void;
   resetSignal?: number;
+  workspaceCommandOwner?: 'create' | 'revision' | null;
 };
 
 type CreateFailureKind = 'validation' | 'forbidden';
 
-export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: EmployerCreateFormProps) {
+export function EmployerCreateForm({
+  onAuthorityChange,
+  onCreateSuccess,
+  resetSignal = 0,
+  workspaceCommandOwner = null,
+}: EmployerCreateFormProps) {
   const { messages } = useLanguage();
   const typeSelectRef = useRef<HTMLSelectElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -34,6 +41,7 @@ export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: Employe
   const previousResetSignalRef = useRef(resetSignal);
   const operationGenerationRef = useRef(0);
   const authorityOperationLockRef = useRef(false);
+  const lastAuthorityLockedRef = useRef(false);
   const [employerType, setEmployerType] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
@@ -48,6 +56,18 @@ export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: Employe
     employerType: EmployerType;
     displayName: string;
   } | null>(null);
+  const authorityLocked =
+    pendingAttempt !== null || unknownAttempt !== null || conflictAttempt !== null || isAbandonSearchPending;
+  const blockedByWorkspace = workspaceCommandOwner !== null && workspaceCommandOwner !== 'create';
+
+  useEffect(() => {
+    if (lastAuthorityLockedRef.current === authorityLocked) {
+      return;
+    }
+
+    lastAuthorityLockedRef.current = authorityLocked;
+    onAuthorityChange?.({ owner: authorityLocked ? 'create' : null, locked: authorityLocked });
+  }, [authorityLocked, onAuthorityChange]);
 
   useEffect(() => {
     if (createdDetail !== null) {
@@ -112,7 +132,7 @@ export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: Employe
   }, [resetSignal]);
 
   function handleTypeChange(event: ChangeEvent<HTMLSelectElement>) {
-    if (unknownAttempt !== null || conflictAttempt !== null) {
+    if (blockedByWorkspace || unknownAttempt !== null || conflictAttempt !== null) {
       return;
     }
     setEmployerType(event.target.value);
@@ -126,7 +146,7 @@ export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: Employe
   }
 
   function handleNameChange(event: ChangeEvent<HTMLInputElement>) {
-    if (unknownAttempt !== null || conflictAttempt !== null) {
+    if (blockedByWorkspace || unknownAttempt !== null || conflictAttempt !== null) {
       return;
     }
     setDisplayName(event.target.value);
@@ -268,7 +288,7 @@ export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: Employe
   async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (pendingAttempt !== null || unknownAttempt !== null || conflictAttempt !== null || isAbandonSearchPending) {
+    if (blockedByWorkspace || pendingAttempt !== null || unknownAttempt !== null || conflictAttempt !== null || isAbandonSearchPending) {
       return;
     }
 
@@ -336,7 +356,7 @@ export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: Employe
           className="focus-ring"
           id="create-employer-type"
           name="createEmployerType"
-          disabled={pendingAttempt !== null || unknownAttempt !== null || conflictAttempt !== null || isAbandonSearchPending}
+          disabled={blockedByWorkspace || pendingAttempt !== null || unknownAttempt !== null || conflictAttempt !== null || isAbandonSearchPending}
           onChange={handleTypeChange}
           ref={typeSelectRef}
           value={employerType}
@@ -356,7 +376,7 @@ export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: Employe
           className="focus-ring"
           id="create-employer-name"
           name="createEmployerName"
-          disabled={pendingAttempt !== null || unknownAttempt !== null || conflictAttempt !== null || isAbandonSearchPending}
+          disabled={blockedByWorkspace || pendingAttempt !== null || unknownAttempt !== null || conflictAttempt !== null || isAbandonSearchPending}
           onChange={handleNameChange}
           ref={nameInputRef}
           spellCheck={false}
@@ -367,7 +387,7 @@ export function EmployerCreateForm({ onCreateSuccess, resetSignal = 0 }: Employe
 
       <button
         className="focus-ring"
-        disabled={pendingAttempt !== null || unknownAttempt !== null || conflictAttempt !== null || isAbandonSearchPending}
+        disabled={blockedByWorkspace || pendingAttempt !== null || unknownAttempt !== null || conflictAttempt !== null || isAbandonSearchPending}
         type="submit"
       >
         {messages.employerCreateSubmit}

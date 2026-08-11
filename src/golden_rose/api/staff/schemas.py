@@ -5,7 +5,10 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from golden_rose.application.employer_text import normalize_employer_text
+from golden_rose.application.employer_text import (
+    normalize_employer_text,
+    validate_employer_display_name,
+)
 
 
 class CreateDraftEmployerRequest(BaseModel):
@@ -17,17 +20,20 @@ class CreateDraftEmployerRequest(BaseModel):
     @field_validator("display_name")
     @classmethod
     def validate_display_name(cls, value: str) -> str:
-        normalized = unicodedata.normalize("NFC", value).strip()
-        if not normalized:
-            msg = "display_name must not be blank"
-            raise ValueError(msg)
-        if len(normalized) > 200:
-            msg = "display_name must be 200 characters or fewer"
-            raise ValueError(msg)
-        if any(unicodedata.category(character).startswith("C") for character in normalized):
-            msg = "display_name must not contain control characters"
-            raise ValueError(msg)
-        return normalized
+        return validate_employer_display_name(value)
+
+
+class ReviseDraftEmployerRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_version: int = Field(ge=1, le=2_147_483_646, strict=True)
+    employer_type: Literal["household", "business"]
+    display_name: str
+
+    @field_validator("display_name")
+    @classmethod
+    def validate_display_name(cls, value: str) -> str:
+        return validate_employer_display_name(value)
 
 
 class DraftEmployerResponse(BaseModel):
@@ -54,6 +60,7 @@ class EmployerDetailResponse(BaseModel):
     version: int
     received_at: datetime
     created_at: datetime
+    updated_at: datetime
 
 
 class EmployerSearchItemResponse(BaseModel):

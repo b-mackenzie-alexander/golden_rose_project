@@ -63,6 +63,8 @@ describe('App', () => {
         displayName: 'Focus Rose',
         lifecycleStatus: 'draft',
         sourceChannel: 'staff_entry',
+        version: 1,
+        updatedAt: '2026-08-11T04:20:00Z',
       },
     });
     vi.mocked(createEmployer).mockResolvedValue({
@@ -134,6 +136,8 @@ describe('App', () => {
         displayName: 'Axe Rose',
         lifecycleStatus: 'draft',
         sourceChannel: 'staff_entry',
+        version: 1,
+        updatedAt: '2026-08-11T04:25:00Z',
       },
     });
     vi.mocked(createEmployer).mockResolvedValue({

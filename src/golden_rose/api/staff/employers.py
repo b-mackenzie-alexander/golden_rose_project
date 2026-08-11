@@ -18,11 +18,17 @@ from golden_rose.api.staff.schemas import (
     EmployerDetailResponse,
     EmployerSearchItemResponse,
     EmployerSearchPageResponse,
+    ReviseDraftEmployerRequest,
     SearchEmployersRequest,
 )
 from golden_rose.application.create_draft_employer import create_draft_employer
-from golden_rose.application.errors import EmployerNotFoundError, SafePersistenceError
+from golden_rose.application.errors import (
+    EmployerNotFoundError,
+    EmployerVersionConflictError,
+    SafePersistenceError,
+)
 from golden_rose.application.get_employer import get_employer
+from golden_rose.application.revise_draft_employer import revise_draft_employer
 from golden_rose.application.search_employers import search_employers
 from golden_rose.auth.principal import StaffPrincipal
 from golden_rose.clock import Clock
@@ -51,6 +57,7 @@ def post_staff_employer(
         identifiers=identifiers,
     )
     response.headers["Cache-Control"] = "no-store"
+    response.headers["Idempotency-Result-Version"] = str(result.result_record_version)
     if result.replayed:
         response.headers["Idempotency-Replayed"] = "true"
     return DraftEmployerResponse.model_validate(result.employer)
@@ -102,6 +109,75 @@ def post_staff_employer_search(
         items=[EmployerSearchItemResponse.model_validate(item) for item in page.items],
         next_cursor=page.next_cursor,
     )
+
+
+@router.post(
+    "/{employer_id}/revisions",
+    response_model=EmployerDetailResponse,
+    status_code=status.HTTP_200_OK,
+)
+def post_staff_employer_revision(
+    employer_id: UUID,
+    request: ReviseDraftEmployerRequest,
+    response: Response,
+    idempotency_key: Annotated[UUID, Depends(get_idempotency_key)],
+    session: Annotated[Session, Depends(get_db_session)],
+    principal: Annotated[StaffPrincipal, Depends(get_staff_principal)],
+    clock: Annotated[Clock, Depends(get_clock)],
+) -> EmployerDetailResponse | Response:
+    try:
+        result = revise_draft_employer(
+            session=session,
+            principal=principal,
+            command_id=idempotency_key,
+            employer_id=employer_id,
+            expected_version=request.expected_version,
+            employer_type=request.employer_type,
+            display_name=request.display_name,
+            clock=clock,
+        )
+    except EmployerNotFoundError:
+        return no_store_problem_response(
+            status_code=404,
+            title="Not Found",
+            detail="employer not found",
+            type_="https://golden-rose.local/problems/employer-not-found",
+        )
+    except EmployerVersionConflictError:
+        return no_store_problem_response(
+            status_code=412,
+            title="Precondition Failed",
+            detail="employer version conflict",
+            type_="https://golden-rose.local/problems/employer-version-conflict",
+        )
+    except SafePersistenceError:
+        return no_store_problem_response(
+            status_code=503,
+            title="Service Unavailable",
+            detail="service unavailable",
+            type_="https://golden-rose.local/problems/service-unavailable",
+        )
+    except RuntimeError as exc:
+        if str(exc) == "idempotency conflict":
+            return no_store_problem_response(
+                status_code=409,
+                title="Conflict",
+                detail="idempotency conflict",
+                type_="https://golden-rose.local/problems/idempotency-conflict",
+            )
+        if str(exc) == "employer revision requires a change":
+            return no_store_problem_response(
+                status_code=422,
+                title="Unprocessable Entity",
+                detail="employer revision requires a change",
+                type_="https://golden-rose.local/problems/employer-revision-noop",
+            )
+        raise
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Idempotency-Result-Version"] = str(result.result_record_version)
+    if result.replayed:
+        response.headers["Idempotency-Replayed"] = "true"
+    return EmployerDetailResponse.model_validate(result.employer)
 
 
 @router.get("/{employer_id}", response_model=EmployerDetailResponse, status_code=status.HTTP_200_OK)

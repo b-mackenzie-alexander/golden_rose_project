@@ -3,9 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import { getEmployer, searchEmployers } from '../api/employerClient';
 import type {
   ApiFailureKind,
-  EmployerDetail as EmployerDetailRecord,
   EmployerSummary,
   EmployerType,
+  RevisionEmployerDetail,
   SearchEmployersInput,
 } from '../api/employerContracts';
 import { useLanguage } from '../i18n/LanguageProvider';
@@ -33,20 +33,45 @@ function isValidName(value: string) {
 }
 
 type EmployerSearchProps = {
+  onSelectedDetailChange?: (detail: RevisionEmployerDetail | null) => void;
+  onRefreshRequestSettled?: (resolution: { token: number; outcome: 'success' | 'not_found' | 'failure' }) => void;
+  refreshRequest?: {
+    employerId: string;
+    minimumVersion?: number;
+    reason: 'canonical_reload' | 'confirmed_save';
+    token: number;
+  } | null;
   resetSignal?: number;
+  workspaceCommandOwner?: 'create' | 'revision' | null;
 };
 
-export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
+type DetailRequestOptions = {
+  minimumVersion?: number;
+  origin?: 'selection' | 'refresh';
+  refreshReason?: 'canonical_reload' | 'confirmed_save';
+  refreshToken?: number;
+};
+
+export function EmployerSearch({
+  onSelectedDetailChange,
+  onRefreshRequestSettled,
+  refreshRequest = null,
+  resetSignal = 0,
+  workspaceCommandOwner = null,
+}: EmployerSearchProps) {
   const { messages } = useLanguage();
   const emptyHeadingRef = useRef<HTMLHeadingElement>(null);
   const resultsHeadingRef = useRef<HTMLHeadingElement>(null);
   const failureHeadingRef = useRef<HTMLHeadingElement>(null);
+  const refreshFailureHeadingRef = useRef<HTMLHeadingElement>(null);
+  const revisionSuccessHeadingRef = useRef<HTMLHeadingElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const resultButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const pendingResultsFocusIdRef = useRef<string | null>(null);
   const activeSearchControllerRef = useRef<AbortController | null>(null);
   const activeDetailControllerRef = useRef<AbortController | null>(null);
   const detailRequestVersionRef = useRef(0);
+  const handledRefreshTokenRef = useRef<number | null>(null);
   const previousResetSignalRef = useRef(resetSignal);
   const [displayNameQuery, setDisplayNameQuery] = useState('');
   const [employerType, setEmployerType] = useState('');
@@ -59,9 +84,11 @@ export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
   const [failureState, setFailureState] = useState<SearchFailureState | null>(null);
   const [paginationFailureState, setPaginationFailureState] = useState<PaginationFailureState | null>(null);
   const [submittedSearch, setSubmittedSearch] = useState<Pick<SearchEmployersInput, 'displayNameQuery' | 'employerType'> | null>(null);
-  const [detail, setDetail] = useState<EmployerDetailRecord | null>(null);
+  const [detail, setDetail] = useState<RevisionEmployerDetail | null>(null);
   const [detailFailureState, setDetailFailureState] = useState<DetailFailureState | null>(null);
+  const [refreshFailure, setRefreshFailure] = useState(false);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [showRevisionSuccess, setShowRevisionSuccess] = useState(false);
 
   const currentSearch = useMemo(
     () => ({
@@ -75,6 +102,7 @@ export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
     isSearching &&
     submittedSearch?.displayNameQuery === currentSearch.displayNameQuery &&
     submittedSearch.employerType === currentSearch.employerType;
+  const blockedByWorkspace = workspaceCommandOwner === 'revision';
 
   const submittedSearchSummary =
     searchState === 'empty' || submittedSearch === null
@@ -187,7 +215,19 @@ export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
     }
   }, [searchState]);
 
-  const invalidatePendingDetail = useCallback(() => {
+  useEffect(() => {
+    if (refreshFailure && !isDetailLoading) {
+      refreshFailureHeadingRef.current?.focus();
+    }
+  }, [refreshFailure, isDetailLoading]);
+
+  useEffect(() => {
+    if (showRevisionSuccess && detail !== null && !isDetailLoading) {
+      revisionSuccessHeadingRef.current?.focus();
+    }
+  }, [detail, isDetailLoading, showRevisionSuccess]);
+
+  const invalidatePendingDetail = useCallback((options?: { preserveSelectedDetail?: boolean }) => {
     if (activeDetailControllerRef.current !== null) {
       activeDetailControllerRef.current.abort();
       activeDetailControllerRef.current = null;
@@ -196,10 +236,15 @@ export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
     detailRequestVersionRef.current += 1;
     setDetail(null);
     setDetailFailureState(null);
+    setRefreshFailure(false);
+    setShowRevisionSuccess(false);
     setIsDetailLoading(false);
-  }, []);
+    if (!options?.preserveSelectedDetail) {
+      onSelectedDetailChange?.(null);
+    }
+  }, [onSelectedDetailChange]);
 
-  const invalidatePendingSearch = useCallback((options?: { preserveSubmittedSearch?: boolean }) => {
+  const invalidatePendingSearch = useCallback((options?: { preserveSubmittedSearch?: boolean; preserveSelectedDetail?: boolean }) => {
     if (activeSearchControllerRef.current !== null) {
       activeSearchControllerRef.current.abort();
       activeSearchControllerRef.current = null;
@@ -212,7 +257,7 @@ export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
     setNextCursor(null);
     setFailureState(null);
     setPaginationFailureState(null);
-    invalidatePendingDetail();
+    invalidatePendingDetail({ preserveSelectedDetail: options?.preserveSelectedDetail });
     pendingResultsFocusIdRef.current = null;
 
     if (options?.preserveSubmittedSearch === false) {
@@ -235,7 +280,106 @@ export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
     invalidatePendingSearch({ preserveSubmittedSearch: false });
   }, [invalidatePendingSearch, resetSignal]);
 
+  async function runDetailRequest(employerId: string, options?: DetailRequestOptions) {
+    const controller = new AbortController();
+    const requestVersion = detailRequestVersionRef.current + 1;
+
+    if (activeDetailControllerRef.current !== null) {
+      activeDetailControllerRef.current.abort();
+    }
+
+    activeDetailControllerRef.current = controller;
+    detailRequestVersionRef.current = requestVersion;
+    setDetail(null);
+    setDetailFailureState(null);
+    setRefreshFailure(false);
+    setShowRevisionSuccess(false);
+    setIsDetailLoading(true);
+
+    try {
+      const result = await getEmployer(employerId, { signal: controller.signal });
+
+      if (detailRequestVersionRef.current !== requestVersion || result == null) {
+        return;
+      }
+
+      if (
+        result.ok &&
+        result.value.employerId === employerId &&
+        (options?.minimumVersion === undefined || result.value.version >= options.minimumVersion)
+      ) {
+        setDetail(result.value);
+        setShowRevisionSuccess(options?.origin === 'refresh' && options.refreshReason === 'confirmed_save');
+        onSelectedDetailChange?.(result.value);
+        if (options?.origin === 'refresh' && options.refreshToken !== undefined) {
+          onRefreshRequestSettled?.({ token: options.refreshToken, outcome: 'success' });
+        }
+      } else if (options?.origin === 'refresh' && (!result.ok || result.value.employerId !== employerId || result.value.version < (options.minimumVersion ?? 0))) {
+        if (!result.ok && result.failure.kind === 'not_found') {
+          setDetailFailureState({ kind: 'not_found' });
+          if (options.refreshToken !== undefined) {
+            onRefreshRequestSettled?.({ token: options.refreshToken, outcome: 'not_found' });
+          }
+        } else {
+          if (options?.refreshReason === 'confirmed_save') {
+            setRefreshFailure(true);
+          }
+          if (options.refreshToken !== undefined) {
+            onRefreshRequestSettled?.({ token: options.refreshToken, outcome: 'failure' });
+          }
+        }
+        if (!(!result.ok && options.refreshReason === 'canonical_reload' && result.failure.kind !== 'not_found')) {
+          onSelectedDetailChange?.(null);
+        }
+      } else if (
+        !result.ok &&
+        (result.failure.kind === 'validation' ||
+          result.failure.kind === 'not_found' ||
+          result.failure.kind === 'forbidden' ||
+          result.failure.kind === 'conflict' ||
+          result.failure.kind === 'unavailable' ||
+          result.failure.kind === 'unexpected')
+      ) {
+        setDetailFailureState({ kind: result.failure.kind });
+        onSelectedDetailChange?.(null);
+      } else {
+        setDetailFailureState({ kind: 'unexpected' });
+        onSelectedDetailChange?.(null);
+      }
+    } finally {
+      if (activeDetailControllerRef.current === controller) {
+        activeDetailControllerRef.current = null;
+      }
+
+      if (detailRequestVersionRef.current === requestVersion) {
+        setIsDetailLoading(false);
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (refreshRequest === null || handledRefreshTokenRef.current === refreshRequest.token) {
+      return;
+    }
+
+    handledRefreshTokenRef.current = refreshRequest.token;
+    invalidatePendingSearch({
+      preserveSubmittedSearch: false,
+      preserveSelectedDetail: refreshRequest.reason === 'canonical_reload',
+    });
+    void runDetailRequest(refreshRequest.employerId, {
+      minimumVersion: refreshRequest.minimumVersion,
+      origin: 'refresh',
+      refreshReason: refreshRequest.reason,
+      refreshToken: refreshRequest.token,
+    });
+  }, [invalidatePendingSearch, onRefreshRequestSettled, refreshRequest]);
+
   function handleNameChange(event: ChangeEvent<HTMLInputElement>) {
+    if (blockedByWorkspace) {
+      return;
+    }
+
     setDisplayNameQuery(event.target.value);
     invalidatePendingSearch();
     if (nameError !== null) {
@@ -244,6 +388,10 @@ export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
   }
 
   function handleTypeChange(event: ChangeEvent<HTMLSelectElement>) {
+    if (blockedByWorkspace) {
+      return;
+    }
+
     setEmployerType(event.target.value);
     invalidatePendingSearch();
   }
@@ -335,6 +483,10 @@ export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
   function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (blockedByWorkspace) {
+      return;
+    }
+
     if (!isValidName(displayNameQuery)) {
       setNameError(messages.employerSearchNameError);
       nameInputRef.current?.focus();
@@ -355,7 +507,7 @@ export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
   }
 
   function handleRetry() {
-    if (submittedSearch === null || isSearching || failureState?.kind !== 'unavailable') {
+    if (blockedByWorkspace || submittedSearch === null || isSearching || failureState?.kind !== 'unavailable') {
       return;
     }
 
@@ -364,7 +516,7 @@ export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
   }
 
   function handleLoadMore() {
-    if (submittedSearch === null || nextCursor === null || isLoadingMore || isSearching) {
+    if (blockedByWorkspace || submittedSearch === null || nextCursor === null || isLoadingMore || isSearching) {
       return;
     }
 
@@ -372,7 +524,13 @@ export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
   }
 
   function handleRetryLoadMore() {
-    if (submittedSearch === null || nextCursor === null || isLoadingMore || paginationFailureState?.kind !== 'unavailable') {
+    if (
+      blockedByWorkspace ||
+      submittedSearch === null ||
+      nextCursor === null ||
+      isLoadingMore ||
+      paginationFailureState?.kind !== 'unavailable'
+    ) {
       return;
     }
 
@@ -380,49 +538,15 @@ export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
   }
 
   async function handleSelectEmployer(employerId: string) {
-    const controller = new AbortController();
-    const requestVersion = detailRequestVersionRef.current + 1;
-
-    if (activeDetailControllerRef.current !== null) {
-      activeDetailControllerRef.current.abort();
+    if (blockedByWorkspace) {
+      return;
     }
 
-    activeDetailControllerRef.current = controller;
-    detailRequestVersionRef.current = requestVersion;
-    setDetail(null);
-    setDetailFailureState(null);
-    setIsDetailLoading(true);
-
-    try {
-      const result = await getEmployer(employerId, { signal: controller.signal });
-
-      if (detailRequestVersionRef.current !== requestVersion || result === null) {
-        return;
-      }
-
-      if (result.ok && result.value.employerId === employerId) {
-        setDetail(result.value);
-      } else if (
-        !result.ok &&
-        (result.failure.kind === 'validation' ||
-          result.failure.kind === 'not_found' ||
-          result.failure.kind === 'forbidden' ||
-          result.failure.kind === 'conflict' ||
-          result.failure.kind === 'unavailable' ||
-          result.failure.kind === 'unexpected')
-      ) {
-        setDetailFailureState({ kind: result.failure.kind });
-      }
-    } finally {
-      if (activeDetailControllerRef.current === controller) {
-        activeDetailControllerRef.current = null;
-      }
-
-      if (detailRequestVersionRef.current === requestVersion) {
-        setIsDetailLoading(false);
-      }
-    }
+    await runDetailRequest(employerId, { origin: 'selection' });
   }
+
+  const shouldRenderStandaloneDetail = searchState !== 'results' && (detail !== null || detailFailureState !== null || refreshFailure || isDetailLoading);
+  const detailAutoFocus = !showRevisionSuccess;
 
   return (
     <form aria-label={messages.employerSearchFormLabel} autoComplete="off" className="workspace-panel" onSubmit={handleSubmit}>
@@ -437,6 +561,7 @@ export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
           className="focus-ring"
           id="employer-name-query"
           name="displayNameQuery"
+          disabled={blockedByWorkspace}
           onChange={handleNameChange}
           ref={nameInputRef}
           spellCheck={false}
@@ -494,6 +619,7 @@ export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
               <li key={result.employerId}>
                 <button
                   className="focus-ring"
+                  disabled={blockedByWorkspace}
                   onClick={() => {
                     void handleSelectEmployer(result.employerId);
                   }}
@@ -526,7 +652,7 @@ export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
             </div>
           )}
           {nextCursor === null || paginationFailureCopy !== null ? null : (
-            <button className="focus-ring" disabled={isLoadingMore} onClick={handleLoadMore} type="button">
+            <button className="focus-ring" disabled={blockedByWorkspace || isLoadingMore} onClick={handleLoadMore} type="button">
               {messages.employerSearchLoadMore}
             </button>
           )}
@@ -534,16 +660,44 @@ export function EmployerSearch({ resetSignal = 0 }: EmployerSearchProps) {
         </section>
       )}
 
+      {!shouldRenderStandaloneDetail ? null : (
+        refreshFailure ? (
+          <section aria-live="assertive">
+            <h3 ref={refreshFailureHeadingRef} tabIndex={-1}>
+              {messages.employerRevisionRefreshFailureHeading}
+            </h3>
+            <p>{messages.employerRevisionRefreshFailureBody}</p>
+          </section>
+        ) : (
+          <>
+            {!showRevisionSuccess ? null : (
+              <section aria-live="polite">
+                <h3 ref={revisionSuccessHeadingRef} tabIndex={-1}>
+                  {messages.employerRevisionSuccessHeading}
+                </h3>
+                <p>{messages.employerRevisionSuccessBody}</p>
+              </section>
+            )}
+            <EmployerDetail
+              autoFocus={detailAutoFocus}
+              detail={detail}
+              failureKind={detailFailureState?.kind ?? null}
+              isLoading={isDetailLoading}
+            />
+          </>
+        )
+      )}
+
       <div>
         <label htmlFor="employer-type">{messages.employerSearchTypeLabel}</label>
-        <select className="focus-ring" id="employer-type" name="employerType" onChange={handleTypeChange} value={employerType}>
+        <select className="focus-ring" disabled={blockedByWorkspace} id="employer-type" name="employerType" onChange={handleTypeChange} value={employerType}>
           <option value="">{messages.employerSearchTypeAnyOption}</option>
           <option value="business">{messages.employerTypeBusiness}</option>
           <option value="household">{messages.employerTypeHousehold}</option>
         </select>
       </div>
 
-      <button className="focus-ring" disabled={isDuplicatePendingSearch} type="submit">
+      <button className="focus-ring" disabled={blockedByWorkspace || isDuplicatePendingSearch} type="submit">
         {messages.employerSearchSubmit}
       </button>
     </form>

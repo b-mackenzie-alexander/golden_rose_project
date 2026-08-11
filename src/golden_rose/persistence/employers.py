@@ -18,6 +18,7 @@ class EmployerRecord:
     source_channel: Literal["staff_entry"]
     received_at: datetime
     created_at: datetime
+    updated_at: datetime
     created_by: UUID
     version: int
 
@@ -31,6 +32,7 @@ class EmployerDetailRecord:
     source_channel: Literal["staff_entry"]
     received_at: datetime
     created_at: datetime
+    updated_at: datetime
     version: int
 
 
@@ -62,6 +64,7 @@ def insert_draft_employer(
             source_channel="staff_entry",
             received_at=created_at,
             created_at=created_at,
+            updated_at=created_at,
             created_by=created_by,
             version=1,
         )
@@ -74,6 +77,7 @@ def insert_draft_employer(
         source_channel="staff_entry",
         received_at=created_at,
         created_at=created_at,
+        updated_at=created_at,
         created_by=created_by,
         version=1,
     )
@@ -89,6 +93,7 @@ def get_authoritative_employer_by_id(*, session: Session, employer_id: UUID) -> 
             employers.c.source_channel,
             employers.c.received_at,
             employers.c.created_at,
+            employers.c.updated_at,
             employers.c.created_by,
             employers.c.version,
         ).where(employers.c.employer_id == employer_id)
@@ -106,6 +111,7 @@ def get_employer_by_id(*, session: Session, employer_id: UUID) -> EmployerDetail
             employers.c.source_channel,
             employers.c.received_at,
             employers.c.created_at,
+            employers.c.updated_at,
             employers.c.version,
         ).where(employers.c.employer_id == employer_id)
     ).one()

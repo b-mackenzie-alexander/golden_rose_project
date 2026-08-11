@@ -10,6 +10,7 @@ from golden_rose.api.staff.schemas import (
     EmployerDetailResponse,
     EmployerSearchItemResponse,
     EmployerSearchPageResponse,
+    ReviseDraftEmployerRequest,
     SearchEmployersRequest,
 )
 
@@ -32,6 +33,118 @@ def test_business_request_is_accepted() -> None:
 
     assert request.employer_type == "business"
     assert request.display_name == "Synthetic Business 001"
+
+
+def test_revision_request_accepts_only_expected_version_name_and_type() -> None:
+    request = ReviseDraftEmployerRequest.model_validate(
+        {
+            "expected_version": 1,
+            "employer_type": "business",
+            "display_name": "  Cafe\u0301 Revision  ",
+        }
+    )
+
+    assert request.expected_version == 1
+    assert request.employer_type == "business"
+    assert request.display_name == "Café Revision"
+
+    with pytest.raises(ValidationError) as unexpected_field_exc_info:
+        ReviseDraftEmployerRequest.model_validate(
+            {
+                "expected_version": 1,
+                "employer_type": "business",
+                "display_name": "Synthetic Revision",
+                "source_channel": "staff_entry",
+            }
+        )
+
+    assert unexpected_field_exc_info.value.errors()[0]["type"] == "extra_forbidden"
+
+
+@pytest.mark.parametrize(
+    ("display_name", "message"),
+    [
+        ("   ", "display_name must not be blank"),
+        ("x" * 201, "display_name must be 200 characters or fewer"),
+        ("Bad\nName", "display_name must not contain control characters"),
+    ],
+)
+def test_create_and_revision_request_display_name_validation_stays_parity_aligned(
+    display_name: str,
+    message: str,
+) -> None:
+    invalid_payloads = (
+        (CreateDraftEmployerRequest, {"employer_type": "business", "display_name": display_name}),
+        (
+            ReviseDraftEmployerRequest,
+            {
+                "expected_version": 1,
+                "employer_type": "business",
+                "display_name": display_name,
+            },
+        ),
+    )
+
+    for model, payload in invalid_payloads:
+        with pytest.raises(ValidationError) as exc_info:
+            model.model_validate(payload)
+
+        assert exc_info.value.errors()[0]["msg"] == f"Value error, {message}"
+
+
+@pytest.mark.parametrize(
+    "invalid_expected_version",
+    [True, False, 0, -1, 2_147_483_647],
+)
+def test_revision_request_requires_strict_non_boolean_expected_version_with_safe_integer_bounds(
+    invalid_expected_version: object,
+) -> None:
+    with pytest.raises(ValidationError):
+        ReviseDraftEmployerRequest.model_validate(
+            {
+                "expected_version": invalid_expected_version,
+                "employer_type": "business",
+                "display_name": "Synthetic Revision",
+            }
+        )
+
+    valid_request = ReviseDraftEmployerRequest.model_validate(
+        {
+            "expected_version": 2_147_483_646,
+            "employer_type": "business",
+            "display_name": "Synthetic Revision",
+        }
+    )
+
+    assert valid_request.expected_version == 2_147_483_646
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "employer_id",
+        "lifecycle_status",
+        "source_channel",
+        "received_at",
+        "created_at",
+        "created_by",
+        "updated_at",
+        "updated_by",
+        "version",
+    ],
+)
+def test_revision_request_rejects_system_managed_and_unknown_fields(field_name: str) -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        ReviseDraftEmployerRequest.model_validate(
+            {
+                "expected_version": 1,
+                "employer_type": "business",
+                "display_name": "Synthetic Revision",
+                field_name: "forbidden",
+            }
+        )
+
+    assert exc_info.value.errors()[0]["type"] == "extra_forbidden"
 
 
 def test_display_name_normalizes_nfc_and_trims_outer_whitespace() -> None:
@@ -148,6 +261,7 @@ def test_employer_read_responses_expose_exact_accepted_fields() -> None:
         version=1,
         received_at=timestamp,
         created_at=timestamp,
+        updated_at=timestamp,
     )
     item = EmployerSearchItemResponse(
         employer_id=employer_id,
@@ -168,6 +282,7 @@ def test_employer_read_responses_expose_exact_accepted_fields() -> None:
         "version",
         "received_at",
         "created_at",
+        "updated_at",
     }
     assert set(item.model_dump(mode="json")) == {
         "employer_id",
@@ -181,6 +296,26 @@ def test_employer_read_responses_expose_exact_accepted_fields() -> None:
         "items": [item.model_dump(mode="json")],
         "next_cursor": None,
     }
+
+
+def test_employer_detail_exposes_updated_at_but_not_updated_by() -> None:
+    timestamp = datetime(2026, 8, 5, 3, 30, 0, tzinfo=UTC)
+    detail = EmployerDetailResponse(
+        employer_id=uuid4(),
+        employer_type="business",
+        display_name="Synthetic Detail Revision",
+        lifecycle_status="draft",
+        source_channel="staff_entry",
+        version=2,
+        received_at=timestamp,
+        created_at=timestamp,
+        updated_at=timestamp,
+    )
+
+    dumped = detail.model_dump(mode="json")
+
+    assert dumped["updated_at"] == "2026-08-05T03:30:00Z"
+    assert "updated_by" not in dumped
 
 
 def test_blank_display_name_is_rejected() -> None:

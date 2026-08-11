@@ -41,7 +41,7 @@ describe('LanguageProvider', () => {
     expect(screen.getByRole('link', { name: 'Employers' })).toHaveAttribute('aria-current', 'page');
   });
 
-  it('keeps versioned English and Spanish catalogs complete', () => {
+  it('keeps exact English and Spanish revision keys in parity', () => {
     const englishCatalog = englishMessages as Record<string, string> & {
       catalogVersion?: string;
       reviewStatus?: string;
@@ -60,16 +60,54 @@ describe('LanguageProvider', () => {
     const spanishKeys = Object.keys(spanishCatalog).filter((key) => !key.endsWith('Version') && key !== 'reviewStatus');
 
     expect(spanishKeys).toEqual(englishKeys);
-    expect(spanishMessages.employerSearchInstructions).toContain('sintética');
-    expect(englishMessages.employerCreateValidationFailureHeading).toBe('Create draft employer could not be completed');
-    expect(englishMessages.employerCreateForbiddenFailureHeading).toBe(
-      'Create draft employer is not available for this staff session',
-    );
-    expect(spanishMessages.employerCreateValidationFailureHeading).toContain('creación');
-    expect(spanishMessages.employerCreateForbiddenFailureBody).toContain('permiso');
 
-    for (const [messageKey, messageValue] of Object.entries(spanishMessages)) {
-      expect(messageValue).not.toBe(messageKey);
+    const requiredRevisionKeys = [
+      'employerRevisionEditAction',
+      'employerRevisionHeading',
+      'employerRevisionWarning',
+      'employerRevisionTypeLabel',
+      'employerRevisionNameLabel',
+      'employerRevisionSubmit',
+      'employerRevisionNameError',
+      'employerRevisionTypeError',
+      'employerRevisionNoOpError',
+      'employerRevisionValidationFailureHeading',
+      'employerRevisionValidationFailureBody',
+      'employerRevisionForbiddenFailureHeading',
+      'employerRevisionForbiddenFailureBody',
+      'employerRevisionNotFoundHeading',
+      'employerRevisionNotFoundBody',
+      'employerRevisionStaleHeading',
+      'employerRevisionStaleBody',
+      'employerRevisionStaleReload',
+      'employerRevisionConflictHeading',
+      'employerRevisionConflictBody',
+      'employerRevisionConflictReload',
+      'employerRevisionUnknownHeading',
+      'employerRevisionUnknownBody',
+      'employerRevisionUnknownRetry',
+      'employerRevisionRefreshFailureHeading',
+      'employerRevisionRefreshFailureBody',
+      'employerRevisionSuccessHeading',
+      'employerRevisionSuccessBody',
+    ] as const;
+
+    expect(Object.keys(englishMessages)).toEqual(expect.arrayContaining([...requiredRevisionKeys]));
+    expect(Object.keys(spanishMessages)).toEqual(expect.arrayContaining([...requiredRevisionKeys]));
+    expect(englishMessages.employerRevisionEditAction).toBe('Edit draft employer');
+    expect(englishMessages.employerRevisionSubmit).toBe('Save draft employer revision');
+    expect(englishMessages.employerRevisionUnknownRetry).toBe('Retry same revision attempt');
+    expect(englishMessages.employerRevisionConflictReload).toBe('Reload current employer detail');
+    expect(englishMessages.employerRevisionStaleReload).toBe('Reload current employer detail');
+    expect(englishMessages.employerRevisionSuccessBody).toContain('current draft employer detail');
+    expect(spanishMessages.employerRevisionEditAction).toContain('Editar');
+    expect(spanishMessages.employerRevisionSubmit).toContain('Guardar');
+    expect(spanishMessages.employerRevisionForbiddenFailureBody).toContain('sesión del personal');
+    expect(spanishMessages.employerRevisionRefreshFailureBody).toContain('detalle actual del empleador');
+    expect(spanishMessages.employerRevisionSuccessBody).toContain('detalle actual del empleador en borrador');
+
+    for (const revisionKey of requiredRevisionKeys) {
+      expect(spanishMessages[revisionKey]).not.toBe(revisionKey);
     }
   });
 });

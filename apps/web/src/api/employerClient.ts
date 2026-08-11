@@ -4,6 +4,9 @@ import type {
   EmployerDetail,
   EmployerSearchResult,
   EmployerSummary,
+  ReviseEmployerInput,
+  ReviseEmployerResult,
+  RevisionEmployerDetail,
   SearchEmployersInput,
 } from './employerContracts';
 
@@ -128,6 +131,10 @@ function conflict() {
   return { ok: false as const, failure: { kind: 'conflict' as const } };
 }
 
+function stale() {
+  return { ok: false as const, failure: { kind: 'stale' as const } };
+}
+
 function unknownOutcome() {
   return { ok: false as const, failure: { kind: 'unknown_outcome' as const } };
 }
@@ -227,6 +234,20 @@ function parseEmployerDetail(value: unknown, requestedId: string): EmployerDetai
     return null;
   }
   const candidate = value as Record<string, unknown>;
+  const allowedKeys = new Set([
+    'employer_id',
+    'employer_type',
+    'display_name',
+    'lifecycle_status',
+    'version',
+    'received_at',
+    'source_channel',
+    'created_at',
+    'updated_at',
+  ]);
+  if (Object.keys(candidate).some((key) => !allowedKeys.has(key))) {
+    return null;
+  }
   if (candidate.source_channel !== 'staff_entry') return null;
   if (!isValidTimestamp(candidate.created_at)) return null;
   return {
@@ -235,12 +256,57 @@ function parseEmployerDetail(value: unknown, requestedId: string): EmployerDetai
   };
 }
 
+function parseRevisionEmployerDetail(value: unknown, requestedId: string): RevisionEmployerDetail | null {
+  const detail = parseEmployerDetail(value, requestedId);
+  if (detail === null) {
+    return null;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const allowedKeys = new Set([
+    'employer_id',
+    'employer_type',
+    'display_name',
+    'lifecycle_status',
+    'version',
+    'received_at',
+    'source_channel',
+    'created_at',
+    'updated_at',
+  ]);
+  if (Object.keys(candidate).some((key) => !allowedKeys.has(key))) {
+    return null;
+  }
+  if (!Number.isSafeInteger(candidate.version) || (candidate.version as number) <= 0) {
+    return null;
+  }
+  if (!isValidTimestamp(candidate.updated_at)) {
+    return null;
+  }
+
+  return {
+    ...detail,
+    version: candidate.version as number,
+    updatedAt: candidate.updated_at,
+  };
+}
+
+function parsePositiveIntegerHeader(headers: Headers, name: string): number | null {
+  const value = headers.get(name);
+  if (value === null || !/^\d+$/.test(value)) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
 export async function getEmployer(
   employerId: string,
   options?: {
     signal?: AbortSignal;
   },
-): Promise<ApiResult<EmployerDetail> | null> {
+): Promise<ApiResult<RevisionEmployerDetail> | null> {
   if (!isValidUuid(employerId)) {
     return validation();
   }
@@ -282,7 +348,7 @@ export async function getEmployer(
 
   try {
     const payload: unknown = await response.json();
-    const parsed = parseEmployerDetail(payload, employerId);
+    const parsed = parseRevisionEmployerDetail(payload, employerId);
     return parsed ? { ok: true, value: parsed } : unexpected();
   } catch (error) {
     if (isAbortError(error)) {
@@ -337,6 +403,88 @@ export async function createEmployer(_input: CreateEmployerInput): Promise<ApiRe
     const requestedId = typeof candidate.employer_id === 'string' ? candidate.employer_id : '';
     const detail = parseEmployerDetail(payload, requestedId);
     return detail ? { ok: true, value: detail } : unknownOutcome();
+  } catch {
+    return unknownOutcome();
+  }
+}
+
+export async function reviseEmployer(input: ReviseEmployerInput): Promise<ApiResult<ReviseEmployerResult>> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/staff/v1/employers/${input.employerId}/revisions`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'Idempotency-Key': input.commandId,
+      },
+      body: JSON.stringify({
+        expected_version: input.expectedVersion,
+        employer_type: input.employerType,
+        display_name: input.displayName,
+      }),
+      cache: 'no-store',
+      credentials: 'same-origin',
+      mode: 'same-origin',
+      redirect: 'error',
+      referrerPolicy: 'no-referrer',
+    });
+  } catch {
+    return unknownOutcome();
+  }
+
+  if (response.status !== 200) {
+    await cancelUnreadBody(response);
+    if (response.status === 400 || response.status === 422) return validation();
+    if (response.status === 403) return forbidden();
+    if (response.status === 404) return { ok: false, failure: { kind: 'not_found' } };
+    if (response.status === 409) return conflict();
+    if (response.status === 412) return stale();
+    return unknownOutcome();
+  }
+  if (!isJsonResponse(response)) {
+    await cancelUnreadBody(response);
+    return unknownOutcome();
+  }
+
+  const resultVersion = parsePositiveIntegerHeader(response.headers, 'Idempotency-Result-Version');
+  if (resultVersion === null) {
+    await cancelUnreadBody(response);
+    return unknownOutcome();
+  }
+
+  const replayHeader = response.headers.get('Idempotency-Replayed');
+  if (!(replayHeader === null || replayHeader === 'true')) {
+    await cancelUnreadBody(response);
+    return unknownOutcome();
+  }
+
+  try {
+    const payload: unknown = await response.json();
+    if (typeof payload !== 'object' || payload === null) {
+      return unknownOutcome();
+    }
+
+    const candidate = payload as Record<string, unknown>;
+    const requestedId = typeof candidate.employer_id === 'string' ? candidate.employer_id : '';
+    const detail = parseRevisionEmployerDetail(payload, requestedId);
+    if (detail === null) {
+      return unknownOutcome();
+    }
+
+    const replayed = replayHeader === 'true';
+    if ((!replayed && detail.version !== resultVersion) || (replayed && detail.version < resultVersion)) {
+      return unknownOutcome();
+    }
+
+    return {
+      ok: true,
+      value: {
+        detail,
+        resultVersion,
+        replayed,
+      },
+    };
   } catch {
     return unknownOutcome();
   }

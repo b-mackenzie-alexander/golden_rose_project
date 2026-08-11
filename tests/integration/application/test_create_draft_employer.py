@@ -1,3 +1,5 @@
+import hashlib
+import json
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
@@ -6,6 +8,7 @@ from uuid import UUID
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from golden_rose.application.create_draft_employer import (
@@ -13,6 +16,7 @@ from golden_rose.application.create_draft_employer import (
     create_draft_employer,
 )
 from golden_rose.application.errors import SafePersistenceError
+from golden_rose.application.revise_draft_employer import revise_draft_employer
 from golden_rose.auth.principal import StaffPrincipal
 
 
@@ -168,6 +172,569 @@ def test_create_draft_employer_creates_receipt_employer_and_audit_event(
         "source_type": "staff_api",
         "payload_classification": "sensitive_operational",
     }
+
+
+def test_existing_create_command_populates_revision_compatible_attribution_and_receipt(
+    session,
+    clean_tables,
+) -> None:
+    principal = StaffPrincipal(
+        actor_id=UUID("26262626-2626-4262-8262-262626262626"),
+        role_name="operations_staff",
+        permissions=frozenset({"employer:draft:create"}),
+    )
+    command_id = UUID("27272727-2727-4272-8272-272727272727")
+    employer_id = UUID("28282828-2828-4282-8282-282828282828")
+    audit_event_id = UUID("29292929-2929-4292-8292-292929292929")
+    fixed_now = datetime(2026, 8, 10, 19, 35, 0, tzinfo=UTC)
+
+    result = create_draft_employer(
+        session=session,
+        principal=principal,
+        command_id=command_id,
+        employer_type="business",
+        display_name="Synthetic Revision Compatible Employer",
+        clock=FixedClock(fixed_now),
+        identifiers=FixedIdentifierFactory(employer_id, audit_event_id),
+    )
+
+    employer = (
+        session.execute(
+            text(
+                """
+            SELECT employer_id, created_at, created_by, updated_at, updated_by, version
+            FROM employers
+            WHERE employer_id = :employer_id
+            """
+            ),
+            {"employer_id": employer_id},
+        )
+        .mappings()
+        .one()
+    )
+    command_receipt = (
+        session.execute(
+            text(
+                """
+            SELECT command_id, actor_id, result_entity_id, result_record_version, result_event_type
+            FROM command_receipts
+            WHERE command_id = :command_id
+            """
+            ),
+            {"command_id": command_id},
+        )
+        .mappings()
+        .one()
+    )
+
+    assert result.replayed is False
+    assert dict(employer) == {
+        "employer_id": employer_id,
+        "created_at": fixed_now,
+        "created_by": principal.actor_id,
+        "updated_at": fixed_now,
+        "updated_by": principal.actor_id,
+        "version": 1,
+    }
+    assert dict(command_receipt) == {
+        "command_id": command_id,
+        "actor_id": principal.actor_id,
+        "result_entity_id": employer_id,
+        "result_record_version": 1,
+        "result_event_type": "employer.created",
+    }
+
+
+def test_receipt_replay_rejects_changed_command_type_actor_target_or_payload(
+    session,
+    clean_tables,
+) -> None:
+    principal = StaffPrincipal(
+        actor_id=UUID("30303030-3030-4030-8030-303030303030"),
+        role_name="operations_staff",
+        permissions=frozenset({"employer:draft:create"}),
+    )
+    command_id = UUID("31313131-3131-4131-8131-313131313131")
+    fixed_now = datetime(2026, 8, 10, 20, 0, 0, tzinfo=UTC)
+    session.execute(
+        text(
+            """
+            INSERT INTO employers (
+                employer_id,
+                employer_type,
+                display_name,
+                lifecycle_status,
+                source_channel,
+                received_at,
+                created_at,
+                created_by,
+                updated_at,
+                updated_by,
+                version
+            ) VALUES (
+                :employer_id,
+                'household',
+                'Synthetic Seed Employer',
+                'draft',
+                'staff_entry',
+                :created_at,
+                :created_at,
+                :created_by,
+                :created_at,
+                :created_by,
+                1
+            )
+            """
+        ),
+        {
+            "employer_id": UUID("33333333-3333-4333-8333-333333333333"),
+            "created_at": fixed_now,
+            "created_by": UUID("36363636-3636-4363-8363-363636363636"),
+        },
+    )
+
+    session.execute(
+        text(
+            """
+            INSERT INTO audit_events (
+                audit_event_id,
+                event_schema_name,
+                event_schema_version,
+                event_type,
+                entity_type,
+                entity_id,
+                entity_sequence,
+                prior_record_version,
+                new_record_version,
+                actor_type,
+                actor_id,
+                initiating_staff_actor_id,
+                occurred_at,
+                effective_at,
+                command_id,
+                correlation_id,
+                reason_code,
+                reason_text,
+                source_type,
+                source_reference,
+                related_event_ids,
+                changed_fields,
+                payload_classification
+            ) VALUES (
+                :audit_event_id,
+                'employer.created',
+                1,
+                'employer.created',
+                'employer',
+                :entity_id,
+                1,
+                0,
+                1,
+                'staff',
+                :actor_id,
+                NULL,
+                :occurred_at,
+                NULL,
+                :command_id,
+                :command_id,
+                NULL,
+                NULL,
+                'staff_api',
+                NULL,
+                '[]'::jsonb,
+                '{"field_names": ["employer_type", "display_name"]}'::jsonb,
+                'sensitive_operational'
+            )
+            """
+        ),
+        {
+            "audit_event_id": UUID("37373737-3737-4373-8373-373737373737"),
+            "entity_id": UUID("33333333-3333-4333-8333-333333333333"),
+            "actor_id": UUID("32323232-3232-4232-8232-323232323232"),
+            "occurred_at": fixed_now,
+            "command_id": command_id,
+        },
+    )
+
+    session.execute(
+        text(
+            """
+            INSERT INTO command_receipts (
+                command_id,
+                command_schema_version,
+                command_type,
+                actor_id,
+                request_fingerprint,
+                result_entity_type,
+                result_entity_id,
+                result_record_version,
+                result_event_type,
+                created_at
+            ) VALUES (
+                :command_id,
+                1,
+                'create_draft_employer',
+                :actor_id,
+                :request_fingerprint,
+                'employer',
+                :result_entity_id,
+                1,
+                'employer.created',
+                :created_at
+            )
+            """
+        ),
+        {
+            "command_id": command_id,
+            "actor_id": UUID("32323232-3232-4232-8232-323232323232"),
+            "request_fingerprint": hashlib.sha256(b"mismatched-payload").digest(),
+            "result_entity_id": UUID("33333333-3333-4333-8333-333333333333"),
+            "created_at": fixed_now,
+        },
+    )
+    session.commit()
+
+    with pytest.raises(IdempotencyConflictError) as conflict:
+        create_draft_employer(
+            session=session,
+            principal=principal,
+            command_id=command_id,
+            employer_type="household",
+            display_name="Synthetic Authority Household",
+            clock=FixedClock(fixed_now),
+            identifiers=FixedIdentifierFactory(
+                UUID("34343434-3434-4334-8334-343434343434"),
+                UUID("35353535-3535-4353-8353-353535353535"),
+            ),
+        )
+
+    assert str(conflict.value) == "idempotency conflict"
+
+
+def test_replay_rejects_authority_state_where_current_version_precedes_receipt_result_version(
+    session,
+    clean_tables,
+) -> None:
+    principal = StaffPrincipal(
+        actor_id=UUID("38383838-3838-4838-8838-383838383838"),
+        role_name="operations_staff",
+        permissions=frozenset({"employer:draft:create"}),
+    )
+    command_id = UUID("39393939-3939-4939-8939-393939393939")
+    employer_id = UUID("40404040-4040-4040-8040-404040404040")
+    fixed_now = datetime(2026, 8, 10, 20, 10, 0, tzinfo=UTC)
+    request_fingerprint = hashlib.sha256(
+        json.dumps(
+            {
+                "command_schema_version": 1,
+                "command_type": "create_draft_employer",
+                "employer_type": "household",
+                "display_name": "Synthetic Corrupted Replay Employer",
+            },
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).digest()
+
+    session.execute(
+        text(
+            """
+            INSERT INTO employers (
+                employer_id,
+                employer_type,
+                display_name,
+                lifecycle_status,
+                source_channel,
+                received_at,
+                created_at,
+                created_by,
+                updated_at,
+                updated_by,
+                version
+            ) VALUES (
+                :employer_id,
+                'household',
+                'Synthetic Corrupted Replay Employer',
+                'draft',
+                'staff_entry',
+                :created_at,
+                :created_at,
+                :created_by,
+                :created_at,
+                :created_by,
+                1
+            )
+            """
+        ),
+        {
+            "employer_id": employer_id,
+            "created_at": fixed_now,
+            "created_by": principal.actor_id,
+        },
+    )
+    session.execute(
+        text(
+            """
+            INSERT INTO audit_events (
+                audit_event_id,
+                event_schema_name,
+                event_schema_version,
+                event_type,
+                entity_type,
+                entity_id,
+                entity_sequence,
+                prior_record_version,
+                new_record_version,
+                actor_type,
+                actor_id,
+                initiating_staff_actor_id,
+                occurred_at,
+                effective_at,
+                command_id,
+                correlation_id,
+                reason_code,
+                reason_text,
+                source_type,
+                source_reference,
+                related_event_ids,
+                changed_fields,
+                payload_classification
+            ) VALUES (
+                :audit_event_id,
+                'employer.created',
+                1,
+                'employer.created',
+                'employer',
+                :entity_id,
+                2,
+                1,
+                2,
+                'staff',
+                :actor_id,
+                NULL,
+                :occurred_at,
+                NULL,
+                :command_id,
+                :command_id,
+                NULL,
+                NULL,
+                'staff_api',
+                NULL,
+                '[]'::jsonb,
+                '{"field_names": ["employer_type", "display_name"]}'::jsonb,
+                'sensitive_operational'
+            )
+            """
+        ),
+        {
+            "audit_event_id": UUID("41414141-4141-4141-8141-414141414141"),
+            "entity_id": employer_id,
+            "actor_id": principal.actor_id,
+            "occurred_at": fixed_now,
+            "command_id": command_id,
+        },
+    )
+    with pytest.raises(IntegrityError, match="ck_command_receipts_result_authority_shape"):
+        session.execute(
+            text(
+                """
+                INSERT INTO command_receipts (
+                    command_id,
+                    command_schema_version,
+                    command_type,
+                    actor_id,
+                    request_fingerprint,
+                    result_entity_type,
+                    result_entity_id,
+                    result_record_version,
+                    result_event_type,
+                    created_at
+                ) VALUES (
+                    :command_id,
+                    1,
+                    'create_draft_employer',
+                    :actor_id,
+                    :request_fingerprint,
+                    'employer',
+                    :result_entity_id,
+                    2,
+                    'employer.created',
+                    :created_at
+                )
+                """
+            ),
+            {
+                "command_id": command_id,
+                "actor_id": principal.actor_id,
+                "request_fingerprint": request_fingerprint,
+                "result_entity_id": employer_id,
+                "created_at": fixed_now,
+            },
+        )
+    session.rollback()
+
+
+def test_create_replay_rejects_inconsistent_result_version_event_type_or_target(
+    session,
+    clean_tables,
+) -> None:
+    principal = StaffPrincipal(
+        actor_id=UUID("44444444-4444-4444-8444-444444444444"),
+        role_name="operations_staff",
+        permissions=frozenset({"employer:draft:create"}),
+    )
+    command_id = UUID("45454545-4545-4545-8545-454545454545")
+    employer_id = UUID("46464646-4646-4646-8646-464646464646")
+    fixed_now = datetime(2026, 8, 10, 20, 20, 0, tzinfo=UTC)
+    request_fingerprint = hashlib.sha256(
+        json.dumps(
+            {
+                "command_schema_version": 1,
+                "command_type": "create_draft_employer",
+                "employer_type": "household",
+                "display_name": "Synthetic Invalid Create Replay Metadata Employer",
+            },
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).digest()
+
+    session.execute(
+        text(
+            """
+            INSERT INTO employers (
+                employer_id,
+                employer_type,
+                display_name,
+                lifecycle_status,
+                source_channel,
+                received_at,
+                created_at,
+                created_by,
+                updated_at,
+                updated_by,
+                version
+            ) VALUES (
+                :employer_id,
+                'household',
+                'Synthetic Invalid Create Replay Metadata Employer',
+                'draft',
+                'staff_entry',
+                :created_at,
+                :created_at,
+                :created_by,
+                :created_at,
+                :created_by,
+                2
+            )
+            """
+        ),
+        {
+            "employer_id": employer_id,
+            "created_at": fixed_now,
+            "created_by": principal.actor_id,
+        },
+    )
+    session.execute(
+        text(
+            """
+            INSERT INTO audit_events (
+                audit_event_id,
+                event_schema_name,
+                event_schema_version,
+                event_type,
+                entity_type,
+                entity_id,
+                entity_sequence,
+                prior_record_version,
+                new_record_version,
+                actor_type,
+                actor_id,
+                initiating_staff_actor_id,
+                occurred_at,
+                effective_at,
+                command_id,
+                correlation_id,
+                reason_code,
+                reason_text,
+                source_type,
+                source_reference,
+                related_event_ids,
+                changed_fields,
+                payload_classification
+            ) VALUES (
+                :audit_event_id,
+                'employer.created',
+                1,
+                'employer.created',
+                'employer',
+                :entity_id,
+                2,
+                1,
+                2,
+                'staff',
+                :actor_id,
+                NULL,
+                :occurred_at,
+                NULL,
+                :command_id,
+                :command_id,
+                NULL,
+                NULL,
+                'staff_api',
+                NULL,
+                '[]'::jsonb,
+                '{"field_names": ["employer_type", "display_name"]}'::jsonb,
+                'sensitive_operational'
+            )
+            """
+        ),
+        {
+            "audit_event_id": UUID("47474747-4747-4747-8747-474747474747"),
+            "entity_id": employer_id,
+            "actor_id": principal.actor_id,
+            "occurred_at": fixed_now,
+            "command_id": command_id,
+        },
+    )
+    with pytest.raises(IntegrityError, match="ck_command_receipts_result_authority_shape"):
+        session.execute(
+            text(
+                """
+                INSERT INTO command_receipts (
+                    command_id,
+                    command_schema_version,
+                    command_type,
+                    actor_id,
+                    request_fingerprint,
+                    result_entity_type,
+                    result_entity_id,
+                    result_record_version,
+                    result_event_type,
+                    created_at
+                ) VALUES (
+                    :command_id,
+                    1,
+                    'create_draft_employer',
+                    :actor_id,
+                    :request_fingerprint,
+                    'employer',
+                    :result_entity_id,
+                    2,
+                    'employer.created',
+                    :created_at
+                )
+                """
+            ),
+            {
+                "command_id": command_id,
+                "actor_id": principal.actor_id,
+                "request_fingerprint": request_fingerprint,
+                "result_entity_id": employer_id,
+                "created_at": fixed_now,
+            },
+        )
+    session.rollback()
 
 
 def test_create_draft_employer_audit_event_changed_fields_omits_display_name_value(
@@ -365,6 +932,94 @@ def test_create_draft_employer_identical_replay_returns_original_result_without_
     assert employer_count == 1
     assert command_receipt_count == 1
     assert audit_event_count == 1
+
+
+def test_create_replay_after_later_revision_returns_current_truth_with_original_result_version(
+    session,
+    clean_tables,
+) -> None:
+    principal = StaffPrincipal(
+        actor_id=UUID("61616161-aaaa-4aaa-8aaa-616161616161"),
+        role_name="operations_staff",
+        permissions=frozenset({"employer:draft:create", "employer:draft:revise"}),
+    )
+    command_id = UUID("62626262-bbbb-4bbb-8bbb-626262626262")
+    employer_id = UUID("63636363-cccc-4ccc-8ccc-636363636363")
+    audit_event_id = UUID("64646464-dddd-4ddd-8ddd-646464646464")
+    created_at = datetime(2026, 8, 11, 0, 15, 0, tzinfo=UTC)
+    revised_at = datetime(2026, 8, 11, 0, 16, 0, tzinfo=UTC)
+
+    first_result = create_draft_employer(
+        session=session,
+        principal=principal,
+        command_id=command_id,
+        employer_type="household",
+        display_name="Synthetic Later Revision Employer",
+        clock=FixedClock(created_at),
+        identifiers=FixedIdentifierFactory(employer_id, audit_event_id),
+    )
+    revise_draft_employer(
+        session=session,
+        principal=principal,
+        command_id=UUID("65656565-eeee-4eee-8eee-656565656565"),
+        employer_id=employer_id,
+        expected_version=1,
+        employer_type="business",
+        display_name="Synthetic Later Revision Employer Updated",
+        clock=FixedClock(revised_at),
+    )
+    command_receipt_count_before_replay = session.execute(
+        text("SELECT COUNT(*) FROM command_receipts")
+    ).scalar_one()
+    audit_event_count_before_replay = session.execute(
+        text("SELECT COUNT(*) FROM audit_events")
+    ).scalar_one()
+    second_result = create_draft_employer(
+        session=session,
+        principal=principal,
+        command_id=command_id,
+        employer_type="household",
+        display_name="Synthetic Later Revision Employer",
+        clock=FixedClock(datetime(2026, 8, 11, 0, 17, 0, tzinfo=UTC)),
+        identifiers=FixedIdentifierFactory(
+            UUID("66666666-ffff-4fff-8fff-666666666666"),
+            UUID("67676767-abab-4bab-8bab-676767676767"),
+        ),
+    )
+
+    command_receipt = (
+        session.execute(
+            text(
+                """
+                SELECT result_record_version
+                FROM command_receipts
+                WHERE command_id = :command_id
+                """
+            ),
+            {"command_id": command_id},
+        )
+        .mappings()
+        .one()
+    )
+    employer_count = session.execute(text("SELECT COUNT(*) FROM employers")).scalar_one()
+    command_receipt_count = session.execute(
+        text("SELECT COUNT(*) FROM command_receipts")
+    ).scalar_one()
+    audit_event_count = session.execute(text("SELECT COUNT(*) FROM audit_events")).scalar_one()
+
+    assert first_result.replayed is False
+    assert first_result.employer.version == 1
+    assert second_result.replayed is True
+    assert second_result.employer.employer_id == employer_id
+    assert second_result.employer.employer_type == "business"
+    assert second_result.employer.display_name == "Synthetic Later Revision Employer Updated"
+    assert second_result.employer.version == 2
+    assert dict(command_receipt) == {"result_record_version": 1}
+    assert employer_count == 1
+    assert command_receipt_count_before_replay == 2
+    assert audit_event_count_before_replay == 2
+    assert command_receipt_count == command_receipt_count_before_replay
+    assert audit_event_count == audit_event_count_before_replay
 
 
 def test_create_normalizes_display_name_before_fingerprint_and_insert(

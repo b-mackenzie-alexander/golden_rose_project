@@ -24,6 +24,8 @@ employers = Table(
     Column("received_at", TIMESTAMP(timezone=True), nullable=False),
     Column("created_at", TIMESTAMP(timezone=True), nullable=False),
     Column("created_by", UUID(as_uuid=True), nullable=False),
+    Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("updated_by", UUID(as_uuid=True), nullable=False),
     Column("version", Integer, nullable=False),
     CheckConstraint("employer_type IN ('household', 'business')", name="ck_employers_type"),
     CheckConstraint("btrim(display_name) <> ''", name="ck_employers_display_name_nonblank"),
@@ -44,15 +46,30 @@ command_receipts = Table(
     Column("request_fingerprint", BYTEA, nullable=False),
     Column("result_entity_type", String(length=32), nullable=False),
     Column("result_entity_id", UUID(as_uuid=True), nullable=False),
+    Column("result_record_version", Integer, nullable=False),
+    Column("result_event_type", String(length=64), nullable=False),
     Column("created_at", TIMESTAMP(timezone=True), nullable=False),
     CheckConstraint("command_schema_version = 1", name="ck_command_receipts_schema_version"),
     CheckConstraint(
-        "command_type = 'create_draft_employer'", name="ck_command_receipts_command_type"
+        "command_type IN ('create_draft_employer', 'revise_draft_employer')",
+        name="ck_command_receipts_command_type",
     ),
     CheckConstraint(
         "octet_length(request_fingerprint) = 32", name="ck_command_receipts_request_fingerprint_len"
     ),
     CheckConstraint("result_entity_type = 'employer'", name="ck_command_receipts_entity_type"),
+    CheckConstraint(
+        "result_record_version >= 1", name="ck_command_receipts_result_record_version_positive"
+    ),
+    CheckConstraint(
+        "((command_type = 'create_draft_employer' "
+        "AND result_event_type = 'employer.created' "
+        "AND result_record_version = 1) OR "
+        "(command_type = 'revise_draft_employer' "
+        "AND result_event_type = 'employer.draft_revised' "
+        "AND result_record_version >= 2))",
+        name="ck_command_receipts_result_authority_shape",
+    ),
     ForeignKeyConstraint(
         ["result_entity_id"],
         ["employers.employer_id"],
@@ -67,7 +84,34 @@ command_receipts = Table(
         deferrable=True,
         initially="DEFERRED",
     ),
+    ForeignKeyConstraint(
+        [
+            "command_id",
+            "result_entity_id",
+            "result_record_version",
+            "result_event_type",
+            "actor_id",
+        ],
+        [
+            "audit_events.command_id",
+            "audit_events.entity_id",
+            "audit_events.new_record_version",
+            "audit_events.event_type",
+            "audit_events.actor_id",
+        ],
+        name="fk_command_receipts_result_audit_event",
+        deferrable=True,
+        initially="DEFERRED",
+    ),
     UniqueConstraint("command_id", "result_entity_id", name="uq_command_receipts_command_result"),
+    UniqueConstraint(
+        "command_id",
+        "result_entity_id",
+        "result_record_version",
+        "result_event_type",
+        "actor_id",
+        name="uq_command_receipts_result_authority",
+    ),
 )
 
 audit_events = Table(
@@ -87,9 +131,7 @@ audit_events = Table(
     Column("initiating_staff_actor_id", UUID(as_uuid=True), nullable=True),
     Column("occurred_at", TIMESTAMP(timezone=True), nullable=False),
     Column("effective_at", TIMESTAMP(timezone=True), nullable=True),
-    Column(
-        "command_id", UUID(as_uuid=True), ForeignKey("command_receipts.command_id"), nullable=False
-    ),
+    Column("command_id", UUID(as_uuid=True), nullable=False),
     Column("correlation_id", UUID(as_uuid=True), nullable=False),
     Column("reason_code", String(length=64), nullable=True),
     Column("reason_text", String(length=512), nullable=True),
@@ -103,19 +145,53 @@ audit_events = Table(
     ),
     UniqueConstraint("command_id", "entity_id", name="uq_audit_events_command_entity"),
     UniqueConstraint("command_id", "event_type", name="uq_audit_events_command_event_type"),
-    CheckConstraint("event_schema_name = 'employer.created'", name="ck_audit_events_schema_name"),
+    UniqueConstraint(
+        "command_id",
+        "entity_id",
+        "new_record_version",
+        "event_type",
+        "actor_id",
+        name="uq_audit_events_result_authority",
+    ),
+    CheckConstraint(
+        "event_schema_name IN ('employer.created', 'employer.draft_revised')",
+        name="ck_audit_events_schema_name",
+    ),
+    CheckConstraint("event_schema_name = event_type", name="ck_audit_events_schema_matches_type"),
     CheckConstraint("event_schema_version = 1", name="ck_audit_events_schema_version"),
-    CheckConstraint("event_type = 'employer.created'", name="ck_audit_events_event_type"),
+    CheckConstraint(
+        "event_type IN ('employer.created', 'employer.draft_revised')",
+        name="ck_audit_events_event_type",
+    ),
     CheckConstraint("entity_type = 'employer'", name="ck_audit_events_entity_type"),
     CheckConstraint("actor_type = 'staff'", name="ck_audit_events_actor_type"),
+    CheckConstraint(
+        "correlation_id = command_id", name="ck_audit_events_correlation_matches_command"
+    ),
     CheckConstraint("source_type = 'staff_api'", name="ck_audit_events_source_type"),
     CheckConstraint(
         "payload_classification = 'sensitive_operational'",
         name="ck_audit_events_payload_classification",
     ),
+    CheckConstraint(
+        "entity_sequence = new_record_version",
+        name="ck_audit_events_entity_sequence_matches_new_record_version",
+    ),
+    CheckConstraint(
+        "new_record_version = prior_record_version + 1",
+        name="ck_audit_events_one_step_version_advance",
+    ),
     ForeignKeyConstraint(
-        ["command_id", "entity_id"],
-        ["command_receipts.command_id", "command_receipts.result_entity_id"],
+        ["command_id", "entity_id", "new_record_version", "event_type", "actor_id"],
+        [
+            "command_receipts.command_id",
+            "command_receipts.result_entity_id",
+            "command_receipts.result_record_version",
+            "command_receipts.result_event_type",
+            "command_receipts.actor_id",
+        ],
         name="fk_audit_events_command_result",
+        deferrable=True,
+        initially="DEFERRED",
     ),
 )

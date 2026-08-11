@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 
-import { createEmployer, getEmployer, searchEmployers } from './employerClient';
+import { createEmployer, getEmployer, reviseEmployer, searchEmployers } from './employerClient';
 
 const VALID_OFFSET_TIMESTAMPS = [
   '0001-01-01T00:00:00Z',
@@ -264,6 +264,7 @@ it('accepts valid RFC3339 offsets across search detail and create payloads', asy
             version: 1,
             received_at: timestamp,
             created_at: timestamp,
+            updated_at: timestamp,
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -277,6 +278,8 @@ it('accepts valid RFC3339 offsets across search detail and create payloads', asy
         displayName: 'Offset Detail Rose',
         lifecycleStatus: 'draft',
         sourceChannel: 'staff_entry',
+        version: 1,
+        updatedAt: timestamp,
       },
     });
 
@@ -404,6 +407,7 @@ it('sends and validates exact detail', async () => {
         version: 1,
         received_at: '2026-08-05T07:15:00Z',
         created_at: '2026-08-05T07:15:00Z',
+        updated_at: '2026-08-11T04:00:00Z',
       }),
       {
         status: 200,
@@ -437,6 +441,8 @@ it('sends and validates exact detail', async () => {
       displayName: 'Golden Detail Household',
       lifecycleStatus: 'draft',
       sourceChannel: 'staff_entry',
+      version: 1,
+      updatedAt: '2026-08-11T04:00:00Z',
     },
   });
 
@@ -525,6 +531,797 @@ it('sends create with caller command identity', async () => {
     ok: false,
     failure: { kind: 'unknown_outcome' },
   });
+});
+
+it('posts an exact revision command with frozen expected version and idempotency key', async () => {
+  const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        employer_id: '33333333-3333-4333-8333-333333333333',
+        employer_type: 'business',
+        display_name: 'Synthetic Revision Updated',
+        lifecycle_status: 'draft',
+        source_channel: 'staff_entry',
+        version: 2,
+        received_at: '2026-08-05T00:10:45Z',
+        created_at: '2026-08-05T00:10:45Z',
+        updated_at: '2026-08-11T02:50:00Z',
+      }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Result-Version': '2',
+        },
+      },
+    ),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+
+  await reviseEmployer({
+    employerId: '33333333-3333-4333-8333-333333333333',
+    commandId: '44444444-4444-4444-8444-444444444444',
+    expectedVersion: 1,
+    employerType: 'business',
+    displayName: 'Synthetic Revision Updated',
+  });
+
+  expect(fetchMock).toHaveBeenCalledWith('/api/staff/v1/employers/33333333-3333-4333-8333-333333333333/revisions', {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'Idempotency-Key': '44444444-4444-4444-8444-444444444444',
+    },
+    body: JSON.stringify({
+      expected_version: 1,
+      employer_type: 'business',
+      display_name: 'Synthetic Revision Updated',
+    }),
+    cache: 'no-store',
+    credentials: 'same-origin',
+    mode: 'same-origin',
+    redirect: 'error',
+    referrerPolicy: 'no-referrer',
+  });
+});
+
+it('accepts exact current-authoritative revision success and result-version metadata', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          employer_id: '33333333-3333-4333-8333-333333333333',
+          employer_type: 'business',
+          display_name: 'Synthetic Revision Updated',
+          lifecycle_status: 'draft',
+          source_channel: 'staff_entry',
+          version: 2,
+          received_at: '2026-08-05T00:10:45Z',
+          created_at: '2026-08-05T00:10:45Z',
+          updated_at: '2026-08-11T02:50:00Z',
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Result-Version': '2',
+          },
+        },
+      ),
+    ),
+  );
+
+  const result = await reviseEmployer({
+    employerId: '33333333-3333-4333-8333-333333333333',
+    commandId: '44444444-4444-4444-8444-444444444444',
+    expectedVersion: 1,
+    employerType: 'business',
+    displayName: 'Synthetic Revision Updated',
+  });
+
+  expect(result).toEqual({
+    ok: true,
+    value: {
+      detail: {
+        employerId: '33333333-3333-4333-8333-333333333333',
+        employerType: 'business',
+        displayName: 'Synthetic Revision Updated',
+        lifecycleStatus: 'draft',
+        sourceChannel: 'staff_entry',
+        version: 2,
+        updatedAt: '2026-08-11T02:50:00Z',
+      },
+      resultVersion: 2,
+      replayed: false,
+    },
+  });
+});
+
+it('rejects actor attribution fields from routine revision and detail browser responses', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            employer_id: '22222222-2222-4222-8222-222222222222',
+            employer_type: 'household',
+            display_name: 'Golden Detail Household',
+            lifecycle_status: 'draft',
+            source_channel: 'staff_entry',
+            version: 1,
+            received_at: '2026-08-05T07:15:00Z',
+            created_at: '2026-08-05T07:15:00Z',
+            updated_at: '2026-08-11T04:00:00Z',
+            updated_by: 'staff-actor-should-not-leak',
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json; charset=utf-8' },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            employer_id: '33333333-3333-4333-8333-333333333333',
+            employer_type: 'business',
+            display_name: 'Synthetic Revision Updated',
+            lifecycle_status: 'draft',
+            source_channel: 'staff_entry',
+            version: 2,
+            received_at: '2026-08-05T00:10:45Z',
+            created_at: '2026-08-05T00:10:45Z',
+            updated_at: '2026-08-11T02:50:00Z',
+            updated_by: 'staff-actor-should-not-leak',
+          }),
+          {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+              'Idempotency-Result-Version': '2',
+            },
+          },
+        ),
+      ),
+  );
+
+  expect(await getEmployer('22222222-2222-4222-8222-222222222222')).toEqual({
+    ok: false,
+    failure: { kind: 'unexpected' },
+  });
+
+  expect(
+    await reviseEmployer({
+      employerId: '33333333-3333-4333-8333-333333333333',
+      commandId: '44444444-4444-4444-8444-444444444444',
+      expectedVersion: 1,
+      employerType: 'business',
+      displayName: 'Synthetic Revision Updated',
+    }),
+  ).toEqual({
+    ok: false,
+    failure: { kind: 'unknown_outcome' },
+  });
+});
+
+it('accepts replay after later mutation without treating the older result version as malformed', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          employer_id: '33333333-3333-4333-8333-333333333333',
+          employer_type: 'business',
+          display_name: 'Synthetic Revision Updated Again',
+          lifecycle_status: 'draft',
+          source_channel: 'staff_entry',
+          version: 3,
+          received_at: '2026-08-05T00:10:45Z',
+          created_at: '2026-08-05T00:10:45Z',
+          updated_at: '2026-08-11T03:05:00Z',
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Result-Version': '2',
+            'Idempotency-Replayed': 'true',
+          },
+        },
+      ),
+    ),
+  );
+
+  const result = await reviseEmployer({
+    employerId: '33333333-3333-4333-8333-333333333333',
+    commandId: '44444444-4444-4444-8444-444444444444',
+    expectedVersion: 1,
+    employerType: 'business',
+    displayName: 'Synthetic Revision Updated',
+  });
+
+  expect(result).toEqual({
+    ok: true,
+    value: {
+      detail: {
+        employerId: '33333333-3333-4333-8333-333333333333',
+        employerType: 'business',
+        displayName: 'Synthetic Revision Updated Again',
+        lifecycleStatus: 'draft',
+        sourceChannel: 'staff_entry',
+        version: 3,
+        updatedAt: '2026-08-11T03:05:00Z',
+      },
+      resultVersion: 2,
+      replayed: true,
+    },
+  });
+});
+
+it('requires fresh body version to equal result version and replay body version to be at least result version', async () => {
+  const invalidResponses = [
+    {
+      label: 'fresh body version lower than result version',
+      response: new Response(
+        JSON.stringify({
+          employer_id: '33333333-3333-4333-8333-333333333333',
+          employer_type: 'business',
+          display_name: 'Synthetic Revision Updated',
+          lifecycle_status: 'draft',
+          source_channel: 'staff_entry',
+          version: 1,
+          received_at: '2026-08-05T00:10:45Z',
+          created_at: '2026-08-05T00:10:45Z',
+          updated_at: '2026-08-11T02:50:00Z',
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Result-Version': '2',
+          },
+        },
+      ),
+    },
+    {
+      label: 'fresh body version higher than result version',
+      response: new Response(
+        JSON.stringify({
+          employer_id: '33333333-3333-4333-8333-333333333333',
+          employer_type: 'business',
+          display_name: 'Synthetic Revision Updated',
+          lifecycle_status: 'draft',
+          source_channel: 'staff_entry',
+          version: 3,
+          received_at: '2026-08-05T00:10:45Z',
+          created_at: '2026-08-05T00:10:45Z',
+          updated_at: '2026-08-11T02:50:00Z',
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Result-Version': '2',
+          },
+        },
+      ),
+    },
+    {
+      label: 'replay body version lower than result version',
+      response: new Response(
+        JSON.stringify({
+          employer_id: '33333333-3333-4333-8333-333333333333',
+          employer_type: 'business',
+          display_name: 'Synthetic Revision Updated',
+          lifecycle_status: 'draft',
+          source_channel: 'staff_entry',
+          version: 1,
+          received_at: '2026-08-05T00:10:45Z',
+          created_at: '2026-08-05T00:10:45Z',
+          updated_at: '2026-08-11T02:50:00Z',
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Result-Version': '2',
+            'Idempotency-Replayed': 'true',
+          },
+        },
+      ),
+    },
+  ];
+
+  for (const invalidResponse of invalidResponses) {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(invalidResponse.response));
+
+    const result = await reviseEmployer({
+      employerId: '33333333-3333-4333-8333-333333333333',
+      commandId: '44444444-4444-4444-8444-444444444444',
+      expectedVersion: 1,
+      employerType: 'business',
+      displayName: 'Synthetic Revision Updated',
+    });
+
+    expect(result, invalidResponse.label).toEqual({
+      ok: false,
+      failure: { kind: 'unknown_outcome' },
+    });
+  }
+});
+
+it('rejects missing malformed or unexpected replay and result-version headers as unknown outcome', async () => {
+  const invalidResponses = [
+    {
+      label: 'missing result-version header',
+      response: new Response(
+        JSON.stringify({
+          employer_id: '33333333-3333-4333-8333-333333333333',
+          employer_type: 'business',
+          display_name: 'Synthetic Revision Updated',
+          lifecycle_status: 'draft',
+          source_channel: 'staff_entry',
+          version: 2,
+          received_at: '2026-08-05T00:10:45Z',
+          created_at: '2026-08-05T00:10:45Z',
+          updated_at: '2026-08-11T02:50:00Z',
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+      ),
+    },
+    {
+      label: 'malformed result-version header',
+      response: new Response(
+        JSON.stringify({
+          employer_id: '33333333-3333-4333-8333-333333333333',
+          employer_type: 'business',
+          display_name: 'Synthetic Revision Updated',
+          lifecycle_status: 'draft',
+          source_channel: 'staff_entry',
+          version: 2,
+          received_at: '2026-08-05T00:10:45Z',
+          created_at: '2026-08-05T00:10:45Z',
+          updated_at: '2026-08-11T02:50:00Z',
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Result-Version': 'abc',
+          },
+        },
+      ),
+    },
+    {
+      label: 'missing replay header on replay success',
+      response: new Response(
+        JSON.stringify({
+          employer_id: '33333333-3333-4333-8333-333333333333',
+          employer_type: 'business',
+          display_name: 'Synthetic Revision Updated Again',
+          lifecycle_status: 'draft',
+          source_channel: 'staff_entry',
+          version: 3,
+          received_at: '2026-08-05T00:10:45Z',
+          created_at: '2026-08-05T00:10:45Z',
+          updated_at: '2026-08-11T03:05:00Z',
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Result-Version': '2',
+          },
+        },
+      ),
+    },
+    {
+      label: 'malformed replay header value',
+      response: new Response(
+        JSON.stringify({
+          employer_id: '33333333-3333-4333-8333-333333333333',
+          employer_type: 'business',
+          display_name: 'Synthetic Revision Updated Again',
+          lifecycle_status: 'draft',
+          source_channel: 'staff_entry',
+          version: 3,
+          received_at: '2026-08-05T00:10:45Z',
+          created_at: '2026-08-05T00:10:45Z',
+          updated_at: '2026-08-11T03:05:00Z',
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Result-Version': '2',
+            'Idempotency-Replayed': 'false',
+          },
+        },
+      ),
+    },
+  ];
+
+  for (const invalidResponse of invalidResponses) {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(invalidResponse.response));
+
+    const result = await reviseEmployer({
+      employerId: '33333333-3333-4333-8333-333333333333',
+      commandId: '44444444-4444-4444-8444-444444444444',
+      expectedVersion: 1,
+      employerType: 'business',
+      displayName: 'Synthetic Revision Updated',
+    });
+
+    expect(result, invalidResponse.label).toEqual({
+      ok: false,
+      failure: { kind: 'unknown_outcome' },
+    });
+  }
+});
+
+it('rejects body versions lower than the command result version', async () => {
+  const invalidResponses = [
+    {
+      label: 'fresh body version lower than result version',
+      response: new Response(
+        JSON.stringify({
+          employer_id: '33333333-3333-4333-8333-333333333333',
+          employer_type: 'business',
+          display_name: 'Synthetic Revision Updated',
+          lifecycle_status: 'draft',
+          source_channel: 'staff_entry',
+          version: 1,
+          received_at: '2026-08-05T00:10:45Z',
+          created_at: '2026-08-05T00:10:45Z',
+          updated_at: '2026-08-11T02:50:00Z',
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Result-Version': '2',
+          },
+        },
+      ),
+    },
+    {
+      label: 'replay body version lower than result version',
+      response: new Response(
+        JSON.stringify({
+          employer_id: '33333333-3333-4333-8333-333333333333',
+          employer_type: 'business',
+          display_name: 'Synthetic Revision Updated',
+          lifecycle_status: 'draft',
+          source_channel: 'staff_entry',
+          version: 1,
+          received_at: '2026-08-05T00:10:45Z',
+          created_at: '2026-08-05T00:10:45Z',
+          updated_at: '2026-08-11T02:50:00Z',
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Result-Version': '2',
+            'Idempotency-Replayed': 'true',
+          },
+        },
+      ),
+    },
+  ];
+
+  for (const invalidResponse of invalidResponses) {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(invalidResponse.response));
+
+    const result = await reviseEmployer({
+      employerId: '33333333-3333-4333-8333-333333333333',
+      commandId: '44444444-4444-4444-8444-444444444444',
+      expectedVersion: 1,
+      employerType: 'business',
+      displayName: 'Synthetic Revision Updated',
+    });
+
+    expect(result, invalidResponse.label).toEqual({
+      ok: false,
+      failure: { kind: 'unknown_outcome' },
+    });
+  }
+});
+
+it('maps 400 403 404 409 412 and 422 to definitive bounded revision failures', async () => {
+  const failureStatuses = [
+    { status: 400, expected: { ok: false, failure: { kind: 'validation' } } },
+    { status: 403, expected: { ok: false, failure: { kind: 'forbidden' } } },
+    { status: 404, expected: { ok: false, failure: { kind: 'not_found' } } },
+    { status: 409, expected: { ok: false, failure: { kind: 'conflict' } } },
+    { status: 412, expected: { ok: false, failure: { kind: 'stale' } } },
+    { status: 422, expected: { ok: false, failure: { kind: 'validation' } } },
+  ] as const;
+
+  for (const { status, expected } of failureStatuses) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockResolvedValue(
+        new Response('secret-like-body', {
+          status,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+
+    const result = await reviseEmployer({
+      employerId: '33333333-3333-4333-8333-333333333333',
+      commandId: '44444444-4444-4444-8444-444444444444',
+      expectedVersion: 1,
+      employerType: 'business',
+      displayName: 'Synthetic Revision Updated',
+    });
+
+    expect(result, `status ${String(status)}`).toEqual(expected);
+  }
+});
+
+it('maps network 500 503 redirect media-type and malformed-success failures to unknown outcome', async () => {
+  const failureCases = [
+    {
+      label: 'network failure',
+      install: () => vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockRejectedValue(new TypeError('network down'))),
+    },
+    {
+      label: '500 failure',
+      install: () =>
+        vi.stubGlobal(
+          'fetch',
+          vi.fn<typeof fetch>().mockResolvedValue(
+            new Response('secret-like-body', {
+              status: 500,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+          ),
+        ),
+    },
+    {
+      label: '503 failure',
+      install: () =>
+        vi.stubGlobal(
+          'fetch',
+          vi.fn<typeof fetch>().mockResolvedValue(
+            new Response('secret-like-body', {
+              status: 503,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+          ),
+        ),
+    },
+    {
+      label: 'redirect failure',
+      install: () =>
+        vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockRejectedValue(new TypeError('redirect blocked'))),
+    },
+    {
+      label: 'wrong media type on success status',
+      install: () =>
+        vi.stubGlobal(
+          'fetch',
+          vi.fn<typeof fetch>().mockResolvedValue(
+            new Response('<html>nope</html>', {
+              status: 200,
+              headers: { 'Content-Type': 'text/html' },
+            }),
+          ),
+        ),
+    },
+    {
+      label: 'malformed success body',
+      install: () =>
+        vi.stubGlobal(
+          'fetch',
+          vi.fn<typeof fetch>().mockResolvedValue(
+            new Response('null', {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json',
+                'Idempotency-Result-Version': '2',
+              },
+            }),
+          ),
+        ),
+    },
+  ] as const;
+
+  for (const failureCase of failureCases) {
+    failureCase.install();
+
+    const result = await reviseEmployer({
+      employerId: '33333333-3333-4333-8333-333333333333',
+      commandId: '44444444-4444-4444-8444-444444444444',
+      expectedVersion: 1,
+      employerType: 'business',
+      displayName: 'Synthetic Revision Updated',
+    });
+
+    expect(result, failureCase.label).toEqual({
+      ok: false,
+      failure: { kind: 'unknown_outcome' },
+    });
+  }
+});
+
+it('parses each accepted revision body exactly once and disposes every other terminal response body without exposing values', async () => {
+  const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+  function trackedResponse(options: {
+    status: number;
+    contentType?: string | null;
+    resultVersion?: string | null;
+    replayed?: string | null;
+    jsonValue?: unknown;
+  }) {
+    const json = vi.fn(() => Promise.resolve(options.jsonValue));
+    const text = vi.fn(() => Promise.resolve('secret-like-body'));
+    const cancel = vi.fn(() => Promise.resolve());
+
+    const response = {
+      status: options.status,
+      headers: {
+        get: (name: string) => {
+          switch (name.toLowerCase()) {
+            case 'content-type':
+              return options.contentType ?? null;
+            case 'idempotency-result-version':
+              return options.resultVersion ?? null;
+            case 'idempotency-replayed':
+              return options.replayed ?? null;
+            default:
+              return null;
+          }
+        },
+      } as Headers,
+      body: { cancel } as unknown as ReadableStream<Uint8Array>,
+      json,
+      text,
+    } as unknown as Response;
+
+    return { response, json, text, cancel };
+  }
+
+  const acceptedSuccess = trackedResponse({
+    status: 200,
+    contentType: 'application/json',
+    resultVersion: '2',
+    jsonValue: {
+      employer_id: '33333333-3333-4333-8333-333333333333',
+      employer_type: 'business',
+      display_name: 'Synthetic Revision Updated',
+      lifecycle_status: 'draft',
+      source_channel: 'staff_entry',
+      version: 2,
+      received_at: '2026-08-05T00:10:45Z',
+      created_at: '2026-08-05T00:10:45Z',
+      updated_at: '2026-08-11T02:50:00Z',
+    },
+  });
+
+  vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(acceptedSuccess.response));
+  expect(
+    await reviseEmployer({
+      employerId: '33333333-3333-4333-8333-333333333333',
+      commandId: '44444444-4444-4444-8444-444444444444',
+      expectedVersion: 1,
+      employerType: 'business',
+      displayName: 'Synthetic Revision Updated',
+    }),
+  ).toEqual({
+    ok: true,
+    value: {
+      detail: {
+        employerId: '33333333-3333-4333-8333-333333333333',
+        employerType: 'business',
+        displayName: 'Synthetic Revision Updated',
+        lifecycleStatus: 'draft',
+        sourceChannel: 'staff_entry',
+        version: 2,
+        updatedAt: '2026-08-11T02:50:00Z',
+      },
+      resultVersion: 2,
+      replayed: false,
+    },
+  });
+  expect(acceptedSuccess.json).toHaveBeenCalledTimes(1);
+  expect(acceptedSuccess.text).not.toHaveBeenCalled();
+  expect(acceptedSuccess.cancel).not.toHaveBeenCalled();
+
+  const malformedSuccess = trackedResponse({
+    status: 200,
+    contentType: 'application/json',
+    resultVersion: '2',
+    jsonValue: null,
+  });
+
+  vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(malformedSuccess.response));
+  expect(
+    await reviseEmployer({
+      employerId: '33333333-3333-4333-8333-333333333333',
+      commandId: '44444444-4444-4444-8444-444444444444',
+      expectedVersion: 1,
+      employerType: 'business',
+      displayName: 'Synthetic Revision Updated',
+    }),
+  ).toEqual({ ok: false, failure: { kind: 'unknown_outcome' } });
+  expect(malformedSuccess.json).toHaveBeenCalledTimes(1);
+  expect(malformedSuccess.text).not.toHaveBeenCalled();
+  expect(malformedSuccess.cancel).not.toHaveBeenCalled();
+
+  const staleResponse = trackedResponse({
+    status: 412,
+    contentType: 'application/json',
+  });
+
+  vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(staleResponse.response));
+  expect(
+    await reviseEmployer({
+      employerId: '33333333-3333-4333-8333-333333333333',
+      commandId: '44444444-4444-4444-8444-444444444444',
+      expectedVersion: 1,
+      employerType: 'business',
+      displayName: 'Synthetic Revision Updated',
+    }),
+  ).toEqual({ ok: false, failure: { kind: 'stale' } });
+  expect(staleResponse.json).not.toHaveBeenCalled();
+  expect(staleResponse.text).not.toHaveBeenCalled();
+  expect(staleResponse.cancel).toHaveBeenCalledTimes(1);
+
+  const wrongMedia = trackedResponse({
+    status: 200,
+    contentType: 'text/html',
+  });
+
+  vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(wrongMedia.response));
+  expect(
+    await reviseEmployer({
+      employerId: '33333333-3333-4333-8333-333333333333',
+      commandId: '44444444-4444-4444-8444-444444444444',
+      expectedVersion: 1,
+      employerType: 'business',
+      displayName: 'Synthetic Revision Updated',
+    }),
+  ).toEqual({ ok: false, failure: { kind: 'unknown_outcome' } });
+  expect(wrongMedia.json).not.toHaveBeenCalled();
+  expect(wrongMedia.text).not.toHaveBeenCalled();
+  expect(wrongMedia.cancel).toHaveBeenCalledTimes(1);
+
+  const internalError = trackedResponse({
+    status: 500,
+    contentType: 'application/json',
+  });
+
+  vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(internalError.response));
+  expect(
+    await reviseEmployer({
+      employerId: '33333333-3333-4333-8333-333333333333',
+      commandId: '44444444-4444-4444-8444-444444444444',
+      expectedVersion: 1,
+      employerType: 'business',
+      displayName: 'Synthetic Revision Updated',
+    }),
+  ).toEqual({ ok: false, failure: { kind: 'unknown_outcome' } });
+  expect(internalError.json).not.toHaveBeenCalled();
+  expect(internalError.text).not.toHaveBeenCalled();
+  expect(internalError.cancel).toHaveBeenCalledTimes(1);
+
+  expect(consoleError).not.toHaveBeenCalled();
+  expect(consoleWarn).not.toHaveBeenCalled();
+  expect(consoleLog).not.toHaveBeenCalled();
 });
 
 it('maps create transport and invalid-success-body failures to unknown outcome', async () => {

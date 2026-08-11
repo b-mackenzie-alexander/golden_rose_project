@@ -99,6 +99,96 @@ def test_search_returns_minimized_page_cursor_no_total_and_no_store(
         assert "total" not in response.json()
 
 
+def test_existing_search_success_media_cache_body_headers_and_read_only_contract_remains_exact(
+    clean_tables,
+    monkeypatch,
+    session,
+) -> None:
+    monkeypatch.setenv("GOLDEN_ROSE_ENVIRONMENT", "local")
+    monkeypatch.setenv("GOLDEN_ROSE_AUTH_MODE", "synthetic")
+    monkeypatch.setenv("GOLDEN_ROSE_SYNTHETIC_STAFF_ID", "22222222-2222-4222-8222-222222222222")
+
+    app = create_app()
+    identifiers = FixedIdentifierFactory(
+        UUID("11111111-aaaa-4aaa-8aaa-111111111111"),
+        UUID("22222222-bbbb-4bbb-8bbb-222222222222"),
+        UUID("33333333-cccc-4ccc-8ccc-333333333333"),
+        UUID("44444444-dddd-4ddd-8ddd-444444444444"),
+    )
+    app.dependency_overrides[get_identifier_factory] = lambda: identifiers
+    with TestClient(app) as client:
+        app.dependency_overrides[get_clock] = lambda: FixedClock(
+            datetime(2026, 8, 11, 2, 40, 0, tzinfo=UTC)
+        )
+        first_create = client.post(
+            "/api/staff/v1/employers",
+            headers={"Idempotency-Key": "45454545-aaaa-4aaa-8aaa-454545454545"},
+            json={
+                "employer_type": "business",
+                "display_name": "Synthetic Search Alpha Rose",
+            },
+        )
+        app.dependency_overrides[get_clock] = lambda: FixedClock(
+            datetime(2026, 8, 11, 2, 45, 0, tzinfo=UTC)
+        )
+        second_create = client.post(
+            "/api/staff/v1/employers",
+            headers={"Idempotency-Key": "46464646-bbbb-4bbb-8bbb-464646464646"},
+            json={
+                "employer_type": "household",
+                "display_name": "Synthetic Search Beta Rose",
+            },
+        )
+        command_receipt_count_before_search = session.execute(
+            text("SELECT COUNT(*) FROM command_receipts")
+        ).scalar_one()
+        audit_event_count_before_search = session.execute(
+            text("SELECT COUNT(*) FROM audit_events")
+        ).scalar_one()
+
+        response = client.post(
+            "/api/staff/v1/employers/search",
+            json={
+                "display_name_query": "rose",
+                "employer_type": "household",
+                "page_size": 10,
+            },
+        )
+
+        command_receipt_count = session.execute(
+            text("SELECT COUNT(*) FROM command_receipts")
+        ).scalar_one()
+        audit_event_count = session.execute(text("SELECT COUNT(*) FROM audit_events")).scalar_one()
+
+        assert first_create.status_code == 201
+        assert second_create.status_code == 201
+        assert first_create.headers["Idempotency-Result-Version"] == "1"
+        assert second_create.headers["Idempotency-Result-Version"] == "1"
+        assert response.status_code == 200
+        assert response.headers["Content-Type"] == "application/json"
+        assert response.headers["Cache-Control"] == "no-store"
+        assert "Idempotency-Result-Version" not in response.headers
+        assert "Idempotency-Replayed" not in response.headers
+        assert response.json() == {
+            "items": [
+                {
+                    "employer_id": "33333333-cccc-4ccc-8ccc-333333333333",
+                    "employer_type": "household",
+                    "display_name": "Synthetic Search Beta Rose",
+                    "lifecycle_status": "draft",
+                    "version": 1,
+                    "received_at": "2026-08-11T02:45:00Z",
+                }
+            ],
+            "next_cursor": None,
+        }
+        assert "total" not in response.json()
+        assert command_receipt_count_before_search == 2
+        assert audit_event_count_before_search == 2
+        assert command_receipt_count == command_receipt_count_before_search
+        assert audit_event_count == audit_event_count_before_search
+
+
 def test_authorized_invalid_search_inputs_return_nonreflective_no_store_422(
     clean_tables,
     monkeypatch,
@@ -124,6 +214,146 @@ def test_authorized_invalid_search_inputs_return_nonreflective_no_store_422(
             "detail": "request validation failed",
             "status": 422,
         }
+
+
+def test_existing_search_failure_matrix_media_cache_body_headers_and_read_only_contract_remains_exact(  # noqa: E501
+    clean_tables,
+    monkeypatch,
+    session,
+    engine: Engine,
+) -> None:
+    monkeypatch.setenv("GOLDEN_ROSE_ENVIRONMENT", "local")
+    monkeypatch.setenv("GOLDEN_ROSE_AUTH_MODE", "synthetic")
+    monkeypatch.setenv("GOLDEN_ROSE_SYNTHETIC_STAFF_ID", "22222222-2222-4222-8222-222222222222")
+
+    with TestClient(create_app(), raise_server_exceptions=False) as client:
+        validation_response = client.post(
+            "/api/staff/v1/employers/search",
+            json={
+                "display_name_query": "rose",
+                "cursor": "Synthetic Search Bad Cursor Value",
+            },
+        )
+
+    sql_statements: list[str] = []
+
+    def record_sql(
+        conn,
+        cursor,
+        statement: str,
+        parameters,
+        context,
+        executemany,
+    ) -> None:
+        sql_statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", record_sql)
+    try:
+        denied_app = create_app()
+        denied_app.dependency_overrides[get_staff_principal] = lambda: StaffPrincipal(
+            actor_id=UUID("47474747-aaaa-4aaa-8aaa-474747474747"),
+            role_name="synthetic_staff_without_read",
+            permissions=frozenset(),
+        )
+        with TestClient(denied_app, raise_server_exceptions=False) as denied_client:
+            denied_response = denied_client.post(
+                "/api/staff/v1/employers/search",
+                headers={
+                    "X-Staff-Actor-Id": "48484848-bbbb-4bbb-8bbb-484848484848",
+                    "X-Staff-Role": "platform_admin",
+                    "X-Staff-Permissions": "employer:read",
+                },
+                json={"display_name_query": "rose"},
+            )
+    finally:
+        event.remove(engine, "before_cursor_execute", record_sql)
+
+    def raise_safe_persistence_error(**_: object):
+        raise SafePersistenceError("persistence failed with Synthetic Search Persistence Value")
+
+    monkeypatch.setattr(employers_module, "search_employers", raise_safe_persistence_error)
+    with TestClient(create_app(), raise_server_exceptions=False) as unavailable_client:
+        unavailable_response = unavailable_client.post(
+            "/api/staff/v1/employers/search",
+            json={"display_name_query": "Synthetic Search Persistence Value"},
+        )
+
+    def raise_unexpected_error(**_: object):
+        raise RuntimeError("unexpected Synthetic Search Internal Value")
+
+    monkeypatch.setattr(employers_module, "search_employers", raise_unexpected_error)
+    with TestClient(create_app(), raise_server_exceptions=False) as error_client:
+        unexpected_response = error_client.post(
+            "/api/staff/v1/employers/search",
+            json={"display_name_query": "Synthetic Search Internal Value"},
+        )
+
+    cases = [
+        (
+            "validation",
+            validation_response,
+            422,
+            {
+                "type": "https://golden-rose.local/problems/request-validation",
+                "title": "Unprocessable Entity",
+                "detail": "request validation failed",
+                "status": 422,
+            },
+        ),
+        (
+            "denied",
+            denied_response,
+            403,
+            {
+                "type": "https://golden-rose.local/problems/forbidden",
+                "title": "Forbidden",
+                "detail": "forbidden",
+                "status": 403,
+            },
+        ),
+        (
+            "unavailable",
+            unavailable_response,
+            503,
+            {
+                "type": "https://golden-rose.local/problems/service-unavailable",
+                "title": "Service Unavailable",
+                "detail": "service unavailable",
+                "status": 503,
+            },
+        ),
+        (
+            "unexpected",
+            unexpected_response,
+            500,
+            {
+                "type": "https://golden-rose.local/problems/internal-error",
+                "title": "Internal Server Error",
+                "detail": "internal server error",
+                "status": 500,
+            },
+        ),
+    ]
+
+    for label, response, status_code, expected_problem in cases:
+        assert response.status_code == status_code, label
+        assert response.headers["Content-Type"] == "application/json"
+        assert response.headers["Cache-Control"] == "no-store"
+        assert response.json() == expected_problem
+        assert "Idempotency-Result-Version" not in response.headers
+        assert "Idempotency-Replayed" not in response.headers
+        assert "Synthetic Search" not in response.text
+
+    employer_count = session.execute(text("SELECT COUNT(*) FROM employers")).scalar_one()
+    command_receipt_count = session.execute(
+        text("SELECT COUNT(*) FROM command_receipts")
+    ).scalar_one()
+    audit_event_count = session.execute(text("SELECT COUNT(*) FROM audit_events")).scalar_one()
+
+    assert sql_statements == []
+    assert employer_count == 0
+    assert command_receipt_count == 0
+    assert audit_event_count == 0
 
 
 def test_search_failures_map_to_safe_redacted_503_and_500(
@@ -221,7 +451,72 @@ def test_get_existing_returns_exact_detail_with_no_store(
             "version": 1,
             "received_at": "2026-08-05T07:15:00Z",
             "created_at": "2026-08-05T07:15:00Z",
+            "updated_at": "2026-08-05T07:15:00Z",
         }
+
+
+def test_existing_detail_success_media_cache_body_headers_and_read_only_contract_remains_exact(
+    clean_tables,
+    monkeypatch,
+    session,
+) -> None:
+    monkeypatch.setenv("GOLDEN_ROSE_ENVIRONMENT", "local")
+    monkeypatch.setenv("GOLDEN_ROSE_AUTH_MODE", "synthetic")
+    monkeypatch.setenv("GOLDEN_ROSE_SYNTHETIC_STAFF_ID", "22222222-2222-4222-8222-222222222222")
+
+    app = create_app()
+    app.dependency_overrides[get_clock] = lambda: FixedClock(
+        datetime(2026, 8, 11, 2, 50, 0, tzinfo=UTC)
+    )
+    app.dependency_overrides[get_identifier_factory] = lambda: FixedIdentifierFactory(
+        UUID("49494949-aaaa-4aaa-8aaa-494949494949"),
+        UUID("50505050-bbbb-4bbb-8bbb-505050505050"),
+    )
+    with TestClient(app) as client:
+        create_response = client.post(
+            "/api/staff/v1/employers",
+            headers={"Idempotency-Key": "51515151-cccc-4ccc-8ccc-515151515151"},
+            json={
+                "employer_type": "business",
+                "display_name": "Synthetic Detail Compatibility",
+            },
+        )
+        command_receipt_count_before_detail = session.execute(
+            text("SELECT COUNT(*) FROM command_receipts")
+        ).scalar_one()
+        audit_event_count_before_detail = session.execute(
+            text("SELECT COUNT(*) FROM audit_events")
+        ).scalar_one()
+
+        response = client.get("/api/staff/v1/employers/49494949-aaaa-4aaa-8aaa-494949494949")
+
+        command_receipt_count = session.execute(
+            text("SELECT COUNT(*) FROM command_receipts")
+        ).scalar_one()
+        audit_event_count = session.execute(text("SELECT COUNT(*) FROM audit_events")).scalar_one()
+
+        assert create_response.status_code == 201
+        assert create_response.headers["Idempotency-Result-Version"] == "1"
+        assert response.status_code == 200
+        assert response.headers["Content-Type"] == "application/json"
+        assert response.headers["Cache-Control"] == "no-store"
+        assert "Idempotency-Result-Version" not in response.headers
+        assert "Idempotency-Replayed" not in response.headers
+        assert response.json() == {
+            "employer_id": "49494949-aaaa-4aaa-8aaa-494949494949",
+            "employer_type": "business",
+            "display_name": "Synthetic Detail Compatibility",
+            "lifecycle_status": "draft",
+            "source_channel": "staff_entry",
+            "version": 1,
+            "received_at": "2026-08-11T02:50:00Z",
+            "created_at": "2026-08-11T02:50:00Z",
+            "updated_at": "2026-08-11T02:50:00Z",
+        }
+        assert command_receipt_count_before_detail == 1
+        assert audit_event_count_before_detail == 1
+        assert command_receipt_count == command_receipt_count_before_detail
+        assert audit_event_count == audit_event_count_before_detail
 
 
 def test_get_absent_returns_nonreflective_no_store_404(
@@ -343,6 +638,159 @@ def test_detail_validation_and_failures_map_to_safe_no_store_problems(
             "detail": "service unavailable",
             "status": 503,
         }
+
+
+def test_existing_detail_failure_matrix_media_cache_body_headers_and_read_only_contract_remains_exact(  # noqa: E501
+    clean_tables,
+    monkeypatch,
+    session,
+    engine: Engine,
+) -> None:
+    monkeypatch.setenv("GOLDEN_ROSE_ENVIRONMENT", "local")
+    monkeypatch.setenv("GOLDEN_ROSE_AUTH_MODE", "synthetic")
+    monkeypatch.setenv("GOLDEN_ROSE_SYNTHETIC_STAFF_ID", "22222222-2222-4222-8222-222222222222")
+
+    with TestClient(create_app(), raise_server_exceptions=False) as client:
+        invalid_uuid_response = client.get("/api/staff/v1/employers/not-a-uuid")
+
+    sql_statements: list[str] = []
+
+    def record_sql(
+        conn,
+        cursor,
+        statement: str,
+        parameters,
+        context,
+        executemany,
+    ) -> None:
+        sql_statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", record_sql)
+    try:
+        denied_app = create_app()
+        denied_app.dependency_overrides[get_staff_principal] = lambda: StaffPrincipal(
+            actor_id=UUID("53535353-bbbb-4bbb-8bbb-535353535353"),
+            role_name="synthetic_staff_without_read",
+            permissions=frozenset(),
+        )
+        with TestClient(denied_app, raise_server_exceptions=False) as denied_client:
+            denied_response = denied_client.get(
+                "/api/staff/v1/employers/54545454-cccc-4ccc-8ccc-545454545454",
+                headers={
+                    "X-Staff-Actor-Id": "55555555-dddd-4ddd-8ddd-555555555555",
+                    "X-Staff-Role": "platform_admin",
+                    "X-Staff-Permissions": "employer:read",
+                },
+            )
+    finally:
+        event.remove(engine, "before_cursor_execute", record_sql)
+
+    def raise_not_found(**_: object):
+        raise EmployerNotFoundError("employer not found Synthetic Detail Missing Value")
+
+    monkeypatch.setattr(employers_module, "get_employer", raise_not_found)
+    with TestClient(create_app(), raise_server_exceptions=False) as not_found_client:
+        not_found_response = not_found_client.get(
+            "/api/staff/v1/employers/52525252-aaaa-4aaa-8aaa-525252525252"
+        )
+
+    def raise_safe_persistence_error(**_: object):
+        raise SafePersistenceError("persistence failed with Synthetic Detail Persistence Value")
+
+    monkeypatch.setattr(employers_module, "get_employer", raise_safe_persistence_error)
+    with TestClient(create_app(), raise_server_exceptions=False) as unavailable_client:
+        unavailable_response = unavailable_client.get(
+            "/api/staff/v1/employers/56565656-eeee-4eee-8eee-565656565656"
+        )
+
+    def raise_unexpected_error(**_: object):
+        raise RuntimeError("unexpected Synthetic Detail Internal Value")
+
+    monkeypatch.setattr(employers_module, "get_employer", raise_unexpected_error)
+    with TestClient(create_app(), raise_server_exceptions=False) as error_client:
+        unexpected_response = error_client.get(
+            "/api/staff/v1/employers/57575757-ffff-4fff-8fff-575757575757"
+        )
+
+    cases = [
+        (
+            "validation",
+            invalid_uuid_response,
+            422,
+            {
+                "type": "https://golden-rose.local/problems/request-validation",
+                "title": "Unprocessable Entity",
+                "detail": "request validation failed",
+                "status": 422,
+            },
+        ),
+        (
+            "not-found",
+            not_found_response,
+            404,
+            {
+                "type": "https://golden-rose.local/problems/employer-not-found",
+                "title": "Not Found",
+                "detail": "employer not found",
+                "status": 404,
+            },
+        ),
+        (
+            "denied",
+            denied_response,
+            403,
+            {
+                "type": "https://golden-rose.local/problems/forbidden",
+                "title": "Forbidden",
+                "detail": "forbidden",
+                "status": 403,
+            },
+        ),
+        (
+            "unavailable",
+            unavailable_response,
+            503,
+            {
+                "type": "https://golden-rose.local/problems/service-unavailable",
+                "title": "Service Unavailable",
+                "detail": "service unavailable",
+                "status": 503,
+            },
+        ),
+        (
+            "unexpected",
+            unexpected_response,
+            500,
+            {
+                "type": "https://golden-rose.local/problems/internal-error",
+                "title": "Internal Server Error",
+                "detail": "internal server error",
+                "status": 500,
+            },
+        ),
+    ]
+
+    for label, response, status_code, expected_problem in cases:
+        assert response.status_code == status_code, label
+        assert response.headers["Content-Type"] == "application/json"
+        assert response.headers["Cache-Control"] == "no-store"
+        assert response.json() == expected_problem
+        assert "Idempotency-Result-Version" not in response.headers
+        assert "Idempotency-Replayed" not in response.headers
+        assert "Synthetic Detail" not in response.text
+        assert "not-a-uuid" not in response.text
+        assert "52525252" not in response.text
+
+    employer_count = session.execute(text("SELECT COUNT(*) FROM employers")).scalar_one()
+    command_receipt_count = session.execute(
+        text("SELECT COUNT(*) FROM command_receipts")
+    ).scalar_one()
+    audit_event_count = session.execute(text("SELECT COUNT(*) FROM audit_events")).scalar_one()
+
+    assert sql_statements == []
+    assert employer_count == 0
+    assert command_receipt_count == 0
+    assert audit_event_count == 0
 
 
 def test_search_filters_and_cursor_round_trip_over_http(
@@ -616,10 +1064,12 @@ def test_openapi_exposes_only_approved_staff_employer_routes() -> None:
             "/api/staff/v1/employers",
             "/api/staff/v1/employers/search",
             "/api/staff/v1/employers/{employer_id}",
+            "/api/staff/v1/employers/{employer_id}/revisions",
         }
         assert set(paths["/api/staff/v1/employers"]) == {"post"}
         assert set(paths["/api/staff/v1/employers/search"]) == {"post"}
         assert set(paths["/api/staff/v1/employers/{employer_id}"]) == {"get"}
+        assert set(paths["/api/staff/v1/employers/{employer_id}/revisions"]) == {"post"}
 
 
 def test_search_logs_do_not_include_body_cursor_filter_sql_url_actor_or_exception(

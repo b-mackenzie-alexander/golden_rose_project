@@ -84,6 +84,34 @@ export type MessageCatalog = {
   employerCreateAbandonSearchFailure: string;
   employerCreateConflictHeading: string;
   employerCreateConflictAction: string;
+  employerRevisionEditAction: string;
+  employerRevisionHeading: string;
+  employerRevisionWarning: string;
+  employerRevisionTypeLabel: string;
+  employerRevisionNameLabel: string;
+  employerRevisionSubmit: string;
+  employerRevisionNameError: string;
+  employerRevisionTypeError: string;
+  employerRevisionNoOpError: string;
+  employerRevisionUnknownHeading: string;
+  employerRevisionUnknownBody: string;
+  employerRevisionUnknownRetry: string;
+  employerRevisionValidationFailureHeading: string;
+  employerRevisionValidationFailureBody: string;
+  employerRevisionForbiddenFailureHeading: string;
+  employerRevisionForbiddenFailureBody: string;
+  employerRevisionSuccessHeading: string;
+  employerRevisionSuccessBody: string;
+  employerRevisionNotFoundHeading: string;
+  employerRevisionNotFoundBody: string;
+  employerRevisionConflictHeading: string;
+  employerRevisionConflictBody: string;
+  employerRevisionConflictReload: string;
+  employerRevisionStaleHeading: string;
+  employerRevisionStaleBody: string;
+  employerRevisionStaleReload: string;
+  employerRevisionRefreshFailureHeading: string;
+  employerRevisionRefreshFailureBody: string;
   notFoundHeading: string;
   notFoundBody: string;
 };
@@ -174,6 +202,34 @@ export const englishMessages: MessageCatalog = {
   employerCreateAbandonSearchFailure: 'The required follow-up search could not complete. Retry the search before starting a changed create attempt.',
   employerCreateConflictHeading: 'Create is blocked until you search first',
   employerCreateConflictAction: 'Abandon blocked create and search',
+  employerRevisionEditAction: 'Edit draft employer',
+  employerRevisionHeading: 'Revise draft employer',
+  employerRevisionWarning: 'Revise only fictional synthetic draft employers in this local staff workspace.',
+  employerRevisionTypeLabel: 'Revision employer type',
+  employerRevisionNameLabel: 'Revision employer name',
+  employerRevisionSubmit: 'Save draft employer revision',
+  employerRevisionNameError: 'Enter 1 to 200 visible characters for the employer name.',
+  employerRevisionTypeError: 'Select either Business or Household before saving the draft employer revision.',
+  employerRevisionNoOpError: 'Change the employer type or employer name before saving the draft employer revision.',
+  employerRevisionUnknownHeading: 'Revision outcome is unknown',
+  employerRevisionUnknownBody: 'Retry the same revision attempt because it may already have succeeded.',
+  employerRevisionUnknownRetry: 'Retry same revision attempt',
+  employerRevisionValidationFailureHeading: 'Draft employer revision could not be completed',
+  employerRevisionValidationFailureBody: 'Correct the revision values and submit a new draft employer revision attempt.',
+  employerRevisionForbiddenFailureHeading: 'Draft employer revision is not available for this staff session',
+  employerRevisionForbiddenFailureBody: 'This staff session cannot revise the draft employer. Keep the current detail authoritative until access changes.',
+  employerRevisionSuccessHeading: 'Draft employer revision saved',
+  employerRevisionSuccessBody: 'The current draft employer detail now reflects the saved revision.',
+  employerRevisionNotFoundHeading: 'Draft employer revision target is no longer available',
+  employerRevisionNotFoundBody: 'Select a current draft employer before starting another revision attempt.',
+  employerRevisionConflictHeading: 'Revision is blocked until current employer detail reloads',
+  employerRevisionConflictBody: 'Reload the current employer detail before creating a new revision attempt.',
+  employerRevisionConflictReload: 'Reload current employer detail',
+  employerRevisionStaleHeading: 'Revision requires current employer detail before editing can continue',
+  employerRevisionStaleBody: 'Reload the current employer detail before starting another revision attempt.',
+  employerRevisionStaleReload: 'Reload current employer detail',
+  employerRevisionRefreshFailureHeading: 'Current employer detail could not be refreshed',
+  employerRevisionRefreshFailureBody: 'Retry reloading the current employer detail before starting another revision attempt.',
   notFoundHeading: 'Page not found / Página no encontrada',
   notFoundBody: 'This placeholder route does not expose employer workflow data.',
 };
@@ -266,6 +322,34 @@ export const spanishMessages: MessageCatalog = {
   employerCreateAbandonSearchFailure: 'La búsqueda de seguimiento requerida no pudo completarse. Reintente la búsqueda antes de iniciar un intento de creación cambiado.',
   employerCreateConflictHeading: 'La creación está bloqueada hasta que busque primero',
   employerCreateConflictAction: 'Abandonar la creación bloqueada y buscar',
+  employerRevisionEditAction: 'Editar empleador en borrador',
+  employerRevisionHeading: 'Revisar empleador en borrador',
+  employerRevisionWarning: 'Revise solo empleadores en borrador ficticios y sintéticos en este espacio de trabajo local del personal.',
+  employerRevisionTypeLabel: 'Tipo de empleador para la revisión',
+  employerRevisionNameLabel: 'Nombre del empleador para la revisión',
+  employerRevisionSubmit: 'Guardar revisión del empleador en borrador',
+  employerRevisionNameError: 'Ingrese entre 1 y 200 caracteres visibles para el nombre del empleador.',
+  employerRevisionTypeError: 'Seleccione Business o Household antes de guardar la revisión del empleador en borrador.',
+  employerRevisionNoOpError: 'Cambie el tipo o el nombre del empleador antes de guardar la revisión del empleador en borrador.',
+  employerRevisionUnknownHeading: 'El resultado de la revisión es desconocido',
+  employerRevisionUnknownBody: 'Reintente la misma revisión porque puede que ya se haya realizado con éxito.',
+  employerRevisionUnknownRetry: 'Reintentar la misma revisión',
+  employerRevisionValidationFailureHeading: 'No se pudo completar la revisión del empleador en borrador',
+  employerRevisionValidationFailureBody: 'Corrija los valores de la revisión y envíe un nuevo intento de revisión del empleador en borrador.',
+  employerRevisionForbiddenFailureHeading: 'La revisión del empleador en borrador no está disponible para esta sesión del personal',
+  employerRevisionForbiddenFailureBody: 'Esta sesión del personal no puede revisar el empleador en borrador. Mantenga el detalle actual como autoridad hasta que cambie el acceso.',
+  employerRevisionSuccessHeading: 'La revisión del empleador en borrador se guardó',
+  employerRevisionSuccessBody: 'El detalle actual del empleador en borrador ahora refleja la revisión guardada.',
+  employerRevisionNotFoundHeading: 'El objetivo de la revisión del empleador en borrador ya no está disponible',
+  employerRevisionNotFoundBody: 'Seleccione un empleador en borrador actual antes de iniciar otro intento de revisión.',
+  employerRevisionConflictHeading: 'La revisión está bloqueada hasta que se recargue el detalle actual del empleador',
+  employerRevisionConflictBody: 'Recargue el detalle actual del empleador antes de crear un nuevo intento de revisión.',
+  employerRevisionConflictReload: 'Recargar el detalle actual del empleador',
+  employerRevisionStaleHeading: 'La revisión requiere el detalle actual del empleador antes de que la edición pueda continuar',
+  employerRevisionStaleBody: 'Recargue el detalle actual del empleador antes de iniciar otro intento de revisión.',
+  employerRevisionStaleReload: 'Recargar el detalle actual del empleador',
+  employerRevisionRefreshFailureHeading: 'No se pudo actualizar el detalle actual del empleador',
+  employerRevisionRefreshFailureBody: 'Reintente recargar el detalle actual del empleador antes de iniciar otro intento de revisión.',
   notFoundHeading: 'Page not found / Página no encontrada',
   notFoundBody: 'Esta ruta provisional no expone datos del flujo de trabajo de empleadores.',
 };

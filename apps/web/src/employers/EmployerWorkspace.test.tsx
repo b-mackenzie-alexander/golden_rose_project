@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { vi } from 'vitest';
 
-import { createEmployer, getEmployer, searchEmployers } from '../api/employerClient';
+import { createEmployer, getEmployer, reviseEmployer, searchEmployers } from '../api/employerClient';
 import { App, AppRoutes } from '../app/App';
 import { EmployerCreateForm } from './EmployerCreateForm';
 import { EmployerWorkspace } from './EmployerWorkspace';
@@ -13,6 +13,7 @@ import { VALUE_SAFE_TESTING_LIBRARY_MESSAGE } from '../test/valueSafeDiagnostics
 vi.mock('../api/employerClient', () => ({
   createEmployer: vi.fn(),
   getEmployer: vi.fn(),
+  reviseEmployer: vi.fn(),
   searchEmployers: vi.fn(),
 }));
 
@@ -1097,6 +1098,8 @@ describe('EmployerWorkspace', () => {
         displayName: '<img src=x onerror=alert(1)> Detail Rendering Rose',
         lifecycleStatus: 'draft',
         sourceChannel: 'staff_entry',
+        version: 1,
+        updatedAt: '2026-08-11T04:00:00Z',
       },
     });
 
@@ -1127,6 +1130,2158 @@ describe('EmployerWorkspace', () => {
     expect(within(detailRegion).queryByText('ffffffff-ffff-4fff-8fff-ffffffffffff')).not.toBeInTheDocument();
     expect(within(detailRegion).queryByText('2026-08-05T07:15:00Z')).not.toBeInTheDocument();
     expect(document.querySelector('img')).toBeNull();
+  });
+
+  it('edits only the selected exact draft Employer', async () => {
+    const user = userEvent.setup();
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    const getEmployerMock = vi.mocked(getEmployer);
+    searchEmployersMock.mockReset();
+    getEmployerMock.mockReset();
+
+    searchEmployersMock.mockResolvedValue({
+      ok: true,
+      value: {
+        items: [
+          {
+            employerId: '71717171-7171-4171-8171-717171717171',
+            employerType: 'business',
+            displayName: 'Selected Draft Anchor',
+            lifecycleStatus: 'draft',
+          },
+          {
+            employerId: '81818181-8181-4181-8181-818181818181',
+            employerType: 'household',
+            displayName: 'Unselected Draft Anchor',
+            lifecycleStatus: 'draft',
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+    getEmployerMock.mockResolvedValue({
+      ok: true,
+      value: {
+        employerId: '71717171-7171-4171-8171-717171717171',
+        employerType: 'business',
+        displayName: 'Selected Draft Anchor',
+        lifecycleStatus: 'draft',
+        sourceChannel: 'staff_entry',
+        version: 7,
+        updatedAt: '2026-08-11T04:10:00Z',
+      },
+    });
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Edit draft employer' })).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Employer name'), 'Draft');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await user.click(screen.getByRole('button', { name: 'Selected Draft Anchor' }));
+
+    await screen.findByRole('region', { name: 'Employer detail' });
+    const revisionEditButton = screen.getByRole('button', { name: 'Edit draft employer' });
+    expect(revisionEditButton).toBeInTheDocument();
+
+    await user.click(revisionEditButton);
+
+    expect(screen.getByRole('form', { name: 'Revise draft employer' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Revision employer type')).toHaveValue('business');
+    expect(screen.getByLabelText('Revision employer name')).toHaveValue('Selected Draft Anchor');
+    expect(screen.queryByDisplayValue('Unselected Draft Anchor')).not.toBeInTheDocument();
+  });
+
+  it('serializes create and revision with one workspace command lock', async () => {
+    const user = userEvent.setup();
+    const createEmployerMock = vi.mocked(createEmployer);
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    const getEmployerMock = vi.mocked(getEmployer);
+    const reviseEmployerMock = vi.mocked(reviseEmployer);
+    createEmployerMock.mockReset();
+    searchEmployersMock.mockReset();
+    getEmployerMock.mockReset();
+    reviseEmployerMock.mockReset();
+
+    const deferredCreate = createDeferredPromise<Awaited<ReturnType<typeof createEmployer>>>();
+    const deferredRevision = createDeferredPromise<Awaited<ReturnType<typeof reviseEmployer>>>();
+
+    searchEmployersMock.mockResolvedValue({
+      ok: true,
+      value: {
+        items: [
+          {
+            employerId: '91919191-9191-4191-8191-919191919191',
+            employerType: 'business',
+            displayName: 'Workspace Lock Draft',
+            lifecycleStatus: 'draft',
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+    getEmployerMock.mockResolvedValue({
+      ok: true,
+      value: {
+        employerId: '91919191-9191-4191-8191-919191919191',
+        employerType: 'business',
+        displayName: 'Workspace Lock Draft',
+        lifecycleStatus: 'draft',
+        sourceChannel: 'staff_entry',
+        version: 7,
+        updatedAt: '2026-08-11T05:00:00Z',
+      },
+    });
+    createEmployerMock.mockReturnValueOnce(deferredCreate.promise);
+    reviseEmployerMock.mockReturnValueOnce(deferredRevision.promise);
+
+    const randomUuidSpy = vi
+      .spyOn(globalThis.crypto, 'randomUUID')
+      .mockReturnValueOnce('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
+      .mockReturnValueOnce('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(screen.getByLabelText('Employer name'), 'Draft');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await user.click(screen.getByRole('button', { name: 'Workspace Lock Draft' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Workspace Revision Attempt');
+
+    await user.selectOptions(screen.getByLabelText('Create employer type'), 'household');
+    await user.type(screen.getByLabelText('Create employer name'), 'Workspace Create Attempt');
+    await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
+
+    expect(createEmployerMock).toHaveBeenCalledTimes(1);
+    expect(createEmployerMock).toHaveBeenCalledWith({
+      commandId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      employerType: 'household',
+      displayName: 'Workspace Create Attempt',
+    });
+    expect(screen.getByRole('button', { name: 'Save draft employer revision' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+    expect(reviseEmployerMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      deferredCreate.resolve({
+        ok: true,
+        value: {
+          employerId: '92929292-9292-4292-8292-929292929292',
+          employerType: 'household',
+          displayName: 'Workspace Create Attempt',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+        },
+      });
+      await deferredCreate.promise;
+    });
+
+    await user.type(screen.getByLabelText('Employer name'), 'Draft');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await user.click(screen.getByRole('button', { name: 'Workspace Lock Draft' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+
+    const revisionEntryButton = screen.queryByRole('button', { name: 'Edit draft employer' });
+    if (revisionEntryButton !== null) {
+      await user.click(revisionEntryButton);
+    } else {
+      expect(screen.getByRole('form', { name: 'Revise draft employer' })).toBeInTheDocument();
+    }
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Workspace Revision Attempt');
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+
+    expect(reviseEmployerMock).toHaveBeenCalledTimes(1);
+    expect(reviseEmployerMock).toHaveBeenCalledWith({
+      employerId: '91919191-9191-4191-8191-919191919191',
+      commandId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      expectedVersion: 7,
+      employerType: 'business',
+      displayName: 'Workspace Revision Attempt',
+    });
+    expect(screen.getByLabelText('Create employer type')).toBeDisabled();
+    expect(screen.getByLabelText('Create employer name')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create draft employer' })).toBeDisabled();
+
+    await act(async () => {
+      deferredRevision.resolve({
+        ok: true,
+        value: {
+          detail: {
+            employerId: '91919191-9191-4191-8191-919191919191',
+            employerType: 'business',
+            displayName: 'Workspace Revision Attempt',
+            lifecycleStatus: 'draft',
+            sourceChannel: 'staff_entry',
+            version: 8,
+            updatedAt: '2026-08-11T05:10:00Z',
+          },
+          resultVersion: 8,
+          replayed: false,
+        },
+      });
+      await deferredRevision.promise;
+    });
+
+    randomUuidSpy.mockRestore();
+  });
+
+  it('blocks revision during pending unknown conflict and recovery create authority', async () => {
+    const user = userEvent.setup();
+    const createEmployerMock = vi.mocked(createEmployer);
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    const getEmployerMock = vi.mocked(getEmployer);
+    const reviseEmployerMock = vi.mocked(reviseEmployer);
+    createEmployerMock.mockReset();
+    searchEmployersMock.mockReset();
+    getEmployerMock.mockReset();
+    reviseEmployerMock.mockReset();
+
+    const pendingCreate = createDeferredPromise<Awaited<ReturnType<typeof createEmployer>>>();
+    const abandonmentSearch = createDeferredPromise<Awaited<ReturnType<typeof searchEmployers>>>();
+
+    searchEmployersMock
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          items: [
+            {
+              employerId: '93939393-9393-4393-8393-939393939393',
+              employerType: 'business',
+              displayName: 'Create Authority Draft',
+              lifecycleStatus: 'draft',
+            },
+          ],
+          nextCursor: null,
+        },
+      })
+      .mockReturnValueOnce(abandonmentSearch.promise);
+    getEmployerMock.mockResolvedValue({
+      ok: true,
+      value: {
+        employerId: '93939393-9393-4393-8393-939393939393',
+        employerType: 'business',
+        displayName: 'Create Authority Draft',
+        lifecycleStatus: 'draft',
+        sourceChannel: 'staff_entry',
+        version: 7,
+        updatedAt: '2026-08-11T05:20:00Z',
+      },
+    });
+    createEmployerMock
+      .mockReturnValueOnce(pendingCreate.promise)
+      .mockResolvedValueOnce({ ok: false, failure: { kind: 'conflict' } });
+
+    const randomUuidSpy = vi
+      .spyOn(globalThis.crypto, 'randomUUID')
+      .mockReturnValueOnce('cccccccc-cccc-4ccc-8ccc-cccccccccccc')
+      .mockReturnValueOnce('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(screen.getByLabelText('Employer name'), 'Draft');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await user.click(screen.getByRole('button', { name: 'Create Authority Draft' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+
+    const revisionNameInput = screen.getByLabelText('Revision employer name');
+    const revisionSubmitButton = screen.getByRole('button', { name: 'Save draft employer revision' });
+
+    await user.clear(revisionNameInput);
+    await user.type(revisionNameInput, 'Blocked Revision Attempt');
+    await user.selectOptions(screen.getByLabelText('Create employer type'), 'business');
+    await user.type(screen.getByLabelText('Create employer name'), 'Create Lock Attempt');
+    await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
+
+    expect(createEmployerMock).toHaveBeenCalledTimes(1);
+    expect(revisionNameInput).toBeDisabled();
+    expect(revisionSubmitButton).toBeDisabled();
+
+    await user.click(revisionSubmitButton);
+    expect(reviseEmployerMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      pendingCreate.resolve({ ok: false, failure: { kind: 'unknown_outcome' } });
+      await pendingCreate.promise;
+    });
+
+    const unknownHeading = await screen.findByRole('heading', { name: 'Create outcome is unknown' });
+    const unknownRegion = unknownHeading.closest('section');
+    expect(unknownRegion).not.toBeNull();
+    expect(revisionNameInput).toBeDisabled();
+    expect(revisionSubmitButton).toBeDisabled();
+
+    await user.click(within(unknownRegion as HTMLElement).getByRole('button', { name: 'Abandon unknown create and search' }));
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(revisionNameInput).toBeDisabled();
+    expect(revisionSubmitButton).toBeDisabled();
+
+    await act(async () => {
+      abandonmentSearch.resolve({ ok: true, value: { items: [], nextCursor: null } });
+      await abandonmentSearch.promise;
+    });
+
+    expect(screen.queryByRole('heading', { name: 'Create outcome is unknown' })).not.toBeInTheDocument();
+    expect(revisionNameInput).not.toBeDisabled();
+    expect(revisionSubmitButton).not.toBeDisabled();
+
+    await user.selectOptions(screen.getByLabelText('Create employer type'), 'business');
+    await user.type(screen.getByLabelText('Create employer name'), 'Create Conflict Attempt');
+    await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
+
+    const conflictHeading = await screen.findByRole('heading', { name: 'Create is blocked until you search first' });
+    expect(conflictHeading).toBeInTheDocument();
+    expect(revisionNameInput).toBeDisabled();
+    expect(revisionSubmitButton).toBeDisabled();
+    expect(reviseEmployerMock).not.toHaveBeenCalled();
+
+    randomUuidSpy.mockRestore();
+    confirmSpy.mockRestore();
+  });
+
+  it('blocks create during pending unknown conflict and recovery revision authority', async () => {
+    const user = userEvent.setup();
+    const createEmployerMock = vi.mocked(createEmployer);
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    const getEmployerMock = vi.mocked(getEmployer);
+    const reviseEmployerMock = vi.mocked(reviseEmployer);
+    createEmployerMock.mockReset();
+    searchEmployersMock.mockReset();
+    getEmployerMock.mockReset();
+    reviseEmployerMock.mockReset();
+
+    const pendingRevision = createDeferredPromise<Awaited<ReturnType<typeof reviseEmployer>>>();
+
+    searchEmployersMock.mockResolvedValue({
+      ok: true,
+      value: {
+        items: [
+          {
+            employerId: '94949494-9494-4494-8494-949494949494',
+            employerType: 'business',
+            displayName: 'Revision Authority Draft',
+            lifecycleStatus: 'draft',
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+    getEmployerMock.mockResolvedValue({
+      ok: true,
+      value: {
+        employerId: '94949494-9494-4494-8494-949494949494',
+        employerType: 'business',
+        displayName: 'Revision Authority Draft',
+        lifecycleStatus: 'draft',
+        sourceChannel: 'staff_entry',
+        version: 7,
+        updatedAt: '2026-08-11T05:30:00Z',
+      },
+    });
+    reviseEmployerMock
+      .mockReturnValueOnce(pendingRevision.promise)
+      .mockResolvedValueOnce({ ok: false, failure: { kind: 'conflict' } })
+      .mockResolvedValueOnce({ ok: false, failure: { kind: 'stale' } });
+
+    const randomUuidSpy = vi
+      .spyOn(globalThis.crypto, 'randomUUID')
+      .mockReturnValueOnce('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')
+      .mockReturnValueOnce('ffffffff-ffff-4fff-8fff-ffffffffffff')
+      .mockReturnValueOnce('abababab-abab-4bab-8bab-abababababab');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(screen.getByLabelText('Employer name'), 'Draft');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await user.click(screen.getByRole('button', { name: 'Revision Authority Draft' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Pending Revision Lock');
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+
+    expect(reviseEmployerMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('Create employer type')).toBeDisabled();
+    expect(screen.getByLabelText('Create employer name')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create draft employer' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
+    expect(createEmployerMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      pendingRevision.resolve({ ok: false, failure: { kind: 'unknown_outcome' } });
+      await pendingRevision.promise;
+    });
+
+    const unknownHeading = await screen.findByRole('heading', { name: 'Revision outcome is unknown' });
+    const unknownRegion = unknownHeading.closest('section');
+    expect(unknownRegion).not.toBeNull();
+    expect(screen.getByLabelText('Create employer type')).toBeDisabled();
+    expect(screen.getByLabelText('Create employer name')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create draft employer' })).toBeDisabled();
+
+    await user.click(within(unknownRegion as HTMLElement).getByRole('button', { name: 'Reload current employer detail' }));
+    expect(screen.getByRole('button', { name: 'Edit draft employer' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Conflict Revision Lock');
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+
+    const conflictHeading = await screen.findByRole('heading', {
+      name: 'Revision is blocked until current employer detail reloads',
+    });
+    const conflictRegion = conflictHeading.closest('section');
+    expect(conflictRegion).not.toBeNull();
+    expect(screen.getByLabelText('Create employer type')).toBeDisabled();
+    expect(screen.getByLabelText('Create employer name')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create draft employer' })).toBeDisabled();
+
+    await user.click(within(conflictRegion as HTMLElement).getByRole('button', { name: 'Reload current employer detail' }));
+    expect(screen.getByRole('button', { name: 'Edit draft employer' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Stale Revision Lock');
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+
+    const staleHeading = await screen.findByRole('heading', {
+      name: 'Revision requires current employer detail before editing can continue',
+    });
+    expect(staleHeading).toBeInTheDocument();
+    expect(screen.getByLabelText('Create employer type')).toBeDisabled();
+    expect(screen.getByLabelText('Create employer name')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create draft employer' })).toBeDisabled();
+    expect(createEmployerMock).not.toHaveBeenCalled();
+
+    randomUuidSpy.mockRestore();
+  });
+
+  it('blocks same-tick create revision and repeated handler re-entry before React rerenders', async () => {
+    const createEmployerMock = vi.mocked(createEmployer);
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    const getEmployerMock = vi.mocked(getEmployer);
+    const reviseEmployerMock = vi.mocked(reviseEmployer);
+    createEmployerMock.mockReset();
+    searchEmployersMock.mockReset();
+    getEmployerMock.mockReset();
+    reviseEmployerMock.mockReset();
+
+    const pendingCreate = createDeferredPromise<Awaited<ReturnType<typeof createEmployer>>>();
+
+    searchEmployersMock.mockResolvedValue({
+      ok: true,
+      value: {
+        items: [
+          {
+            employerId: '95959595-9595-4595-8595-959595959595',
+            employerType: 'business',
+            displayName: 'Same Tick Draft',
+            lifecycleStatus: 'draft',
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+    getEmployerMock.mockResolvedValue({
+      ok: true,
+      value: {
+        employerId: '95959595-9595-4595-8595-959595959595',
+        employerType: 'business',
+        displayName: 'Same Tick Draft',
+        lifecycleStatus: 'draft',
+        sourceChannel: 'staff_entry',
+        version: 7,
+        updatedAt: '2026-08-11T05:40:00Z',
+      },
+    });
+    createEmployerMock.mockReturnValueOnce(pendingCreate.promise);
+
+    const randomUuidSpy = vi
+      .spyOn(globalThis.crypto, 'randomUUID')
+      .mockReturnValueOnce('12121212-1212-4121-8121-121212121212')
+      .mockReturnValueOnce('34343434-3434-4343-8343-343434343434');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await userEvent.type(screen.getByLabelText('Employer name'), 'Draft');
+    await userEvent.click(screen.getByRole('button', { name: 'Search employers' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Same Tick Draft' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+    await userEvent.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await userEvent.clear(screen.getByLabelText('Revision employer name'));
+    await userEvent.type(screen.getByLabelText('Revision employer name'), 'Blocked Same Tick Revision');
+    await userEvent.selectOptions(screen.getByLabelText('Create employer type'), 'business');
+    await userEvent.type(screen.getByLabelText('Create employer name'), 'Same Tick Create Attempt');
+
+    const createSubmitButton = screen.getByRole('button', { name: 'Create draft employer' });
+    const revisionSubmitButton = screen.getByRole('button', { name: 'Save draft employer revision' });
+
+    fireEvent.click(createSubmitButton);
+    fireEvent.click(createSubmitButton);
+    fireEvent.click(revisionSubmitButton);
+
+    expect(createEmployerMock).toHaveBeenCalledTimes(1);
+    expect(createEmployerMock).toHaveBeenCalledWith({
+      commandId: '12121212-1212-4121-8121-121212121212',
+      employerType: 'business',
+      displayName: 'Same Tick Create Attempt',
+    });
+    expect(reviseEmployerMock).not.toHaveBeenCalled();
+
+    randomUuidSpy.mockRestore();
+  });
+
+  it('disables create search selection pagination and competing edit authority while revision is frozen', async () => {
+    const user = userEvent.setup();
+    const createEmployerMock = vi.mocked(createEmployer);
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    const getEmployerMock = vi.mocked(getEmployer);
+    const reviseEmployerMock = vi.mocked(reviseEmployer);
+    createEmployerMock.mockReset();
+    searchEmployersMock.mockReset();
+    getEmployerMock.mockReset();
+    reviseEmployerMock.mockReset();
+
+    searchEmployersMock.mockResolvedValue({
+      ok: true,
+      value: {
+        items: [
+          {
+            employerId: '96969696-9696-4696-8696-969696969696',
+            employerType: 'business',
+            displayName: 'Frozen Revision Draft',
+            lifecycleStatus: 'draft',
+          },
+          {
+            employerId: '97979797-9797-4797-8797-979797979797',
+            employerType: 'household',
+            displayName: 'Competing Draft Target',
+            lifecycleStatus: 'draft',
+          },
+        ],
+        nextCursor: 'opaque-next-page',
+      },
+    });
+    getEmployerMock.mockResolvedValue({
+      ok: true,
+      value: {
+        employerId: '96969696-9696-4696-8696-969696969696',
+        employerType: 'business',
+        displayName: 'Frozen Revision Draft',
+        lifecycleStatus: 'draft',
+        sourceChannel: 'staff_entry',
+        version: 7,
+        updatedAt: '2026-08-11T05:50:00Z',
+      },
+    });
+    reviseEmployerMock.mockResolvedValueOnce({ ok: false, failure: { kind: 'unknown_outcome' } });
+
+    const randomUuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('56565656-5656-4565-8565-565656565656');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(screen.getByLabelText('Employer name'), 'Draft');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await user.click(screen.getByRole('button', { name: 'Frozen Revision Draft' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Frozen Unknown Revision');
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+
+    const unknownHeading = await screen.findByRole('heading', { name: 'Revision outcome is unknown' });
+    expect(unknownHeading).toBeInTheDocument();
+
+    expect(screen.getByLabelText('Create employer type')).toBeDisabled();
+    expect(screen.getByLabelText('Create employer name')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create draft employer' })).toBeDisabled();
+    expect(screen.getByLabelText('Employer name')).toBeDisabled();
+    expect(screen.getByLabelText('Employer type')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Search employers' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Competing Draft Target' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Load more employers' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Competing Draft Target' }));
+    await user.click(screen.getByRole('button', { name: 'Load more employers' }));
+    expect(getEmployerMock).toHaveBeenCalledTimes(1);
+    expect(searchEmployersMock).toHaveBeenCalledTimes(1);
+
+    randomUuidSpy.mockRestore();
+  });
+
+  it('revision success invalidates prior search results cursor and detail before exact refresh', async () => {
+    const user = userEvent.setup();
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    const getEmployerMock = vi.mocked(getEmployer);
+    const reviseEmployerMock = vi.mocked(reviseEmployer);
+    searchEmployersMock.mockReset();
+    getEmployerMock.mockReset();
+    reviseEmployerMock.mockReset();
+
+    const pendingRevision = createDeferredPromise<Awaited<ReturnType<typeof reviseEmployer>>>();
+    const refreshDetail = createDeferredPromise<Awaited<ReturnType<typeof getEmployer>>>();
+
+    searchEmployersMock.mockResolvedValue({
+      ok: true,
+      value: {
+        items: [
+          {
+            employerId: '98989898-9898-4989-8989-989898989898',
+            employerType: 'business',
+            displayName: 'Refresh Boundary Draft',
+            lifecycleStatus: 'draft',
+          },
+        ],
+        nextCursor: 'cursor-before-revision-success',
+      },
+    });
+    getEmployerMock
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          employerId: '98989898-9898-4989-8989-989898989898',
+          employerType: 'business',
+          displayName: 'Refresh Boundary Draft',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 7,
+          updatedAt: '2026-08-11T06:00:00Z',
+        },
+      })
+      .mockReturnValueOnce(refreshDetail.promise);
+    reviseEmployerMock.mockReturnValueOnce(pendingRevision.promise);
+
+    const randomUuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('78787878-7878-4787-8787-787878787878');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(screen.getByLabelText('Employer name'), 'Refresh');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await screen.findByRole('heading', { name: 'Search results' });
+    expect(screen.getByText('Submitted search: Refresh')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Load more employers' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Refresh Boundary Draft' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Refresh Boundary Draft Revised');
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+
+    await act(async () => {
+      pendingRevision.resolve({
+        ok: true,
+        value: {
+          detail: {
+            employerId: '98989898-9898-4989-8989-989898989898',
+            employerType: 'business',
+            displayName: 'Refresh Boundary Draft Revised',
+            lifecycleStatus: 'draft',
+            sourceChannel: 'staff_entry',
+            version: 8,
+            updatedAt: '2026-08-11T06:05:00Z',
+          },
+          resultVersion: 8,
+          replayed: false,
+        },
+      });
+      await pendingRevision.promise;
+    });
+
+    expect(screen.queryByRole('heading', { name: 'Search results' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Submitted search: Refresh')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load more employers' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Refresh Boundary Draft' })).not.toBeInTheDocument();
+    const refreshStatusRegion = screen.getByRole('region', { name: 'Employer detail' });
+    expect(within(refreshStatusRegion).getByRole('status')).toHaveTextContent('Loading employer detail.');
+    expect(getEmployerMock).toHaveBeenCalledTimes(2);
+
+    randomUuidSpy.mockRestore();
+  });
+
+  it('confirmed revision success performs exact detail refresh from a clean invalidated workspace state', async () => {
+    const user = userEvent.setup();
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    const getEmployerMock = vi.mocked(getEmployer);
+    const reviseEmployerMock = vi.mocked(reviseEmployer);
+    searchEmployersMock.mockReset();
+    getEmployerMock.mockReset();
+    reviseEmployerMock.mockReset();
+
+    const refreshDetail = createDeferredPromise<Awaited<ReturnType<typeof getEmployer>>>();
+    const pendingRevision = createDeferredPromise<Awaited<ReturnType<typeof reviseEmployer>>>();
+
+    searchEmployersMock.mockResolvedValue({
+      ok: true,
+      value: {
+        items: [
+          {
+            employerId: '90909090-9090-4090-8090-909090909090',
+            employerType: 'business',
+            displayName: 'Refresh Current Truth Draft',
+            lifecycleStatus: 'draft',
+          },
+        ],
+        nextCursor: 'cursor-before-clean-refresh',
+      },
+    });
+    getEmployerMock
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          employerId: '90909090-9090-4090-8090-909090909090',
+          employerType: 'business',
+          displayName: 'Refresh Current Truth Draft',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 7,
+          updatedAt: '2026-08-11T06:10:00Z',
+        },
+      })
+      .mockReturnValueOnce(refreshDetail.promise);
+    reviseEmployerMock.mockReturnValueOnce(pendingRevision.promise);
+
+    const randomUuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('79797979-7979-4797-8797-797979797979');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(screen.getByLabelText('Employer name'), 'Refresh');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await screen.findByRole('heading', { name: 'Search results' });
+    await user.click(screen.getByRole('button', { name: 'Refresh Current Truth Draft' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Refresh Current Truth Draft Revised');
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+
+    await act(async () => {
+      pendingRevision.resolve({
+        ok: true,
+        value: {
+          detail: {
+            employerId: '90909090-9090-4090-8090-909090909090',
+            employerType: 'business',
+            displayName: 'Refresh Current Truth Draft Revised',
+            lifecycleStatus: 'draft',
+            sourceChannel: 'staff_entry',
+            version: 8,
+            updatedAt: '2026-08-11T06:15:00Z',
+          },
+          resultVersion: 8,
+          replayed: false,
+        },
+      });
+      await pendingRevision.promise;
+    });
+
+    expect(screen.queryByRole('heading', { name: 'Search results' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Submitted search: Refresh')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load more employers' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Refresh Current Truth Draft' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit draft employer' })).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading employer detail.');
+    expect(getEmployerMock).toHaveBeenCalledTimes(2);
+    const secondGetEmployerCall = getEmployerMock.mock.calls[1];
+    expect(secondGetEmployerCall?.[0]).toBe('90909090-9090-4090-8090-909090909090');
+    expect(secondGetEmployerCall?.[1]?.signal).toBeInstanceOf(AbortSignal);
+
+    await act(async () => {
+      refreshDetail.resolve({
+        ok: true,
+        value: {
+          employerId: '90909090-9090-4090-8090-909090909090',
+          employerType: 'business',
+          displayName: 'Refresh Current Truth Draft Revised',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 8,
+          updatedAt: '2026-08-11T06:15:00Z',
+        },
+      });
+      await refreshDetail.promise;
+    });
+
+    const refreshedDetailRegion = await screen.findByRole('region', { name: 'Employer detail' });
+    expect(within(refreshedDetailRegion).getByText('Refresh Current Truth Draft Revised')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Search results' })).not.toBeInTheDocument();
+
+    randomUuidSpy.mockRestore();
+  });
+
+  it('revision success retires every active read before clearing results cursor failures submitted search and old selection', async () => {
+    const user = userEvent.setup();
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    const getEmployerMock = vi.mocked(getEmployer);
+    const reviseEmployerMock = vi.mocked(reviseEmployer);
+    searchEmployersMock.mockReset();
+    getEmployerMock.mockReset();
+    reviseEmployerMock.mockReset();
+
+    const pendingPage = createDeferredPromise<Awaited<ReturnType<typeof searchEmployers>>>();
+    const refreshDetail = createDeferredPromise<Awaited<ReturnType<typeof getEmployer>>>();
+    const pendingRevision = createDeferredPromise<Awaited<ReturnType<typeof reviseEmployer>>>();
+
+    searchEmployersMock
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          items: [
+            {
+              employerId: '91919191-9191-4191-8191-919191919191',
+              employerType: 'business',
+              displayName: 'Retire Active Reads Draft',
+              lifecycleStatus: 'draft',
+            },
+          ],
+          nextCursor: 'cursor-with-pending-page',
+        },
+      })
+      .mockReturnValueOnce(pendingPage.promise);
+    getEmployerMock
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          employerId: '91919191-9191-4191-8191-919191919191',
+          employerType: 'business',
+          displayName: 'Retire Active Reads Draft',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 7,
+          updatedAt: '2026-08-11T06:20:00Z',
+        },
+      })
+      .mockReturnValueOnce(refreshDetail.promise);
+    reviseEmployerMock.mockReturnValueOnce(pendingRevision.promise);
+
+    const randomUuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('80808080-8080-4080-8080-808080808080');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(screen.getByLabelText('Employer name'), 'Retire');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await screen.findByRole('heading', { name: 'Search results' });
+    await user.click(screen.getByRole('button', { name: 'Retire Active Reads Draft' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Retired Reads Revised');
+
+    await user.click(screen.getByRole('button', { name: 'Load more employers' }));
+    const paginationSignal = searchEmployersMock.mock.calls[1]?.[0].signal;
+    expect(paginationSignal).toBeInstanceOf(AbortSignal);
+
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+
+    await act(async () => {
+      pendingRevision.resolve({
+        ok: true,
+        value: {
+          detail: {
+            employerId: '91919191-9191-4191-8191-919191919191',
+            employerType: 'business',
+            displayName: 'Retired Reads Revised',
+            lifecycleStatus: 'draft',
+            sourceChannel: 'staff_entry',
+            version: 8,
+            updatedAt: '2026-08-11T06:25:00Z',
+          },
+          resultVersion: 8,
+          replayed: false,
+        },
+      });
+      await pendingRevision.promise;
+    });
+
+    expect(paginationSignal?.aborted).toBe(true);
+    expect(screen.queryByRole('heading', { name: 'Search results' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Submitted search: Retire')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load more employers' })).not.toBeInTheDocument();
+
+    await act(async () => {
+      pendingPage.resolve({
+        ok: true,
+        value: {
+          items: [
+            {
+              employerId: '92929292-9292-4292-8292-929292929292',
+              employerType: 'household',
+              displayName: 'Late Appended Result',
+              lifecycleStatus: 'draft',
+            },
+          ],
+          nextCursor: null,
+        },
+      });
+      await pendingPage.promise;
+    });
+
+    expect(screen.queryByText('Late Appended Result')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading employer detail.');
+    expect(getEmployerMock).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      refreshDetail.resolve({
+        ok: true,
+        value: {
+          employerId: '91919191-9191-4191-8191-919191919191',
+          employerType: 'business',
+          displayName: 'Retired Reads Revised',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 8,
+          updatedAt: '2026-08-11T06:25:00Z',
+        },
+      });
+      await refreshDetail.promise;
+    });
+
+    expect(screen.queryByText('Late Appended Result')).not.toBeInTheDocument();
+
+    randomUuidSpy.mockRestore();
+  });
+
+  it('late search pagination and detail completions cannot repaint after revision acknowledgement', async () => {
+    const user = userEvent.setup();
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    const getEmployerMock = vi.mocked(getEmployer);
+    const reviseEmployerMock = vi.mocked(reviseEmployer);
+    searchEmployersMock.mockReset();
+    getEmployerMock.mockReset();
+    reviseEmployerMock.mockReset();
+
+    const pendingPage = createDeferredPromise<Awaited<ReturnType<typeof searchEmployers>>>();
+    const pendingStaleDetail = createDeferredPromise<Awaited<ReturnType<typeof getEmployer>>>();
+    const refreshDetail = createDeferredPromise<Awaited<ReturnType<typeof getEmployer>>>();
+    const pendingRevision = createDeferredPromise<Awaited<ReturnType<typeof reviseEmployer>>>();
+
+    searchEmployersMock
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          items: [
+            {
+              employerId: '93939393-9393-4393-8393-939393939393',
+              employerType: 'business',
+              displayName: 'Late Paint Guard Draft',
+              lifecycleStatus: 'draft',
+            },
+          ],
+          nextCursor: 'cursor-with-late-read-risk',
+        },
+      })
+      .mockReturnValueOnce(pendingPage.promise);
+    getEmployerMock
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          employerId: '93939393-9393-4393-8393-939393939393',
+          employerType: 'business',
+          displayName: 'Late Paint Guard Draft',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 7,
+          updatedAt: '2026-08-11T06:30:00Z',
+        },
+      })
+      .mockReturnValueOnce(pendingStaleDetail.promise)
+      .mockReturnValueOnce(refreshDetail.promise);
+    reviseEmployerMock.mockReturnValueOnce(pendingRevision.promise);
+
+    const randomUuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('81818181-8181-4181-8181-818181818181');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(screen.getByLabelText('Employer name'), 'Late');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await screen.findByRole('heading', { name: 'Search results' });
+    await user.click(screen.getByRole('button', { name: 'Late Paint Guard Draft' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Late Paint Guard Revised');
+
+    await user.click(screen.getByRole('button', { name: 'Load more employers' }));
+    const paginationSignal = searchEmployersMock.mock.calls[1]?.[0].signal;
+    expect(paginationSignal).toBeInstanceOf(AbortSignal);
+
+    await user.click(screen.getByRole('button', { name: 'Late Paint Guard Draft' }));
+    expect(screen.getByRole('status')).toHaveTextContent('Loading employer detail.');
+    const staleDetailSignal = getEmployerMock.mock.calls[1]?.[1]?.signal;
+    expect(staleDetailSignal).toBeInstanceOf(AbortSignal);
+
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+
+    await act(async () => {
+      pendingRevision.resolve({
+        ok: true,
+        value: {
+          detail: {
+            employerId: '93939393-9393-4393-8393-939393939393',
+            employerType: 'business',
+            displayName: 'Late Paint Guard Revised',
+            lifecycleStatus: 'draft',
+            sourceChannel: 'staff_entry',
+            version: 8,
+            updatedAt: '2026-08-11T06:35:00Z',
+          },
+          resultVersion: 8,
+          replayed: false,
+        },
+      });
+      await pendingRevision.promise;
+    });
+
+    expect(paginationSignal?.aborted).toBe(true);
+    expect(staleDetailSignal?.aborted).toBe(true);
+
+    await act(async () => {
+      pendingPage.resolve({
+        ok: true,
+        value: {
+          items: [
+            {
+              employerId: '94949494-9494-4494-8494-949494949494',
+              employerType: 'household',
+              displayName: 'Late Pagination Paint',
+              lifecycleStatus: 'draft',
+            },
+          ],
+          nextCursor: null,
+        },
+      });
+      pendingStaleDetail.resolve({
+        ok: true,
+        value: {
+          employerId: '93939393-9393-4393-8393-939393939393',
+          employerType: 'business',
+          displayName: 'Late Detail Paint',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 7,
+          updatedAt: '2026-08-11T06:31:00Z',
+        },
+      });
+      await pendingPage.promise;
+      await pendingStaleDetail.promise;
+    });
+
+    expect(screen.queryByText('Late Pagination Paint')).not.toBeInTheDocument();
+    expect(screen.queryByText('Late Detail Paint')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading employer detail.');
+
+    await act(async () => {
+      refreshDetail.resolve({
+        ok: true,
+        value: {
+          employerId: '93939393-9393-4393-8393-939393939393',
+          employerType: 'business',
+          displayName: 'Late Paint Guard Revised',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 8,
+          updatedAt: '2026-08-11T06:35:00Z',
+        },
+      });
+      await refreshDetail.promise;
+    });
+
+    expect(screen.queryByText('Late Pagination Paint')).not.toBeInTheDocument();
+    expect(screen.queryByText('Late Detail Paint')).not.toBeInTheDocument();
+    expect(screen.getByText('Late Paint Guard Revised')).toBeInTheDocument();
+
+    randomUuidSpy.mockRestore();
+  });
+
+  it('confirmed save refresh failure never becomes unknown and never retries the command', async () => {
+    const user = userEvent.setup();
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    const getEmployerMock = vi.mocked(getEmployer);
+    const reviseEmployerMock = vi.mocked(reviseEmployer);
+    searchEmployersMock.mockReset();
+    getEmployerMock.mockReset();
+    reviseEmployerMock.mockReset();
+
+    const refreshDetail = createDeferredPromise<Awaited<ReturnType<typeof getEmployer>>>();
+    const pendingRevision = createDeferredPromise<Awaited<ReturnType<typeof reviseEmployer>>>();
+
+    searchEmployersMock.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        items: [
+          {
+            employerId: '95959595-9595-4595-8595-959595959595',
+            employerType: 'business',
+            displayName: 'Refresh Failure Guard Draft',
+            lifecycleStatus: 'draft',
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+    getEmployerMock
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          employerId: '95959595-9595-4595-8595-959595959595',
+          employerType: 'business',
+          displayName: 'Refresh Failure Guard Draft',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 7,
+          updatedAt: '2026-08-11T06:40:00Z',
+        },
+      })
+      .mockReturnValueOnce(refreshDetail.promise);
+    reviseEmployerMock.mockReturnValueOnce(pendingRevision.promise);
+
+    const randomUuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('82828282-8282-4282-8282-828282828282');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(screen.getByLabelText('Employer name'), 'Refresh');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await screen.findByRole('heading', { name: 'Search results' });
+    await user.click(screen.getByRole('button', { name: 'Refresh Failure Guard Draft' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Refresh Failure Guard Revised');
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+
+    await act(async () => {
+      pendingRevision.resolve({
+        ok: true,
+        value: {
+          detail: {
+            employerId: '95959595-9595-4595-8595-959595959595',
+            employerType: 'business',
+            displayName: 'Refresh Failure Guard Revised',
+            lifecycleStatus: 'draft',
+            sourceChannel: 'staff_entry',
+            version: 8,
+            updatedAt: '2026-08-11T06:45:00Z',
+          },
+          resultVersion: 8,
+          replayed: false,
+        },
+      });
+      await pendingRevision.promise;
+    });
+
+    expect(reviseEmployerMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('status')).toHaveTextContent('Loading employer detail.');
+
+    await act(async () => {
+      refreshDetail.resolve({ ok: false, failure: { kind: 'unavailable' } });
+      await refreshDetail.promise;
+    });
+
+    const failureHeading = await screen.findByRole('heading', { name: 'Current employer detail could not be refreshed' });
+    expect(failureHeading).toHaveFocus();
+    expect(screen.getByText('Retry reloading the current employer detail before starting another revision attempt.')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Revision outcome is unknown' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry same revision attempt' })).not.toBeInTheDocument();
+    expect(reviseEmployerMock).toHaveBeenCalledTimes(1);
+
+    randomUuidSpy.mockRestore();
+  });
+
+  it('command and canonical refresh not found clear authority and require a new selected exact detail', async () => {
+    const user = userEvent.setup();
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    const getEmployerMock = vi.mocked(getEmployer);
+    const reviseEmployerMock = vi.mocked(reviseEmployer);
+    searchEmployersMock.mockReset();
+    getEmployerMock.mockReset();
+    reviseEmployerMock.mockReset();
+
+    const refreshDetail = createDeferredPromise<Awaited<ReturnType<typeof getEmployer>>>();
+    const pendingRevision = createDeferredPromise<Awaited<ReturnType<typeof reviseEmployer>>>();
+
+    searchEmployersMock
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          items: [
+            {
+              employerId: '96969696-9696-4696-8696-969696969696',
+              employerType: 'business',
+              displayName: 'Refresh Not Found Draft',
+              lifecycleStatus: 'draft',
+            },
+          ],
+          nextCursor: null,
+        },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          items: [
+            {
+              employerId: '97979797-9797-4797-8797-979797979797',
+              employerType: 'household',
+              displayName: 'Replacement Selected Draft',
+              lifecycleStatus: 'draft',
+            },
+          ],
+          nextCursor: null,
+        },
+      });
+    getEmployerMock
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          employerId: '96969696-9696-4696-8696-969696969696',
+          employerType: 'business',
+          displayName: 'Refresh Not Found Draft',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 7,
+          updatedAt: '2026-08-11T06:50:00Z',
+        },
+      })
+      .mockReturnValueOnce(refreshDetail.promise)
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          employerId: '97979797-9797-4797-8797-979797979797',
+          employerType: 'household',
+          displayName: 'Replacement Selected Draft',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 3,
+          updatedAt: '2026-08-11T06:55:00Z',
+        },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          employerId: '98989898-9898-4898-8898-989898989898',
+          employerType: 'household',
+          displayName: 'Conflict Reload Revised',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 9,
+          updatedAt: '2026-08-11T07:10:00Z',
+        },
+      })
+      .mockResolvedValue({
+        ok: true,
+        value: {
+          employerId: '98989898-9898-4898-8898-989898989898',
+          employerType: 'household',
+          displayName: 'Conflict Reload Revised',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 9,
+          updatedAt: '2026-08-11T07:10:00Z',
+        },
+      });
+    reviseEmployerMock.mockReturnValueOnce(pendingRevision.promise);
+
+    const randomUuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('83838383-8383-4383-8383-838383838383');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(screen.getByLabelText('Employer name'), 'Refresh');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await screen.findByRole('heading', { name: 'Search results' });
+    await user.click(screen.getByRole('button', { name: 'Refresh Not Found Draft' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Refresh Not Found Revised');
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+
+    await act(async () => {
+      pendingRevision.resolve({
+        ok: true,
+        value: {
+          detail: {
+            employerId: '96969696-9696-4696-8696-969696969696',
+            employerType: 'business',
+            displayName: 'Refresh Not Found Revised',
+            lifecycleStatus: 'draft',
+            sourceChannel: 'staff_entry',
+            version: 8,
+            updatedAt: '2026-08-11T06:52:00Z',
+          },
+          resultVersion: 8,
+          replayed: false,
+        },
+      });
+      await pendingRevision.promise;
+    });
+
+    await act(async () => {
+      refreshDetail.resolve({ ok: false, failure: { kind: 'not_found' } });
+      await refreshDetail.promise;
+    });
+
+    const notFoundHeading = await screen.findByRole('heading', { name: 'Employer detail is no longer available' });
+    expect(notFoundHeading).toHaveFocus();
+    expect(screen.getByText('The selected employer detail could not be found for this staff workspace.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit draft employer' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: 'Revise draft employer' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Revision outcome is unknown' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry same revision attempt' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Create employer type')).toBeEnabled();
+    expect(screen.getByLabelText('Create employer name')).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await screen.findByRole('button', { name: 'Replacement Selected Draft' });
+    expect(screen.queryByRole('button', { name: 'Edit draft employer' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Replacement Selected Draft' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+    expect(screen.getByRole('button', { name: 'Edit draft employer' })).toBeInTheDocument();
+
+    randomUuidSpy.mockRestore();
+  });
+
+  it('revision conflict reloads exact detail before a new edit command can exist', async () => {
+    const user = userEvent.setup();
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    const getEmployerMock = vi.mocked(getEmployer);
+    const reviseEmployerMock = vi.mocked(reviseEmployer);
+    searchEmployersMock.mockReset();
+    getEmployerMock.mockReset();
+    reviseEmployerMock.mockReset();
+
+    const conflictRefreshDetail = createDeferredPromise<Awaited<ReturnType<typeof getEmployer>>>();
+
+    searchEmployersMock.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        items: [
+          {
+            employerId: '98989898-9898-4898-8898-989898989898',
+            employerType: 'business',
+            displayName: 'Conflict Reload Draft',
+            lifecycleStatus: 'draft',
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+    getEmployerMock
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          employerId: '98989898-9898-4898-8898-989898989898',
+          employerType: 'business',
+          displayName: 'Conflict Reload Draft',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 7,
+          updatedAt: '2026-08-11T07:00:00Z',
+        },
+      })
+      .mockReturnValueOnce(conflictRefreshDetail.promise);
+    reviseEmployerMock.mockResolvedValueOnce({ ok: false, failure: { kind: 'conflict' } }).mockResolvedValueOnce({
+      ok: true,
+      value: {
+        detail: {
+          employerId: '98989898-9898-4898-8898-989898989898',
+          employerType: 'household',
+          displayName: 'Conflict Reload Revised',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 9,
+          updatedAt: '2026-08-11T07:10:00Z',
+        },
+        resultVersion: 9,
+        replayed: false,
+      },
+    });
+
+    const randomUuidSpy = vi
+      .spyOn(globalThis.crypto, 'randomUUID')
+      .mockReturnValueOnce('84848484-8484-4484-8484-848484848484')
+      .mockReturnValueOnce('85858585-8585-4585-8585-858585858585');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(screen.getByLabelText('Employer name'), 'Conflict');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await screen.findByRole('heading', { name: 'Search results' });
+    await user.click(screen.getByRole('button', { name: 'Conflict Reload Draft' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.selectOptions(screen.getByLabelText('Revision employer type'), 'household');
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Conflict Reload Revised');
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+
+    const conflictHeading = await screen.findByRole('heading', { name: 'Revision is blocked until current employer detail reloads' });
+    const conflictRegion = conflictHeading.closest('section');
+    expect(conflictRegion).not.toBeNull();
+
+    await user.click(within(conflictRegion as HTMLElement).getByRole('button', { name: 'Reload current employer detail' }));
+
+    const secondConflictReloadCall = getEmployerMock.mock.calls[1];
+    expect(secondConflictReloadCall?.[0]).toBe('98989898-9898-4898-8898-989898989898');
+    expect(secondConflictReloadCall?.[1]?.signal).toBeInstanceOf(AbortSignal);
+    expect(screen.queryByRole('button', { name: 'Edit draft employer' })).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading employer detail.');
+
+    await act(async () => {
+      conflictRefreshDetail.resolve({
+        ok: true,
+        value: {
+          employerId: '98989898-9898-4898-8898-989898989898',
+          employerType: 'business',
+          displayName: 'Conflict Reload Current',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 8,
+          updatedAt: '2026-08-11T07:05:00Z',
+        },
+      });
+      await conflictRefreshDetail.promise;
+    });
+
+    expect(screen.getByRole('button', { name: 'Edit draft employer' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.selectOptions(screen.getByLabelText('Revision employer type'), 'household');
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Conflict Reload Revised');
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+
+    expect(reviseEmployerMock).toHaveBeenNthCalledWith(2, {
+      employerId: '98989898-9898-4898-8898-989898989898',
+      commandId: '85858585-8585-4585-8585-858585858585',
+      expectedVersion: 8,
+      employerType: 'household',
+      displayName: 'Conflict Reload Revised',
+    });
+
+    randomUuidSpy.mockRestore();
+  });
+
+  it('stale revision releases the command key but blocks editing until exact detail refresh', async () => {
+    const user = userEvent.setup();
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    const getEmployerMock = vi.mocked(getEmployer);
+    const reviseEmployerMock = vi.mocked(reviseEmployer);
+    searchEmployersMock.mockReset();
+    getEmployerMock.mockReset();
+    reviseEmployerMock.mockReset();
+
+    const staleRefreshDetail = createDeferredPromise<Awaited<ReturnType<typeof getEmployer>>>();
+
+    searchEmployersMock.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        items: [
+          {
+            employerId: 'a8a8a8a8-a8a8-48a8-88a8-a8a8a8a8a8a8',
+            employerType: 'business',
+            displayName: 'Stale Reload Draft',
+            lifecycleStatus: 'draft',
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+    getEmployerMock
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          employerId: 'a8a8a8a8-a8a8-48a8-88a8-a8a8a8a8a8a8',
+          employerType: 'business',
+          displayName: 'Stale Reload Draft',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 7,
+          updatedAt: '2026-08-11T07:20:00Z',
+        },
+      })
+      .mockReturnValueOnce(staleRefreshDetail.promise)
+      .mockResolvedValue({
+        ok: true,
+        value: {
+          employerId: 'a8a8a8a8-a8a8-48a8-88a8-a8a8a8a8a8a8',
+          employerType: 'household',
+          displayName: 'Stale Reload Revised',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 9,
+          updatedAt: '2026-08-11T07:30:00Z',
+        },
+      });
+    reviseEmployerMock.mockResolvedValueOnce({ ok: false, failure: { kind: 'stale' } }).mockResolvedValueOnce({
+      ok: true,
+      value: {
+        detail: {
+          employerId: 'a8a8a8a8-a8a8-48a8-88a8-a8a8a8a8a8a8',
+          employerType: 'household',
+          displayName: 'Stale Reload Revised Again',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 10,
+          updatedAt: '2026-08-11T07:35:00Z',
+        },
+        resultVersion: 10,
+        replayed: false,
+      },
+    });
+
+    const randomUuidSpy = vi
+      .spyOn(globalThis.crypto, 'randomUUID')
+      .mockReturnValueOnce('86868686-8686-4686-8686-868686868686')
+      .mockReturnValueOnce('87878787-8787-4787-8787-878787878787');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(screen.getByLabelText('Employer name'), 'Stale');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await screen.findByRole('heading', { name: 'Search results' });
+    await user.click(screen.getByRole('button', { name: 'Stale Reload Draft' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.selectOptions(screen.getByLabelText('Revision employer type'), 'household');
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Stale Reload Revised');
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+
+    const staleHeading = await screen.findByRole('heading', {
+      name: 'Revision requires current employer detail before editing can continue',
+    });
+    const staleRegion = staleHeading.closest('section');
+    expect(staleRegion).not.toBeNull();
+
+    await user.click(within(staleRegion as HTMLElement).getByRole('button', { name: 'Reload current employer detail' }));
+
+    const secondStaleReloadCall = getEmployerMock.mock.calls[1];
+    expect(secondStaleReloadCall?.[0]).toBe('a8a8a8a8-a8a8-48a8-88a8-a8a8a8a8a8a8');
+    expect(secondStaleReloadCall?.[1]?.signal).toBeInstanceOf(AbortSignal);
+    expect(screen.queryByRole('button', { name: 'Edit draft employer' })).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading employer detail.');
+
+    await act(async () => {
+      staleRefreshDetail.resolve({
+        ok: true,
+        value: {
+          employerId: 'a8a8a8a8-a8a8-48a8-88a8-a8a8a8a8a8a8',
+          employerType: 'household',
+          displayName: 'Stale Reload Revised',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 9,
+          updatedAt: '2026-08-11T07:30:00Z',
+        },
+      });
+      await staleRefreshDetail.promise;
+    });
+
+    expect(screen.getByRole('button', { name: 'Edit draft employer' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Stale Reload Revised Again');
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+
+    expect(reviseEmployerMock).toHaveBeenNthCalledWith(2, {
+      employerId: 'a8a8a8a8-a8a8-48a8-88a8-a8a8a8a8a8a8',
+      commandId: '87878787-8787-4787-8787-878787878787',
+      expectedVersion: 9,
+      employerType: 'household',
+      displayName: 'Stale Reload Revised Again',
+    });
+
+    randomUuidSpy.mockRestore();
+  });
+
+  it('revision unknown reload failure preserves the original authority', async () => {
+    const user = userEvent.setup();
+    const createEmployerMock = vi.mocked(createEmployer);
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    const getEmployerMock = vi.mocked(getEmployer);
+    const reviseEmployerMock = vi.mocked(reviseEmployer);
+    createEmployerMock.mockReset();
+    searchEmployersMock.mockReset();
+    getEmployerMock.mockReset();
+    reviseEmployerMock.mockReset();
+
+    searchEmployersMock.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        items: [
+          {
+            employerId: 'b9b9b9b9-b9b9-49b9-89b9-b9b9b9b9b9b9',
+            employerType: 'business',
+            displayName: 'Unknown Reload Draft',
+            lifecycleStatus: 'draft',
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+    getEmployerMock
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          employerId: 'b9b9b9b9-b9b9-49b9-89b9-b9b9b9b9b9b9',
+          employerType: 'business',
+          displayName: 'Unknown Reload Draft',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 7,
+          updatedAt: '2026-08-11T07:40:00Z',
+        },
+      })
+      .mockResolvedValueOnce({ ok: false, failure: { kind: 'unavailable' } });
+    reviseEmployerMock
+      .mockResolvedValueOnce({ ok: false, failure: { kind: 'unknown_outcome' } })
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          detail: {
+            employerId: 'b9b9b9b9-b9b9-49b9-89b9-b9b9b9b9b9b9',
+            employerType: 'household',
+            displayName: 'Unknown Reload Revised',
+            lifecycleStatus: 'draft',
+            sourceChannel: 'staff_entry',
+            version: 8,
+            updatedAt: '2026-08-11T07:45:00Z',
+          },
+          resultVersion: 8,
+          replayed: false,
+        },
+      });
+
+    const randomUuidSpy = vi
+      .spyOn(globalThis.crypto, 'randomUUID')
+      .mockReturnValueOnce('89898989-8989-4898-8989-898989898989')
+      .mockReturnValueOnce('90909090-9090-4090-8090-909090909090');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(screen.getByLabelText('Employer name'), 'Unknown');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await screen.findByRole('heading', { name: 'Search results' });
+    await user.click(screen.getByRole('button', { name: 'Unknown Reload Draft' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.selectOptions(screen.getByLabelText('Revision employer type'), 'household');
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Unknown Reload Revised');
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+
+    const unknownHeading = await screen.findByRole('heading', { name: 'Revision outcome is unknown' });
+    const unknownRegion = unknownHeading.closest('section');
+    expect(unknownRegion).not.toBeNull();
+    expect(screen.getByLabelText('Create employer type')).toBeDisabled();
+    expect(screen.getByLabelText('Create employer name')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create draft employer' })).toBeDisabled();
+
+    await user.click(within(unknownRegion as HTMLElement).getByRole('button', { name: 'Reload current employer detail' }));
+
+    const secondUnknownReloadCall = getEmployerMock.mock.calls[1];
+    expect(secondUnknownReloadCall?.[0]).toBe('b9b9b9b9-b9b9-49b9-89b9-b9b9b9b9b9b9');
+    expect(secondUnknownReloadCall?.[1]?.signal).toBeInstanceOf(AbortSignal);
+    const unknownHeadingAfterReload = await screen.findByRole('heading', { name: 'Revision outcome is unknown' });
+    const unknownRegionAfterReload = unknownHeadingAfterReload.closest('section');
+    expect(unknownRegionAfterReload).not.toBeNull();
+    expect(within(unknownRegionAfterReload as HTMLElement).getByRole('button', { name: 'Retry same revision attempt' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit draft employer' })).not.toBeInTheDocument();
+
+    await user.click(within(unknownRegionAfterReload as HTMLElement).getByRole('button', { name: 'Retry same revision attempt' }));
+
+    expect(reviseEmployerMock).toHaveBeenNthCalledWith(2, {
+      employerId: 'b9b9b9b9-b9b9-49b9-89b9-b9b9b9b9b9b9',
+      commandId: '89898989-8989-4898-8989-898989898989',
+      expectedVersion: 7,
+      employerType: 'household',
+      displayName: 'Unknown Reload Revised',
+    });
+
+    randomUuidSpy.mockRestore();
+  });
+
+  it('pagehide invalidates revision search and detail late completions', async () => {
+    const user = userEvent.setup();
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    const getEmployerMock = vi.mocked(getEmployer);
+    const reviseEmployerMock = vi.mocked(reviseEmployer);
+    searchEmployersMock.mockReset();
+    getEmployerMock.mockReset();
+    reviseEmployerMock.mockReset();
+
+    const deferredPagination = createDeferredPromise<Awaited<ReturnType<typeof searchEmployers>>>();
+    const deferredCanonicalReload = createDeferredPromise<Awaited<ReturnType<typeof getEmployer>>>();
+    const paginationSignals: Array<AbortSignal | undefined> = [];
+    const detailSignals: Array<AbortSignal | undefined> = [];
+
+    searchEmployersMock
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          items: [
+            {
+              employerId: 'c1c1c1c1-c1c1-41c1-81c1-c1c1c1c1c1c1',
+              employerType: 'business',
+              displayName: 'Pagehide Revision Draft',
+              lifecycleStatus: 'draft',
+            },
+          ],
+          nextCursor: 'next-page',
+        },
+      })
+      .mockImplementationOnce((_input) => {
+        paginationSignals.push(_input.signal);
+        return deferredPagination.promise;
+      });
+    getEmployerMock
+      .mockImplementationOnce((_employerId, options) => {
+        detailSignals.push(options?.signal);
+        return Promise.resolve({
+          ok: true,
+          value: {
+            employerId: 'c1c1c1c1-c1c1-41c1-81c1-c1c1c1c1c1c1',
+            employerType: 'business',
+            displayName: 'Pagehide Revision Draft',
+            lifecycleStatus: 'draft',
+            sourceChannel: 'staff_entry',
+            version: 7,
+            updatedAt: '2026-08-11T08:00:00Z',
+          },
+        });
+      })
+      .mockImplementationOnce((_employerId, options) => {
+        detailSignals.push(options?.signal);
+        return deferredCanonicalReload.promise;
+      });
+    reviseEmployerMock.mockResolvedValueOnce({ ok: false, failure: { kind: 'conflict' } });
+
+    const randomUuidSpy = vi
+      .spyOn(globalThis.crypto, 'randomUUID')
+      .mockReturnValueOnce('91919191-9191-4919-8919-919191919191');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(screen.getByLabelText('Employer name'), 'Pagehide');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await screen.findByRole('heading', { name: 'Search results' });
+
+    await user.click(screen.getByRole('button', { name: 'Load more employers' }));
+    expect(searchEmployersMock).toHaveBeenNthCalledWith(2, {
+      cursor: 'next-page',
+      displayNameQuery: 'Pagehide',
+      employerType: undefined,
+      signal: paginationSignals[0],
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Pagehide Revision Draft' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.selectOptions(screen.getByLabelText('Revision employer type'), 'household');
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Pagehide Revision Revised');
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+
+    const conflictHeading = await screen.findByRole('heading', {
+      name: 'Revision is blocked until current employer detail reloads',
+    });
+    const conflictRegion = conflictHeading.closest('section');
+    expect(conflictRegion).not.toBeNull();
+
+    await user.click(within(conflictRegion as HTMLElement).getByRole('button', { name: 'Reload current employer detail' }));
+    expect(getEmployerMock).toHaveBeenNthCalledWith(2, 'c1c1c1c1-c1c1-41c1-81c1-c1c1c1c1c1c1', {
+      signal: detailSignals[1],
+    });
+
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+
+    expect(paginationSignals[0]?.aborted).toBe(true);
+    expect(detailSignals[1]?.aborted).toBe(true);
+    expect(screen.queryByRole('heading', { name: 'Search results' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Employer detail' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Revision is blocked until current employer detail reloads' })).not.toBeInTheDocument();
+
+    await act(async () => {
+      deferredPagination.resolve({
+        ok: true,
+        value: {
+          items: [
+            {
+              employerId: 'd2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2',
+              employerType: 'household',
+              displayName: 'Late Pagehide Pagination Result',
+              lifecycleStatus: 'draft',
+            },
+          ],
+          nextCursor: null,
+        },
+      });
+      deferredCanonicalReload.resolve({
+        ok: true,
+        value: {
+          employerId: 'c1c1c1c1-c1c1-41c1-81c1-c1c1c1c1c1c1',
+          employerType: 'household',
+          displayName: 'Late Pagehide Reloaded Detail',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 8,
+          updatedAt: '2026-08-11T08:05:00Z',
+        },
+      });
+      await deferredPagination.promise;
+      await deferredCanonicalReload.promise;
+    });
+
+    expect(screen.queryByText('Late Pagehide Pagination Result')).not.toBeInTheDocument();
+    expect(screen.queryByText('Late Pagehide Reloaded Detail')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit draft employer' })).not.toBeInTheDocument();
+
+    randomUuidSpy.mockRestore();
+  });
+
+  it('pagehide generation invalidation wins over an already queued mutation completion microtask', async () => {
+    const user = userEvent.setup();
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    const getEmployerMock = vi.mocked(getEmployer);
+    const reviseEmployerMock = vi.mocked(reviseEmployer);
+    searchEmployersMock.mockReset();
+    getEmployerMock.mockReset();
+    reviseEmployerMock.mockReset();
+
+    const pendingRevision = createDeferredPromise<Awaited<ReturnType<typeof reviseEmployer>>>();
+
+    searchEmployersMock.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        items: [
+          {
+            employerId: 'e3e3e3e3-e3e3-43e3-83e3-e3e3e3e3e3e3',
+            employerType: 'business',
+            displayName: 'Queued Pagehide Draft',
+            lifecycleStatus: 'draft',
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+    getEmployerMock.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        employerId: 'e3e3e3e3-e3e3-43e3-83e3-e3e3e3e3e3e3',
+        employerType: 'business',
+        displayName: 'Queued Pagehide Draft',
+        lifecycleStatus: 'draft',
+        sourceChannel: 'staff_entry',
+        version: 7,
+        updatedAt: '2026-08-11T08:20:00Z',
+      },
+    });
+    reviseEmployerMock.mockReturnValueOnce(pendingRevision.promise);
+
+    const randomUuidSpy = vi
+      .spyOn(globalThis.crypto, 'randomUUID')
+      .mockReturnValueOnce('a1a1a1a1-a1a1-41a1-81a1-a1a1a1a1a1a1');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(screen.getByLabelText('Employer name'), 'Queued');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await screen.findByRole('heading', { name: 'Search results' });
+    await user.click(screen.getByRole('button', { name: 'Queued Pagehide Draft' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.selectOptions(screen.getByLabelText('Revision employer type'), 'household');
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Queued Pagehide Revised');
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+
+    expect(reviseEmployerMock).toHaveBeenCalledTimes(1);
+
+    pendingRevision.resolve({
+      ok: true,
+      value: {
+        detail: {
+          employerId: 'e3e3e3e3-e3e3-43e3-83e3-e3e3e3e3e3e3',
+          employerType: 'household',
+          displayName: 'Queued Pagehide Revised',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 8,
+          updatedAt: '2026-08-11T08:25:00Z',
+        },
+        resultVersion: 8,
+        replayed: false,
+      },
+    });
+
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+
+    await act(async () => {
+      await pendingRevision.promise;
+    });
+
+    expect(getEmployerMock).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('heading', { name: 'Draft employer revision saved' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Revision outcome is unknown' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Employer detail' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit draft employer' })).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Queued Pagehide Revised')).not.toBeInTheDocument();
+
+    randomUuidSpy.mockRestore();
+  });
+
+  it('revision success heading retains final focus after refreshed detail renders', async () => {
+    const user = userEvent.setup();
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    const getEmployerMock = vi.mocked(getEmployer);
+    const reviseEmployerMock = vi.mocked(reviseEmployer);
+    searchEmployersMock.mockReset();
+    getEmployerMock.mockReset();
+    reviseEmployerMock.mockReset();
+
+    const refreshDetail = createDeferredPromise<Awaited<ReturnType<typeof getEmployer>>>();
+    const pendingRevision = createDeferredPromise<Awaited<ReturnType<typeof reviseEmployer>>>();
+
+    searchEmployersMock.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        items: [
+          {
+            employerId: 'f4f4f4f4-f4f4-44f4-84f4-f4f4f4f4f4f4',
+            employerType: 'business',
+            displayName: 'Focus Owner Draft',
+            lifecycleStatus: 'draft',
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+    getEmployerMock
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          employerId: 'f4f4f4f4-f4f4-44f4-84f4-f4f4f4f4f4f4',
+          employerType: 'business',
+          displayName: 'Focus Owner Draft',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 7,
+          updatedAt: '2026-08-11T08:30:00Z',
+        },
+      })
+      .mockReturnValueOnce(refreshDetail.promise);
+    reviseEmployerMock.mockReturnValueOnce(pendingRevision.promise);
+
+    const randomUuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('b2b2b2b2-b2b2-42b2-82b2-b2b2b2b2b2b2');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(screen.getByLabelText('Employer name'), 'Focus');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await user.click(screen.getByRole('button', { name: 'Focus Owner Draft' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Focus Owner Draft Revised');
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+
+    await act(async () => {
+      pendingRevision.resolve({
+        ok: true,
+        value: {
+          detail: {
+            employerId: 'f4f4f4f4-f4f4-44f4-84f4-f4f4f4f4f4f4',
+            employerType: 'business',
+            displayName: 'Focus Owner Draft Revised',
+            lifecycleStatus: 'draft',
+            sourceChannel: 'staff_entry',
+            version: 8,
+            updatedAt: '2026-08-11T08:35:00Z',
+          },
+          resultVersion: 8,
+          replayed: false,
+        },
+      });
+      await pendingRevision.promise;
+    });
+
+    expect(screen.getByRole('status')).toHaveTextContent('Loading employer detail.');
+
+    await act(async () => {
+      refreshDetail.resolve({
+        ok: true,
+        value: {
+          employerId: 'f4f4f4f4-f4f4-44f4-84f4-f4f4f4f4f4f4',
+          employerType: 'business',
+          displayName: 'Focus Owner Draft Revised',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 8,
+          updatedAt: '2026-08-11T08:35:00Z',
+        },
+      });
+      await refreshDetail.promise;
+    });
+
+    const successHeading = await screen.findByRole('heading', { name: 'Draft employer revision saved' });
+    expect(successHeading).toHaveFocus();
+    expect(screen.getByText('The current draft employer detail now reflects the saved revision.')).toBeInTheDocument();
+
+    const detailRegion = screen.getByRole('region', { name: 'Employer detail' });
+    expect(within(detailRegion).getByText('Focus Owner Draft Revised')).toBeInTheDocument();
+    expect(within(detailRegion).getByRole('heading', { name: 'Employer detail' })).not.toHaveFocus();
+
+    randomUuidSpy.mockRestore();
+  });
+
+  it('persisted pageshow still uses canonical document reload', () => {
+    const canonicalReloadSpy = vi.fn();
+
+    render(
+      <LanguageProvider>
+        <EmployerWorkspace onPersistedRestore={canonicalReloadSpy} />
+      </LanguageProvider>,
+    );
+
+    const nonPersistedPageShowEvent = new Event('pageshow');
+    Object.defineProperty(nonPersistedPageShowEvent, 'persisted', { configurable: true, value: false });
+
+    const persistedPageShowEvent = new Event('pageshow');
+    Object.defineProperty(persistedPageShowEvent, 'persisted', { configurable: true, value: true });
+
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+      window.dispatchEvent(nonPersistedPageShowEvent);
+      window.dispatchEvent(persistedPageShowEvent);
+    });
+
+    expect(canonicalReloadSpy).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('region', { name: 'Employers workspace' })).toBeInTheDocument();
+    expect(screen.getByRole('form', { name: 'Create a draft employer' })).toBeInTheDocument();
+    expect(screen.getByRole('form', { name: 'Employer search' })).toBeInTheDocument();
   });
 
   it('invalidates pending detail on selection filter search and unmount', async () => {
@@ -1245,6 +3400,8 @@ describe('EmployerWorkspace', () => {
           displayName: 'Late First Detail',
           lifecycleStatus: 'draft',
           sourceChannel: 'staff_entry',
+          version: 1,
+          updatedAt: '2026-08-11T04:30:00Z',
         },
       });
       await firstDetail.promise;
@@ -1267,6 +3424,8 @@ describe('EmployerWorkspace', () => {
           displayName: 'Late Second Detail',
           lifecycleStatus: 'draft',
           sourceChannel: 'staff_entry',
+          version: 1,
+          updatedAt: '2026-08-11T04:31:00Z',
         },
       });
       await secondDetail.promise;
@@ -1292,6 +3451,8 @@ describe('EmployerWorkspace', () => {
           displayName: 'Late Third Detail',
           lifecycleStatus: 'draft',
           sourceChannel: 'staff_entry',
+          version: 1,
+          updatedAt: '2026-08-11T04:32:00Z',
         },
       });
       await thirdDetail.promise;
@@ -1314,6 +3475,8 @@ describe('EmployerWorkspace', () => {
           displayName: 'Late Fourth Detail',
           lifecycleStatus: 'draft',
           sourceChannel: 'staff_entry',
+          version: 1,
+          updatedAt: '2026-08-11T04:33:00Z',
         },
       });
       await fourthDetail.promise;
@@ -1351,6 +3514,8 @@ describe('EmployerWorkspace', () => {
           displayName: 'Previously Visible Detail',
           lifecycleStatus: 'draft',
           sourceChannel: 'staff_entry',
+          version: 1,
+          updatedAt: '2026-08-11T04:34:00Z',
         },
       })
       .mockResolvedValueOnce({ ok: false, failure: { kind: 'validation' } })
@@ -1452,6 +3617,8 @@ describe('EmployerWorkspace', () => {
         displayName: 'Privacy Detail Rendering',
         lifecycleStatus: 'draft',
         sourceChannel: 'staff_entry',
+        version: 1,
+        updatedAt: '2026-08-11T04:05:00Z',
       },
     });
 
@@ -1548,7 +3715,7 @@ describe('EmployerWorkspace', () => {
     const submitButton = screen.getByRole('button', { name: 'Create draft employer' });
 
     await user.selectOptions(typeSelect, 'business');
-    await user.type(nameInput, 'Á'.repeat(200));
+    fireEvent.change(nameInput, { target: { value: 'Á'.repeat(200) } });
     await user.click(submitButton);
 
     expect(createEmployerMock).toHaveBeenCalledTimes(1);
@@ -1560,7 +3727,7 @@ describe('EmployerWorkspace', () => {
     );
 
     await user.clear(nameInput);
-    await user.type(nameInput, 'A'.repeat(201));
+    fireEvent.change(nameInput, { target: { value: 'A'.repeat(201) } });
     await user.click(submitButton);
     expect(screen.getByRole('alert')).toHaveTextContent('Enter 1 to 200 visible characters for the employer name.');
     expect(nameInput).toHaveFocus();
@@ -1616,7 +3783,7 @@ describe('EmployerWorkspace', () => {
     const submitButton = screen.getByRole('button', { name: 'Create draft employer' });
 
     await user.selectOptions(typeSelect, 'business');
-    await user.type(nameInput, 'Immutable Pending Rose');
+    fireEvent.change(nameInput, { target: { value: 'Immutable Pending Rose' } });
     await user.click(submitButton);
 
     expect(createEmployerMock).toHaveBeenCalledTimes(1);
@@ -1720,7 +3887,7 @@ describe('EmployerWorkspace', () => {
     const submitButton = screen.getByRole('button', { name: 'Create draft employer' });
 
     await user.selectOptions(typeSelect, 'business');
-    await user.type(nameInput, 'Unknown Outcome Rose');
+    fireEvent.change(nameInput, { target: { value: 'Unknown Outcome Rose' } });
     await user.click(submitButton);
 
     const warningHeading = await screen.findByRole('heading', { name: 'Create outcome is unknown' });
@@ -2407,6 +4574,151 @@ describe('EmployerWorkspace', () => {
     randomUuidSpy.mockRestore();
   });
 
+  it('revision flow never accesses Cache API or service workers and never exposes values in browser or diagnostic channels', async () => {
+    const user = userEvent.setup();
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    const getEmployerMock = vi.mocked(getEmployer);
+    const reviseEmployerMock = vi.mocked(reviseEmployer);
+    searchEmployersMock.mockReset();
+    getEmployerMock.mockReset();
+    reviseEmployerMock.mockReset();
+
+    searchEmployersMock.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        items: [
+          {
+            employerId: 'd5d5d5d5-d5d5-45d5-85d5-d5d5d5d5d5d5',
+            employerType: 'business',
+            displayName: 'Revision Privacy Draft',
+            lifecycleStatus: 'draft',
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+    getEmployerMock.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        employerId: 'd5d5d5d5-d5d5-45d5-85d5-d5d5d5d5d5d5',
+        employerType: 'business',
+        displayName: 'Revision Privacy Draft',
+        lifecycleStatus: 'draft',
+        sourceChannel: 'staff_entry',
+        version: 7,
+        updatedAt: '2026-08-11T09:10:00Z',
+      },
+    });
+    reviseEmployerMock.mockResolvedValueOnce({ ok: false, failure: { kind: 'unknown_outcome' } });
+
+    const randomUuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+    const localStorageSetItem = vi.spyOn(Storage.prototype, 'setItem');
+    const localStorageGetItem = vi.spyOn(Storage.prototype, 'getItem');
+    const sessionStorageSetItem = vi.spyOn(Storage.prototype, 'setItem');
+    const sessionStorageGetItem = vi.spyOn(Storage.prototype, 'getItem');
+    const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const consoleInfo = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const cacheOpenSpy = vi.fn();
+    const cachesGetterSpy = vi.fn(() => ({ open: cacheOpenSpy }));
+    const originalCachesDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'caches');
+    Object.defineProperty(globalThis, 'caches', {
+      configurable: true,
+      get: cachesGetterSpy,
+    });
+    const serviceWorkerRegister = vi.fn();
+    const originalServiceWorkerDescriptor = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker');
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: { register: serviceWorkerRegister },
+    });
+
+    window.history.replaceState({}, '', '/employers');
+
+    render(
+      <LanguageProvider>
+        <App />
+      </LanguageProvider>,
+    );
+
+    replaceStateSpy.mockClear();
+    pushStateSpy.mockClear();
+
+    await user.type(screen.getByLabelText('Employer name'), 'Revision');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await user.click(screen.getByRole('button', { name: 'Revision Privacy Draft' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.selectOptions(screen.getByLabelText('Revision employer type'), 'household');
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'SYNTHETIC_REVISION_BODY_SECRET');
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+
+    await screen.findByRole('heading', { name: 'Revision outcome is unknown' });
+
+    expect(document.body.textContent).not.toContain('SYNTHETIC_REVISION_BODY_SECRET');
+    expect(document.body.textContent).not.toContain('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
+    expect(document.body.textContent).not.toContain('version: 7');
+    expect(screen.queryByDisplayValue('SYNTHETIC_REVISION_BODY_SECRET')).not.toBeInTheDocument();
+
+    expect(window.location.pathname).toBe('/employers');
+    expect(window.location.search).toBe('');
+    expect(window.location.hash).toBe('');
+    expect(replaceStateSpy).not.toHaveBeenCalled();
+    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(localStorageSetItem).not.toHaveBeenCalled();
+    expect(localStorageGetItem).not.toHaveBeenCalled();
+    expect(sessionStorageSetItem).not.toHaveBeenCalled();
+    expect(sessionStorageGetItem).not.toHaveBeenCalled();
+    expect(consoleLog).not.toHaveBeenCalled();
+    expect(consoleInfo).not.toHaveBeenCalled();
+    expect(consoleWarn).not.toHaveBeenCalled();
+    expect(consoleError).not.toHaveBeenCalled();
+    expect(cachesGetterSpy).not.toHaveBeenCalled();
+    expect(cacheOpenSpy).not.toHaveBeenCalled();
+    expect(serviceWorkerRegister).not.toHaveBeenCalled();
+
+    const dataAttributeValues = Array.from(document.querySelectorAll<HTMLElement>('*')).flatMap((element) =>
+      element.getAttributeNames()
+        .filter((attributeName) => attributeName.startsWith('data-'))
+        .map((attributeName) => element.getAttribute(attributeName) ?? ''),
+    );
+
+    expect(dataAttributeValues.join(' ')).not.toContain('SYNTHETIC_REVISION_BODY_SECRET');
+    expect(dataAttributeValues.join(' ')).not.toContain('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
+    expect(dataAttributeValues.join(' ')).not.toContain('7');
+
+    render(<div>SYNTHETIC_REVISION_DIAGNOSTIC SECRET_EXPECTED_VERSION_7</div>);
+
+    let redactedDiagnostic = '';
+
+    try {
+      screen.getByRole('heading', { name: 'Missing revision diagnostic target' });
+    } catch (error) {
+      redactedDiagnostic = error instanceof Error ? error.message : String(error);
+    }
+
+    expect(redactedDiagnostic).toContain(VALUE_SAFE_TESTING_LIBRARY_MESSAGE);
+    expect(redactedDiagnostic).not.toContain('SYNTHETIC_REVISION_DIAGNOSTIC');
+    expect(redactedDiagnostic).not.toContain('SECRET_EXPECTED_VERSION_7');
+    expect(redactedDiagnostic).not.toContain('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
+
+    randomUuidSpy.mockRestore();
+    if (originalCachesDescriptor === undefined) {
+      Reflect.deleteProperty(globalThis, 'caches');
+    } else {
+      Object.defineProperty(globalThis, 'caches', originalCachesDescriptor);
+    }
+    if (originalServiceWorkerDescriptor === undefined) {
+      Reflect.deleteProperty(navigator, 'serviceWorker');
+    } else {
+      Object.defineProperty(navigator, 'serviceWorker', originalServiceWorkerDescriptor);
+    }
+  });
+
   it('keeps created detail authoritative over stale reads', async () => {
     const user = userEvent.setup();
     const stalePage = createDeferredPromise<Awaited<ReturnType<typeof searchEmployers>>>();
@@ -2700,6 +5012,8 @@ describe('EmployerWorkspace', () => {
           displayName: 'Status Rose',
           lifecycleStatus: 'draft',
           sourceChannel: 'staff_entry',
+          version: 1,
+          updatedAt: '2026-08-11T04:35:00Z',
         },
       });
       await deferredDetail.promise;

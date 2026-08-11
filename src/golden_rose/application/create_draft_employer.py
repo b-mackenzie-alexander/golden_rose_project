@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from golden_rose.application.employer_text import normalize_employer_text
+from golden_rose.application.employer_text import validate_employer_display_name
 from golden_rose.application.errors import SafePersistenceError
 from golden_rose.auth.permissions import can_create_draft_employer
 from golden_rose.auth.principal import StaffPrincipal
@@ -29,6 +29,7 @@ from golden_rose.persistence.employers import (
 class CreateDraftEmployerResult:
     employer: EmployerRecord
     replayed: bool
+    result_record_version: int
 
 
 class IdempotencyConflictError(RuntimeError):
@@ -49,7 +50,7 @@ def create_draft_employer(
         msg = "principal lacks employer:draft:create"
         raise PermissionError(msg)
 
-    normalized_display_name = normalize_employer_text(display_name)
+    normalized_display_name = validate_employer_display_name(display_name)
     now = clock.now()
     employer_id = identifiers.new_uuid4()
     audit_event_id = identifiers.new_uuid4()
@@ -77,11 +78,19 @@ def create_draft_employer(
                 or existing_receipt.request_fingerprint != request_fingerprint
             ):
                 raise IdempotencyConflictError("idempotency conflict")
+            if existing_receipt.result_record_version != 1:
+                raise SafePersistenceError("persistence operation failed")
             employer = get_authoritative_employer_by_id(
                 session=session, employer_id=existing_receipt.result_entity_id
             )
+            if employer.version < existing_receipt.result_record_version:
+                raise SafePersistenceError("persistence operation failed")
             session.rollback()
-            return CreateDraftEmployerResult(employer=employer, replayed=True)
+            return CreateDraftEmployerResult(
+                employer=employer,
+                replayed=True,
+                result_record_version=existing_receipt.result_record_version,
+            )
         employer = insert_draft_employer(
             session=session,
             employer_id=employer_id,
@@ -108,7 +117,7 @@ def create_draft_employer(
         session.rollback()
         raise
 
-    return CreateDraftEmployerResult(employer=employer, replayed=False)
+    return CreateDraftEmployerResult(employer=employer, replayed=False, result_record_version=1)
 
 
 def _build_request_fingerprint(

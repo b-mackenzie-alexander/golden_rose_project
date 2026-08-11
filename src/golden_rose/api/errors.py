@@ -82,6 +82,17 @@ def install_exception_handlers(app: FastAPI) -> None:
     async def handle_request_validation_error(
         request: Request, exc: RequestValidationError
     ) -> JSONResponse:
+        if any(
+            tuple(error.get("loc", ())) == ("header", "Idempotency-Key")
+            and error.get("type") == "missing"
+            for error in exc.errors()
+        ):
+            return no_store_problem_response(
+                status_code=400,
+                title="Bad Request",
+                detail="invalid idempotency key",
+                type_="https://golden-rose.local/problems/invalid-idempotency-key",
+            )
         return no_store_problem_response(
             status_code=422,
             title="Unprocessable Entity",

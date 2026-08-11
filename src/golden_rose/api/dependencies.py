@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from golden_rose.api.errors import InvalidIdempotencyKeyError
 from golden_rose.auth.permissions import (
     CREATE_DRAFT_EMPLOYER_PERMISSION,
+    EMPLOYER_DRAFT_REVISE_PERMISSION,
     EMPLOYER_READ_PERMISSION,
 )
 from golden_rose.auth.principal import StaffPrincipal
@@ -42,7 +43,13 @@ def get_staff_principal(settings: Annotated[Settings, Depends(get_settings)]) ->
     return StaffPrincipal(
         actor_id=settings.synthetic_staff_id,
         role_name="synthetic_staff",
-        permissions=frozenset({CREATE_DRAFT_EMPLOYER_PERMISSION, EMPLOYER_READ_PERMISSION}),
+        permissions=frozenset(
+            {
+                CREATE_DRAFT_EMPLOYER_PERMISSION,
+                EMPLOYER_READ_PERMISSION,
+                EMPLOYER_DRAFT_REVISE_PERMISSION,
+            }
+        ),
     )
 
 
@@ -55,11 +62,8 @@ def get_identifier_factory() -> Uuid4IdentifierFactory:
 
 
 def get_idempotency_key(
-    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    idempotency_key: str = Header(alias="Idempotency-Key"),
 ) -> UUID:
-    if idempotency_key is None:
-        raise InvalidIdempotencyKeyError
-
     try:
         parsed = UUID(idempotency_key)
     except ValueError as exc:

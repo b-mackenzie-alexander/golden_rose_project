@@ -7,18 +7,19 @@ type EmployerDetailProps = {
   detail: EmployerDetailRecord | null;
   failureKind: 'validation' | 'not_found' | 'forbidden' | 'conflict' | 'unavailable' | 'unexpected' | null;
   isLoading: boolean;
+  autoFocus?: boolean;
 };
 
-export function EmployerDetail({ detail, failureKind, isLoading }: EmployerDetailProps) {
+export function EmployerDetail({ detail, failureKind, isLoading, autoFocus = true }: EmployerDetailProps) {
   const { messages } = useLanguage();
   const detailHeadingRef = useRef<HTMLHeadingElement>(null);
   const detailFailureHeadingRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
-    if (detail !== null && !isLoading) {
+    if (autoFocus && detail !== null && !isLoading) {
       detailHeadingRef.current?.focus();
     }
-  }, [detail, isLoading]);
+  }, [autoFocus, detail, isLoading]);
 
   useEffect(() => {
     if (failureKind !== null && !isLoading) {

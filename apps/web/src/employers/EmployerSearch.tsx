@@ -280,7 +280,7 @@ export function EmployerSearch({
     invalidatePendingSearch({ preserveSubmittedSearch: false });
   }, [invalidatePendingSearch, resetSignal]);
 
-  async function runDetailRequest(employerId: string, options?: DetailRequestOptions) {
+  const runDetailRequest = useCallback(async (employerId: string, options?: DetailRequestOptions) => {
     const controller = new AbortController();
     const requestVersion = detailRequestVersionRef.current + 1;
 
@@ -321,7 +321,7 @@ export function EmployerSearch({
             onRefreshRequestSettled?.({ token: options.refreshToken, outcome: 'not_found' });
           }
         } else {
-          if (options?.refreshReason === 'confirmed_save') {
+          if (options.refreshReason === 'confirmed_save') {
             setRefreshFailure(true);
           }
           if (options.refreshToken !== undefined) {
@@ -355,7 +355,7 @@ export function EmployerSearch({
         setIsDetailLoading(false);
       }
     }
-  }
+  }, [onRefreshRequestSettled, onSelectedDetailChange]);
 
   useEffect(() => {
     if (refreshRequest === null || handledRefreshTokenRef.current === refreshRequest.token) {
@@ -373,7 +373,7 @@ export function EmployerSearch({
       refreshReason: refreshRequest.reason,
       refreshToken: refreshRequest.token,
     });
-  }, [invalidatePendingSearch, onRefreshRequestSettled, refreshRequest]);
+  }, [invalidatePendingSearch, refreshRequest, runDetailRequest]);
 
   function handleNameChange(event: ChangeEvent<HTMLInputElement>) {
     if (blockedByWorkspace) {

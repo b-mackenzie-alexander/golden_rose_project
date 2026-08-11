@@ -1937,9 +1937,9 @@ describe('EmployerWorkspace', () => {
     expect(screen.queryByRole('button', { name: 'Edit draft employer' })).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Loading employer detail.');
     expect(getEmployerMock).toHaveBeenCalledTimes(2);
-    expect(getEmployerMock).toHaveBeenNthCalledWith(2, '90909090-9090-4090-8090-909090909090', {
-      signal: expect.any(AbortSignal),
-    });
+    const secondGetEmployerCall = getEmployerMock.mock.calls[1];
+    expect(secondGetEmployerCall?.[0]).toBe('90909090-9090-4090-8090-909090909090');
+    expect(secondGetEmployerCall?.[1]?.signal).toBeInstanceOf(AbortSignal);
 
     await act(async () => {
       refreshDetail.resolve({
@@ -2606,9 +2606,9 @@ describe('EmployerWorkspace', () => {
 
     await user.click(within(conflictRegion as HTMLElement).getByRole('button', { name: 'Reload current employer detail' }));
 
-    expect(getEmployerMock).toHaveBeenNthCalledWith(2, '98989898-9898-4898-8898-989898989898', {
-      signal: expect.any(AbortSignal),
-    });
+    const secondConflictReloadCall = getEmployerMock.mock.calls[1];
+    expect(secondConflictReloadCall?.[0]).toBe('98989898-9898-4898-8898-989898989898');
+    expect(secondConflictReloadCall?.[1]?.signal).toBeInstanceOf(AbortSignal);
     expect(screen.queryByRole('button', { name: 'Edit draft employer' })).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Loading employer detail.');
 
@@ -2748,9 +2748,9 @@ describe('EmployerWorkspace', () => {
 
     await user.click(within(staleRegion as HTMLElement).getByRole('button', { name: 'Reload current employer detail' }));
 
-    expect(getEmployerMock).toHaveBeenNthCalledWith(2, 'a8a8a8a8-a8a8-48a8-88a8-a8a8a8a8a8a8', {
-      signal: expect.any(AbortSignal),
-    });
+    const secondStaleReloadCall = getEmployerMock.mock.calls[1];
+    expect(secondStaleReloadCall?.[0]).toBe('a8a8a8a8-a8a8-48a8-88a8-a8a8a8a8a8a8');
+    expect(secondStaleReloadCall?.[1]?.signal).toBeInstanceOf(AbortSignal);
     expect(screen.queryByRole('button', { name: 'Edit draft employer' })).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Loading employer detail.');
 
@@ -2880,9 +2880,9 @@ describe('EmployerWorkspace', () => {
 
     await user.click(within(unknownRegion as HTMLElement).getByRole('button', { name: 'Reload current employer detail' }));
 
-    expect(getEmployerMock).toHaveBeenNthCalledWith(2, 'b9b9b9b9-b9b9-49b9-89b9-b9b9b9b9b9b9', {
-      signal: expect.any(AbortSignal),
-    });
+    const secondUnknownReloadCall = getEmployerMock.mock.calls[1];
+    expect(secondUnknownReloadCall?.[0]).toBe('b9b9b9b9-b9b9-49b9-89b9-b9b9b9b9b9b9');
+    expect(secondUnknownReloadCall?.[1]?.signal).toBeInstanceOf(AbortSignal);
     const unknownHeadingAfterReload = await screen.findByRole('heading', { name: 'Revision outcome is unknown' });
     const unknownRegionAfterReload = unknownHeadingAfterReload.closest('section');
     expect(unknownRegionAfterReload).not.toBeNull();
@@ -2931,14 +2931,14 @@ describe('EmployerWorkspace', () => {
           nextCursor: 'next-page',
         },
       })
-      .mockImplementationOnce(async (_input) => {
+      .mockImplementationOnce((_input) => {
         paginationSignals.push(_input.signal);
         return deferredPagination.promise;
       });
     getEmployerMock
-      .mockImplementationOnce(async (_employerId, options) => {
+      .mockImplementationOnce((_employerId, options) => {
         detailSignals.push(options?.signal);
-        return {
+        return Promise.resolve({
           ok: true,
           value: {
             employerId: 'c1c1c1c1-c1c1-41c1-81c1-c1c1c1c1c1c1',
@@ -2949,9 +2949,9 @@ describe('EmployerWorkspace', () => {
             version: 7,
             updatedAt: '2026-08-11T08:00:00Z',
           },
-        };
+        });
       })
-      .mockImplementationOnce(async (_employerId, options) => {
+      .mockImplementationOnce((_employerId, options) => {
         detailSignals.push(options?.signal);
         return deferredCanonicalReload.promise;
       });
@@ -3715,7 +3715,7 @@ describe('EmployerWorkspace', () => {
     const submitButton = screen.getByRole('button', { name: 'Create draft employer' });
 
     await user.selectOptions(typeSelect, 'business');
-    await user.type(nameInput, 'Á'.repeat(200));
+    fireEvent.change(nameInput, { target: { value: 'Á'.repeat(200) } });
     await user.click(submitButton);
 
     expect(createEmployerMock).toHaveBeenCalledTimes(1);
@@ -3727,7 +3727,7 @@ describe('EmployerWorkspace', () => {
     );
 
     await user.clear(nameInput);
-    await user.type(nameInput, 'A'.repeat(201));
+    fireEvent.change(nameInput, { target: { value: 'A'.repeat(201) } });
     await user.click(submitButton);
     expect(screen.getByRole('alert')).toHaveTextContent('Enter 1 to 200 visible characters for the employer name.');
     expect(nameInput).toHaveFocus();
@@ -3783,7 +3783,7 @@ describe('EmployerWorkspace', () => {
     const submitButton = screen.getByRole('button', { name: 'Create draft employer' });
 
     await user.selectOptions(typeSelect, 'business');
-    await user.type(nameInput, 'Immutable Pending Rose');
+    fireEvent.change(nameInput, { target: { value: 'Immutable Pending Rose' } });
     await user.click(submitButton);
 
     expect(createEmployerMock).toHaveBeenCalledTimes(1);
@@ -3887,7 +3887,7 @@ describe('EmployerWorkspace', () => {
     const submitButton = screen.getByRole('button', { name: 'Create draft employer' });
 
     await user.selectOptions(typeSelect, 'business');
-    await user.type(nameInput, 'Unknown Outcome Rose');
+    fireEvent.change(nameInput, { target: { value: 'Unknown Outcome Rose' } });
     await user.click(submitButton);
 
     const warningHeading = await screen.findByRole('heading', { name: 'Create outcome is unknown' });

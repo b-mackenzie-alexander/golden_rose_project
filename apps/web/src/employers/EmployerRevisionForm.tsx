@@ -21,10 +21,12 @@ function createCommandId() {
   return globalThis.crypto.randomUUID();
 }
 
+type CanonicalReloadOutcome = 'success' | 'not_found';
+
 type EmployerRevisionFormProps = {
   detail: RevisionEmployerDetail | null;
   onAuthorityChange?: (state: { owner: 'revision' | null; locked: boolean }) => void;
-  onCanonicalReload?: () => void | 'success' | 'not_found' | Promise<void | 'success' | 'not_found'>;
+  onCanonicalReload?: () => CanonicalReloadOutcome | undefined | Promise<CanonicalReloadOutcome | undefined>;
   onRevisionSuccess?: (result: ReviseEmployerResult) => void;
   onReset?: () => void;
   resetSignal?: number;
@@ -62,8 +64,12 @@ export function EmployerRevisionForm(props: EmployerRevisionFormProps) {
   const [staleRecoveryRequired, setStaleRecoveryRequired] = useState(false);
   const [isRecoveryPending, setIsRecoveryPending] = useState(false);
   const [successResult, setSuccessResult] = useState<ReviseEmployerResult | null>(null);
-  const authorityLocked = isPending || isRecoveryPending || unknownAttempt !== null || conflictAttempt !== null || staleRecoveryRequired;
+  const onAuthorityChange = props.onAuthorityChange;
+  const onCanonicalReload = props.onCanonicalReload;
+  const onRevisionSuccess = props.onRevisionSuccess;
+  const onReset = props.onReset;
   const workspaceCommandOwner = props.workspaceCommandOwner ?? null;
+  const authorityLocked = isPending || isRecoveryPending || unknownAttempt !== null || conflictAttempt !== null || staleRecoveryRequired;
   const blockedByWorkspace = workspaceCommandOwner !== null && workspaceCommandOwner !== 'revision';
 
   useEffect(() => {
@@ -84,8 +90,8 @@ export function EmployerRevisionForm(props: EmployerRevisionFormProps) {
     }
 
     lastAuthorityLockedRef.current = authorityLocked;
-    props.onAuthorityChange?.({ owner: authorityLocked ? 'revision' : null, locked: authorityLocked });
-  }, [authorityLocked, props.onAuthorityChange]);
+    onAuthorityChange?.({ owner: authorityLocked ? 'revision' : null, locked: authorityLocked });
+  }, [authorityLocked, onAuthorityChange]);
 
   useEffect(() => {
     if (!isPending && unknownAttempt === null) {
@@ -168,11 +174,11 @@ export function EmployerRevisionForm(props: EmployerRevisionFormProps) {
     setStaleRecoveryRequired(false);
     setIsRecoveryPending(false);
     setSuccessResult(null);
-    props.onReset?.();
-  }, [props, props.resetSignal]);
+    onReset?.();
+  }, [onReset, props.resetSignal]);
 
   const detail = props.detail;
-  const detailIdentity = detail === null ? null : `${detail.employerId}:${detail.version}`;
+  const detailIdentity = detail === null ? null : `${detail.employerId}:${String(detail.version)}`;
 
   useEffect(() => {
     if (detailIdentity === null) {
@@ -258,8 +264,8 @@ export function EmployerRevisionForm(props: EmployerRevisionFormProps) {
         setStaleRecoveryRequired(false);
         setRefreshFailure(false);
         setIsEditing(false);
-        if (props.onRevisionSuccess) {
-          props.onRevisionSuccess(result.value);
+        if (onRevisionSuccess) {
+          onRevisionSuccess(result.value);
         } else {
           setSuccessResult(result.value);
         }
@@ -312,7 +318,7 @@ export function EmployerRevisionForm(props: EmployerRevisionFormProps) {
     setRefreshFailure(false);
 
     try {
-      await props.onCanonicalReload?.();
+      await onCanonicalReload?.();
       setConflictAttempt(null);
       setIsEditing(false);
     } catch {
@@ -332,11 +338,11 @@ export function EmployerRevisionForm(props: EmployerRevisionFormProps) {
     setRefreshFailure(false);
 
     try {
-      const reloadResult = await props.onCanonicalReload?.();
+      const reloadResult = await onCanonicalReload?.();
       if (reloadResult === 'success' || reloadResult === undefined) {
         setStaleRecoveryRequired(false);
         setIsEditing(false);
-      } else if (reloadResult === 'not_found') {
+      } else {
         setStaleRecoveryRequired(false);
         setTerminalNotFound(true);
         setEmployerType('');
@@ -360,8 +366,11 @@ export function EmployerRevisionForm(props: EmployerRevisionFormProps) {
     setRefreshFailure(false);
 
     try {
-      const reloadResult = await props.onCanonicalReload?.();
-      if (reloadResult === 'success' || reloadResult === 'not_found' || reloadResult === undefined) {
+      const reloadResult = await onCanonicalReload?.();
+      if (reloadResult === 'not_found') {
+        setUnknownAttempt(null);
+        setIsEditing(false);
+      } else {
         setUnknownAttempt(null);
         setIsEditing(false);
       }

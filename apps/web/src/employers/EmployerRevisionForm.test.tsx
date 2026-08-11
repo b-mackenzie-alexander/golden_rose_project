@@ -987,7 +987,7 @@ describe('EmployerRevisionForm', () => {
     const user = userEvent.setup();
     const reviseEmployerMock = vi.mocked(reviseEmployer);
     const deferredRetry = createDeferredPromise<Awaited<ReturnType<typeof reviseEmployer>>>();
-    const deferredConflictReload = createDeferredPromise<void | 'success' | 'not_found'>();
+    const deferredConflictReload = createDeferredPromise<undefined | 'success' | 'not_found'>();
     const onCanonicalReload = vi.fn().mockReturnValueOnce(deferredConflictReload.promise);
 
     reviseEmployerMock.mockReset();
@@ -1108,7 +1108,9 @@ describe('EmployerRevisionForm', () => {
     const user = userEvent.setup();
     const reviseEmployerMock = vi.mocked(reviseEmployer);
     const unknownRefreshFailure = new Error('reload failed');
-    const originalMatchMedia = window.matchMedia;
+    const originalMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia')?.value as
+      | typeof window.matchMedia
+      | undefined;
 
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
@@ -1282,10 +1284,10 @@ describe('EmployerRevisionForm', () => {
 
     async function assertEnglishSpanishAxeState(
       user: ReturnType<typeof userEvent.setup>,
-      trigger: () => Promise<void>,
-      englishAssertion: () => Promise<void>,
-      spanishAssertion: () => Promise<void>,
-      options?: { onCanonicalReload?: () => void | 'success' | 'not_found' | Promise<void | 'success' | 'not_found'> },
+      trigger: () => void | Promise<void>,
+      englishAssertion: () => void | Promise<void>,
+      spanishAssertion: () => void | Promise<void>,
+      options?: { onCanonicalReload?: () => 'success' | 'not_found' | undefined | Promise<'success' | 'not_found' | undefined> },
     ) {
       const view = render(
         <LanguageProvider>
@@ -1373,12 +1375,12 @@ describe('EmployerRevisionForm', () => {
         async () => {
           await openAndSubmit(user, 'Pending Axe Rose');
         },
-        async () => {
+        () => {
           expect(screen.getByLabelText('Revision employer type')).toBeDisabled();
           expect(screen.getByLabelText('Revision employer name')).toBeDisabled();
           expect(screen.getByRole('button', { name: 'Save draft employer revision' })).toBeDisabled();
         },
-        async () => {
+        () => {
           expect(screen.getByLabelText('Tipo de empleador para la revisión')).toBeDisabled();
           expect(screen.getByLabelText('Nombre del empleador para la revisión')).toBeDisabled();
           expect(screen.getByRole('button', { name: 'Guardar revisión del empleador en borrador' })).toBeDisabled();

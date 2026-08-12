@@ -56,6 +56,17 @@ The matrix governs the approved Phase 1 canonical records and derived staff surf
 | Health monitoring, cache/job remediation, and approved platform troubleshooting | Deny | Deny | Deny | Allow | Separate technical identity/path; support operations must be narrowly designed and attributable. |
 | Exceptional production operational-record access for technical support | Approve/review only | Approve/review only when delegated | Deny | Break-glass only | The Platform Administrator does not self-authorize. Access is time-bounded, scoped, logged, and post-reviewed. |
 
+### Accepted ADR-0008 planning permission mapping
+
+The accepted capability rows above authorize Owner, Delegated Manager, and Operations Staff to view and create bounded draft contact records while denying ordinary Platform Administrator access. Accepted planning ADR-0008 maps only that capability into these future server-enforced names:
+
+| Candidate permission | Owner | Delegated Manager | Operations Staff | Platform Administrator | Additional gate |
+|---|---|---|---|---|---|
+| `employer_contact:draft:create` | Allow | Allow | Allow | Deny | Also requires `employer:read`; parent must exist and remain `draft`. |
+| `employer_contact:read` | Allow | Allow | Allow | Deny | Also requires `employer:read`; bounded collection-query and exact reads remain parent-scoped, with no global/name search or count. |
+
+This mapping is accepted technical planning, not active implementation or a new operational-policy grant. Exact-artifact review passed and Beatrice formally accepted ADR-0008, but it becomes implementation authority only after protected planning-only merge, exact-tip coding rebaseline, and separate coding approval. It grants no contact correction, lifecycle, name/global search, unbounded list/count, export, communication, public-plane, or support bypass authority; only the bounded parent collection query is included for authoritative rediscovery.
+
 ## Delegation and account-lifecycle controls
 
 1. The Owner is the only Phase 1 business authority that may grant, narrow, revoke, or review Manager and Operations Staff role permissions.

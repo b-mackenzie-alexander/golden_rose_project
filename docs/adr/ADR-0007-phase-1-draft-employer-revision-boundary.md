@@ -1,14 +1,14 @@
 # ADR-0007: Phase 1 Draft Employer Revision Boundary
 
-- **Status:** Accepted planning boundary — publication candidate; no implementation authority
+- **Status:** Accepted and implemented boundary — PR #17 merged at `1543248`; bounded post-merge remediation active
 - **Date:** 2026-08-08
 - **Decision owners:** Beatrice for technical delivery and security boundaries; Golden Rose client for accepted operational policy
 - **Depends on:** ADR-0002, ADR-0004, ADR-0005, and merged ADR-0006
-- **Implementation authority:** None. This ADR and its plan must merge through a planning-only PR, the exact merged tip must be verified, and Beatrice must separately authorize coding from a fresh branch before product work begins.
+- **Implementation authority:** Historical activation gate completed: PR #16 merged this planning packet at `1c66eeb`, Beatrice authorized implementation from that exact tip, and PR #17 merged the bounded implementation at `1543248`. Current authority is limited to post-merge correction of defects inside this ADR's existing boundary; no adjacent Phase 1 product slice is authorized.
 
 ## Context
 
-The merged staff Employer workspace can create one synthetic/local draft `Employer`, search authorized Employer records, and read exact Employer detail. PR #15 merged the independently rereviewed and exact-head-qualified post-merge closeout to `develop` at `7ae448e`; ADR-0006, database-authority constraints, FastAPI lifespan ownership, browser lifecycle/privacy remediation, diagnostics hardening, and SBOM validation are now predecessor authority.
+The merged staff Employer workspace can create one synthetic/local draft `Employer`, search authorized Employer records, and read exact Employer detail. PR #15 merged the independently rereviewed and exact-head-qualified post-merge closeout to `develop` at `7ae448e`; PR #16 merged this accepted planning packet at `1c66eeb`; and PR #17 merged the bounded draft-revision implementation at `1543248`. ADR-0006, database-authority constraints, FastAPI lifespan ownership, browser lifecycle/privacy remediation, diagnostics hardening, and SBOM validation remain predecessor authority.
 
 The next useful Phase 1 slice is a bounded draft-Employer revision command. Staff need to correct only the existing draft `display_name` and `employer_type`. The command must not become a generic patch surface, lifecycle transition, audit timeline, contact/worksite/request workflow, or public API.
 
@@ -18,8 +18,8 @@ Claims in this ADR are classified as follows:
 
 - **Observed:** `Employer` is the current authoritative row; `version` starts at `1`; create idempotency is actor-, command-type-, and normalized-payload-bound; audit events and command receipts are append-only; the read boundary already returns minimized no-store detail.
 - **Reported/accepted:** staff may correct draft Employer data; only `display_name` and `employer_type` are in this slice.
-- **Accepted planning decision:** the exact revision command, replay metadata, audit payload, browser authority state machine, and schema evolution below.
-- **Validated:** no implementation behavior in this slice until executable evidence is produced and independently reviewed.
+- **Accepted decision:** the exact revision command, replay metadata, audit payload, browser authority state machine, and schema evolution below.
+- **Validated:** PR #17 implemented this boundary under executable backend/frontend/migration/quality evidence. Post-merge review then found two Medium authority defects now controlled by the remediation addendum below.
 
 ## Decision
 
@@ -302,7 +302,7 @@ All new states, instructions, controls, validation, conflict, unknown-outcome, r
 - The first revision requires a migration, shared idempotency refactor, and explicit browser state machine.
 - Existing create response and replay tests must evolve to account for `updated_at` and command-result-version metadata.
 - A conservative `409` browser response requires a canonical reload even for rare idempotency-key conflicts.
-- The planning packet is rebaselined on exact merged closeout tip `7ae448e`; any later integration-base change before publication requires another rebaseline and rereview.
+- The historical planning packet was rebaselined on exact merged closeout tip `7ae448e`; PR #16 and PR #17 subsequently completed planning and implementation promotion.
 
 ## Alternatives rejected
 
@@ -348,15 +348,26 @@ This decision does not authorize:
 - offline persistence, service workers, local/session storage, URL-carried Employer values, or client caches; or
 - human browser/accessibility/fluent-language qualification before a shared deployed environment exists.
 
-## Implementation activation gate
+## Historical implementation activation gate
 
-Beatrice accepted this bounded planning direction for planning-only publication. That acceptance is not implementation authority. Product coding remains blocked until all of the following occur:
+Beatrice accepted this bounded planning direction for planning-only publication. The following activation gate was completed before PR #17 implementation:
 
 1. **Completed:** the Employer-workspace closeout was independently rereviewed, committed, exact-head qualified, exact-range scanned, merged to `develop` by PR #15, fetched, and used as this branch's exact base;
 2. **Completed:** ADR-0007 and Alembic `0003` remain free, merged predecessor paths/nodes were reinspected, and contract/path drift was reconciled;
-3. this ADR, its implementation plan, replay-contract reconciliation, ADR index, technology register, and planning-status living-document changes receive independent post-rebaseline review;
-4. every High/Blocker planning finding is remediated;
-5. every Medium planning finding is remediated or explicitly accepted by Beatrice with rationale and owner;
-6. the complete planning packet is committed, exact-head qualified, exact-range scanned, pushed, reviewed by a planning-only PR, and merged to `develop`;
-7. a fresh fetch verifies the exact accepted packet exists on the merged `origin/develop` tip; and
-8. Beatrice explicitly authorizes implementation from a new branch based on that exact merged planning tip.
+3. **Completed:** this ADR, its implementation plan, replay-contract reconciliation, ADR index, technology register, and planning-status living-document changes received independent post-rebaseline review;
+4. **Completed:** every High/Blocker planning finding was remediated;
+5. **Completed:** every Medium planning finding was remediated or explicitly accepted by Beatrice with rationale and owner;
+6. **Completed:** PR #16 committed, qualified, scanned, reviewed, and merged the planning packet to `develop` at `1c66eeb`;
+7. **Completed:** a fresh fetch verified the exact accepted packet on merged `origin/develop`; and
+8. **Completed:** Beatrice authorized implementation from a fresh branch based on `1c66eeb`, and PR #17 merged the resulting bounded implementation at `1543248`.
+
+## Post-merge remediation addendum — 2026-08-11
+
+Independent audit of exact merged PR #17 found no Blocker or High issue and two Medium correctness/authority defects:
+
+1. the revision browser client validated a successful response against the response's own `employer_id` rather than the Employer ID requested in the path, so a valid-shaped cross-target response could be accepted as authoritative; and
+2. fresh-command no-op detection and `changed_fields` derivation occurred before receipt reservation/compare-and-swap, allowing a future-version catch-up under PostgreSQL `READ COMMITTED` to turn a semantic no-op into an extra version and inaccurate audit evidence.
+
+The bounded remediation requires the browser parser to bind accepted success to the requested Employer ID. On the backend, fresh commands must reserve their receipt first, then lock and read the exact current draft row at `expected_version`, derive no-op and changed-field authority from that locked row, and only then perform the compare-and-swap, audit append, and commit. If the locked current values already equal the submitted normalized values, the reserved receipt must roll back and the command must remain a no-op. Known SQLAlchemy persistence failures must roll back and cross the API boundary only as value-safe service-unavailable problems.
+
+This addendum does not alter endpoint shape, accepted fields, lifecycle scope, permission, idempotency binding, replay semantics, minimized audit payload, browser recovery contract, or any non-scope above. A fresh independent rereview and complete quality/security gate are required before this remediation may be committed, pushed, or proposed for merge. No next product slice may start before that closeout merges and the repository is rebaselined from exact protected `develop`.

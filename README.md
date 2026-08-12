@@ -1,28 +1,32 @@
 # Golden Rose Operations Platform
 
 This repository contains bounded synthetic/local tracers for the Golden Rose
-staff employer-demand workflow. The first staff Employer browser workspace and
-its bounded post-merge closeout are merged into `develop`.
+staff employer-demand workflow. The first staff Employer browser workspace,
+its closeout, and the bounded draft-Employer revision slice are merged into
+`develop`.
 This is not a public portal, production deployment, or
 automated hiring, matching, ranking, eligibility, or referral system.
 
 ## Current tracer boundary
 
 - Exposes `POST /api/staff/v1/employers`, `GET /api/staff/v1/employers/{employer_id}`,
-  and bounded `POST /api/staff/v1/employers/search` on the staff plane.
+  bounded `POST /api/staff/v1/employers/search`, and bounded
+  `POST /api/staff/v1/employers/{employer_id}/revisions` on the staff plane.
 - Create accepts only a bounded `employer_type` and normalized `display_name`;
   search requires a bounded name fragment with optional type and opaque cursor.
 - Uses a synthetic staff principal only in `local` and `test` environments;
   `production` with synthetic authentication fails during application creation.
-- Writes a draft `Employer`, idempotency `CommandReceipt`, and append-only
-  `AuditEvent` atomically in PostgreSQL.
+- Writes draft Employer creation/revision changes, idempotency `CommandReceipt`
+  authority, and append-only `AuditEvent` evidence atomically in PostgreSQL.
 - Uses fictional/synthetic fixtures only. Do not use client, live, or
   production data.
 - ADR-0005 accepted a standalone `apps/web/` frontend boundary over only these
   contracts, and PR #13 merged the initial local/synthetic Employer workspace.
-- ADR-0006 and `.hermes/plans/2026-08-07_145911-phase-1-employer-workspace-closeout-plan.md`
-  govern the closeout merged by PR #15. ADR-0007 and its paired plan define the
-  next bounded planning direction, but no draft-revision coding is authorized.
+- ADR-0006 governs the closeout merged by PR #15. ADR-0007 and its paired plan
+  govern the draft-revision implementation merged by PR #17 at `1543248`.
+- The active lane is a bounded post-merge remediation for revision target
+  binding, concurrent no-op/audit authority, safe persistence classification,
+  and documentation drift; no adjacent entity or workflow is authorized.
 - Automated frontend parity/accessibility evidence exists locally, but human
   browser/manual accessibility/fluent-language qualification remains deferred
   until a shared deployed `develop` target exists.

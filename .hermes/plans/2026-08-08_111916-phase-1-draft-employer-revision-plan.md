@@ -1,5 +1,7 @@
 # Phase 1 Draft Employer Revision — Accepted Planning-Publication Candidate
 
+> **Historical completion notice (2026-08-11):** PR #16 merged this planning packet at `1c66eeb`; Beatrice then authorized implementation from that exact tip; and PR #17 merged the bounded implementation at `1543248`. Publication-candidate, branch, and future-gate language below preserves planning-time evidence and is not current instruction. The active lane is the separately bounded `fix/draft-employer-revision-post-merge` remediation recorded in ADR-0007 and the living documents.
+
 > **For implementation agents:** This is planning only. Do not execute Task 1 or any product-code task until this rebased packet is independently reviewed, committed, pushed, reviewed by planning-only PR, and merged to `develop`; the exact merged tip is verified to contain the accepted packet; and Beatrice explicitly authorizes coding from a fresh implementation branch.
 
 **Status:** Accepted planning direction; publication candidate; not implementation authority

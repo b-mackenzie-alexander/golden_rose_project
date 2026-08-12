@@ -1,5 +1,7 @@
 # Review Handoff — Draft Employer revision implementation slice
 
+> **Historical handoff notice:** Sections 1-12 record the pre-PR review surface that ultimately merged through PR #17 at `1543248`. Their branch, commit-count, and stop-boundary statements are preserved as historical evidence, not current repository state. Section 13 records the separate post-merge remediation handoff.
+
 **Date:** 2026-08-11
 **Branch:** `feat/staff-draft-employer-revision`
 **Target PR base:** `develop`
@@ -251,3 +253,32 @@ The correct current disposition is:
 - **cleared for independent rereview handoff after remediation**
 - **not yet cleared for push/PR/merge**
 - **final-head closeout evidence still belongs after review and commit**
+
+## 13. Post-merge remediation handoff — 2026-08-11
+
+### Current branch truth
+
+- Base: exact merged `origin/develop` at `1543248` (`feat: implement draft employer revision slice (#17)`)
+- Branch: `fix/draft-employer-revision-post-merge`
+- Review surface: local uncommitted working tree
+- Publication status: commit/push/PR remain blocked on complete local gates and fresh independent rereview
+
+### Findings being remediated
+
+1. **Medium — browser target binding:** `reviseEmployer()` accepted a valid-shaped success whose `employer_id` differed from the requested path Employer. The parser now validates the response against `input.employerId`; focused coverage proves a cross-target success becomes `unknown_outcome` rather than browser authority.
+2. **Medium — concurrent no-op/audit authority:** fresh-command no-op and `changed_fields` were calculated before receipt reservation/compare-and-swap. The use case now reserves first, performs a locked exact current-row read at `expected_version`, derives semantic change authority from that row, and rolls back the reserved receipt on no-op. Deterministic unit coverage recorded the original RED; a PostgreSQL interleaving regression proves a future-version catch-up remains at version 2 with no spurious receipt or audit event.
+3. **Low hardening closed in the same application boundary:** known SQLAlchemy receipt/read/write/audit failures now roll back and raise `SafePersistenceError`, preserving the existing value-safe API 503 contract rather than leaking raw persistence exceptions.
+
+### Scope and review focus
+
+Review the exact browser target-binding change, receipt-reservation/row-lock ordering, no-op rollback, changed-field derivation, replay preservation, persistence exception classification, new focused tests, and documentation reconciliation. Confirm no endpoint, field, lifecycle, permission, replay, audit-payload, deployment, live-data, or adjacent-entity expansion.
+
+### Required disposition
+
+Focused and complete local application-quality/security verification now pass: locked toolchain/package checks, frontend verification/audit/SBOM, Ruff, mypy, Bandit, Alembic upgrade→downgrade→upgrade, `238 passed` backend tests at `96.14%` coverage, pip-audit, backend SBOM validation, and `git diff --check`. The remediation remains not PR-ready until a fresh independent rereview reports no unresolved Blocker/High/Medium finding.
+
+The exact changed tracked/untracked working-tree source set was additionally scanned with `gitleaks detect --no-git` after a rejected zero-byte Git-mode attempt; the content scan covered `678,465` bytes and found no leaks. This does not replace required exact-range scanning after a reviewed commit exists.
+
+### Independent rereview disposition
+
+Fresh independent rereview of the exact uncommitted surface returned **PASS** with no Blocker, High, or Medium finding. It verified requested-target response binding, receipt-reservation/locked-row no-op and changed-field ordering, atomic CAS/audit behavior, safe SQLAlchemy failure classification, historical-versus-current documentation truth, preserved deferred gates, and no unauthorized scope expansion. The reviewer found the surface ready for the closeout commit after the completed full gate; it remains not PR-ready until final-head verification and exact-range scanning run after that commit.

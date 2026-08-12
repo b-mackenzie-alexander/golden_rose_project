@@ -45,7 +45,7 @@ Human browser/manual accessibility/fluent-language qualification is explicitly d
 
 ## Approval, owner, and revisit trigger
 
-Beatrice accepted the closeout direction after independent review of the planning packet. PR #14 merged only the paired closeout plan into `develop` at `b0a459b`; PR #15 then merged the independently rereviewed and exact-head-qualified implementation closeout plus this ADR into `develop` at `7ae448e`. The closeout lane is complete. ADR-0007 and its paired plan are a separate planning-publication boundary and do not authorize draft-revision implementation.
+Beatrice accepted the closeout direction after independent review of the planning packet. PR #14 merged only the paired closeout plan into `develop` at `b0a459b`; PR #15 then merged the independently rereviewed and exact-head-qualified implementation closeout plus this ADR into `develop` at `7ae448e`. The closeout lane is complete. ADR-0007 and its paired plan separately governed the bounded draft-revision implementation later merged by PR #17 at `1543248`; the active post-merge correction remains inside ADR-0007 and does not reopen this closeout boundary.
 
 Revisit this ADR before any of the following:
 

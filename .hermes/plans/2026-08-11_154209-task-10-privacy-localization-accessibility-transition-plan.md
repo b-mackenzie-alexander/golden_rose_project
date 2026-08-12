@@ -1,5 +1,7 @@
 # Task 10 Privacy Localization Accessibility Transition Plan
 
+> **Historical completion notice (2026-08-11):** This transition plan was executed on the retired `feat/staff-draft-employer-revision` branch and its bounded implementation merged through PR #17 at `1543248`. Branch, working-tree, and future-tense statements below preserve execution-time evidence; they are not current workflow instructions. Current work is the separately bounded `fix/draft-employer-revision-post-merge` remediation recorded in ADR-0007 and the living documents.
+
 > **For Hermes:** Use subagent-driven-development skill only if Beatrice explicitly asks for delegated execution; otherwise execute this plan task-by-task in strict exact-node TDD. This is a lane-transition planning artifact, not product-code implementation.
 
 **Goal:** Transition from the exhausted Task 9 workspace-authority node list into the already-approved ADR-0007 Task 10 evidence lane: privacy, localization, accessibility, and diagnostic boundaries for the bounded draft-Employer revision slice.

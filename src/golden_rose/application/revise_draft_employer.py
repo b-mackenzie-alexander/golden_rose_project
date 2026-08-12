@@ -22,6 +22,7 @@ from golden_rose.auth.principal import StaffPrincipal
 from golden_rose.clock import Clock
 from golden_rose.persistence.audit_events import insert_employer_draft_revised_event
 from golden_rose.persistence.command_receipts import (
+    CommandReceiptRecord,
     get_command_receipt,
     reserve_revision_command_receipt,
 )
@@ -61,59 +62,20 @@ def revise_draft_employer(
     )
 
     try:
-        existing_receipt = get_command_receipt(session=session, command_id=command_id)
-    except NoResultFound:
-        existing_receipt = None
-    if existing_receipt is not None:
-        if existing_receipt.result_entity_id != employer_id:
-            raise SafePersistenceError("persistence operation failed")
-        if (
-            existing_receipt.command_schema_version == 1
-            and existing_receipt.command_type == "revise_draft_employer"
-            and existing_receipt.actor_id == principal.actor_id
-            and existing_receipt.result_entity_type == "employer"
-            and existing_receipt.result_entity_id == employer_id
-            and existing_receipt.request_fingerprint == request_fingerprint
-        ):
-            if existing_receipt.result_record_version != expected_version + 1:
-                raise SafePersistenceError("persistence operation failed")
-            if existing_receipt.result_event_type != "employer.draft_revised":
-                raise SafePersistenceError("persistence operation failed")
-            employer = get_authoritative_employer_by_id(session=session, employer_id=employer_id)
-            if employer.version < existing_receipt.result_record_version:
-                raise SafePersistenceError("persistence operation failed")
-            return ReviseDraftEmployerResult(
-                employer=employer,
-                replayed=True,
-                result_record_version=existing_receipt.result_record_version,
+        try:
+            existing_receipt = get_command_receipt(session=session, command_id=command_id)
+        except NoResultFound:
+            existing_receipt = None
+        if existing_receipt is not None:
+            return _replay_existing_revision(
+                session=session,
+                existing_receipt=existing_receipt,
+                principal=principal,
+                employer_id=employer_id,
+                expected_version=expected_version,
+                request_fingerprint=request_fingerprint,
             )
-        raise RuntimeError("idempotency conflict")
 
-    current_match = session.execute(
-        select(employers.c.employer_type, employers.c.display_name).where(
-            employers.c.employer_id == employer_id,
-            employers.c.lifecycle_status == "draft",
-            employers.c.version == expected_version,
-        )
-    ).one_or_none()
-    current_values: tuple[str, str] | None = None
-    if current_match is not None:
-        current_employer_type, current_display_name = current_match
-        current_values = (current_employer_type, current_display_name)
-        normalized_current_display_name = normalize_employer_text(current_display_name)
-        if (
-            current_employer_type == employer_type
-            and normalized_current_display_name == normalized_display_name
-        ):
-            raise RuntimeError("employer revision requires a change")
-
-    changed_fields = _build_changed_fields(
-        current_match=current_values,
-        employer_type=employer_type,
-        display_name=normalized_display_name,
-    )
-
-    try:
         receipt_inserted = reserve_revision_command_receipt(
             session=session,
             command_id=command_id,
@@ -124,31 +86,54 @@ def revise_draft_employer(
             created_at=now,
         )
         if not receipt_inserted:
-            existing_receipt = get_command_receipt(session=session, command_id=command_id)
-            if existing_receipt.result_entity_id != employer_id:
-                raise SafePersistenceError("persistence operation failed")
-            if (
-                existing_receipt.command_schema_version == 1
-                and existing_receipt.command_type == "revise_draft_employer"
-                and existing_receipt.actor_id == principal.actor_id
-                and existing_receipt.result_entity_type == "employer"
-                and existing_receipt.result_entity_id == employer_id
-                and existing_receipt.request_fingerprint == request_fingerprint
-                and existing_receipt.result_record_version == expected_version + 1
-                and existing_receipt.result_event_type == "employer.draft_revised"
-            ):
-                employer = get_authoritative_employer_by_id(
-                    session=session, employer_id=employer_id
-                )
-                if employer.version < existing_receipt.result_record_version:
-                    raise SafePersistenceError("persistence operation failed")
-                session.rollback()
-                return ReviseDraftEmployerResult(
-                    employer=employer,
-                    replayed=True,
-                    result_record_version=existing_receipt.result_record_version,
-                )
-            raise RuntimeError("idempotency conflict")
+            try:
+                existing_receipt = get_command_receipt(session=session, command_id=command_id)
+            except NoResultFound as exc:
+                raise SafePersistenceError("persistence operation failed") from exc
+            result = _replay_existing_revision(
+                session=session,
+                existing_receipt=existing_receipt,
+                principal=principal,
+                employer_id=employer_id,
+                expected_version=expected_version,
+                request_fingerprint=request_fingerprint,
+            )
+            session.rollback()
+            return result
+
+        current_match = session.execute(
+            select(employers.c.employer_type, employers.c.display_name)
+            .where(
+                employers.c.employer_id == employer_id,
+                employers.c.lifecycle_status == "draft",
+                employers.c.version == expected_version,
+            )
+            .with_for_update()
+        ).one_or_none()
+        if current_match is None:
+            session.rollback()
+            existing_employer_id = session.execute(
+                select(employers.c.employer_id).where(employers.c.employer_id == employer_id)
+            ).scalar_one_or_none()
+            if existing_employer_id is None:
+                raise EmployerNotFoundError("employer not found")
+            raise EmployerVersionConflictError("employer version conflict")
+
+        current_employer_type, current_display_name = current_match
+        current_values = (current_employer_type, current_display_name)
+        normalized_current_display_name = normalize_employer_text(current_display_name)
+        if (
+            current_employer_type == employer_type
+            and normalized_current_display_name == normalized_display_name
+        ):
+            session.rollback()
+            raise RuntimeError("employer revision requires a change")
+
+        changed_fields = _build_changed_fields(
+            current_match=current_values,
+            employer_type=employer_type,
+            display_name=normalized_display_name,
+        )
 
         row = session.execute(
             update(employers)
@@ -177,20 +162,7 @@ def revise_draft_employer(
                 employers.c.version,
             )
         ).one()
-    except NoResultFound as exc:
-        session.rollback()
-        existing_employer_id = session.execute(
-            select(employers.c.employer_id).where(employers.c.employer_id == employer_id)
-        ).scalar_one_or_none()
-        if existing_employer_id is None:
-            raise EmployerNotFoundError("employer not found") from exc
-        raise EmployerVersionConflictError("employer version conflict") from exc
-    except SQLAlchemyError as exc:
-        session.rollback()
-        raise SafePersistenceError("persistence operation failed") from exc
-
-    employer = EmployerRecord(*row)
-    try:
+        employer = EmployerRecord(*row)
         insert_employer_draft_revised_event(
             session=session,
             audit_event_id=_build_revision_audit_event_id(command_id),
@@ -203,6 +175,9 @@ def revise_draft_employer(
             changed_fields=changed_fields,
         )
         session.commit()
+    except SQLAlchemyError as exc:
+        session.rollback()
+        raise SafePersistenceError("persistence operation failed") from exc
     except Exception:
         session.rollback()
         raise
@@ -211,6 +186,43 @@ def revise_draft_employer(
         employer=employer,
         replayed=False,
         result_record_version=expected_version + 1,
+    )
+
+
+def _replay_existing_revision(
+    *,
+    session: Session,
+    existing_receipt: CommandReceiptRecord,
+    principal: StaffPrincipal,
+    employer_id: UUID,
+    expected_version: int,
+    request_fingerprint: bytes,
+) -> ReviseDraftEmployerResult:
+    if existing_receipt.result_entity_id != employer_id:
+        raise SafePersistenceError("persistence operation failed")
+    if not (
+        existing_receipt.command_schema_version == 1
+        and existing_receipt.command_type == "revise_draft_employer"
+        and existing_receipt.actor_id == principal.actor_id
+        and existing_receipt.result_entity_type == "employer"
+        and existing_receipt.result_entity_id == employer_id
+        and existing_receipt.request_fingerprint == request_fingerprint
+    ):
+        raise RuntimeError("idempotency conflict")
+    if existing_receipt.result_record_version != expected_version + 1:
+        raise SafePersistenceError("persistence operation failed")
+    if existing_receipt.result_event_type != "employer.draft_revised":
+        raise SafePersistenceError("persistence operation failed")
+    try:
+        employer = get_authoritative_employer_by_id(session=session, employer_id=employer_id)
+    except NoResultFound as exc:
+        raise SafePersistenceError("persistence operation failed") from exc
+    if employer.version < existing_receipt.result_record_version:
+        raise SafePersistenceError("persistence operation failed")
+    return ReviseDraftEmployerResult(
+        employer=employer,
+        replayed=True,
+        result_record_version=existing_receipt.result_record_version,
     )
 
 

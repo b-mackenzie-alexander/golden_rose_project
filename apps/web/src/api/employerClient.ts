@@ -465,9 +465,7 @@ export async function reviseEmployer(input: ReviseEmployerInput): Promise<ApiRes
       return unknownOutcome();
     }
 
-    const candidate = payload as Record<string, unknown>;
-    const requestedId = typeof candidate.employer_id === 'string' ? candidate.employer_id : '';
-    const detail = parseRevisionEmployerDetail(payload, requestedId);
+    const detail = parseRevisionEmployerDetail(payload, input.employerId);
     if (detail === null) {
       return unknownOutcome();
     }

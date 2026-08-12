@@ -23,10 +23,13 @@ automated hiring, matching, ranking, eligibility, or referral system.
 - ADR-0005 accepted a standalone `apps/web/` frontend boundary over only these
   contracts, and PR #13 merged the initial local/synthetic Employer workspace.
 - ADR-0006 governs the closeout merged by PR #15. ADR-0007 and its paired plan
-  govern the draft-revision implementation merged by PR #17 at `1543248`.
-- The active lane is a bounded post-merge remediation for revision target
-  binding, concurrent no-op/audit authority, safe persistence classification,
-  and documentation drift; no adjacent entity or workflow is authorized.
+  govern the draft-revision implementation merged by PR #17 at `1543248`;
+  PR #18 merged its bounded remediation at `a4d8f90`.
+- The active lane is planning publication. Accepted ADR-0008 and its paired plan
+  define a backend EmployerContact create, bounded parent collection-query,
+  exact-read, and authority foundation. Exact-artifact review passed, but no
+  adjacent implementation is authorized until the planning packet merges through
+  protected `develop` and a fresh coding lane receives separate approval.
 - Automated frontend parity/accessibility evidence exists locally, but human
   browser/manual accessibility/fluent-language qualification remains deferred
   until a shared deployed `develop` target exists.

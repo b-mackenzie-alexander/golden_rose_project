@@ -1,6 +1,6 @@
 # Review Handoff — Draft Employer revision implementation slice
 
-> **Historical handoff notice:** Sections 1-12 record the pre-PR review surface that ultimately merged through PR #17 at `1543248`. Their branch, commit-count, and stop-boundary statements are preserved as historical evidence, not current repository state. Section 13 records the separate post-merge remediation handoff.
+> **Historical handoff notice:** Sections 1-12 record the pre-PR review surface that ultimately merged through PR #17 at `1543248`. Their branch, commit-count, and stop-boundary statements are preserved as historical evidence, not current repository state. Section 13 records the separate post-merge remediation handoff that ultimately merged through PR #18 at `a4d8f90`; its pre-merge stop statements are also historical.
 
 **Date:** 2026-08-11
 **Branch:** `feat/staff-draft-employer-revision`
@@ -282,3 +282,7 @@ The exact changed tracked/untracked working-tree source set was additionally sca
 ### Independent rereview disposition
 
 Fresh independent rereview of the exact uncommitted surface returned **PASS** with no Blocker, High, or Medium finding. It verified requested-target response binding, receipt-reservation/locked-row no-op and changed-field ordering, atomic CAS/audit behavior, safe SQLAlchemy failure classification, historical-versus-current documentation truth, preserved deferred gates, and no unauthorized scope expansion. The reviewer found the surface ready for the closeout commit after the completed full gate; it remains not PR-ready until final-head verification and exact-range scanning run after that commit.
+
+### Historical merge disposition — 2026-08-12
+
+The closeout commit completed final-head verification and exact-range secret scanning, all protected checks passed, and PR #18 merged the remediation into protected `develop` at `a4d8f90`. Section 13 is retained as review history and no longer represents an active branch or gate.

@@ -1,10 +1,10 @@
 # ADR-0007: Phase 1 Draft Employer Revision Boundary
 
-- **Status:** Accepted and implemented boundary — PR #17 merged at `1543248`; bounded post-merge remediation active
+- **Status:** Accepted and implemented boundary — PR #17 merged at `1543248`; PR #18 remediation merged at `a4d8f90`
 - **Date:** 2026-08-08
 - **Decision owners:** Beatrice for technical delivery and security boundaries; Golden Rose client for accepted operational policy
 - **Depends on:** ADR-0002, ADR-0004, ADR-0005, and merged ADR-0006
-- **Implementation authority:** Historical activation gate completed: PR #16 merged this planning packet at `1c66eeb`, Beatrice authorized implementation from that exact tip, and PR #17 merged the bounded implementation at `1543248`. Current authority is limited to post-merge correction of defects inside this ADR's existing boundary; no adjacent Phase 1 product slice is authorized.
+- **Implementation authority:** Historical activation gate completed: PR #16 merged this planning packet at `1c66eeb`, Beatrice authorized implementation from that exact tip, PR #17 merged the bounded implementation at `1543248`, and PR #18 merged its bounded remediation at `a4d8f90`. Any adjacent Phase 1 product slice still requires a separately reviewed and merged plan.
 
 ## Context
 

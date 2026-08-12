@@ -69,12 +69,12 @@ Additional rules:
 
 ### EmployerContact
 
-**Purpose:** Identify an authorized person staff may contact about an employer or request.
+**Purpose:** Maintain a staff-entered candidate contact identity associated with an Employer for a later authorized communication workflow.
 
 | Field / group | Purpose | Data classification | Phase 1 boundary |
 |---|---|---|---|
 | `employer_contact_id`, `employer_id` | Maintain stable contact identity and employer relationship | Internal operational | System-generated relationship; a contact may not silently move between employers |
-| `full_name` | Identify the person staff communicates with | Contact PII | Staff-only unless a separately approved disclosure requires it |
+| `full_name` | Record the name staff associates with the candidate contact identity | Contact PII | Staff-only unless a separately approved disclosure requires it; the name alone does not establish authority, identity verification, contactability, communication history, or consent |
 | `role_or_relationship` | Explain the contact's authority or relationship to the employer | Sensitive operational | Controlled/short text; not a protected-trait field |
 | `phone` | Permit approved operational follow-up | Contact PII | Format-validated; collection is not marketing consent |
 | `email` | Permit approved operational follow-up | Contact PII | Format-validated; collection is not marketing consent |
@@ -84,6 +84,8 @@ Additional rules:
 | `created_at`, `created_by` | Attribute record creation | Audit metadata | System-managed and immutable |
 
 **Prohibited uses:** Do not infer ethnicity, nationality, immigration status, religion, or other protected/proxy traits from names, language, phone, email, or relationship.
+
+**Authority boundary:** An EmployerContact record and `full_name` are attributable staff-entered operational data, not proof that the person is authorized to act for the Employer, has been identity-verified, is currently contactable, has consented to a communication channel, or has participated in any communication. Those claims require separately approved fields/workflows and evidence.
 
 ### Worksite
 

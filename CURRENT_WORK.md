@@ -1,9 +1,9 @@
 # Current Work — Golden Rose Operations Platform
 
 **Updated:** 2026-08-13
-**Lane:** Phase 0.5 planning — private synthetic GCP `develop` deployment foundation
-**Verification:** PR #20 merged the independently reviewed EmployerContact authority foundation into protected `develop` at `6eb05d5`. After fetch/prune, local `develop` was fast-forwarded to that exact tip and fresh planning branch `docs/gcp-develop-deployment-plan` was created from it with a clean tree.
-**Overall status:** The current tracer now includes backend EmployerContact create, bounded parent query, exact read, and typed receipt/audit authority, but broad Phase 1 product epics remain incomplete. Beatrice approved a planning-only transition toward an isolated GCP `develop` environment for facilitator visibility and shared testing. ADR-0009 and `.hermes/plans/2026-08-13_145234-gcp-develop-deployment-foundation-plan.md` define a private, fictional-synthetic-only Cloud Run + Cloud SQL path. The first independent review requested remediation of two High and seven Medium planning gaps; the exact remediated artifacts then received ACCEPT across cloud security/IAM/logging/governance, runtime/container/database/migration, and cross-document evidence review with no remaining Blocker, High, or Medium findings. Beatrice explicitly accepted the packet on 2026-08-13. It remains uncommitted and unmerged; acceptance authorizes only planning publication, not product/runtime code, Terraform apply, billing linkage, cloud resources, credentials, image push, deployment, service start, public access, real identity, or live/client data.
+**Lane:** Phase 0.5 implementation — Slice B local runtime/container contract
+**Verification:** PR #21 merged accepted ADR-0009 and `.hermes/plans/2026-08-13_145234-gcp-develop-deployment-foundation-plan.md` into protected `develop` at `9e27f8036184c885fcaff8a4949770a70d0c77fe`. After fetch/prune and stale-branch/worktree cleanup, local `develop` was verified equal to `origin/develop`, then fresh branch `feat/gcp-develop-runtime-container` was created from that exact tip.
+**Overall status:** The current tracer now includes backend EmployerContact create, bounded parent query, exact read, typed receipt/audit authority, and an accepted planning boundary for a private, fictional-synthetic-only GCP `develop` path. Beatrice authorized the fresh exact-tip Slice B lane on 2026-08-13. `.hermes/plans/2026-08-13_160852-slice-b-runtime-container-contract-plan.md` narrows this lane to local runtime/container packageability, liveness/readiness, same-origin serving, entrypoint behavior, and local image verification. Tasks 1-11 are implemented/qualified locally on `feat/gcp-develop-runtime-container`; independent Round 2 rereview cleared the uncommitted working tree for PR preparation, not merge. The lane is now in closeout-commit/final-head verification/push/PR-preparation flow. This lane still does not authorize Terraform apply, GCP project/billing/API/resource/service-identity provisioning, credentials, image push, cloud deployment, Cloud SQL use, public access, real identity, live/client data, production work, or merge approval.
 
 ## Active objective
 Turn the completed initial discovery baseline into an approved, narrow first delivery: an agency-staff pilot for employer demand entry and retrieval, followed by a governed dashboard and transparent worker/employer comparison aid.
@@ -30,10 +30,10 @@ Turn the completed initial discovery baseline into an approved, narrow first del
 - Accepted correction/audit baseline: PostgreSQL domain rows hold current operational truth; append-only `AuditEvent` records preserve material history through atomic expected-version/idempotent commands; restricted prior/new values remain field-authorized; and derived projections are disposable rather than competing record stores. `docs/planning/phase-1-correction-audit-event-contract.md` is authoritative.
 
 ## Immediate next steps
-1. Complete committed-head planning-only closeout, exact-range secret scanning, push, PR review, and merge through protected `develop`; do not treat planning merge as implementation or provisioning approval.
-2. Resolve the plan's pre-IaC decisions before provisioning: region, non-production cost/budget, project/billing/state ownership, named cloud/support roles, Cloud SQL recovery posture, private tester access, and retained evidence.
-3. Create a fresh exact-tip implementation plan/branch for the locally verifiable runtime/container contract only after the planning packet merges and separate coding approval is given.
-4. Preserve separate explicit gates for GCP provisioning, billing linkage, secrets, first migration/deployment, real identity, live/client data, and production. Facilitator visibility must not weaken private access or overstate product readiness.
+1. Create the reviewed closeout commit, then rerun final-head checks on the committed range before push/PR: `git diff --check origin/develop...HEAD`, exact-range `gitleaks git --no-banner --redact --log-opts 'origin/develop..HEAD'`, and the focused verification bundle.
+2. Keep the Task 11 local-image evidence explicit: the image builds and serves `/health`/SPA shell locally; `/readiness` correctly returns static 503 without a wired local database during the image-only probe.
+3. Do not push the image or convert local Docker evidence into cloud deployment evidence; cloud runtime, migration-job, Terraform, WIF, Artifact Registry, and Cloud SQL work remain separately gated.
+4. Preserve separate explicit gates for Terraform/IaC, GCP provisioning, billing linkage, secrets, first cloud migration/deployment, real identity, live/client data, and production. Facilitator visibility must not weaken private access or overstate product readiness.
 
 ## Gate classification
 
@@ -57,7 +57,7 @@ The complete discovery inventory and evidence rules are in `docs/planning/phase-
 - Do not enable public workflows, uploads, payment, signatures, screening, or vendor integrations.
 - Do not encode legacy language, protected-trait/proxy criteria, suggested legal research, fee policy, retention rules, or business terms as validated or production behavior before the applicable approval gate.
 - Do not implement automated matching, ranking, eligibility, hiring, or referral decisions.
-- Do not start cloud services, provision accounts, or change client systems without explicit scoped approval.
+- Do not start cloud services, provision accounts, push images, call GCP APIs, use Cloud SQL, or change client systems without explicit scoped approval.
 - Do not present provisional queue business hours, thresholds, escalation behavior, or no-response procedure as production policy, an SLA, compliance rule, or staff-performance standard before client validation.
 
 ## Repository-governance closeout
@@ -75,7 +75,7 @@ The complete discovery inventory and evidence rules are in `docs/planning/phase-
 - PR #14 merged the independently reviewed closeout plan into `develop` at `b0a459b`.
 - PR #15 merged the independently rereviewed and exact-head-qualified closeout plus ADR-0006 into `develop` at `7ae448e`; the retired closeout branch is historical.
 - PR #16 merged the accepted ADR-0007 draft-revision planning packet into `develop` at `1c66eeb`.
-- PR #17 merged the bounded synthetic/local draft-Employer revision implementation into protected `develop` at `1543248`; PR #18 merged its independently rereviewed remediation at `a4d8f90`. PR #19 merged the accepted ADR-0008 planning packet at `745f9e8`, and PR #20 merged its independently reviewed EmployerContact authority implementation at `6eb05d5`. Those feature branches are historical; the active planning branch starts exactly from the PR #20 merged tip.
+- PR #17 merged the bounded synthetic/local draft-Employer revision implementation into protected `develop` at `1543248`; PR #18 merged its independently rereviewed remediation at `a4d8f90`. PR #19 merged the accepted ADR-0008 planning packet at `745f9e8`, PR #20 merged its independently reviewed EmployerContact authority implementation at `6eb05d5`, and PR #21 merged the accepted ADR-0009 GCP develop deployment foundation planning packet at `9e27f80`. Those feature/docs branches are historical; the active Slice B implementation branch starts exactly from the PR #21 merged tip.
 
 ## Repository bootstrap state
 - The initial tracked baseline contains the living documents, ADR convention, and a protective `.gitignore`.

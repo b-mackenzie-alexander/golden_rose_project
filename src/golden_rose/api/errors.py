@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from golden_rose.application.create_draft_employer import IdempotencyConflictError
 from golden_rose.application.errors import SafePersistenceError
@@ -36,6 +37,18 @@ def no_store_problem_response(
 
 
 def install_exception_handlers(app: FastAPI) -> None:
+    @app.exception_handler(StarletteHTTPException)
+    async def handle_starlette_http_exception(
+        request: Request, exc: StarletteHTTPException
+    ) -> JSONResponse:
+        response = JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+            headers=exc.headers,
+        )
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
     @app.exception_handler(InvalidIdempotencyKeyError)
     async def handle_invalid_idempotency_key(
         request: Request, exc: InvalidIdempotencyKeyError

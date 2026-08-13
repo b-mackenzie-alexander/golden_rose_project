@@ -2003,6 +2003,8 @@ def test_openapi_exposes_only_intended_staff_route() -> None:
         assert openapi.status_code == 200
         paths = openapi.json()["paths"]
         assert set(paths) == {
+            "/health",
+            "/readiness",
             "/api/staff/v1/employers",
             "/api/staff/v1/employers/search",
             "/api/staff/v1/employers/{employer_id}/revisions",
@@ -2011,6 +2013,8 @@ def test_openapi_exposes_only_intended_staff_route() -> None:
             "/api/staff/v1/employers/{employer_id}/contacts/query",
             "/api/staff/v1/employers/{employer_id}/contacts/{employer_contact_id}",
         }
+        assert set(paths["/health"]) == {"get"}
+        assert set(paths["/readiness"]) == {"get"}
         assert set(paths["/api/staff/v1/employers"]) == {"post"}
         assert set(paths["/api/staff/v1/employers/search"]) == {"post"}
         assert set(paths["/api/staff/v1/employers/{employer_id}/revisions"]) == {"post"}
@@ -2029,6 +2033,8 @@ def test_openapi_exposes_only_create_search_detail_and_revision_routes() -> None
         assert openapi.status_code == 200
         paths = openapi.json()["paths"]
         assert set(paths) == {
+            "/health",
+            "/readiness",
             "/api/staff/v1/employers",
             "/api/staff/v1/employers/search",
             "/api/staff/v1/employers/{employer_id}/revisions",
@@ -2037,6 +2043,8 @@ def test_openapi_exposes_only_create_search_detail_and_revision_routes() -> None
             "/api/staff/v1/employers/{employer_id}/contacts/query",
             "/api/staff/v1/employers/{employer_id}/contacts/{employer_contact_id}",
         }
+        assert set(paths["/health"]) == {"get"}
+        assert set(paths["/readiness"]) == {"get"}
         assert set(paths["/api/staff/v1/employers"]) == {"post"}
         assert set(paths["/api/staff/v1/employers/search"]) == {"post"}
         assert set(paths["/api/staff/v1/employers/{employer_id}"]) == {"get"}

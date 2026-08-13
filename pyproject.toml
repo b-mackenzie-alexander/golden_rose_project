@@ -18,6 +18,9 @@ dependencies = [
   "uvicorn==0.52.1",
 ]
 
+[project.scripts]
+golden-rose-run = "golden_rose.runtime:main"
+
 [dependency-groups]
 dev = [
   "bandit==1.9.4",

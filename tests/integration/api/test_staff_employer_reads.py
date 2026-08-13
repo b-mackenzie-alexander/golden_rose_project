@@ -2475,6 +2475,8 @@ def test_openapi_exposes_only_approved_staff_employer_routes() -> None:
         assert openapi.status_code == 200
         paths = openapi.json()["paths"]
         assert set(paths) == {
+            "/health",
+            "/readiness",
             "/api/staff/v1/employers",
             "/api/staff/v1/employers/search",
             "/api/staff/v1/employers/{employer_id}",
@@ -2483,6 +2485,8 @@ def test_openapi_exposes_only_approved_staff_employer_routes() -> None:
             "/api/staff/v1/employers/{employer_id}/contacts/query",
             "/api/staff/v1/employers/{employer_id}/contacts/{employer_contact_id}",
         }
+        assert set(paths["/health"]) == {"get"}
+        assert set(paths["/readiness"]) == {"get"}
         assert set(paths["/api/staff/v1/employers"]) == {"post"}
         assert set(paths["/api/staff/v1/employers/search"]) == {"post"}
         assert set(paths["/api/staff/v1/employers/{employer_id}"]) == {"get"}
@@ -2844,7 +2848,7 @@ def test_staff_employer_contact_unmatched_and_method_not_allowed_routes_do_not_e
         assert response.status_code == 405
         assert response.headers["Content-Type"] == "application/json"
         assert response.headers["Allow"] == allow_header
-        assert "Cache-Control" not in response.headers
+        assert response.headers["Cache-Control"] == "no-store"
         assert "Idempotency-Result-Version" not in response.headers
         assert "Idempotency-Replayed" not in response.headers
         assert response.json() == {"detail": "Method Not Allowed"}
@@ -2855,7 +2859,7 @@ def test_staff_employer_contact_unmatched_and_method_not_allowed_routes_do_not_e
     assert unmatched_response.status_code == 404
     assert unmatched_response.headers["Content-Type"] == "application/json"
     assert "Allow" not in unmatched_response.headers
-    assert "Cache-Control" not in unmatched_response.headers
+    assert unmatched_response.headers["Cache-Control"] == "no-store"
     assert "Idempotency-Result-Version" not in unmatched_response.headers
     assert "Idempotency-Replayed" not in unmatched_response.headers
     assert unmatched_response.json() == {"detail": "Not Found"}

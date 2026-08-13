@@ -2007,11 +2007,19 @@ def test_openapi_exposes_only_intended_staff_route() -> None:
             "/api/staff/v1/employers/search",
             "/api/staff/v1/employers/{employer_id}/revisions",
             "/api/staff/v1/employers/{employer_id}",
+            "/api/staff/v1/employers/{employer_id}/contacts",
+            "/api/staff/v1/employers/{employer_id}/contacts/query",
+            "/api/staff/v1/employers/{employer_id}/contacts/{employer_contact_id}",
         }
         assert set(paths["/api/staff/v1/employers"]) == {"post"}
         assert set(paths["/api/staff/v1/employers/search"]) == {"post"}
         assert set(paths["/api/staff/v1/employers/{employer_id}/revisions"]) == {"post"}
         assert set(paths["/api/staff/v1/employers/{employer_id}"]) == {"get"}
+        assert set(paths["/api/staff/v1/employers/{employer_id}/contacts"]) == {"post"}
+        assert set(paths["/api/staff/v1/employers/{employer_id}/contacts/query"]) == {"post"}
+        assert set(
+            paths["/api/staff/v1/employers/{employer_id}/contacts/{employer_contact_id}"]
+        ) == {"get"}
 
 
 def test_openapi_exposes_only_create_search_detail_and_revision_routes() -> None:
@@ -2025,11 +2033,19 @@ def test_openapi_exposes_only_create_search_detail_and_revision_routes() -> None
             "/api/staff/v1/employers/search",
             "/api/staff/v1/employers/{employer_id}/revisions",
             "/api/staff/v1/employers/{employer_id}",
+            "/api/staff/v1/employers/{employer_id}/contacts",
+            "/api/staff/v1/employers/{employer_id}/contacts/query",
+            "/api/staff/v1/employers/{employer_id}/contacts/{employer_contact_id}",
         }
         assert set(paths["/api/staff/v1/employers"]) == {"post"}
         assert set(paths["/api/staff/v1/employers/search"]) == {"post"}
         assert set(paths["/api/staff/v1/employers/{employer_id}"]) == {"get"}
         assert set(paths["/api/staff/v1/employers/{employer_id}/revisions"]) == {"post"}
+        assert set(paths["/api/staff/v1/employers/{employer_id}/contacts"]) == {"post"}
+        assert set(paths["/api/staff/v1/employers/{employer_id}/contacts/query"]) == {"post"}
+        assert set(
+            paths["/api/staff/v1/employers/{employer_id}/contacts/{employer_contact_id}"]
+        ) == {"get"}
 
 
 def test_staff_employer_revision_openapi_exposes_only_approved_contract() -> None:
@@ -2046,6 +2062,9 @@ def test_staff_employer_revision_openapi_exposes_only_approved_contract() -> Non
             "/api/staff/v1/employers/search",
             "/api/staff/v1/employers/{employer_id}/revisions",
             "/api/staff/v1/employers/{employer_id}",
+            "/api/staff/v1/employers/{employer_id}/contacts",
+            "/api/staff/v1/employers/{employer_id}/contacts/query",
+            "/api/staff/v1/employers/{employer_id}/contacts/{employer_contact_id}",
         }
         revision_path = paths["/api/staff/v1/employers/{employer_id}/revisions"]
         assert set(revision_path) == {"post"}

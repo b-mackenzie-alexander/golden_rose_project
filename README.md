@@ -25,11 +25,17 @@ automated hiring, matching, ranking, eligibility, or referral system.
 - ADR-0006 governs the closeout merged by PR #15. ADR-0007 and its paired plan
   govern the draft-revision implementation merged by PR #17 at `1543248`;
   PR #18 merged its bounded remediation at `a4d8f90`.
-- The active lane is planning publication. Accepted ADR-0008 and its paired plan
-  define a backend EmployerContact create, bounded parent collection-query,
-  exact-read, and authority foundation. Exact-artifact review passed, but no
-  adjacent implementation is authorized until the planning packet merges through
-  protected `develop` and a fresh coding lane receives separate approval.
+- PR #19 merged the accepted ADR-0008 planning packet into `develop` at
+  `745f9e8`, and the separately authorized coding lane now runs on
+  `feat/employer-contact-authority-foundation` from that exact tip.
+- The current local review surface is the backend-only EmployerContact
+  authority foundation: nested create, bounded parent collection-query,
+  exact-read, and the typed receipt/audit authority generalization. The exact
+  approved node list is locally complete, a durable handoff packet now exists
+  at `docs/review-handoffs/2026-08-12-employer-contact-authority-foundation-review-handoff.md`,
+  and the next step is independent review of the uncommitted working tree. No
+  browser, broader Phase 1 entity, deployment, or live-data expansion is
+  authorized by this slice.
 - Automated frontend parity/accessibility evidence exists locally, but human
   browser/manual accessibility/fluent-language qualification remains deferred
   until a shared deployed `develop` target exists.

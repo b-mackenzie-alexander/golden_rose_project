@@ -7,7 +7,9 @@ from typing import Literal
 from uuid import UUID
 
 import pytest
-from sqlalchemy import text
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -18,6 +20,7 @@ from golden_rose.application.create_draft_employer import (
 from golden_rose.application.errors import SafePersistenceError
 from golden_rose.application.revise_draft_employer import revise_draft_employer
 from golden_rose.auth.principal import StaffPrincipal
+from tests.integration.conftest import PROJECT_ROOT
 
 
 class FixedClock:
@@ -34,6 +37,19 @@ class FixedIdentifierFactory:
 
     def new_uuid4(self) -> UUID:
         return self._identifiers.pop(0)
+
+
+def _insert_employer_authority(session, employer_id: UUID) -> None:
+    session.execute(
+        text(
+            """
+            INSERT INTO entity_authorities (
+                entity_type, entity_id, employer_id, employer_contact_id
+            ) VALUES ('employer', :employer_id, :employer_id, NULL)
+            """
+        ),
+        {"employer_id": employer_id},
+    )
 
 
 def _run_create_draft_employer_in_isolated_session(
@@ -293,6 +309,7 @@ def test_receipt_replay_rejects_changed_command_type_actor_target_or_payload(
         },
     )
 
+    _insert_employer_authority(session, UUID("33333333-3333-4333-8333-333333333333"))
     session.execute(
         text(
             """
@@ -472,6 +489,7 @@ def test_replay_rejects_authority_state_where_current_version_precedes_receipt_r
             "created_by": principal.actor_id,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.execute(
         text(
             """
@@ -635,6 +653,7 @@ def test_create_replay_rejects_inconsistent_result_version_event_type_or_target(
             "created_by": principal.actor_id,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.execute(
         text(
             """
@@ -826,6 +845,181 @@ def test_create_draft_employer_rolls_back_when_late_write_fails(
     assert employer_count == 0
     assert command_receipt_count == 0
     assert audit_event_count == 0
+
+
+def test_existing_employer_create_remains_atomic_and_replay_safe_on_employer_contact_schema(
+    session,
+    clean_tables,
+    monkeypatch,
+) -> None:
+    inspector = inspect(session.connection())
+    if "entity_authorities" not in inspector.get_table_names():
+        alembic_config = Config(str(PROJECT_ROOT / "alembic.ini"))
+        alembic_config.set_main_option("path_separator", "os")
+        command.upgrade(alembic_config, "head")
+        inspector = inspect(session.connection())
+        assert "entity_authorities" in inspector.get_table_names()
+
+    principal = StaffPrincipal(
+        actor_id=UUID("51515151-5151-4515-8515-515151515151"),
+        role_name="operations_staff",
+        permissions=frozenset({"employer:draft:create"}),
+    )
+    command_id = UUID("52525252-5252-4525-8525-525252525252")
+    employer_id = UUID("53535353-5353-4535-8535-535353535353")
+    audit_event_id = UUID("54545454-5454-4545-8545-545454545454")
+    fixed_now = datetime(2026, 8, 12, 20, 0, 0, tzinfo=UTC)
+
+    result = create_draft_employer(
+        session=session,
+        principal=principal,
+        command_id=command_id,
+        employer_type="business",
+        display_name="Synthetic Employer Authority Compatibility",
+        clock=FixedClock(fixed_now),
+        identifiers=FixedIdentifierFactory(employer_id, audit_event_id),
+    )
+
+    authority_row = (
+        session.execute(
+            text(
+                """
+                SELECT entity_type, entity_id, employer_id, employer_contact_id
+                FROM entity_authorities
+                WHERE entity_type = 'employer'
+                  AND entity_id = :entity_id
+                """
+            ),
+            {"entity_id": employer_id},
+        )
+        .mappings()
+        .one()
+    )
+    receipt_row = (
+        session.execute(
+            text(
+                """
+                SELECT
+                    result_entity_type,
+                    result_entity_id,
+                    result_record_version,
+                    result_event_type
+                FROM command_receipts
+                WHERE command_id = :command_id
+                """
+            ),
+            {"command_id": command_id},
+        )
+        .mappings()
+        .one()
+    )
+    audit_row = (
+        session.execute(
+            text(
+                """
+                SELECT entity_type, entity_id, new_record_version, event_type
+                FROM audit_events
+                WHERE command_id = :command_id
+                """
+            ),
+            {"command_id": command_id},
+        )
+        .mappings()
+        .one()
+    )
+
+    assert result.replayed is False
+    assert result.result_record_version == 1
+    assert dict(authority_row) == {
+        "entity_type": "employer",
+        "entity_id": employer_id,
+        "employer_id": employer_id,
+        "employer_contact_id": None,
+    }
+    assert dict(receipt_row) == {
+        "result_entity_type": "employer",
+        "result_entity_id": employer_id,
+        "result_record_version": 1,
+        "result_event_type": "employer.created",
+    }
+    assert dict(audit_row) == {
+        "entity_type": "employer",
+        "entity_id": employer_id,
+        "new_record_version": 1,
+        "event_type": "employer.created",
+    }
+
+    replay_result = create_draft_employer(
+        session=session,
+        principal=principal,
+        command_id=command_id,
+        employer_type="business",
+        display_name="Synthetic Employer Authority Compatibility",
+        clock=FixedClock(fixed_now),
+        identifiers=FixedIdentifierFactory(
+            UUID("55555555-5555-4555-8555-555555555555"),
+            UUID("56565656-5656-4565-8565-565656565656"),
+        ),
+    )
+
+    replay_counts = session.execute(
+        text(
+            """
+            SELECT
+                (SELECT COUNT(*) FROM employers) AS employer_count,
+                (SELECT COUNT(*) FROM entity_authorities) AS entity_authority_count,
+                (SELECT COUNT(*) FROM command_receipts) AS command_receipt_count,
+                (SELECT COUNT(*) FROM audit_events) AS audit_event_count
+            """
+        )
+    ).one()
+
+    assert replay_result.replayed is True
+    assert replay_result.employer.employer_id == employer_id
+    assert replay_result.result_record_version == 1
+    assert replay_counts.employer_count == 1
+    assert replay_counts.entity_authority_count == 1
+    assert replay_counts.command_receipt_count == 1
+    assert replay_counts.audit_event_count == 1
+
+    def fail_authority_insert(**_: object) -> None:
+        raise RuntimeError("synthetic authority failure")
+
+    monkeypatch.setattr(
+        "golden_rose.application.create_draft_employer.insert_employer_authority",
+        fail_authority_insert,
+    )
+
+    with pytest.raises(RuntimeError, match="synthetic authority failure"):
+        create_draft_employer(
+            session=session,
+            principal=principal,
+            command_id=UUID("57575757-5757-4575-8575-575757575757"),
+            employer_type="household",
+            display_name="Synthetic Authority Failure Employer",
+            clock=FixedClock(datetime(2026, 8, 12, 20, 5, 0, tzinfo=UTC)),
+            identifiers=FixedIdentifierFactory(
+                UUID("58585858-5858-4585-8585-585858585858"),
+                UUID("59595959-5959-4595-8595-595959595959"),
+            ),
+        )
+
+    failure_counts = session.execute(
+        text(
+            """
+            SELECT
+                (SELECT COUNT(*) FROM employers) AS employer_count,
+                (SELECT COUNT(*) FROM entity_authorities) AS entity_authority_count,
+                (SELECT COUNT(*) FROM command_receipts) AS command_receipt_count,
+                (SELECT COUNT(*) FROM audit_events) AS audit_event_count
+            """
+        )
+    ).one()
+
+    assert failure_counts.employer_count == 1
+    assert failure_counts.entity_authority_count == 1
+    assert failure_counts.command_receipt_count == 1
+    assert failure_counts.audit_event_count == 1
 
 
 def test_create_draft_employer_rolls_back_and_redacts_audit_id_collision_failure(

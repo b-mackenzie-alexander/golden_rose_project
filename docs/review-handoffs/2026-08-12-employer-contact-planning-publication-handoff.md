@@ -1,11 +1,11 @@
-# Review Handoff — EmployerContact planning publication
+# Review Handoff — EmployerContact planning publication (historical, merged)
 
 **Date:** 2026-08-12
 **Target PR base:** `develop`
 **Planning base:** `a4d8f90dc8272de2db5f75c3bf3b96017236aceb` (`develop == origin/develop` before publication preparation)
 **Intended branch:** `docs/employer-contact-authority-plan`
 **Review surface:** local uncommitted Markdown-only working tree
-**PR status:** no commit, push, or PR yet
+**PR status:** historical artifact; PR #19 merged this planning packet into protected `develop` at `745f9e8`
 
 ## 1. Purpose
 
@@ -16,7 +16,7 @@ Controlling artifacts:
 - `docs/adr/ADR-0008-phase-1-employer-contact-authority-foundation.md`
 - `.hermes/plans/2026-08-12_111500-phase-1-employer-contact-authority-foundation-plan.md`
 
-ADR-0008 is an **Accepted planning boundary — publication pending**. EmployerContact implementation remains blocked until this packet merges through protected `develop`, a fresh coding lane rebaselines from the exact merge tip, and Beatrice separately authorizes implementation and any required PostgreSQL use.
+ADR-0008 was an **Accepted planning boundary — publication pending** at the time of this handoff. That packet later merged through protected `develop` in PR #19 at `745f9e8`, and a fresh separately authorized coding lane rebaselined from that exact merge tip onto `feat/employer-contact-authority-foundation`.
 
 ## 2. Accepted technical boundary
 
@@ -103,6 +103,6 @@ Review the complete uncommitted working-tree diff and report Blocker/High/Medium
 
 ## 7. Stop boundary
 
-Do not implement EmployerContact, create migration `0004`, add permissions/routes/models/tests, start or alter services, use client/live data, commit, push, open a PR, or merge as part of this handoff review.
+At the time of this handoff, EmployerContact implementation, migration `0004`, permissions/routes/models/tests, service changes, client/live data use, commit, push, PR creation, and merge were all out of scope.
 
-After independent publication-delta clearance, commit/push/PR creation still requires separate authorization. After protected merge, implementation requires a fresh exact-tip rebaseline and separate coding approval.
+Historical outcome: after publication-delta clearance, PR #19 merged the packet into protected `develop` at `745f9e8`, and implementation later moved to the separately authorized exact-tip coding branch `feat/employer-contact-authority-foundation`.

@@ -46,6 +46,44 @@ def insert_employer_created_event(
     )
 
 
+def insert_employer_contact_created_event(
+    *,
+    session: Session,
+    audit_event_id: UUID,
+    employer_contact_id: UUID,
+    actor_id: UUID,
+    command_id: UUID,
+    occurred_at: datetime,
+) -> None:
+    session.execute(
+        insert(audit_events).values(
+            audit_event_id=audit_event_id,
+            event_schema_name="employer_contact.created",
+            event_schema_version=1,
+            event_type="employer_contact.created",
+            entity_type="employer_contact",
+            entity_id=employer_contact_id,
+            entity_sequence=1,
+            prior_record_version=0,
+            new_record_version=1,
+            actor_type="staff",
+            actor_id=actor_id,
+            initiating_staff_actor_id=None,
+            occurred_at=occurred_at,
+            effective_at=None,
+            command_id=command_id,
+            correlation_id=command_id,
+            reason_code=None,
+            reason_text=None,
+            source_type="staff_api",
+            source_reference=None,
+            related_event_ids=[],
+            changed_fields={"field_names": ["full_name"], "approved_values": {}},
+            payload_classification="sensitive_operational",
+        )
+    )
+
+
 def insert_employer_draft_revised_event(
     *,
     session: Session,

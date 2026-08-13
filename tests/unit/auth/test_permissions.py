@@ -1,10 +1,14 @@
 from uuid import uuid4
 
 from golden_rose.auth.permissions import (
+    EMPLOYER_CONTACT_DRAFT_CREATE_PERMISSION,
+    EMPLOYER_CONTACT_READ_PERMISSION,
     EMPLOYER_DRAFT_REVISE_PERMISSION,
     EMPLOYER_READ_PERMISSION,
     can_create_draft_employer,
+    can_create_draft_employer_contact,
     can_read_employer,
+    can_read_employer_contact,
     can_revise_draft_employer,
 )
 from golden_rose.auth.principal import StaffPrincipal
@@ -138,3 +142,24 @@ def test_principal_actor_id_is_uuid_data_and_not_request_supplied() -> None:
     assert isinstance(principal.actor_id, type(actor_id))
     assert not hasattr(principal, "headers")
     assert not hasattr(principal, "request_body")
+
+
+def test_employer_contact_permission_constants_have_exact_values_and_do_not_follow_role_labels(  # noqa: E501
+) -> None:
+    owner_principal = StaffPrincipal(
+        actor_id=uuid4(),
+        role_name="owner",
+        permissions=frozenset({"system:health:read"}),
+    )
+    platform_principal = StaffPrincipal(
+        actor_id=uuid4(),
+        role_name="platform_administrator",
+        permissions=frozenset({"system:health:read"}),
+    )
+
+    assert EMPLOYER_CONTACT_DRAFT_CREATE_PERMISSION == "employer_contact:draft:create"
+    assert EMPLOYER_CONTACT_READ_PERMISSION == "employer_contact:read"
+    assert can_create_draft_employer_contact(owner_principal) is False
+    assert can_read_employer_contact(owner_principal) is False
+    assert can_create_draft_employer_contact(platform_principal) is False
+    assert can_read_employer_contact(platform_principal) is False

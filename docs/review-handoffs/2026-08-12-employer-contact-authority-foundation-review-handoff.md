@@ -8,10 +8,10 @@
 - `docs/adr/ADR-0008-phase-1-employer-contact-authority-foundation.md`
 - `.hermes/plans/2026-08-12_111500-phase-1-employer-contact-authority-foundation-plan.md`
 - `GIT_WORKFLOW.md`
-**Review surface:** local uncommitted working tree
+**Review surface:** historical pre-merge handoff; PR #20 subsequently merged the reviewed implementation into `develop` at `6eb05d5`
 **Ahead commits vs `origin/develop` at handoff creation:** `0`
 **Behind commits vs `origin/develop` at handoff creation:** `0`
-**PR status:** no PR yet; commit/push/PR-open remain blocked on independent review, post-review closeout, final-head verification, and exact-range secret scanning
+**PR status:** historical. Required review, remediation, final-head verification, exact-range secret scanning, protected checks, and merge were subsequently completed through PR #20. Preserve the observations below as evidence; do not treat this file as an active review target.
 
 ## 1. Current branch truth
 

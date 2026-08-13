@@ -65,7 +65,7 @@ The accepted capability rows above authorize Owner, Delegated Manager, and Opera
 | `employer_contact:draft:create` | Allow | Allow | Allow | Deny | Also requires `employer:read`; parent must exist and remain `draft`. |
 | `employer_contact:read` | Allow | Allow | Allow | Deny | Also requires `employer:read`; bounded collection-query and exact reads remain parent-scoped, with no global/name search or count. |
 
-This mapping is accepted technical planning, not active implementation or a new operational-policy grant. Exact-artifact review passed and Beatrice formally accepted ADR-0008, but it becomes implementation authority only after protected planning-only merge, exact-tip coding rebaseline, and separate coding approval. It grants no contact correction, lifecycle, name/global search, unbounded list/count, export, communication, public-plane, or support bypass authority; only the bounded parent collection query is included for authoritative rediscovery.
+This mapping now controls the active EmployerContact coding lane after PR #19 merged ADR-0008 into protected `develop` at `745f9e8` and the separately authorized implementation branch rebaselined from that exact tip. It still grants no contact correction, lifecycle, name/global search, unbounded list/count, export, communication, public-plane, or support bypass authority; only the bounded parent collection query is included for authoritative rediscovery.
 
 ## Delegation and account-lifecycle controls
 

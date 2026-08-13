@@ -42,6 +42,37 @@ def reserve_command_receipt(
             request_fingerprint=request_fingerprint,
             result_entity_type="employer",
             result_entity_id=result_entity_id,
+            result_record_version=1,
+            result_event_type="employer.created",
+            created_at=created_at,
+        )
+        .on_conflict_do_nothing(index_elements=[command_receipts.c.command_id])
+        .returning(command_receipts.c.command_id)
+    )
+    return result.scalar_one_or_none() is not None
+
+
+def reserve_create_employer_contact_receipt(
+    *,
+    session: Session,
+    command_id: UUID,
+    actor_id: UUID,
+    request_fingerprint: bytes,
+    result_entity_id: UUID,
+    created_at: datetime,
+) -> bool:
+    result = session.execute(
+        insert(command_receipts)
+        .values(
+            command_id=command_id,
+            command_schema_version=1,
+            command_type="create_employer_contact",
+            actor_id=actor_id,
+            request_fingerprint=request_fingerprint,
+            result_entity_type="employer_contact",
+            result_entity_id=result_entity_id,
+            result_record_version=1,
+            result_event_type="employer_contact.created",
             created_at=created_at,
         )
         .on_conflict_do_nothing(index_elements=[command_receipts.c.command_id])

@@ -30,6 +30,19 @@ class FixedClock:
         return self._now
 
 
+def _insert_employer_authority(session, employer_id: UUID) -> None:
+    session.execute(
+        text(
+            """
+            INSERT INTO entity_authorities (
+                entity_type, entity_id, employer_id, employer_contact_id
+            ) VALUES ('employer', :employer_id, :employer_id, NULL)
+            """
+        ),
+        {"employer_id": employer_id},
+    )
+
+
 def _run_revise_draft_employer_in_isolated_session(
     *,
     engine,
@@ -107,6 +120,7 @@ def test_revision_updates_only_name_type_updated_at_updated_by_and_version(
             "created_by": created_by,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     result = revise_draft_employer(
@@ -209,6 +223,7 @@ def test_revision_requires_named_permission_before_record_or_writes(
             "created_by": created_by,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     with pytest.raises(PermissionError, match="principal lacks employer:draft:revise"):
@@ -333,6 +348,7 @@ def test_revision_rejects_stale_expected_version_without_writes(
             "created_by": created_by,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     with pytest.raises(RuntimeError, match="employer version conflict"):
@@ -424,6 +440,7 @@ def test_revision_rejects_normalized_noop_without_consuming_command_key(
             "created_by": created_by,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     with pytest.raises(RuntimeError, match="employer revision requires a change"):
@@ -515,6 +532,7 @@ def test_revision_stale_precedes_noop_when_values_match_later_current_truth(
             "created_by": created_by,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     with pytest.raises(RuntimeError, match="employer version conflict"):
@@ -606,6 +624,7 @@ def test_revision_normalizes_before_fingerprint_compare_and_update(
             "created_by": created_by,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     with pytest.raises(RuntimeError, match="employer revision requires a change"):
@@ -813,6 +832,7 @@ def test_revision_reuses_matching_receipt_without_rewrite(
             "created_at": revised_at,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     result = revise_draft_employer(
@@ -1026,6 +1046,7 @@ def test_identical_revision_replay_is_write_free_and_returns_current_truth(
             "created_at": revised_at,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     result = revise_draft_employer(
@@ -1239,6 +1260,7 @@ def test_identical_revision_replay_precedes_stale_and_noop_evaluation(
             "created_at": revised_at,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     result = revise_draft_employer(
@@ -1453,6 +1475,7 @@ def test_conflicting_revision_replay_is_write_free(
             "created_at": revised_at,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     with pytest.raises(RuntimeError, match="idempotency conflict"):
@@ -1661,6 +1684,7 @@ def test_changed_revision_replay_conflict_precedes_stale_evaluation(
             "created_at": revised_at,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     with pytest.raises(RuntimeError, match="idempotency conflict"):
@@ -1871,6 +1895,8 @@ def test_revision_replay_rejects_inconsistent_result_version_event_type_or_targe
             "created_at": revised_at,
         },
     )
+    _insert_employer_authority(session, employer_id)
+    _insert_employer_authority(session, replay_target_employer_id)
     session.commit()
 
     with pytest.raises(SafePersistenceError, match="persistence operation failed"):
@@ -2053,6 +2079,7 @@ def test_revision_replay_after_later_revision_returns_current_truth_and_original
             "created_at": revised_at,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     result = revise_draft_employer(
@@ -2151,6 +2178,7 @@ def test_revision_races_use_two_read_committed_sessions_and_synchronization_barr
             "created_by": created_by,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     def run_and_capture(**kwargs):
@@ -2255,6 +2283,7 @@ def test_two_distinct_commands_with_same_expected_version_have_one_winner(
             "created_by": created_by,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     def run_and_capture(**kwargs):
@@ -2392,6 +2421,7 @@ def test_concurrent_identical_revision_command_has_one_update_receipt_and_event(
             "created_by": created_by,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     def run_and_capture(**kwargs):
@@ -2516,6 +2546,7 @@ def test_concurrent_same_key_changed_actor_or_payload_has_one_success_and_one_co
             "created_by": created_by,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     def run_and_capture(**kwargs):
@@ -2650,6 +2681,7 @@ def test_late_audit_failure_rolls_back_receipt_and_employer_update(
             "created_by": created_by,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     def raise_late_audit_failure(**_kwargs):
@@ -2812,6 +2844,7 @@ def test_revision_audit_event_is_minimized_for_each_allowed_changed_field_set(
             "created_by": created_by,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     result = revise_draft_employer(
@@ -2902,6 +2935,7 @@ def test_revision_persistence_failures_are_value_safe(
             "created_by": created_by,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     def raise_persistence_failure(**_kwargs):
@@ -3019,6 +3053,7 @@ def test_revision_rejects_invalid_display_name_without_writes(
             "created_by": created_by,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     with pytest.raises(ValueError, match=message):
@@ -3128,6 +3163,7 @@ def test_identical_revision_replay_rejects_malformed_receipt_result_version(
             "actor_id": principal.actor_id,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     monkeypatch.setattr(
@@ -3326,6 +3362,7 @@ def test_identical_revision_replay_rejects_current_version_behind_receipt_result
             "created_at": revised_at,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     with pytest.raises(SafePersistenceError, match="persistence operation failed"):

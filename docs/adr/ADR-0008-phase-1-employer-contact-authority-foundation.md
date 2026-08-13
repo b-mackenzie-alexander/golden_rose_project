@@ -1,10 +1,10 @@
 # ADR-0008 — Phase 1 EmployerContact authority foundation
 
-- **Status:** Accepted planning boundary — publication pending
+- **Status:** Accepted
 - **Date:** 2026-08-12
 - **Decision owner:** Beatrice, technical delivery owner
 - **Scope:** Accepted synthetic/local backend-only EmployerContact create, bounded parent collection-query, and exact-read planning slice after PR #18
-- **Acceptance:** Beatrice formally accepted this independently reviewed planning boundary on 2026-08-12. It remains non-implementable until the exact planning packet merges through protected `develop` and a separately authorized coding lane rebaselines from that merge tip.
+- **Acceptance:** Beatrice formally accepted this independently reviewed boundary on 2026-08-12. PR #19 merged the exact planning packet through protected `develop` at `745f9e8`, and a separately authorized coding lane then rebaselined from that merge tip onto `feat/employer-contact-authority-foundation`.
 
 ## Context and evidence posture
 
@@ -12,7 +12,7 @@ PR #18 merged the bounded draft-Employer revision remediation into protected `de
 
 The accepted Phase 1 structure requires `EmployerContact`, but field requiredness, contact lifecycle, named permissions, and the existing Employer-only receipt/audit foreign-key model must be resolved before code. Worksite, StaffingRequest, queue, calendar, map, and real identity work have more unresolved policy, privacy, or deployment dependencies and should not be bundled into this first adjacent-entity migration.
 
-This record is an accepted planning boundary. Exact-artifact API/security/privacy and persistence/migration/TDD closure reviews passed with no residual Blocker, High, or Medium findings. It is not coding authority until merged to protected `develop` and rebaselined from the resulting exact integration tip under separate implementation approval.
+This record is an accepted implementation boundary. Exact-artifact API/security/privacy and persistence/migration/TDD closure reviews passed with no residual Blocker, High, or Medium findings, PR #19 merged the planning packet into protected `develop` at `745f9e8`, and the separately approved coding lane rebaselined from that exact integration tip before implementation began.
 
 ## Accepted planning decision
 
@@ -117,4 +117,4 @@ Upgrade and downgrade run in one transaction under a fixed writer-compatible loc
 
 ## Publication and revisit trigger
 
-The accepted ADR and paired plan must merge through protected `develop` before a fresh implementation branch may treat them as authority. Revisit before adding contact methods, contact status, correction/supersession, browser behavior, name/global search, unbounded list/count, request opening rules, communications, public access, live data, or another authoritative entity type.
+The accepted ADR and paired plan merged through protected `develop` in PR #19 at `745f9e8`, and the fresh implementation branch now treats them as the controlling authority. Revisit before adding contact methods, contact status, correction/supersession, browser behavior, name/global search, unbounded list/count, request opening rules, communications, public access, live data, or another authoritative entity type.

@@ -36,6 +36,48 @@ class ReviseDraftEmployerRequest(BaseModel):
         return validate_employer_display_name(value)
 
 
+class EmployerContactCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    full_name: str
+
+
+class EmployerContactResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+    employer_contact_id: UUID
+    employer_id: UUID
+    full_name: str
+    version: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class EmployerContactSummaryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+    employer_contact_id: UUID
+    employer_id: UUID
+    full_name: str
+    version: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class EmployerContactQueryPageResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[EmployerContactSummaryResponse]
+    next_cursor: str | None
+
+
+class EmployerContactQueryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    page_size: int = Field(default=25, ge=1, le=50)
+    cursor: str | None = Field(default=None, max_length=512)
+
+
 class DraftEmployerResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

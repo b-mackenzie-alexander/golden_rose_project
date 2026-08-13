@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from golden_rose.api.errors import InvalidIdempotencyKeyError
 from golden_rose.auth.permissions import (
     CREATE_DRAFT_EMPLOYER_PERMISSION,
+    EMPLOYER_CONTACT_DRAFT_CREATE_PERMISSION,
+    EMPLOYER_CONTACT_READ_PERMISSION,
     EMPLOYER_DRAFT_REVISE_PERMISSION,
     EMPLOYER_READ_PERMISSION,
 )
@@ -48,6 +50,8 @@ def get_staff_principal(settings: Annotated[Settings, Depends(get_settings)]) ->
                 CREATE_DRAFT_EMPLOYER_PERMISSION,
                 EMPLOYER_READ_PERMISSION,
                 EMPLOYER_DRAFT_REVISE_PERMISSION,
+                EMPLOYER_CONTACT_DRAFT_CREATE_PERMISSION,
+                EMPLOYER_CONTACT_READ_PERMISSION,
             }
         ),
     )

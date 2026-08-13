@@ -23,6 +23,7 @@ from golden_rose.persistence.employers import (
     get_authoritative_employer_by_id,
     insert_draft_employer,
 )
+from golden_rose.persistence.entity_authorities import insert_employer_authority
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,6 +100,7 @@ def create_draft_employer(
             created_by=principal.actor_id,
             created_at=now,
         )
+        insert_employer_authority(session=session, employer_id=employer_id)
         insert_employer_created_event(
             session=session,
             audit_event_id=audit_event_id,

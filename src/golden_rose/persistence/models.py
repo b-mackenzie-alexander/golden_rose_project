@@ -1,7 +1,6 @@
 from sqlalchemy import (
     CheckConstraint,
     Column,
-    ForeignKey,
     ForeignKeyConstraint,
     Integer,
     MetaData,
@@ -36,6 +35,67 @@ employers = Table(
     CheckConstraint("version >= 1", name="ck_employers_version_positive"),
 )
 
+employer_contacts = Table(
+    "employer_contacts",
+    metadata,
+    Column("employer_contact_id", UUID(as_uuid=True), primary_key=True),
+    Column("employer_id", UUID(as_uuid=True), nullable=False),
+    Column("full_name", String(length=200), nullable=False),
+    Column("created_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("created_by", UUID(as_uuid=True), nullable=False),
+    Column("updated_by", UUID(as_uuid=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    ForeignKeyConstraint(
+        ["employer_id"],
+        ["employers.employer_id"],
+        name="fk_employer_contacts_employer",
+    ),
+    UniqueConstraint(
+        "employer_id",
+        "employer_contact_id",
+        name="uq_employer_contacts_parent_scoped_identity",
+    ),
+    CheckConstraint("btrim(full_name) <> ''", name="ck_employer_contacts_full_name_nonblank"),
+    CheckConstraint("version = 1", name="ck_employer_contacts_version_is_one"),
+)
+
+entity_authorities = Table(
+    "entity_authorities",
+    metadata,
+    Column("entity_type", String(length=32), primary_key=True),
+    Column("entity_id", UUID(as_uuid=True), primary_key=True),
+    Column("employer_id", UUID(as_uuid=True), nullable=True),
+    Column("employer_contact_id", UUID(as_uuid=True), nullable=True),
+    ForeignKeyConstraint(
+        ["employer_id"],
+        ["employers.employer_id"],
+        name="fk_entity_authorities_employer",
+        deferrable=True,
+        initially="DEFERRED",
+    ),
+    ForeignKeyConstraint(
+        ["employer_contact_id"],
+        ["employer_contacts.employer_contact_id"],
+        name="fk_entity_authorities_employer_contact",
+        deferrable=True,
+        initially="DEFERRED",
+    ),
+    UniqueConstraint("employer_id", name="uq_entity_authorities_employer_id"),
+    UniqueConstraint("employer_contact_id", name="uq_entity_authorities_employer_contact_id"),
+    CheckConstraint(
+        "entity_type IN ('employer', 'employer_contact')",
+        name="ck_entity_authorities_entity_type",
+    ),
+    CheckConstraint(
+        "((entity_type = 'employer' AND employer_id = entity_id "
+        "AND employer_contact_id IS NULL) OR "
+        "(entity_type = 'employer_contact' "
+        "AND employer_contact_id = entity_id AND employer_id IS NULL))",
+        name="ck_entity_authorities_exactly_one_concrete_id",
+    ),
+)
+
 command_receipts = Table(
     "command_receipts",
     metadata,
@@ -51,35 +111,46 @@ command_receipts = Table(
     Column("created_at", TIMESTAMP(timezone=True), nullable=False),
     CheckConstraint("command_schema_version = 1", name="ck_command_receipts_schema_version"),
     CheckConstraint(
-        "command_type IN ('create_draft_employer', 'revise_draft_employer')",
+        "command_type IN ("
+        "'create_draft_employer', 'create_employer_contact', 'revise_draft_employer'"
+        ")",
         name="ck_command_receipts_command_type",
     ),
     CheckConstraint(
         "octet_length(request_fingerprint) = 32", name="ck_command_receipts_request_fingerprint_len"
     ),
-    CheckConstraint("result_entity_type = 'employer'", name="ck_command_receipts_entity_type"),
+    CheckConstraint(
+        "result_entity_type IN ('employer', 'employer_contact')",
+        name="ck_command_receipts_entity_type",
+    ),
     CheckConstraint(
         "result_record_version >= 1", name="ck_command_receipts_result_record_version_positive"
     ),
     CheckConstraint(
         "((command_type = 'create_draft_employer' "
+        "AND result_entity_type = 'employer' "
         "AND result_event_type = 'employer.created' "
         "AND result_record_version = 1) OR "
+        "(command_type = 'create_employer_contact' "
+        "AND result_entity_type = 'employer_contact' "
+        "AND result_event_type = 'employer_contact.created' "
+        "AND result_record_version = 1) OR "
         "(command_type = 'revise_draft_employer' "
+        "AND result_entity_type = 'employer' "
         "AND result_event_type = 'employer.draft_revised' "
         "AND result_record_version >= 2))",
         name="ck_command_receipts_result_authority_shape",
     ),
     ForeignKeyConstraint(
-        ["result_entity_id"],
-        ["employers.employer_id"],
-        name="fk_command_receipts_result_employer",
+        ["result_entity_type", "result_entity_id"],
+        ["entity_authorities.entity_type", "entity_authorities.entity_id"],
+        name="fk_command_receipts_result_entity_authority",
         deferrable=True,
         initially="DEFERRED",
     ),
     ForeignKeyConstraint(
-        ["command_id", "result_entity_id"],
-        ["audit_events.command_id", "audit_events.entity_id"],
+        ["command_id", "result_entity_type", "result_entity_id"],
+        ["audit_events.command_id", "audit_events.entity_type", "audit_events.entity_id"],
         name="fk_command_receipts_creation_event",
         deferrable=True,
         initially="DEFERRED",
@@ -106,6 +177,13 @@ command_receipts = Table(
     UniqueConstraint("command_id", "result_entity_id", name="uq_command_receipts_command_result"),
     UniqueConstraint(
         "command_id",
+        "result_entity_type",
+        "result_entity_id",
+        name="uq_command_receipts_command_result_entity",
+    ),
+    UniqueConstraint(
+        "command_id",
+        "result_entity_type",
         "result_entity_id",
         "result_record_version",
         "result_event_type",
@@ -122,7 +200,7 @@ audit_events = Table(
     Column("event_schema_version", Integer, nullable=False),
     Column("event_type", String(length=64), nullable=False),
     Column("entity_type", String(length=32), nullable=False),
-    Column("entity_id", UUID(as_uuid=True), ForeignKey("employers.employer_id"), nullable=False),
+    Column("entity_id", UUID(as_uuid=True), nullable=False),
     Column("entity_sequence", Integer, nullable=False),
     Column("prior_record_version", Integer, nullable=False),
     Column("new_record_version", Integer, nullable=False),
@@ -143,7 +221,9 @@ audit_events = Table(
     UniqueConstraint(
         "entity_type", "entity_id", "entity_sequence", name="uq_audit_events_entity_sequence"
     ),
-    UniqueConstraint("command_id", "entity_id", name="uq_audit_events_command_entity"),
+    UniqueConstraint(
+        "command_id", "entity_type", "entity_id", name="uq_audit_events_command_entity"
+    ),
     UniqueConstraint("command_id", "event_type", name="uq_audit_events_command_event_type"),
     UniqueConstraint(
         "command_id",
@@ -154,16 +234,20 @@ audit_events = Table(
         name="uq_audit_events_result_authority",
     ),
     CheckConstraint(
-        "event_schema_name IN ('employer.created', 'employer.draft_revised')",
+        "event_schema_name IN ("
+        "'employer.created', 'employer_contact.created', 'employer.draft_revised'"
+        ")",
         name="ck_audit_events_schema_name",
     ),
     CheckConstraint("event_schema_name = event_type", name="ck_audit_events_schema_matches_type"),
     CheckConstraint("event_schema_version = 1", name="ck_audit_events_schema_version"),
     CheckConstraint(
-        "event_type IN ('employer.created', 'employer.draft_revised')",
+        "event_type IN ('employer.created', 'employer_contact.created', 'employer.draft_revised')",
         name="ck_audit_events_event_type",
     ),
-    CheckConstraint("entity_type = 'employer'", name="ck_audit_events_entity_type"),
+    CheckConstraint(
+        "entity_type IN ('employer', 'employer_contact')", name="ck_audit_events_entity_type"
+    ),
     CheckConstraint("actor_type = 'staff'", name="ck_audit_events_actor_type"),
     CheckConstraint(
         "correlation_id = command_id", name="ck_audit_events_correlation_matches_command"
@@ -182,9 +266,17 @@ audit_events = Table(
         name="ck_audit_events_one_step_version_advance",
     ),
     ForeignKeyConstraint(
-        ["command_id", "entity_id", "new_record_version", "event_type", "actor_id"],
+        ["entity_type", "entity_id"],
+        ["entity_authorities.entity_type", "entity_authorities.entity_id"],
+        name="fk_audit_events_entity_authority",
+        deferrable=True,
+        initially="DEFERRED",
+    ),
+    ForeignKeyConstraint(
+        ["command_id", "entity_type", "entity_id", "new_record_version", "event_type", "actor_id"],
         [
             "command_receipts.command_id",
+            "command_receipts.result_entity_type",
             "command_receipts.result_entity_id",
             "command_receipts.result_record_version",
             "command_receipts.result_event_type",

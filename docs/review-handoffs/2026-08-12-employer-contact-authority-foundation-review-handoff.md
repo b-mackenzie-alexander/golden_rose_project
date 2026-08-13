@@ -371,5 +371,6 @@ After independent rereview accepted the local surface, the slice was committed a
   - result: `284 passed, 1 warning` with total coverage `96.22%`
 
 ### Current disposition
-- This PR #20 remediation is local and uncommitted at the time of this addendum.
-- Required next steps: commit the remediation, run exact-range Gitleaks on the amended PR range, push, and monitor PR #20 checks.
+- The PR #20 remediation was committed as `f00de15` and pushed.
+- Exact-range Gitleaks across `745f9e88a23bea57c70a2e0fee7541c6984c65f7..f00de15af518e555a66c5ee354c85a634c5b3704` scanned `2 commits` and found no leaks.
+- PR #20 was monitored after the push until `application`, `check`, `enforce`, and CodeRabbit all reported success for `f00de15`.

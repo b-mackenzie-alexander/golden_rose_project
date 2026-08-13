@@ -2066,6 +2066,8 @@ def test_staff_employer_revision_openapi_exposes_only_approved_contract() -> Non
         schemas = document["components"]["schemas"]
 
         assert set(paths) == {
+            "/health",
+            "/readiness",
             "/api/staff/v1/employers",
             "/api/staff/v1/employers/search",
             "/api/staff/v1/employers/{employer_id}/revisions",
@@ -2074,6 +2076,8 @@ def test_staff_employer_revision_openapi_exposes_only_approved_contract() -> Non
             "/api/staff/v1/employers/{employer_id}/contacts/query",
             "/api/staff/v1/employers/{employer_id}/contacts/{employer_contact_id}",
         }
+        assert set(paths["/health"]) == {"get"}
+        assert set(paths["/readiness"]) == {"get"}
         revision_path = paths["/api/staff/v1/employers/{employer_id}/revisions"]
         assert set(revision_path) == {"post"}
         revision_operation = revision_path["post"]

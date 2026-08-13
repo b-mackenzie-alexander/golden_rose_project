@@ -20,6 +20,19 @@ class FixedClock:
         return self._now
 
 
+def _insert_employer_authority(session, employer_id: UUID) -> None:
+    session.execute(
+        text(
+            """
+            INSERT INTO entity_authorities (
+                entity_type, entity_id, employer_id, employer_contact_id
+            ) VALUES ('employer', :employer_id, :employer_id, NULL)
+            """
+        ),
+        {"employer_id": employer_id},
+    )
+
+
 def test_future_version_catch_up_rechecks_locked_values_and_rejects_noop(
     engine,
     session,
@@ -74,6 +87,7 @@ def test_future_version_catch_up_rechecks_locked_values_and_rejects_noop(
             "actor_id": principal.actor_id,
         },
     )
+    _insert_employer_authority(session, employer_id)
     session.commit()
 
     catch_up_reached_reservation = threading.Event()

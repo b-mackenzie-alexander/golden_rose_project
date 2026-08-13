@@ -102,3 +102,39 @@ def test_contact_cursor_rejects_malformed_noncanonical_cross_parent_and_page_siz
                 expected_employer_id=employer_id,
                 expected_page_size=25,
             )
+
+
+def test_contact_cursor_rejects_non_object_or_malformed_payload_shapes() -> None:
+    boundary_created_at = datetime(2026, 8, 12, 23, 10, 0, tzinfo=UTC)
+    employer_id = UUID("d5d5d5d5-d5d5-45d5-85d5-d5d5d5d5d5d5")
+    employer_contact_id = UUID("d6d6d6d6-d6d6-46d6-86d6-d6d6d6d6d6d6")
+    valid_payload = {
+        "after_created_at": boundary_created_at.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+        "after_employer_contact_id": str(employer_contact_id),
+        "employer_id": str(employer_id),
+        "page_size": 25,
+        "v": 1,
+    }
+
+    def encode_payload(payload: object) -> str:
+        return (
+            urlsafe_b64encode(
+                json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            )
+            .decode("ascii")
+            .rstrip("=")
+        )
+
+    malformed_payloads: list[object] = [
+        [],
+        {key: value for key, value in valid_payload.items() if key != "v"},
+        {**valid_payload, "v": 2},
+        {**valid_payload, "page_size": "25"},
+        {**valid_payload, "after_created_at": 123},
+        {**valid_payload, "employer_id": 123},
+        {**valid_payload, "after_employer_contact_id": 123},
+    ]
+
+    for payload in malformed_payloads:
+        with pytest.raises(ValueError, match="invalid contact cursor"):
+            decode_contact_cursor(encode_payload(payload))

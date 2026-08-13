@@ -342,3 +342,34 @@ The next independent rereview confirmed the named blockers from addendum 14 were
 - The review surface is still the **local uncommitted working tree** on `feat/employer-contact-authority-foundation` above `origin/develop`.
 - The broader migration/application authority-harness blockers identified by the latest rereview are now remediated and locally reverified.
 - This slice remains **not** commit/push/PR-ready yet, because the remediation itself is uncommitted and still requires independent rereview of the exact live working-tree surface.
+
+## 16. 2026-08-13 PR #20 application-check remediation addendum
+
+After independent rereview accepted the local surface, the slice was committed as `42363c1` and opened as PR #20. The required `application` check failed during the full CI command:
+
+- `uv run pytest --cov=golden_rose --cov-report=term-missing --cov-fail-under=95`
+
+### Observed CI failure class
+- The failing tests were in `tests/integration/application/test_revise_draft_employer.py` and `tests/integration/application/test_revise_draft_employer_post_merge.py`.
+- The common failure was stale full-suite revision harness data: manual Employer fixtures inserted `employers`, and sometimes matching receipt/event rows, without the typed `entity_authorities` row now required by the generalized authority spine.
+- The failures surfaced as `fk_command_receipts_result_entity_authority` and `fk_audit_events_entity_authority` violations before the tests reached their intended revision receipt/event/replay/concurrency assertions.
+- The below-threshold coverage line in CI was a consequence of the aborted failing pytest run, not the primary defect.
+
+### Narrow remediation applied locally
+- Added a local `_insert_employer_authority(...)` helper to `tests/integration/application/test_revise_draft_employer.py`.
+- Added a local `_insert_employer_authority(...)` helper to `tests/integration/application/test_revise_draft_employer_post_merge.py`.
+- Seeded typed Employer authority rows for manual Employer fixtures intended to proceed to revision command/audit/replay/concurrency assertions.
+- In the inconsistent-target replay regression, seeded authority for both the requested employer and the replay-target employer so the test reaches the intended malformed-authority replay boundary rather than failing early on the registry FK.
+
+### Exact local repro after remediation
+- `env -u PYTHONPATH GOLDEN_ROSE_DATABASE_URL='[REDACTED]' uv run pytest tests/integration/application/test_revise_draft_employer.py tests/integration/application/test_revise_draft_employer_post_merge.py -q`
+  - result: `29 passed in 0.85s`
+- The first full local rerun of CI's pytest command then reached completion but still failed the coverage threshold at `94.45%`, so a bounded contact-cursor unit regression was added to cover approved malformed payload-shape rejection branches.
+- `env -u PYTHONPATH uv run pytest tests/unit/application/test_contact_cursor.py -q`
+  - result: `3 passed in 0.28s`
+- `env -u PYTHONPATH GOLDEN_ROSE_ENVIRONMENT=test GOLDEN_ROSE_AUTH_MODE=synthetic GOLDEN_ROSE_SYNTHETIC_STAFF_ID='[REDACTED]' GOLDEN_ROSE_DATABASE_URL='[REDACTED]' uv run pytest --cov=golden_rose --cov-report=term-missing --cov-fail-under=95`
+  - result: `284 passed, 1 warning` with total coverage `96.22%`
+
+### Current disposition
+- This PR #20 remediation is local and uncommitted at the time of this addendum.
+- Required next steps: commit the remediation, run exact-range Gitleaks on the amended PR range, push, and monitor PR #20 checks.

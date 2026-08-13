@@ -1,6 +1,6 @@
 # Architecture — Golden Rose Operations Platform
 
-**Status:** Accepted Phase 1 structural/security baseline with slice-scoped implementation decisions. It does not describe an approved cloud deployment or running system.
+**Status:** Accepted Phase 1 structural/security baseline with a proposed GCP `develop` deployment boundary in ADR-0009. No cloud deployment or running shared system exists yet.
 
 ## Architectural posture
 Start with one modular product and a relational operational core. Preserve explicit trust boundaries and auditability without prematurely splitting into microservices.
@@ -48,9 +48,10 @@ Material operational changes preserve the accepted event envelope, changed-field
 
 ## Accepted and proposed technology direction
 - ADR-0005 accepts React 19, TypeScript 5.9, Vite 8, npm, Vitest/Testing Library, plain CSS, and a typed English/Spanish catalog for the first local/synthetic staff browser slice. PR #12 merged that planning packet into `develop`, and PR #13 merged the first implementation.
-- ADR-0006 governed the post-merge closeout merged by PR #15 at `7ae448e`. ADR-0007 governed the bounded draft-Employer revision implementation merged by PR #17 at `1543248`; PR #18 merged the requested-target, locked-row no-op/changed-field, and safe-persistence remediation at `a4d8f90`. PR #19 then merged ADR-0008 into protected `develop` at `745f9e8`; the separately authorized branch `feat/employer-contact-authority-foundation` has now completed the approved exact-node implementation list locally and sits at independent-review handoff on the uncommitted working tree. Human browser/manual accessibility/fluent-language review, deployment/runtime-role immutability, and load/pool sizing remain deferred gates.
+- ADR-0006 governed the closeout merged by PR #15. ADR-0007 governed draft-Employer revision merged by PR #17 and remediated by PR #18. PR #20 merged ADR-0008's independently reviewed EmployerContact authority implementation at `6eb05d5`. Accepted ADR-0009 defines the planning boundary for a private synthetic-only GCP `develop` target; human browser/manual accessibility/fluent-language review and deployment/runtime-role qualification remain future evidence gates.
 - ADR-0003 accepts Python 3.12, uv, FastAPI/Pydantic v2, synchronous SQLAlchemy 2/psycopg 3, Alembic, and PostgreSQL 16 for the first backend slice.
 - GCP is the selected platform. Cloud Run + Cloud SQL is the managed-container/database baseline; private Cloud Storage, Secret Manager, Artifact Registry, Cloud Logging/Monitoring, and GitHub Actions with Workload Identity Federation are the proposed supporting services. Exact region, account/billing topology, identity, network, recovery, and service configuration remain separately gated. `us-east4` is the current East-US/NYC-area-friendly region candidate pending exact service, cost, and recovery validation; EU primary, active-secondary, or default-backup placement is not proposed.
+- ADR-0009 proposes one private same-origin staff-app Cloud Run service for the first shared tracer, an explicit one-shot migration job, Cloud SQL PostgreSQL 16, distinct runtime/migration/deploy identities and database roles, Terraform, digest promotion, Secret Manager, and value-safe observability. Cloud Run IAM is only an outer test-access perimeter while synthetic application authentication remains; it is not staff business authorization.
 - GitHub-based CI/CD and repository governance as code; exact provider/account configuration remains unapproved.
 
 See `TECHNOLOGY_DECISIONS.md` for rationale and `docs/adr/` for durable decisions.
@@ -64,7 +65,7 @@ See `TECHNOLOGY_DECISIONS.md` for rationale and `docs/adr/` for durable decision
 
 ## Environment and promotion model
 ```text
-feat/*    → PR/CI → develop (isolated non-production, synthetic/approved data)
+feat/*    → PR/CI → develop (isolated non-production; wholly fictional synthetic data under ADR-0009)
 develop   → PR/release evidence → main (immutable production candidate)
 main artifact → protected explicit production promotion
 ```
@@ -77,7 +78,7 @@ ADR-0004 controls the implemented second bounded local/test slice: one `employer
 
 ADR-0005 accepts the first standalone staff browser application boundary under `apps/web/`. Before browser consumption it adds `Cache-Control: no-store` to fresh and replayed create successes without changing status, body, authority, idempotency, persistence, route, or schema. It then consumes the Employer create/search/detail contracts through relative staff API paths, keeps Employer/search/command state in memory rather than URLs or browser persistence, and requires English/Spanish parity plus accessibility and frontend quality/security evidence. PR #13 merged that bounded implementation to `develop`.
 
-ADR-0006 controlled the closeout merged by PR #15 without widening domain scope or claiming deferred human qualification. ADR-0007 and its paired plan controlled the bounded draft-Employer revision merged by PR #17 at `1543248`; PR #18 merged its same-boundary post-merge remediation at `a4d8f90`. ADR-0008 is no longer planning-only: the accepted packet merged through protected `develop` in PR #19 at `745f9e8`, the exact-tip coding branch implemented the currently approved node list locally, and the current stop boundary is independent review handoff rather than further adjacent implementation.
+ADR-0006 controlled the closeout merged by PR #15. ADR-0007 controlled draft-Employer revision merged by PR #17 and remediated by PR #18. ADR-0008's implementation merged through PR #20 at `6eb05d5`. ADR-0009 and its paired plan are accepted planning artifacts only; the current stop boundary is protected planning publication/merge before any fresh runtime/container planning or implementation, while IaC, provisioning, and deployment remain separately gated.
 
 ## Interim infrastructure billing and handoff
 - **Accepted contractual constraint:** Beatrice is responsible for paying approved cloud-infrastructure charges until the final payment for the engagement has been rendered. Billing responsibility then transfers to the client through a documented handoff.
@@ -85,4 +86,4 @@ ADR-0006 controlled the closeout merged by PR #15 without widening domain scope 
 - The handoff record must identify the billing owner, account/project ownership, budget-alert recipients, support/incident contacts, recovery access, and effective transfer date. It does not itself authorize production provisioning, production-data use, or feature expansion.
 
 ## Deferred architecture decisions
-Identity provider; GCP region and account/billing topology; production topology; infrastructure-as-code implementation; document/malware-scanning services; background workers; messaging/signature/payment/screening integrations; RTO/RPO; WAF/CDN/network design; and exact dashboard/reporting technology.
+Identity provider; accepted GCP region and account/billing/state topology; named cloud/support roles; develop cost and recovery targets; production topology; document/malware-scanning services; background workers; messaging/signature/payment/screening integrations; production RTO/RPO; WAF/CDN/network design; and exact dashboard/reporting technology.

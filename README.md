@@ -2,8 +2,8 @@
 
 This repository contains bounded synthetic/local tracers for the Golden Rose
 staff employer-demand workflow. The first staff Employer browser workspace,
-its closeout, and the bounded draft-Employer revision slice are merged into
-`develop`.
+its closeout, bounded draft-Employer revision, and backend EmployerContact
+authority foundation are merged into `develop`.
 This is not a public portal, production deployment, or
 automated hiring, matching, ranking, eligibility, or referral system.
 
@@ -25,17 +25,14 @@ automated hiring, matching, ranking, eligibility, or referral system.
 - ADR-0006 governs the closeout merged by PR #15. ADR-0007 and its paired plan
   govern the draft-revision implementation merged by PR #17 at `1543248`;
   PR #18 merged its bounded remediation at `a4d8f90`.
-- PR #19 merged the accepted ADR-0008 planning packet into `develop` at
-  `745f9e8`, and the separately authorized coding lane now runs on
-  `feat/employer-contact-authority-foundation` from that exact tip.
-- The current local review surface is the backend-only EmployerContact
-  authority foundation: nested create, bounded parent collection-query,
-  exact-read, and the typed receipt/audit authority generalization. The exact
-  approved node list is locally complete, a durable handoff packet now exists
-  at `docs/review-handoffs/2026-08-12-employer-contact-authority-foundation-review-handoff.md`,
-  and the next step is independent review of the uncommitted working tree. No
-  browser, broader Phase 1 entity, deployment, or live-data expansion is
-  authorized by this slice.
+- PR #20 merged the independently reviewed ADR-0008 EmployerContact authority
+  implementation into `develop` at `6eb05d5`: nested create, bounded parent
+  collection-query, exact read, and typed receipt/audit authority.
+- Accepted ADR-0009 and the paired GCP `develop` deployment-foundation plan are
+  planning-only. They target one private, fictional-synthetic-only Cloud Run +
+  Cloud SQL testing environment after separate implementation and provisioning
+  approvals. No cloud resource, public access, real identity, live/client data,
+  or production claim is currently authorized or present.
 - Automated frontend parity/accessibility evidence exists locally, but human
   browser/manual accessibility/fluent-language qualification remains deferred
   until a shared deployed `develop` target exists.
@@ -65,5 +62,6 @@ uv run python scripts/validate_sbom.py build/backend-sbom.cdx.json --spec 1.6 --
 ```
 
 The application must not be started against production settings with synthetic
-authentication. No infrastructure, public route, real identity integration, or
-live-data use is authorized by this tracer.
+authentication. The proposed deployment plan does not itself authorize
+infrastructure creation or startup; public access, real identity integration,
+live-data use, and production remain separately gated.

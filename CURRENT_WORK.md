@@ -1,9 +1,9 @@
 # Current Work — Golden Rose Operations Platform
 
 **Updated:** 2026-08-13
-**Lane:** Phase 1 independent review handoff lane — EmployerContact authority foundation
-**Verification:** PR #19 merged the accepted ADR-0008 EmployerContact planning packet into protected `develop` at `745f9e8`; `develop == origin/develop == 745f9e8` after fetch/prune with a clean tree. Under Beatrice's separate implementation approval, a fresh `feat/employer-contact-authority-foundation` branch was created from that exact merged tip. No `0004` Alembic revision existed before branch creation, so the approved migration slot remains available.
-**Overall status:** PR #20 is open for the ADR-0008 EmployerContact authority foundation slice and the pushed remediation head `f00de15` has cleared the previously failing required `application` CI gate. The failure was reproduced locally in the same integration surface: full-suite revision tests manually seeded Employer rows without the typed `entity_authorities` prerequisite now required by the generalized authority spine, and the first local full-suite rerun then exposed coverage below the CI threshold. The remediation seeds authority rows in the affected revision harness fixtures and adds a bounded contact-cursor malformed-payload regression; final local gates passed, exact-range Gitleaks found no leaks across `745f9e8..f00de15`, and PR #20 now reports `application`, `check`, `enforce`, and CodeRabbit green for `f00de15`. Broad roadmap epics remain incomplete.
+**Lane:** Phase 0.5 planning — private synthetic GCP `develop` deployment foundation
+**Verification:** PR #20 merged the independently reviewed EmployerContact authority foundation into protected `develop` at `6eb05d5`. After fetch/prune, local `develop` was fast-forwarded to that exact tip and fresh planning branch `docs/gcp-develop-deployment-plan` was created from it with a clean tree.
+**Overall status:** The current tracer now includes backend EmployerContact create, bounded parent query, exact read, and typed receipt/audit authority, but broad Phase 1 product epics remain incomplete. Beatrice approved a planning-only transition toward an isolated GCP `develop` environment for facilitator visibility and shared testing. ADR-0009 and `.hermes/plans/2026-08-13_145234-gcp-develop-deployment-foundation-plan.md` define a private, fictional-synthetic-only Cloud Run + Cloud SQL path. The first independent review requested remediation of two High and seven Medium planning gaps; the exact remediated artifacts then received ACCEPT across cloud security/IAM/logging/governance, runtime/container/database/migration, and cross-document evidence review with no remaining Blocker, High, or Medium findings. Beatrice explicitly accepted the packet on 2026-08-13. It remains uncommitted and unmerged; acceptance authorizes only planning publication, not product/runtime code, Terraform apply, billing linkage, cloud resources, credentials, image push, deployment, service start, public access, real identity, or live/client data.
 
 ## Active objective
 Turn the completed initial discovery baseline into an approved, narrow first delivery: an agency-staff pilot for employer demand entry and retrieval, followed by a governed dashboard and transparent worker/employer comparison aid.
@@ -30,10 +30,10 @@ Turn the completed initial discovery baseline into an approved, narrow first del
 - Accepted correction/audit baseline: PostgreSQL domain rows hold current operational truth; append-only `AuditEvent` records preserve material history through atomic expected-version/idempotent commands; restricted prior/new values remain field-authorized; and derived projections are disposable rather than competing record stores. `docs/planning/phase-1-correction-audit-event-contract.md` is authoritative.
 
 ## Immediate next steps
-1. Keep `feat/employer-contact-authority-foundation` anchored to exact merged `develop` tip `745f9e8`; do not widen scope beyond ADR-0008 and the paired plan.
-2. Keep PR #20 under normal review discipline on head `f00de15`; the application/check/enforce statuses are green after the CI-remediation push.
-3. If review requests more changes, repeat the same sequence: reproduce first, patch narrowly, rerun final-head gates, run exact-range Gitleaks on `origin/develop..HEAD`, push, and monitor required checks.
-4. Preserve the separate approval gates for PostgreSQL service use, deployment, real identity, and live/client data; the coding approval for this slice does not waive those runtime/data boundaries.
+1. Complete committed-head planning-only closeout, exact-range secret scanning, push, PR review, and merge through protected `develop`; do not treat planning merge as implementation or provisioning approval.
+2. Resolve the plan's pre-IaC decisions before provisioning: region, non-production cost/budget, project/billing/state ownership, named cloud/support roles, Cloud SQL recovery posture, private tester access, and retained evidence.
+3. Create a fresh exact-tip implementation plan/branch for the locally verifiable runtime/container contract only after the planning packet merges and separate coding approval is given.
+4. Preserve separate explicit gates for GCP provisioning, billing linkage, secrets, first migration/deployment, real identity, live/client data, and production. Facilitator visibility must not weaken private access or overstate product readiness.
 
 ## Gate classification
 
@@ -75,7 +75,7 @@ The complete discovery inventory and evidence rules are in `docs/planning/phase-
 - PR #14 merged the independently reviewed closeout plan into `develop` at `b0a459b`.
 - PR #15 merged the independently rereviewed and exact-head-qualified closeout plus ADR-0006 into `develop` at `7ae448e`; the retired closeout branch is historical.
 - PR #16 merged the accepted ADR-0007 draft-revision planning packet into `develop` at `1c66eeb`.
-- PR #17 merged the bounded synthetic/local draft-Employer revision implementation into protected `develop` at `1543248`; PR #18 merged its independently rereviewed remediation at `a4d8f90`, and both feature branches are historical. PR #19 then merged the accepted ADR-0008 EmployerContact planning packet into protected `develop` at `745f9e8`. Under separate approval, the coding lane was rebaselined from that exact tip onto `feat/employer-contact-authority-foundation`; implementation is now authorized only within the reviewed ADR-0008 boundary.
+- PR #17 merged the bounded synthetic/local draft-Employer revision implementation into protected `develop` at `1543248`; PR #18 merged its independently rereviewed remediation at `a4d8f90`. PR #19 merged the accepted ADR-0008 planning packet at `745f9e8`, and PR #20 merged its independently reviewed EmployerContact authority implementation at `6eb05d5`. Those feature branches are historical; the active planning branch starts exactly from the PR #20 merged tip.
 
 ## Repository bootstrap state
 - The initial tracked baseline contains the living documents, ADR convention, and a protective `.gitignore`.

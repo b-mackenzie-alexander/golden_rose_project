@@ -2,7 +2,7 @@
 
 This directory contains the repo-local Terraform scaffold for the Golden Rose private `develop` environment. PR #24 merged this validate-without-apply, local-validation, and static-policy surface into protected `develop` at `50451b3`.
 
-Independent post-merge review did not clear this scaffold as a provisioning/deployment baseline. PR #25 merged that documentation-only disposition at `8dc1198`. ADR-0010 and `.hermes/plans/2026-08-14_164545-pr24-terraform-remediation-plan.md` now define a separate validate-without-apply remediation for required-CI governance, semantic static-policy validation, deterministic `uv`, Cloud Run/private-SQL connectivity, API ordering, Cloud SQL backups, and managed Artifact Registry image authority before bootstrap implementation, plan, or apply.
+Independent post-merge review did not clear this scaffold as a provisioning/deployment baseline. PR #25 merged that documentation-only disposition at `8dc1198`, and PR #26 merged the original ADR-0010 plan at `c5a1380`. Because no independent reviewer/CODEOWNER exists, ADR-0011 and `.hermes/plans/2026-08-14_174830-pr24-solo-maintainer-remediation-amendment-plan.md` propose a truthful successor: the same-repository CI High remains open while only semantic static-policy validation, deterministic `uv`, Cloud Run/private-SQL declaration, API ordering, Cloud SQL backups, and managed Artifact Registry image authority are re-planned as validate-without-apply work. Bootstrap implementation, plan, and apply remain blocked.
 
 Terraform is executed from `infra/gcp`. The root module declares `module "develop"` in `develop.tf` and loads the intended resource scaffold from `infra/gcp/develop/`; nested files are not relied on through recursive file presence alone. Local review must prove `terraform -chdir=infra/gcp graph` includes the expected `module.develop.google_*` resource nodes.
 
@@ -38,8 +38,9 @@ authority and requires every workflow `uses:` action reference to be pinned to a
 40-character commit SHA; this is not limited to `infrastructure*` workflow filenames.
 Independent final-head probes proved that the current implementation is still a
 lexically bypassable policy boundary despite those checks. Do not treat it as
-semantic or fail-closed until ADR-0010's parser and adversarial tests are
-implemented and independently cleared.
+semantic or fail-closed until the successor ADR-0011 parser and adversarial
+tests are implemented and qualified under the solo-maintainer protocol. That
+protocol is quality evidence, not independent authorization.
 
 ## Explicit non-scope
 

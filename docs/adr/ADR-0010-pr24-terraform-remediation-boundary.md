@@ -1,13 +1,13 @@
 # ADR-0010: PR #24 Terraform remediation boundary
 
-- **Status:** Accepted planning boundary; implementation requires a separate authorized branch
+- **Status:** Accepted historical planning boundary; execution supersession proposed in ADR-0011
 - **Date:** 2026-08-14
-- **Owners:** Beatrice Alexander (engagement owner); independently controlled CODEOWNER required before implementation
-- **Related:** ADR-0001, ADR-0009, `.hermes/plans/2026-08-14_164545-pr24-terraform-remediation-plan.md`
+- **Owners:** Beatrice Alexander (engagement owner)
+- **Related:** ADR-0001, ADR-0009, ADR-0011, `.hermes/plans/2026-08-14_164545-pr24-terraform-remediation-plan.md`, `.hermes/plans/2026-08-14_174830-pr24-solo-maintainer-remediation-amendment-plan.md`
 
 ## Context and evidence posture
 
-PR #24 merged a backend-free Terraform validation scaffold into protected `develop` at `50451b3`. Its configured checks passed, but independent final-head review found two High and five Medium defects. PR #25 merged the documentation-only disposition into `develop` at `8dc1198` and did not remediate implementation or grant cloud authority.
+PR #24 merged a backend-free Terraform validation scaffold into protected `develop` at `50451b3`. Its configured checks passed, but independent final-head review found two High and five Medium defects. PR #25 merged the documentation-only disposition into `develop` at `8dc1198`, and PR #26 merged this original planning packet at `c5a1380`; neither event remediated implementation or granted cloud authority. Live evidence then established that no independently controlled reviewer/CODEOWNER exists in this single-maintainer repository. ADR-0011 proposes the successor execution boundary.
 
 Validated findings:
 

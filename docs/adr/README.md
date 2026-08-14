@@ -22,6 +22,7 @@ Use `ADR-NNNN-short-title.md`, with monotonic numbers. Never renumber an existin
 - `ADR-0008-phase-1-employer-contact-authority-foundation.md` — accepted and implemented backend-only synthetic/local EmployerContact create, bounded parent query, exact read, and typed receipt/audit authority; PR #20 merged the independently reviewed implementation into protected `develop` at `6eb05d5`.
 - `ADR-0009-gcp-develop-deployment-boundary.md` — accepted private, fictional-synthetic-only GCP `develop` boundary; PR #24 merged local validate-without-apply scaffolding, but final-head findings require remediation before bootstrap/state/WIF implementation or cloud-authorized work.
 - `ADR-0010-pr24-terraform-remediation-boundary.md` — accepted planning-only boundary for independent CI authority, semantic static policy, deterministic `uv`, Direct VPC private-SQL connectivity, API ordering, automated backups, and managed-registry digest authority; implementation remains separately gated.
+- `ADR-0011-pr24-solo-maintainer-remediation-boundary.md` — proposed successor planning boundary for a single-maintainer repository: retain the self-authorizing-CI High as open residual risk, avoid review/CODEOWNER theater, and re-plan only six static validate-without-apply tasks.
 
 ## Required sections
 - Status and date

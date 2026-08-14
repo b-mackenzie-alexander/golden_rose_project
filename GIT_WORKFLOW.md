@@ -60,26 +60,12 @@ qualified immutable artifact → explicit protected production promotion
 
 Required review escalation applies to authentication/authorization, staff/public boundaries, secrets, data access, migrations, documents/receipts, payments, exports, logging/audit, dependencies, infrastructure/IaC, and deployment controls.
 
-### Independent authority prerequisite
-The historical solo-maintainer protocol preserved review evidence but did not
-eliminate self-authorization: same-repository workflow status contexts are
-emitted by files that a pull request may edit. ADR-0010 therefore requires a real
-non-author GitHub reviewer/CODEOWNER before PR #24 remediation implementation.
-The reviewer must be another accountable person with an independently
-controlled account, not the author, last pusher, an author-controlled alternate
-account, or an agent using the author's credentials. Protected branches will
-require one approval, stale-review dismissal, CODEOWNER review, and approval
-after the latest push. Until an eligible reviewer is nominated, implementation
-stops and the required-CI High remains open.
+### Solo-maintainer authority boundary
+The historical solo-maintainer protocol preserves useful quality evidence but does not eliminate self-authorization: same-repository status contexts are emitted by files that a pull request may edit. This repository has no independently controlled reviewer/CODEOWNER. ADR-0011 therefore retains the PR #24 required-CI issue as High/open accepted residual risk rather than fabricating an approval boundary.
 
-With one independent reviewer, the author pushes review corrections and the
-reviewer approves the resulting head. If the reviewer becomes the latest
-pusher, a second eligible non-last-pusher approver is required; do not weaken or
-bypass last-push approval to avoid that result.
+The actual policy remains zero required approvals, no CODEOWNER review, and no last-push approval. PRs, owned required checks, strict update-before-merge, stale-review dismissal, conversation resolution, administrator enforcement, deletion/force-push prevention, exact-head local qualification, exact-range secret scanning, and documented owner merge rationale are quality controls—not independent authorization. Delegated or separate-session review evidence must be labeled accordingly.
 
-The bootstrap remediation PR must receive that independent review. After merge,
-repository policy is applied from protected `develop` only under separate
-explicit authorization and read back before the control is called operational.
+`Terraform static validation` may be added as a required quality context only after its unconditional producer is qualified and the merged policy is separately authorized for application/read-back from protected `develop`. It must never be described as immutable or independent. The open High blocks bootstrap/state/WIF, cloud authentication/inspection, Terraform plan/apply, provisioning, deployment, and production work until an independently controlled authority is actually available and separately cleared.
 
 ## Required checks (target state)
 - Branch policy.

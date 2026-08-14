@@ -2,11 +2,11 @@
 
 > Planning packet only. Do not implement from this branch. The later implementation requires a fresh branch from the exact merged `develop` tip, explicit authorization, strict RED → GREEN execution, independent review, and protected promotion.
 
-**Status:** Accepted planning boundary; implementation not authorized
+**Status:** Accepted historical planning boundary; execution supersession proposed in ADR-0011
 **Date:** 2026-08-14
 **Planning base:** `origin/develop` at `8dc1198c0eb571ca39e9f4814bb3af5e33079890` (PR #25 merge)
 **Planning branch:** `docs/pr24-remediation-plan`
-**Controlling decision:** `docs/adr/ADR-0010-pr24-terraform-remediation-boundary.md`
+**Controlling decision:** `docs/adr/ADR-0010-pr24-terraform-remediation-boundary.md`; proposed successor `docs/adr/ADR-0011-pr24-solo-maintainer-remediation-boundary.md`
 **Review handoff:** `docs/review-handoffs/2026-08-14-pr24-remediation-plan-review-handoff.md`
 
 ## Goal

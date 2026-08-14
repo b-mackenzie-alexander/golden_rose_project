@@ -1,6 +1,6 @@
 # Architecture — Golden Rose Operations Platform
 
-**Status:** Accepted Phase 1 structural/security baseline with ADR-0009's private GCP `develop` deployment boundary, PR #22's merged local runtime/container contract, and PR #24's merged validate-without-apply Terraform scaffold. PR #26 merged ADR-0010's original remediation plan at `c5a1380`, but its independent-review prerequisite cannot operate in this single-maintainer repository. ADR-0011 proposes a successor that keeps the CI-authority High open while re-planning six static tasks; bootstrap/state/WIF, cloud deployment, and a running shared system remain blocked.
+**Status:** Accepted Phase 1 structural/security baseline with ADR-0009's private GCP `develop` deployment boundary, PR #22's merged local runtime/container contract, and PR #24's merged validate-without-apply Terraform scaffold. PR #27 merged accepted ADR-0011 at `23f97cc7`, which keeps the CI-authority High open while authorizing six static tasks from a fresh merged-tip branch; bootstrap/state/WIF, cloud deployment, and a running shared system remain blocked.
 
 ## Architectural posture
 Start with one modular product and a relational operational core. Preserve explicit trust boundaries and auditability without prematurely splitting into microservices.

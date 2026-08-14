@@ -1,9 +1,9 @@
 # ADR-0011: PR #24 solo-maintainer remediation boundary
 
-- **Status:** Proposed planning boundary; no implementation authorization
+- **Status:** Accepted planning boundary; implementation requires a fresh branch from the merged acceptance tip
 - **Date:** 2026-08-14
 - **Owner:** Beatrice Alexander (engagement owner and sole repository maintainer)
-- **Supersedes on acceptance:** ADR-0010's independent-review execution prerequisite and its seven-node execution plan
+- **Supersedes:** ADR-0010's independent-review execution prerequisite and its seven-node execution plan
 - **Related:** ADR-0001, ADR-0009, ADR-0010, `.hermes/plans/2026-08-14_174830-pr24-solo-maintainer-remediation-amendment-plan.md`
 
 ## Context and evidence posture
@@ -81,7 +81,7 @@ Deferred. It may provide a stronger future control but is broader than this plan
 
 ## Approval, evidence, and revisit triggers
 
-This ADR is proposed for a planning-only PR. It authorizes no implementation until its successor plan is accepted and merged. The planning PR must state that no independent GitHub authority exists and that the High remains open.
+Beatrice accepted this ADR on 2026-08-14. PR #27 merged the planning-only packet into protected `develop` at `23f97cc7e5a0137da942e4f7aa69c77c56e24210`. A fresh implementation branch may execute only the six static tasks under the paired accepted plan; the planning merge does not close the High or authorize bootstrap/state/WIF, cloud-mutating, or deployment work.
 
 Revisit this ADR if:
 

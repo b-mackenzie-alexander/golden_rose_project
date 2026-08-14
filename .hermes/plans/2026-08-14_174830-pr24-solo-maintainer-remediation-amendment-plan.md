@@ -2,6 +2,8 @@
 
 > **For Hermes:** This is a planning-only amendment. Do not edit Terraform, workflows, policy scripts, dependencies, tests, branch protection, or cloud resources from this plan. Publish and accept the replacement decision/plan before creating any implementation branch.
 
+**Status:** Accepted planning boundary; PR #27 merged to protected `develop` at `23f97cc7e5a0137da942e4f7aa69c77c56e24210`
+
 **Goal:** Replace ADR-0010’s impossible independent-review prerequisite with a truthful solo-maintainer control model while preserving the required-CI finding as an accepted, explicitly bounded residual risk and retaining the six implementable static-remediation tasks.
 
 **Architecture:** The repository remains a personal, single-maintainer repository with classic GitHub branch protection. Required same-repository CI contexts remain useful qualification signals but cannot be represented as independent authorization because the pull request may edit their producers. The revised boundary therefore separates (1) local/static quality controls that can be strengthened now from (2) independent-authorization controls that are unavailable and remain open for every future cloud-mutating or deployment action.

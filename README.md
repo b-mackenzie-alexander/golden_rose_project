@@ -60,10 +60,10 @@ automated hiring, matching, ranking, eligibility, or referral system.
   PR #25 merged the documentation-only disposition at `8dc1198`, and PR #26
   merged the original remediation planning packet at `c5a1380`. Because this is
   a single-maintainer repository with no independent reviewer/CODEOWNER,
-  ADR-0011 and `.hermes/plans/2026-08-14_174830-pr24-solo-maintainer-remediation-amendment-plan.md`
-  propose a truthful successor: the self-authorizing-CI High remains open while
-  only six static validate-without-apply tasks are re-planned. Bootstrap and
-  cloud/deployment work remain blocked.
+  PR #27 merged accepted ADR-0011 and its paired plan at `23f97cc7`: the
+  self-authorizing-CI High remains open while only six static
+  validate-without-apply tasks may begin from a fresh merged-tip branch.
+  Bootstrap and cloud/deployment work remain blocked.
 - Automated frontend parity/accessibility evidence exists locally, but human
   browser/manual accessibility/fluent-language qualification remains deferred
   until a shared deployed `develop` target exists.

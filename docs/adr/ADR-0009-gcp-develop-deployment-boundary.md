@@ -17,7 +17,8 @@ The following claims are classified separately:
 - **Observed:** the current database migrations use application-level triggers and constraints, but the local/test database owner can bypass them through owner-level DDL, trigger changes, or `TRUNCATE`; runtime-role immutability therefore remains unqualified.
 - **Reported by Beatrice:** the facilitator is requesting greater visibility into progress.
 - **Accepted direction:** begin a safe GCP non-production deployment program using fictional synthetic data only.
-- **Not validated:** region, cost, project/billing topology, Terraform state ownership, named cloud administrators, identity-provider configuration, Cloud SQL sizing/recovery, and first provisioning inputs.
+- **Accepted planning inputs:** Beatrice accepted the 14-decision Terraform/IaC posture for the private synthetic-only GCP `develop` target: `us-east4`; Terraform-managed API enablement; split bootstrap/Terraform-provisioner WIF; separate runtime/migration identities and PostgreSQL roles; private regional Artifact Registry with digest deploys and cleanup; Terraform-managed $50/$75/$100 budget alerts; Secret Manager metadata/IAM only; private Cloud SQL PostgreSQL 16 `db-f1-micro`; dedicated VPC/private service access; private Cloud Run invoker IAM; protected GitHub WIF apply/deploy gates; value-safe Logging/Monitoring; standard labels/tags; intentional teardown runbook support; and local state only for validate-without-apply.
+- **Not validated:** project/billing topology, remote Terraform state ownership before shared apply, named cloud administrators, alert recipients, identity-provider principal claims, exact Cloud SQL recovery targets, and first provisioning inputs.
 
 ## Decision
 
@@ -62,6 +63,8 @@ Use the existing accepted direction:
 
 Do not add GKE, Compute Engine, public Cloud Storage hosting, load balancing/CDN, Cloud Tasks/Scheduler, Maps/geocoding, documents, messaging, or other vendors without a concrete approved need.
 
+Use `us-east4` / Northern Virginia as the single develop location for Cloud Run, Cloud SQL, and Artifact Registry. Production topology and any secondary/backup placement remain separate decisions.
+
 ### 5. Immutable artifact and migration boundary
 
 Build once, scan/attest, push once, and deploy by immutable image digest. Tags may assist discovery but never constitute deployment authority.
@@ -97,9 +100,17 @@ Neither liveness nor readiness may create records, replay commands, or act as a 
 
 Terraform is the accepted IaC direction, but no Terraform apply occurs until region, cost, account/billing, IAM, recovery, state ownership, and resource inputs are reviewed and Beatrice gives explicit scoped provisioning approval.
 
-Terraform state location, access, backup, and transfer ownership must be decided before apply. Secrets do not enter Terraform source, state by design, Git, chat, GitHub artifacts, container layers, or ordinary logs.
+The validate-without-apply Terraform slice uses local state only and no shared backend. Remote state location, access, backup, and transfer ownership must be decided before any shared apply. Terraform state, generated plan files, real `.tfvars`, project IDs, billing account IDs, user emails, cloud metadata, and secrets must not be committed. Secrets do not enter Terraform source, state by design, Git, chat, GitHub artifacts, container layers, or ordinary logs.
 
 GitHub deployment uses OIDC/WIF rather than long-lived service-account keys. Pull-request workflows do not receive deploy authority. Protected GitHub environments, immutable action pins, concurrency control, digest deployment, and value-safe evidence are mandatory. CI concurrency does not replace database-level migration serialization.
+
+The accepted API enablement planning set covers Cloud Resource Manager, IAM, Service Usage, Compute Engine, Service Networking, Cloud Run, Cloud SQL Admin, Artifact Registry, Secret Manager, Cloud Logging, and Cloud Monitoring. Terraform manages this allowlist with destructive-disable safeguards such as `disable_on_destroy = false`; candidate APIs including IAM Credentials, Security Token Service, Billing Budgets, and Cloud Build are added only if the reviewed Terraform plan needs them. API enablement approval does not authorize workload resource creation, deployment, or live use.
+
+Terraform manages Secret Manager secret metadata, labels, replication policy, and per-secret IAM only. Secret payloads, database passwords, app keys, and tokens are injected out of band through a separately approved procedure.
+
+The private develop infrastructure posture requires a minimal dedicated Terraform-managed VPC/private-service-access path for a private-IP-only Cloud SQL PostgreSQL 16 instance in `us-east4`; the baseline is zonal `db-f1-micro`, 10 GiB SSD, minimal automated backups for develop recovery evidence, and `db-g1-small` only as evidence-triggered scale-up. Artifact Registry is one private regional Docker repository in `us-east4`; Cloud Run deploys by immutable digest, public repository access is prohibited, and cleanup policy is required.
+
+While synthetic application authentication remains, Cloud Run invocation is private: no `allUsers` or `allAuthenticatedUsers`; Terraform grants service-level `roles/run.invoker` only to approved tester/facilitator principals. Terraform applies standard non-sensitive labels/tags to supported resources for environment, data boundary, managed-by, cost center, owner/contact, service, and teardown inventory.
 
 Cloud Run platform request logs require an explicit minimization contract because exact-detail routes contain entity UUIDs in URL paths. Before deployment, the reviewed configuration must either exclude/disable those request logs where supported or strictly restrict access and sinks with an accepted retention/minimization rationale. Qualification inspects generated platform request logs and every configured sink; application-log tests alone are insufficient. Route redesign remains an alternative requiring its own reviewed product/API change.
 
@@ -107,9 +118,9 @@ Cloud Run platform request logs require an explicit minimization contract becaus
 
 Before provisioning, accept a non-production cost estimate, monthly budget/alert posture, maximum first-run exposure, named alert recipients, Cloud SQL sizing, backup/PITR and restore expectations, develop RTO/RPO targets, log retention/redaction behavior, and teardown/rebuild plan.
 
-Budget alerts are alerts, not hard spending caps. Cloud SQL is expected to be the fixed baseline cost even if Cloud Run scales to zero.
+The initial develop planning estimate is about $15-$20/month using PostgreSQL 16 on zonal `db-f1-micro`, 10 GiB SSD, private IP/no idle public IPv4, Cloud Run scale-to-zero, small Artifact Registry retention, and Secret Manager/Logging/Monitoring within free-tier-scale usage. Budget alert thresholds are $50, $75, and $100; alerts are not hard spending caps. Cloud SQL is expected to be the fixed baseline cost even if Cloud Run scales to zero. Pricing must be rechecked before provisioning.
 
-The first environment is not qualified until budget routing, migration/rollback or forward recovery, log redaction, backup/restore or teardown/rebuild, and intentional shutdown/scale-down behavior are evidenced.
+The first environment is not qualified until budget routing, migration/rollback or forward recovery, log redaction, backup/restore or teardown/rebuild, and intentional shutdown/scale-down behavior are evidenced. Terraform may support teardown/rebuild through labels, outputs, and runbooks, but automatic scheduled destroy is not accepted; teardown requires explicit data-boundary, backup/export, current artifact/migration, and approval checks.
 
 ### 10. Evidence and facilitator visibility
 

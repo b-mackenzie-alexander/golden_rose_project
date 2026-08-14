@@ -36,6 +36,17 @@ automated hiring, matching, ranking, eligibility, or referral system.
   Cloud SQL testing environment after separate Terraform/IaC, provisioning, and
   deployment approvals. No cloud resource, public access, real identity,
   live/client data, or production claim is currently authorized or present.
+- Terraform/IaC planning now uses the accepted 14-decision private synthetic-only
+  GCP `develop` posture: `us-east4` for Cloud Run, Cloud SQL, and Artifact
+  Registry; Terraform-managed APIs; split bootstrap/WIF provisioning identity;
+  separate runtime/migration identities; private Artifact Registry digest
+  deployment; Terraform-managed $50/$75/$100 budget alerts; Secret Manager
+  metadata/IAM only; private Cloud SQL and VPC access; private Cloud Run
+  invoker IAM; protected GitHub WIF gates; value-safe observability; standard
+  labels; intentional teardown runbook support; and local state only until remote
+  state is approved. Terraform implementation, apply, API/resource/service
+  identity provisioning, image push, deployment, real identity, live/client data,
+  and production remain separately gated.
 - Automated frontend parity/accessibility evidence exists locally, but human
   browser/manual accessibility/fluent-language qualification remains deferred
   until a shared deployed `develop` target exists.

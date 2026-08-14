@@ -4,7 +4,7 @@
 
 **Goal:** Prepare a reviewed, non-provisioning Terraform/IaC implementation plan for the private fictional-synthetic-only GCP `develop` foundation.
 
-**Architecture:** Convert ADR-0009 Slice C into exact executable TDD/static-validation tasks while preserving every hard stop from ADR-0009 and the local-only Slice B closeout. This plan should produce planning artifacts and aligned living docs only; the future implementation branch may create Terraform scaffolding and policy tests but must still run with `terraform init -backend=false` and no apply.
+**Architecture:** Convert ADR-0009 Slice C into exact executable TDD/static-validation tasks while preserving every hard stop from ADR-0009 and the local-only Slice B closeout. The accepted develop location is `us-east4` / Northern Virginia for Cloud Run, Cloud SQL, and Artifact Registry. This plan should produce planning artifacts and aligned living docs only; the future implementation branch may create Terraform scaffolding and policy tests but must still run with `terraform init -backend=false` and no apply.
 
 **Tech Stack:** Terraform, GCP provider, Cloud Run, Cloud Run Jobs, Cloud SQL PostgreSQL 16, Artifact Registry, Secret Manager, Cloud Logging/Monitoring, Budgets, GitHub Actions, Workload Identity Federation, local static/policy validation.
 
@@ -18,6 +18,23 @@
 - This lane must not create Terraform modules, provider files, workflow deploy credentials, cloud resources, service accounts, billing links, secret versions, Artifact Registry images, Cloud SQL instances, Cloud Run services/jobs, or GCP API calls.
 - The next implementation slice, if later accepted, must remain validate-without-apply: `terraform fmt`, `terraform init -backend=false`, `terraform validate`, and policy/static tests only.
 - No `terraform apply`, GCP authentication, API enablement, project creation, billing linkage, service identity creation, secret configuration, image push, migration, deployment, service start, public access, real identity, live/client-derived data, or production work is authorized.
+
+## Accepted IaC inputs from 2026-08-13 planning walk-through
+
+1. **API enablement:** Terraform manages the approved API allowlist with destructive-disable safeguards such as `disable_on_destroy = false`; candidate APIs are added only when the reviewed plan proves the need.
+2. **Provisioning identity:** a temporary documented bootstrap authority may establish the project/API/WIF foundation; routine IaC uses a dedicated Terraform provisioner service account impersonated through GitHub OIDC/WIF, never service-account JSON keys.
+3. **Runtime versus migration identity:** Cloud Run runtime and migration job use distinct Terraform-managed service accounts and distinct PostgreSQL roles. Runtime is non-owner application access only; migration assumes schema-owner authority only through reviewed serialized migration execution.
+4. **Artifact Registry:** one private regional Docker repository in `us-east4`, Terraform-managed, with digest-only Cloud Run deployment, repo-scoped writer/pull IAM, no public access, and cleanup policy that preserves current/rollback digests while limiting stale images.
+5. **Budgets:** Terraform manages Cloud Billing Budget alerts after billing scope and recipients are approved. Accepted actual-spend thresholds are $50, $75, and $100; alerts are warnings, not hard caps.
+6. **Secret Manager:** Terraform manages secret metadata, labels, replication policy, and per-secret IAM only. Secret versions/payloads, PostgreSQL passwords, app keys, and tokens are injected out of band and kept out of Terraform source, state, logs, artifacts, containers, chat, and ordinary docs.
+7. **Cloud SQL:** develop baseline is private Cloud SQL PostgreSQL 16 in `us-east4`, zonal `db-f1-micro`, 10 GiB SSD, no public IPv4, and minimal automated backups for develop recovery evidence. `db-g1-small` is evidence-triggered scale-up only.
+8. **Networking:** use a minimal dedicated Terraform-managed develop VPC with private service access for Cloud SQL private IP; Cloud Run connects through the approved private/serverless path. Default VPC, public DB IPs, broad firewall rules, NAT, LB/CDN, and VPN stay out of scope unless separately approved.
+9. **Cloud Run invocation:** while application auth is synthetic, Cloud Run stays private: no `allUsers` or `allAuthenticatedUsers`; service-level `roles/run.invoker` only for approved tester/facilitator principals managed by Terraform.
+10. **GitHub/WIF workflow authority:** PR workflows validate only. Terraform apply, image push, migration execution, and deployment require protected GitHub environment approval and narrowly scoped WIF impersonation.
+11. **Logging/Monitoring:** use value-safe default/short-retention Cloud Logging/Monitoring with restricted access/sinks and minimal health/readiness alerts. Synthetic monitors, extended retention, broad log viewers, and unapproved exports are out of scope.
+12. **Labels/tags:** Terraform applies standard non-sensitive labels/tags across supported resources for environment, data boundary, managed-by, cost center, owner/contact, service, and teardown inventory.
+13. **Teardown/rebuild:** Terraform supports intentional teardown/rebuild through labels, outputs, and a runbook. No automatic scheduled destroy; require data-boundary, backup/export, current artifact/migration, and approval checks before teardown.
+14. **Terraform state:** validate-without-apply starts with local state only and no shared backend. Remote state must be selected and approved before any shared apply; state, plan files, real `.tfvars`, billing IDs, emails, project IDs, cloud metadata, and secret values must not be committed.
 
 ## Planning deliverables
 
@@ -81,6 +98,15 @@
 - `.github/workflows/infrastructure-quality.yml` only if a reviewed stable CI gate is part of the slice
 - `.gitignore` only for local Terraform artifacts if needed
 
+**Future management resources to consider in the plan:**
+- API enablement resources for the accepted allowlist, with candidate APIs only after reviewed need.
+- Budget resources and $50/$75/$100 alert thresholds after billing-account/project binding details and recipients are approved.
+- Least-privilege identity/IAM resources for bootstrap handoff, Terraform provisioner WIF, runtime, migration, image publishing, service-level invocation, and separately approved human break-glass/admin access.
+- Guardrails that reject `allUsers`, `allAuthenticatedUsers`, service-account keys, project-wide secret access, broad owner/editor grants, mutable image-only deploys, public DB IPs, default VPC use, missing labels, secret-version resources, extended log retention, risky log sinks, and committed Terraform state/plan/secret variable files.
+- Artifact Registry cleanup policies to cap image-retention cost and reduce stale-artifact risk while preserving current and rollback/forward-recovery digests.
+- Log bucket retention, sink/access controls, and minimal health/readiness alert policies for value-safe platform evidence.
+- Standard label/tag locals and teardown/rebuild runbook support for non-production inventory.
+
 **Future validation commands to require:**
 - `terraform fmt -check -recursive infra/gcp`
 - `terraform -chdir=infra/gcp init -backend=false`
@@ -94,17 +120,18 @@
 
 **Objective:** Prevent Terraform scaffold work from becoming implicit approval for GCP resources.
 
-**The future plan must leave these as later gates:**
-- cited and accepted region choice;
-- non-production cost estimate and budget/alert thresholds;
+**The future plan must leave these as later gates or accepted inputs:**
+- accepted region choice is now `us-east4` for develop Cloud Run, Cloud SQL, and Artifact Registry;
+- non-production cost estimate and budget/alert thresholds are accepted as initial planning inputs, but pricing must be rechecked before provisioning and budget alert recipients/routing remain open;
 - project/billing/organization/folder/domain ownership plan;
 - named cloud admins, break-glass owners, support and alert recipients;
-- WIF/project identifiers and protected GitHub environment approvals;
-- Terraform state backend location, access, backup, and handoff owner;
-- service-account and database-role matrix;
-- Cloud SQL sizing, backup/PITR, teardown/rebuild, RTO/RPO and recovery test expectations;
+- exact GitHub repository/ref/environment claims for WIF and protected GitHub environment approvals;
+- Terraform remote-state backend location, access, backup, and handoff owner before any shared apply;
+- approved alert recipients/routing and named human break-glass/admin principals;
+- exact service-account and database-role matrix implementation details;
+- Cloud SQL backup/PITR, teardown/rebuild, RTO/RPO and recovery test expectations beyond the accepted minimal develop baseline;
 - Cloud Run platform request-log minimization and sink/access contract;
-- private tester/facilitator access procedure while synthetic auth remains.
+- private tester/facilitator principal list while synthetic auth remains.
 
 ### Task 5: Plan review and acceptance gate
 

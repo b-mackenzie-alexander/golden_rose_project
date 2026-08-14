@@ -17,8 +17,9 @@ The following claims are classified separately:
 - **Observed:** the current database migrations use application-level triggers and constraints, but the local/test database owner can bypass them through owner-level DDL, trigger changes, or `TRUNCATE`; runtime-role immutability therefore remains unqualified.
 - **Reported by Beatrice:** the facilitator is requesting greater visibility into progress.
 - **Accepted direction:** begin a safe GCP non-production deployment program using fictional synthetic data only.
-- **Accepted planning inputs:** Beatrice accepted the 14-decision Terraform/IaC posture for the private synthetic-only GCP `develop` target: `us-east4`; Terraform-managed API enablement; split bootstrap/Terraform-provisioner WIF; separate runtime/migration identities and PostgreSQL roles; private regional Artifact Registry with digest deploys and cleanup; Terraform-managed $50/$75/$100 budget alerts; Secret Manager metadata/IAM only; private Cloud SQL PostgreSQL 16 `db-f1-micro`; dedicated VPC/private service access; private Cloud Run invoker IAM; protected GitHub WIF apply/deploy gates; value-safe Logging/Monitoring; standard labels/tags; intentional teardown runbook support; and local state only for validate-without-apply.
-- **Not validated:** project/billing topology, remote Terraform state ownership before shared apply, named cloud administrators, alert recipients, identity-provider principal claims, exact Cloud SQL recovery targets, and first provisioning inputs.
+- **Accepted implementation inputs:** Beatrice accepted the 14-decision Terraform/IaC posture for the private synthetic-only GCP `develop` target: `us-east4`; Terraform-managed API enablement; split bootstrap/Terraform-provisioner WIF; separate runtime/migration identities and PostgreSQL roles; private regional Artifact Registry with digest deploys and cleanup; Terraform-managed $50/$75/$100 budget alerts; Secret Manager metadata/IAM only; private Cloud SQL PostgreSQL 16 `db-f1-micro`; dedicated VPC/private service access; private Cloud Run invoker IAM; protected GitHub WIF apply/deploy gates; value-safe Logging/Monitoring; standard labels/tags; intentional teardown runbook support; and local state only until remote state is approved before shared apply. Beatrice has now approved local Terraform validation and moving into scoped development/testing cloud implementation once the scaffold branch is review-qualified.
+- **Reported account state:** Beatrice reports a new GCP account with one Beatrice-owned organization and two projects, one dedicated exclusively to cloud deployment/testing. Project IDs, billing IDs, domains, user emails, credentials, and secret payloads remain excluded from tracked source and ordinary docs.
+- **Not validated:** billing topology, remote Terraform state ownership before shared apply, named cloud administrators, alert recipients, identity-provider principal claims, exact Cloud SQL recovery targets, and first provisioning input values.
 
 ## Decision
 
@@ -26,11 +27,11 @@ Adopt a staged, develop-only GCP deployment boundary with these decisions.
 
 ### 1. Environment and data boundary
 
-Create no production environment under this ADR. The only authorized target after separate provisioning approval is one isolated GCP non-production project for `develop` testing.
+Create no production environment under this ADR. The only authorized target for the next cloud implementation lane is the isolated GCP non-production project dedicated to `develop` testing.
 
 The environment admits only wholly fictional synthetic data. Client/live records, transformed or de-identified client data, legacy imports, and production backups are prohibited. The application and evidence must identify the environment as non-production and synthetic-only.
 
-Planning, implementation, cloud provisioning, first deployment, and later production promotion are separate approval events. Accepting or merging this ADR authorizes none of the latter actions by itself.
+Planning, implementation, cloud provisioning, first deployment, and later production promotion remain separate evidence-bearing events. Beatrice has now approved local Terraform validation and the development/testing cloud implementation lane, but public access, real identity, live/client data, and production still require separate approval.
 
 ### 2. First deployable boundary
 
@@ -98,13 +99,13 @@ Neither liveness nor readiness may create records, replay commands, or act as a 
 
 ### 8. Infrastructure, state, CI/CD, and secrets
 
-Terraform is the accepted IaC direction, but no Terraform apply occurs until region, cost, account/billing, IAM, recovery, state ownership, and resource inputs are reviewed and Beatrice gives explicit scoped provisioning approval.
+Terraform is the accepted IaC direction. The current scaffold branch may run local `terraform fmt`, `terraform init -backend=false`, and `terraform validate`. Terraform plan/apply remain out of scope for the scaffold branch and belong only to a later scoped cloud implementation step with reviewed inputs and recorded evidence.
 
-The validate-without-apply Terraform slice uses local state only and no shared backend. Remote state location, access, backup, and transfer ownership must be decided before any shared apply. Terraform state, generated plan files, real `.tfvars`, project IDs, billing account IDs, user emails, cloud metadata, and secrets must not be committed. Secrets do not enter Terraform source, state by design, Git, chat, GitHub artifacts, container layers, or ordinary logs.
+The validate-without-apply Terraform slice uses local state only and no shared backend. Remote state location, access, backup, and transfer ownership must be decided before any shared apply. Terraform state, generated plan files, real `.tfvars`, project IDs, billing account IDs, user emails, cloud metadata, and secrets must not be committed. The provider lockfile generated by `terraform init -backend=false` is reviewable source and should remain tracked. Secrets do not enter Terraform source, state by design, Git, chat, GitHub artifacts, container layers, or ordinary logs.
 
 GitHub deployment uses OIDC/WIF rather than long-lived service-account keys. Pull-request workflows do not receive deploy authority. Protected GitHub environments, immutable action pins, concurrency control, digest deployment, and value-safe evidence are mandatory. CI concurrency does not replace database-level migration serialization.
 
-The accepted API enablement planning set covers Cloud Resource Manager, IAM, Service Usage, Compute Engine, Service Networking, Cloud Run, Cloud SQL Admin, Artifact Registry, Secret Manager, Cloud Logging, and Cloud Monitoring. Terraform manages this allowlist with destructive-disable safeguards such as `disable_on_destroy = false`; candidate APIs including IAM Credentials, Security Token Service, Billing Budgets, and Cloud Build are added only if the reviewed Terraform plan needs them. API enablement approval does not authorize workload resource creation, deployment, or live use.
+The accepted API enablement set covers Cloud Resource Manager, IAM, Service Usage, Compute Engine, Service Networking, Cloud Run, Cloud SQL Admin, Artifact Registry, Secret Manager, Cloud Logging, and Cloud Monitoring. Terraform manages this allowlist with destructive-disable safeguards such as `disable_on_destroy = false`; candidate APIs including IAM Credentials, Security Token Service, Billing Budgets, and Cloud Build are added only if the reviewed implementation needs them. API enablement is allowed only inside the dedicated development/testing cloud lane and does not authorize public access, real identity, live/client data, or production.
 
 Terraform manages Secret Manager secret metadata, labels, replication policy, and per-secret IAM only. Secret payloads, database passwords, app keys, and tokens are injected out of band through a separately approved procedure.
 
@@ -116,7 +117,7 @@ Cloud Run platform request logs require an explicit minimization contract becaus
 
 ### 9. Cost, recovery, logging, and teardown gates
 
-Before provisioning, accept a non-production cost estimate, monthly budget/alert posture, maximum first-run exposure, named alert recipients, Cloud SQL sizing, backup/PITR and restore expectations, develop RTO/RPO targets, log retention/redaction behavior, and teardown/rebuild plan.
+Before broad or repeated provisioning, accept a non-production cost estimate, monthly budget/alert posture, maximum first-run exposure, named alert recipients, Cloud SQL sizing, backup/PITR and restore expectations, develop RTO/RPO targets, log retention/redaction behavior, and teardown/rebuild plan.
 
 The initial develop planning estimate is about $15-$20/month using PostgreSQL 16 on zonal `db-f1-micro`, 10 GiB SSD, private IP/no idle public IPv4, Cloud Run scale-to-zero, small Artifact Registry retention, and Secret Manager/Logging/Monitoring within free-tier-scale usage. Budget alert thresholds are $50, $75, and $100; alerts are not hard spending caps. Cloud SQL is expected to be the fixed baseline cost even if Cloud Run scales to zero. Pricing must be rechecked before provisioning.
 
@@ -186,17 +187,16 @@ Rejected for routine resources. A narrowly documented bootstrap exception may be
 
 ## Approval, owner, and revisit trigger
 
-Beatrice is the technical decision owner. Independent architecture/security, database/recovery, GCP/IAM/cost, CI/supply-chain, and documentation reviews cleared the exact remediated packet with no remaining Blocker, High, or Medium findings, and Beatrice explicitly accepted the decision on 2026-08-13. This ADR is **Accepted** as the planning boundary; it is not implemented or provisioned.
+Beatrice is the technical decision owner. Independent architecture/security, database/recovery, GCP/IAM/cost, CI/supply-chain, and documentation reviews cleared the exact remediated packet with no remaining Blocker, High, or Medium findings, and Beatrice explicitly accepted the decision on 2026-08-13. Beatrice approved local Terraform execution and movement into development/testing cloud implementation on 2026-08-14. This ADR is **Accepted** as the implementation boundary for the private synthetic-only develop environment; it is not a production authorization.
 
 Even after acceptance and merge, separate explicit approvals remain required for:
 
-1. runtime/container implementation;
-2. Terraform/IaC implementation;
-3. GCP project/billing/API/resource/service-identity provisioning;
-4. secret configuration and first migration/deployment;
-5. any real identity/provider integration;
-6. live/client-data admission;
-7. production project creation or production promotion.
+1. Terraform plan/apply and cloud-authenticated operations outside the approved development/testing lane;
+2. secret configuration and first migration/deployment;
+3. any public invocation path;
+4. any real identity/provider integration;
+5. live/client-data admission;
+6. production project creation or production promotion.
 
 Revisit this ADR before:
 

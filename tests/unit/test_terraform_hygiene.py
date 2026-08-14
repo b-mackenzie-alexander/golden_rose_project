@@ -433,6 +433,14 @@ def test_infrastructure_quality_workflow_runs_static_validation_without_apply_or
     assert "deploy" not in workflow.lower()
 
 
+def test_application_quality_workflow_installs_terraform_before_full_pytest() -> None:
+    workflow = (ROOT / ".github/workflows/application-quality.yml").read_text(encoding="utf-8")
+    setup_terraform = "hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd"
+
+    assert setup_terraform in workflow
+    assert workflow.index(setup_terraform) < workflow.index("uv run pytest --cov=golden_rose")
+
+
 def test_terraform_static_validation_harness_rejects_forbidden_patterns(tmp_path: Path) -> None:
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)

@@ -60,25 +60,26 @@ qualified immutable artifact → explicit protected production promotion
 
 Required review escalation applies to authentication/authorization, staff/public boundaries, secrets, data access, migrations, documents/receipts, payments, exports, logging/audit, dependencies, infrastructure/IaC, and deployment controls.
 
-### Solo-maintainer protocol
-This repository currently has one maintainer. Protected-branch policy therefore
-does not require CODEOWNERS or a conventional separate-human approval, because
-either requirement would deadlock the authorized maintainer. This is not a
-substitute for review. Before opening a PR that affects a protected branch, the
-maintainer must preserve auditable evidence of: an independent delegated or
-separate-session review; scoped blast-radius and trust-boundary assessment;
-clean branch topology and diff/conflict checks; relevant test, lint, type,
-security, dependency, and secret-scan results; and successful PR CI. The
-maintainer records the self-approval/merge rationale in the PR and the living
-notes, then applies branch-policy changes only after merge under a separate
-explicit approval.
+### Independent authority prerequisite
+The historical solo-maintainer protocol preserved review evidence but did not
+eliminate self-authorization: same-repository workflow status contexts are
+emitted by files that a pull request may edit. ADR-0010 therefore requires a real
+non-author GitHub reviewer/CODEOWNER before PR #24 remediation implementation.
+The reviewer must be another accountable person with an independently
+controlled account, not the author, last pusher, an author-controlled alternate
+account, or an agent using the author's credentials. Protected branches will
+require one approval, stale-review dismissal, CODEOWNER review, and approval
+after the latest push. Until an eligible reviewer is nominated, implementation
+stops and the required-CI High remains open.
 
-GitHub Actions status contexts are emitted by workflow files in the PR and do
-not by themselves provide an immutable external trust boundary. The solo
-protocol reduces this residual risk through independent evidence and staged
-actions; it does not claim to eliminate it. Revisit CODEOWNERS/approval or an
-external trusted-workflow boundary when an eligible second maintainer or
-organization-level facility exists.
+With one independent reviewer, the author pushes review corrections and the
+reviewer approves the resulting head. If the reviewer becomes the latest
+pusher, a second eligible non-last-pusher approver is required; do not weaken or
+bypass last-push approval to avoid that result.
+
+The bootstrap remediation PR must receive that independent review. After merge,
+repository policy is applied from protected `develop` only under separate
+explicit authorization and read back before the control is called operational.
 
 ## Required checks (target state)
 - Branch policy.
@@ -103,9 +104,9 @@ infra/github/
 The policy should cover protected branches, required checks, review-count mode,
 merge methods, conversation resolution, force-push/deletion rules, branch
 deletion after merge, and drift verification. It must be exercised by a real PR
-before it is considered operational. A zero required-approval count is the
-documented solo-maintainer mode, not evidence that review or validation may be
-skipped.
+before it is considered operational. The current zero-approval policy is
+historical residual risk, not the target state and not evidence that review or
+validation may be skipped.
 
 ## Sensitive-data and artifact hygiene
 Never commit credentials, `.env` files, client records, legacy exports, raw personal data, production backups, unapproved generated reports, or unmanaged cloud state. Commit only reviewed source, non-secret configuration/templates, tests with wholly fictional synthetic fixtures unless a separate test-data procedure explicitly approves otherwise, documentation, and approved infrastructure definitions.

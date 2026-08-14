@@ -57,6 +57,10 @@ automated hiring, matching, ranking, eligibility, or referral system.
   policy, deterministic `uv`, Cloud Run/private-SQL connectivity, API ordering,
   Cloud SQL backup configuration, and managed-registry image binding require a
   separately reviewed validate-without-apply remediation before bootstrap work.
+  PR #25 merged the documentation-only disposition at `8dc1198`; ADR-0010 and
+  `.hermes/plans/2026-08-14_164545-pr24-terraform-remediation-plan.md` now
+  control the planning-only remediation lane. A real non-author reviewer must
+  own the protected CI/policy paths before implementation begins.
 - Automated frontend parity/accessibility evidence exists locally, but human
   browser/manual accessibility/fluent-language qualification remains deferred
   until a shared deployed `develop` target exists.

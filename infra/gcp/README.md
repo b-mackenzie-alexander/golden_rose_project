@@ -2,7 +2,7 @@
 
 This directory contains the repo-local Terraform scaffold for the Golden Rose private `develop` environment. PR #24 merged this validate-without-apply, local-validation, and static-policy surface into protected `develop` at `50451b3`.
 
-Independent post-merge review did not clear this scaffold as a provisioning/deployment baseline. A separate validate-without-apply remediation must close required-CI governance, semantic static-policy validation, deterministic `uv`, Cloud Run/private-SQL connectivity, API ordering, Cloud SQL backup, and managed Artifact Registry image-binding findings before bootstrap implementation, plan, or apply.
+Independent post-merge review did not clear this scaffold as a provisioning/deployment baseline. PR #25 merged that documentation-only disposition at `8dc1198`. ADR-0010 and `.hermes/plans/2026-08-14_164545-pr24-terraform-remediation-plan.md` now define a separate validate-without-apply remediation for required-CI governance, semantic static-policy validation, deterministic `uv`, Cloud Run/private-SQL connectivity, API ordering, Cloud SQL backups, and managed Artifact Registry image authority before bootstrap implementation, plan, or apply.
 
 Terraform is executed from `infra/gcp`. The root module declares `module "develop"` in `develop.tf` and loads the intended resource scaffold from `infra/gcp/develop/`; nested files are not relied on through recursive file presence alone. Local review must prove `terraform -chdir=infra/gcp graph` includes the expected `module.develop.google_*` resource nodes.
 
@@ -24,7 +24,7 @@ terraform -chdir=infra/gcp validate
 python scripts/validate_terraform_static.py
 ```
 
-The `infrastructure-quality` pull-request workflow runs local Terraform
+The current `infrastructure-quality` pull-request workflow runs local Terraform
 format/init-without-backend/validate before the Terraform hygiene tests so a clean CI
 checkout initializes providers before the graph regression runs. It also runs
 static validation through `scripts/validate_terraform_static.py` with read-only repository
@@ -36,6 +36,10 @@ JSON-form backend, provider credentials, and Cloud Run environment/secret-inject
 keys. It also scans every GitHub workflow file for forbidden cloud/deployment
 authority and requires every workflow `uses:` action reference to be pinned to a full
 40-character commit SHA; this is not limited to `infrastructure*` workflow filenames.
+Independent final-head probes proved that the current implementation is still a
+lexically bypassable policy boundary despite those checks. Do not treat it as
+semantic or fail-closed until ADR-0010's parser and adversarial tests are
+implemented and independently cleared.
 
 ## Explicit non-scope
 

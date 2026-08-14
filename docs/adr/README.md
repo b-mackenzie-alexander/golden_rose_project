@@ -21,6 +21,7 @@ Use `ADR-NNNN-short-title.md`, with monotonic numbers. Never renumber an existin
 - `ADR-0007-phase-1-draft-employer-revision-boundary.md` — accepted and implemented boundary for revising only draft Employer `display_name` and `employer_type` with expected-version concurrency, command-bound idempotency, minimized audit authority, and localized browser recovery; PR #17 merged the implementation at `1543248`, and PR #18 merged its bounded remediation at `a4d8f90`.
 - `ADR-0008-phase-1-employer-contact-authority-foundation.md` — accepted and implemented backend-only synthetic/local EmployerContact create, bounded parent query, exact read, and typed receipt/audit authority; PR #20 merged the independently reviewed implementation into protected `develop` at `6eb05d5`.
 - `ADR-0009-gcp-develop-deployment-boundary.md` — accepted private, fictional-synthetic-only GCP `develop` boundary; PR #24 merged local validate-without-apply scaffolding, but final-head findings require remediation before bootstrap/state/WIF implementation or cloud-authorized work.
+- `ADR-0010-pr24-terraform-remediation-boundary.md` — accepted planning-only boundary for independent CI authority, semantic static policy, deterministic `uv`, Direct VPC private-SQL connectivity, API ordering, automated backups, and managed-registry digest authority; implementation remains separately gated.
 
 ## Required sections
 - Status and date

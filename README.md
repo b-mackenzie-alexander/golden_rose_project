@@ -33,10 +33,10 @@ automated hiring, matching, ranking, eligibility, or referral system.
   `/health`, bounded `/readiness`, same-origin static serving, entrypoint/runtime
   behavior, and non-root local image build/inspection evidence.
 - Accepted ADR-0009 targets one private, fictional-synthetic-only Cloud Run +
-  Cloud SQL testing environment. Beatrice has now approved local Terraform
-  execution and moving into development/testing cloud implementation once the
-  current scaffold branch is review-qualified. No public access, real identity,
-  live/client data, or production claim is currently authorized or present.
+  Cloud SQL testing environment. PR #24 merged the local validate-without-apply
+  Terraform scaffold into `develop` at `50451b3`; no cloud resource or running
+  shared system exists. No public access, real identity, live/client data, or
+  production claim is currently authorized or present.
 - Terraform/IaC planning now uses the accepted 14-decision private synthetic-only
   GCP `develop` posture: `us-east4` for Cloud Run, Cloud SQL, and Artifact
   Registry; Terraform-managed APIs; split bootstrap/WIF provisioning identity;
@@ -45,12 +45,18 @@ automated hiring, matching, ranking, eligibility, or referral system.
   metadata/IAM only; private Cloud SQL and VPC access; private Cloud Run
   invoker IAM; protected GitHub WIF gates; value-safe observability; standard
   labels; intentional teardown runbook support; and local state only until remote
-  state is approved. The current branch implements the repo-local scaffold,
-  provider lockfile, static scanner, and infrastructure-quality workflow, and may
-  run local `terraform fmt`, `terraform init -backend=false`, and
-  `terraform validate`. Terraform plan/apply, cloud authentication/API calls,
-  resource/service-identity provisioning, image push, deployment, real identity,
-  live/client data, and production remain outside this branch.
+  state is approved. Beatrice accepted a durable bootstrap/state control plane
+  separate from disposable workload teardown; the existing non-workload project
+  is the candidate boundary pending read-only qualification. A separate reviewed
+  plan is required before implementing that contract. Terraform plan/apply,
+  backend migration, cloud authentication/API calls, resource/service-identity
+  provisioning, image push, deployment, real identity, live/client data, and
+  production remain separately gated.
+- Independent post-merge review found the merged scaffold is not yet a safe
+  provisioning/deployment baseline. Required CI governance, semantic static
+  policy, deterministic `uv`, Cloud Run/private-SQL connectivity, API ordering,
+  Cloud SQL backup configuration, and managed-registry image binding require a
+  separately reviewed validate-without-apply remediation before bootstrap work.
 - Automated frontend parity/accessibility evidence exists locally, but human
   browser/manual accessibility/fluent-language qualification remains deferred
   until a shared deployed `develop` target exists.

@@ -17,9 +17,10 @@ The following claims are classified separately:
 - **Observed:** the current database migrations use application-level triggers and constraints, but the local/test database owner can bypass them through owner-level DDL, trigger changes, or `TRUNCATE`; runtime-role immutability therefore remains unqualified.
 - **Reported by Beatrice:** the facilitator is requesting greater visibility into progress.
 - **Accepted direction:** begin a safe GCP non-production deployment program using fictional synthetic data only.
-- **Accepted implementation inputs:** Beatrice accepted the 14-decision Terraform/IaC posture for the private synthetic-only GCP `develop` target: `us-east4`; Terraform-managed API enablement; split bootstrap/Terraform-provisioner WIF; separate runtime/migration identities and PostgreSQL roles; private regional Artifact Registry with digest deploys and cleanup; Terraform-managed $50/$75/$100 budget alerts; Secret Manager metadata/IAM only; private Cloud SQL PostgreSQL 16 `db-f1-micro`; dedicated VPC/private service access; private Cloud Run invoker IAM; protected GitHub WIF apply/deploy gates; value-safe Logging/Monitoring; standard labels/tags; intentional teardown runbook support; and local state only until remote state is approved before shared apply. Beatrice has now approved local Terraform validation and moving into scoped development/testing cloud implementation once the scaffold branch is review-qualified.
-- **Reported account state:** Beatrice reports a new GCP account with one Beatrice-owned organization and two projects, one dedicated exclusively to cloud deployment/testing. Project IDs, billing IDs, domains, user emails, credentials, and secret payloads remain excluded from tracked source and ordinary docs.
-- **Not validated:** billing topology, remote Terraform state ownership before shared apply, named cloud administrators, alert recipients, identity-provider principal claims, exact Cloud SQL recovery targets, and first provisioning input values.
+- **Accepted implementation inputs:** Beatrice accepted the 14-decision Terraform/IaC posture for the private synthetic-only GCP `develop` target. PR #24 merged the backend-free local validation scaffold at `50451b3`, but independent final-head review found two High and five Medium defects that block its use as a provisioning/deployment baseline.
+- **Accepted control-plane direction:** bootstrap/state authority remains lifecycle-independent from disposable workload infrastructure and survives repeated teardown, movement, and redeployment. The existing non-workload project is the candidate control-plane boundary pending read-only qualification.
+- **Reported account state:** Beatrice reports a new GCP account with one organization and two projects, one dedicated exclusively to cloud deployment/testing. Project IDs, billing IDs, domains, user emails, credentials, and secret payloads remain excluded from tracked source and ordinary docs.
+- **Not validated:** candidate control-plane project suitability, billing topology, exact remote-state ownership/access/versioning/recovery/handoff, named cloud administrators, alert recipients, identity-provider principal claims, exact Cloud SQL recovery targets, and first provisioning input values.
 
 ## Decision
 
@@ -27,11 +28,11 @@ Adopt a staged, develop-only GCP deployment boundary with these decisions.
 
 ### 1. Environment and data boundary
 
-Create no production environment under this ADR. The only authorized target for the next cloud implementation lane is the isolated GCP non-production project dedicated to `develop` testing.
+Create no production environment under this ADR. Any future separately authorized cloud implementation may target only the isolated GCP non-production project dedicated to `develop` testing.
 
 The environment admits only wholly fictional synthetic data. Client/live records, transformed or de-identified client data, legacy imports, and production backups are prohibited. The application and evidence must identify the environment as non-production and synthetic-only.
 
-Planning, implementation, cloud provisioning, first deployment, and later production promotion remain separate evidence-bearing events. Beatrice has now approved local Terraform validation and the development/testing cloud implementation lane, but public access, real identity, live/client data, and production still require separate approval.
+Planning, implementation, cloud provisioning, first deployment, and later production promotion remain separate evidence-bearing events. Beatrice's local Terraform validation approval was exercised by PR #24. The earlier development/testing cloud-lane approval is paused and superseded by PR #24's final-head remediation gate: no cloud authentication, GCP API call, backend migration, Terraform plan/apply, provisioning, or deployment is currently authorized. Fresh scoped authorization may be considered only after remediation merges and the bootstrap/state/WIF packet is reviewed and accepted.
 
 ### 2. First deployable boundary
 
@@ -99,9 +100,9 @@ Neither liveness nor readiness may create records, replay commands, or act as a 
 
 ### 8. Infrastructure, state, CI/CD, and secrets
 
-Terraform is the accepted IaC direction. The current scaffold branch may run local `terraform fmt`, `terraform init -backend=false`, and `terraform validate`. Terraform plan/apply remain out of scope for the scaffold branch and belong only to a later scoped cloud implementation step with reviewed inputs and recorded evidence.
+Terraform is the accepted IaC direction. PR #24 merged a local-only scaffold that passed `terraform fmt`, backend-free init, validate, graph, static validation, and hygiene tests. It did not run plan/apply or authenticate to GCP. Final-head review requires a separate validate-without-apply remediation before this surface can become a provisioning/deployment baseline.
 
-The validate-without-apply Terraform slice uses local state only and no shared backend. Remote state location, access, backup, and transfer ownership must be decided before any shared apply. Terraform state, generated plan files, real `.tfvars`, project IDs, billing account IDs, user emails, cloud metadata, and secrets must not be committed. The provider lockfile generated by `terraform init -backend=false` is reviewable source and should remain tracked. Secrets do not enter Terraform source, state by design, Git, chat, GitHub artifacts, container layers, or ordinary logs.
+The validate-without-apply Terraform slice uses local state only and no shared backend. The future remote-state control plane must remain outside disposable workload teardown. Its project suitability, access, versioning, backup/restore, emergency access, transfer ownership, and migration ceremony must be reviewed before any backend migration or shared apply. Terraform state, generated plan files, real `.tfvars`, project IDs, billing account IDs, user emails, cloud metadata, and secrets must not be committed. The provider lockfile generated by `terraform init -backend=false` is reviewable source and should remain tracked. Secrets do not enter Terraform source, state by design, Git, chat, GitHub artifacts, container layers, or ordinary logs.
 
 GitHub deployment uses OIDC/WIF rather than long-lived service-account keys. Pull-request workflows do not receive deploy authority. Protected GitHub environments, immutable action pins, concurrency control, digest deployment, and value-safe evidence are mandatory. CI concurrency does not replace database-level migration serialization.
 
@@ -187,11 +188,11 @@ Rejected for routine resources. A narrowly documented bootstrap exception may be
 
 ## Approval, owner, and revisit trigger
 
-Beatrice is the technical decision owner. Independent architecture/security, database/recovery, GCP/IAM/cost, CI/supply-chain, and documentation reviews cleared the exact remediated packet with no remaining Blocker, High, or Medium findings, and Beatrice explicitly accepted the decision on 2026-08-13. Beatrice approved local Terraform execution and movement into development/testing cloud implementation on 2026-08-14. This ADR is **Accepted** as the implementation boundary for the private synthetic-only develop environment; it is not a production authorization.
+Beatrice is the technical decision owner. Independent architecture/security, database/recovery, GCP/IAM/cost, CI/supply-chain, and documentation reviews cleared the exact remediated PR #21 planning packet with no remaining Blocker, High, or Medium findings, and Beatrice explicitly accepted the decision on 2026-08-13. That historical planning clearance predates PR #24 and does not clear the Terraform implementation. Beatrice later approved local Terraform execution and movement toward development/testing cloud implementation; local validation was exercised, but the cloud lane is now paused by PR #24's final-head findings. This ADR remains **Accepted** as the architectural boundary for a future private synthetic-only develop environment; it is not current cloud-operation or production authorization.
 
 Even after acceptance and merge, separate explicit approvals remain required for:
 
-1. Terraform plan/apply and cloud-authenticated operations outside the approved development/testing lane;
+1. any Terraform plan/apply, backend migration, cloud authentication, GCP API call, API enablement, provisioning, or deployment after the remediation and bootstrap/state/WIF gates clear;
 2. secret configuration and first migration/deployment;
 3. any public invocation path;
 4. any real identity/provider integration;

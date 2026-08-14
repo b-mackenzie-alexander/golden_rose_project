@@ -52,6 +52,8 @@ This plan does not authorize or claim:
 
 ## Develop environment acceptance boundary
 
+PR #25 merged PR #24's documentation-only final-head disposition at `8dc1198`. ADR-0010 and `.hermes/plans/2026-08-14_164545-pr24-terraform-remediation-plan.md` now gate all later infrastructure slices. Required-CI authority, semantic static policy, deterministic `uv`, Direct VPC private-SQL connectivity, API ordering, automated backups, and managed-registry digest authority must be implemented and independently cleared before bootstrap/state/WIF work or any cloud-authorized step.
+
 The first environment is acceptable for **cloud deployment testing** only when all of the following are true:
 
 1. The service is private to approved named test operators; both `allUsers` and `allAuthenticatedUsers` invocation are denied and effective IAM has been inspected for inherited access.

@@ -311,3 +311,5 @@ The broader final merged surface is **not cleared as a provisioning/deployment b
 7. **Medium — image authority is not bound to the managed Artifact Registry.** The root variable proves only a digest suffix; Cloud Run can accept a digest reference from another registry/project/region/repository.
 
 The next code-changing lane must be a separately planned, independently reviewed validate-without-apply remediation. Both High findings block promotion. The four infrastructure architecture findings block Terraform plan/apply and any deployment-baseline claim. Bootstrap/state/WIF implementation planning follows remediation; its accepted direction keeps state authority lifecycle-independent from disposable workload infrastructure, with the existing non-workload project only a candidate pending read-only qualification.
+
+PR #25 subsequently merged this documentation-only disposition into protected `develop` at `8dc1198c0eb571ca39e9f4814bb3af5e33079890`. ADR-0010 and `.hermes/plans/2026-08-14_164545-pr24-terraform-remediation-plan.md` are the follow-on planning packet; no finding is implemented by those documents.

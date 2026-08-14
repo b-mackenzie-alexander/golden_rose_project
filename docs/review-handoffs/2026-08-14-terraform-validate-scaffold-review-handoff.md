@@ -1,6 +1,7 @@
-# Terraform Validate-Without-Apply Scaffold — Pre-PR Review Handoff
+# Terraform Validate-Without-Apply Scaffold — Historical Pre-PR Handoff and Post-Merge Disposition
 
 **Date:** 2026-08-14
+**Historical status:** PR #24 merged into protected `develop`; the pre-PR surface below is retained as chronological evidence and is superseded for current status by the post-merge disposition at the end of this document.
 **Branch:** `feat/gcp-terraform-validate-scaffold`
 **Intended base:** `origin/develop`
 **Approved base SHA:** `c27e1eeafab4bd18e697b43abc63744673a2b536`
@@ -290,3 +291,23 @@ PR #24's first `application` run failed at `uv run ruff format --check .`. The f
 The formatter follow-up advanced the next `application` run to full pytest, which failed only because `test_gcp_terraform_root_loads_develop_resource_module` invokes `terraform` and the Application quality job did not install that CLI. The remediation adds the same SHA-pinned `hashicorp/setup-terraform` action and Terraform 1.15.8 version already used by infrastructure-quality before the application quality command, with a regression proving the setup precedes full pytest. This supplies a local test dependency only; it adds no Terraform plan/apply, cloud authentication, or cloud authority.
 
 The Terraform-CLI follow-up then reached graph execution but failed because clean CI checkout has no initialized Google provider plugin. The remediation adds `terraform -chdir=infra/gcp init -backend=false -input=false` before full pytest and extends the workflow regression to require that exact backend-free initialization ordering. This downloads the locked provider required for local graph testing only; it does not configure a backend, run Terraform plan/apply, authenticate to GCP, or create cloud authority.
+
+## Post-merge final-head disposition
+
+PR #24 merged into protected `develop` at `50451b30d02e457f70657dd4c82d07ced5ac77eb`. Final PR head `f164815cf971077d783c7de186acc7941e930afc` and the squash merge have the same tree. Required `application`, `check`, and `enforce` checks passed, and the pull-request-only `Terraform static validation` check also passed. The final Application quality run installed Terraform, initialized the locked provider with `-backend=false`, and completed the full existing gate with `404 passed` at `96.23%` coverage. Infrastructure quality completed format, backend-free initialization, validate, static validation, and `100` Terraform hygiene tests. Exact merged-range Gitleaks reported no leaks.
+
+This evidence clears only PR #24's repo-local validate-without-apply behavior. No Terraform plan/apply, GCP authentication, API enablement, provisioning, backend migration, image push, deployment, Cloud SQL use, secret configuration, public access, real identity, live/client data, or production-readiness evidence exists.
+
+GitHub contains no approving review object for PR #24. CodeRabbit's green status represented a skipped review for the non-default target branch and is not substantive review evidence. The final two PR commits changed the required Application quality workflow after the historical uncommitted-tree rereview; independent read-only final-head review inspected those commits and found no separate Medium-or-higher defect introduced by the Terraform setup or backend-free initialization corrections.
+
+The broader final merged surface is **not cleared as a provisioning/deployment baseline**. Independent final-head review returned:
+
+1. **High — required CI is self-authorized.** Live branch protection requires `enforce`, `check`, and `application`, while the Terraform context is not independently required. Pull requests may modify the required workflow definitions while retaining the required job names, and the repository has no required approval, CODEOWNERS, or last-push approval control.
+2. **High — the static scanner is lexically bypassable.** The raw substring/regex implementation accepted a semantically privileged workflow fixture and a Terraform JSON backend whose key used a Unicode escape even though Terraform recognized the backend. The existing `100` hygiene tests therefore do not prove the claimed fail-closed semantic policy boundary.
+3. **Medium — `uv` selection is mutable.** Both workflows pin `astral-sh/setup-uv` by action commit but omit deterministic `version` and checksum inputs; the repository does not otherwise declare the installed `uv` tool version.
+4. **Medium — Cloud Run lacks a declared path to private Cloud SQL.** The private-IP database and dedicated VPC exist, but the service declares neither Direct VPC egress/subnet attachment nor a connector.
+5. **Medium — API enablement is unordered.** Dependent resources do not declare dependencies on their required `google_project_service` resources, allowing first-apply service-activation races.
+6. **Medium — Cloud SQL omits the accepted automated-backup baseline.** The instance has no `backup_configuration` despite ADR-0009's develop-recovery requirement.
+7. **Medium — image authority is not bound to the managed Artifact Registry.** The root variable proves only a digest suffix; Cloud Run can accept a digest reference from another registry/project/region/repository.
+
+The next code-changing lane must be a separately planned, independently reviewed validate-without-apply remediation. Both High findings block promotion. The four infrastructure architecture findings block Terraform plan/apply and any deployment-baseline claim. Bootstrap/state/WIF implementation planning follows remediation; its accepted direction keeps state authority lifecycle-independent from disposable workload infrastructure, with the existing non-workload project only a candidate pending read-only qualification.

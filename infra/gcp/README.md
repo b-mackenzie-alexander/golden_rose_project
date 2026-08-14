@@ -1,6 +1,8 @@
 # GCP Terraform scaffold
 
-This directory contains the repo-local Terraform scaffold for the Golden Rose private `develop` environment. The current branch is a validate-without-apply, local-validation, and static-policy implementation surface only.
+This directory contains the repo-local Terraform scaffold for the Golden Rose private `develop` environment. PR #24 merged this validate-without-apply, local-validation, and static-policy surface into protected `develop` at `50451b3`.
+
+Independent post-merge review did not clear this scaffold as a provisioning/deployment baseline. A separate validate-without-apply remediation must close required-CI governance, semantic static-policy validation, deterministic `uv`, Cloud Run/private-SQL connectivity, API ordering, Cloud SQL backup, and managed Artifact Registry image-binding findings before bootstrap implementation, plan, or apply.
 
 Terraform is executed from `infra/gcp`. The root module declares `module "develop"` in `develop.tf` and loads the intended resource scaffold from `infra/gcp/develop/`; nested files are not relied on through recursive file presence alone. Local review must prove `terraform -chdir=infra/gcp graph` includes the expected `module.develop.google_*` resource nodes.
 
@@ -55,4 +57,4 @@ authority and requires every workflow `uses:` action reference to be pinned to a
 
 ## Approval gates
 
-Beatrice has approved moving into cloud implementation/testing after this scaffold branch is review-qualified, using the dedicated GCP deployment/testing project and fictional synthetic data only. Provisioning, remote state, named principals, alert recipients, billing scope, secret injection, migration execution, deployment, and production promotion remain evidence-bearing steps; real identity, live/client data, public access, and production remain separate approval gates.
+Beatrice has accepted a durable bootstrap/state control plane separate from disposable `develop` workload teardown. The existing non-workload project is the candidate control-plane boundary pending read-only qualification; the dedicated deployment/testing project remains the workload target. A separate reviewed bootstrap/state/WIF packet is required before backend migration, Terraform plan/apply, cloud authentication, or provisioning. Named principals, alert recipients, billing scope, secret injection, migration execution, deployment, real identity, live/client data, public access, and production remain separate evidence and approval gates.

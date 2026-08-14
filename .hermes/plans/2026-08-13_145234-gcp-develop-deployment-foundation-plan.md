@@ -12,11 +12,11 @@
 
 ## Status and authority
 
-- **Planning status:** Proposed. This document authorizes no product code, infrastructure code, cloud resource, billing linkage, service identity, deployment, service start, or external exposure by itself.
+- **Planning status:** Accepted and merged by PR #21 at `9e27f80`; later implementation remains slice-gated. This document authorizes no cloud resource, billing linkage, service identity, deployment, service start, or external exposure by itself.
 - **Base:** PR #20 merged into protected `develop` at `6eb05d5af3bcceed3d05b1eb2e91676ce4e1bf10`.
 - **Target:** One isolated, disposable/rebuildable GCP `develop` environment using fictional synthetic data only.
 - **Acceptance owner:** Beatrice for technical planning and each separately approved implementation/provisioning action. Client production acceptance is not part of this plan.
-- **Controlling decision:** Proposed `docs/adr/ADR-0009-gcp-develop-deployment-boundary.md`.
+- **Controlling decision:** Accepted `docs/adr/ADR-0009-gcp-develop-deployment-boundary.md`.
 - **Prior rollout context:** `.hermes/plans/2026-08-03_gcp-rollout-management-plan.md` remains the broad staged rollout strategy. This plan narrows its Stage 0–3 non-production work into reviewable slices.
 
 ## Non-goals and hard stops
@@ -33,10 +33,10 @@ This plan does not authorize or claim:
 
 ## Decision summary
 
-| Concern | Proposed develop decision | Boundary / rationale |
+| Concern | Accepted develop decision | Boundary / rationale |
 |---|---|---|
 | Environment | Dedicated GCP non-production project | No shared production project or credentials; designed for teardown/rebuild and later ownership transfer. |
-| Region | Keep `us-east4` as candidate until a cited availability/cost/latency/recovery comparison is accepted | Do not encode a region in IaC before validation. |
+| Region | Use `us-east4` for the `develop` Cloud Run, Cloud SQL, and Artifact Registry baseline | Production and any secondary/backup location remain separate decisions. |
 | Deployable | One same-origin staff-app Cloud Run service | Preserves the existing relative `/api/staff/v1/...` browser contract and avoids introducing a premature gateway, load balancer, or cross-origin token design. Revisit before public/staff-plane expansion. |
 | Test access | Cloud Run IAM only; neither `allUsers` nor `allAuthenticatedUsers` may invoke while synthetic auth remains | Service-level `roles/run.invoker` is limited to the approved group or named managed principals. Named operators may use an authenticated local proxy or another separately approved private access method. Cloud IAM identifies the outer caller but does not become application business authorization. |
 | Application auth | Synthetic principal remains develop-only for the first deployment | `develop` must be explicit in validated configuration and visibly labeled. Real identity remains a separate planned gate. |
@@ -321,18 +321,18 @@ Require:
 - **Deployment work displaces Phase 1 product work:** maintain deployment as a parallel bounded lane with explicit exits; do not treat deployed tracer visibility as workflow completeness.
 - **Evidence overclaims readiness:** every report must distinguish source merged, image built, foundation provisioned, service deployed, synthetic workflow qualified, human review complete, and production/live-data gates.
 
-## Open decisions before Slice C can be accepted
+## Remaining decisions before Slices D-G can be accepted
 
-1. Is `us-east4` accepted after current service-availability, latency, backup/recovery, and price comparison, or should another East-US region be selected?
-2. What exact project/billing/folder topology permits Beatrice-funded develop use and eventual client transfer without sharing credentials?
-3. Who receives budget, incident, deployment, database, and break-glass alerts during develop testing?
-4. What monthly develop budget and maximum first-run exposure are acceptable?
-5. What Cloud SQL develop size, storage, backup/PITR, deletion protection, restore cadence, and develop RTO/RPO are approved?
-6. Which named users require private facilitator/test access, and is authenticated local proxy access acceptable for the first walkthrough?
-7. Where will Terraform state live before a client-owned GCP organization/account is available, and how will access/backup/transfer work?
-8. Which container vulnerability severity and exception process blocks deployment?
-9. Will the combined same-origin service serve static assets through FastAPI/Starlette or a small same-container web server? Slice B must compare these two implementations without changing the one-service trust/deployment boundary.
-10. Which qualification artifacts may be retained, for how long, and who may access them?
+Slice B merged through PR #22, and Slice C's validate-without-apply scaffold merged through PR #24. PR #24's final-head findings require a separate remediation before later slices proceed.
+
+1. Does read-only qualification clear the existing non-workload project as the durable bootstrap/state/WIF control plane, and what exact billing/folder/handoff topology supports eventual client transfer without sharing credentials?
+2. Who receives budget, incident, deployment, database, and break-glass alerts during develop testing?
+3. What monthly develop budget and maximum first-run exposure are acceptable?
+4. What Cloud SQL develop size, storage, backup/PITR, deletion protection, restore cadence, and develop RTO/RPO are approved?
+5. Which named users require private facilitator/test access, and is authenticated local proxy access acceptable for the first walkthrough?
+6. What exact bucket, access, versioning, retention, recovery, emergency-access, state-partitioning, migration, and transfer contract implements the accepted lifecycle-independent control plane?
+7. Which container vulnerability severity and exception process blocks deployment?
+8. Which qualification artifacts may be retained, for how long, and who may access them?
 
 ## Completion criteria
 

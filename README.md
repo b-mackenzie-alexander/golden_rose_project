@@ -28,11 +28,25 @@ automated hiring, matching, ranking, eligibility, or referral system.
 - PR #20 merged the independently reviewed ADR-0008 EmployerContact authority
   implementation into `develop` at `6eb05d5`: nested create, bounded parent
   collection-query, exact read, and typed receipt/audit authority.
-- Accepted ADR-0009 and the paired GCP `develop` deployment-foundation plan are
-  planning-only. They target one private, fictional-synthetic-only Cloud Run +
-  Cloud SQL testing environment after separate implementation and provisioning
-  approvals. No cloud resource, public access, real identity, live/client data,
-  or production claim is currently authorized or present.
+- PR #22 merged the local-only runtime/container contract into `develop` at
+  `f3cac4d`: explicit private-synthetic `develop` posture, value-safe marker,
+  `/health`, bounded `/readiness`, same-origin static serving, entrypoint/runtime
+  behavior, and non-root local image build/inspection evidence.
+- Accepted ADR-0009 targets one private, fictional-synthetic-only Cloud Run +
+  Cloud SQL testing environment after separate Terraform/IaC, provisioning, and
+  deployment approvals. No cloud resource, public access, real identity,
+  live/client data, or production claim is currently authorized or present.
+- Terraform/IaC planning now uses the accepted 14-decision private synthetic-only
+  GCP `develop` posture: `us-east4` for Cloud Run, Cloud SQL, and Artifact
+  Registry; Terraform-managed APIs; split bootstrap/WIF provisioning identity;
+  separate runtime/migration identities; private Artifact Registry digest
+  deployment; Terraform-managed $50/$75/$100 budget alerts; Secret Manager
+  metadata/IAM only; private Cloud SQL and VPC access; private Cloud Run
+  invoker IAM; protected GitHub WIF gates; value-safe observability; standard
+  labels; intentional teardown runbook support; and local state only until remote
+  state is approved. Terraform implementation, apply, API/resource/service
+  identity provisioning, image push, deployment, real identity, live/client data,
+  and production remain separately gated.
 - Automated frontend parity/accessibility evidence exists locally, but human
   browser/manual accessibility/fluent-language qualification remains deferred
   until a shared deployed `develop` target exists.

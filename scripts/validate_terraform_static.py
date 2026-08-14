@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 import re
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TERRAFORM_ROOT = ROOT / "infra" / "gcp"
@@ -139,9 +139,7 @@ def main() -> int:
     args = _parse_args()
     root = args.root.resolve()
     terraform_root = root / "infra" / "gcp"
-    required_files = [
-        root / path.relative_to(ROOT) for path in REQUIRED_FILES
-    ]
+    required_files = [root / path.relative_to(ROOT) for path in REQUIRED_FILES]
 
     violations: list[str] = []
     for pattern in FORBIDDEN_ARTIFACT_PATTERNS:
@@ -171,7 +169,8 @@ def main() -> int:
                 )
         for match in FORBIDDEN_WORKFLOW_SECRET_PATTERN.finditer(text):
             violations.append(
-                f"{path.relative_to(root)} contains forbidden workflow secret reference {match.group(0)!r}"
+                f"{path.relative_to(root)} contains forbidden workflow secret reference "
+                f"{match.group(0)!r}"
             )
         for match in WORKFLOW_USES_PATTERN.finditer(text):
             uses_ref = match.group(1)

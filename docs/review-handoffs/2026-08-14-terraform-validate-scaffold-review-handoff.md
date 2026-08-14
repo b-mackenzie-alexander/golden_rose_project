@@ -282,3 +282,7 @@ Independent rereview of this remediation should happen before staging/commit/pus
 5. push and open PR only after final committed evidence is clean.
 
 Do not run Terraform plan/apply, authenticate to GCP, enable APIs, provision resources, push images, configure secrets, start services, deploy, admit real identity, admit live/client data, or claim production readiness as part of this review branch.
+
+## PR #24 CI remediation addendum
+
+PR #24's first `application` run failed at `uv run ruff format --check .`. The failure identified only `scripts/validate_terraform_static.py` and `tests/unit/test_terraform_hygiene.py` as unformatted; the job had already completed the frontend dependency, audit, and frontend-SBOM stages. The missing backend-SBOM artifact was a downstream fail-fast consequence, not an independent backend-SBOM finding. The narrow remediation applies the repository formatter to exactly those two files. Before pushing the follow-up commit, rerun formatter/lint, Terraform static validation and hygiene tests, Terraform fmt/init-without-backend/validate/graph, diff hygiene, and exact-range Gitleaks against the final head. No cloud action is authorized or required.

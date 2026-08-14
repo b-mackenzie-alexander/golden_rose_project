@@ -1,7 +1,7 @@
-from pathlib import Path
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -96,13 +96,12 @@ def test_gcp_terraform_variables_define_required_project_and_region_without_secr
     assert 'variable "credentials"' not in variables
     assert 'variable "secret"' not in variables.lower()
     assert 'variable "container_image_digest"' in variables
-    assert 'default =' not in variables
+    assert "default =" not in variables
     assert "nullable" in variables
     assert "= false" in variables
     assert 'contains(["us-east4"], var.region)' in variables
     assert "client" not in variables.lower()
     assert "golden" not in variables.lower()
-
 
 
 def test_gcp_terraform_outputs_are_value_safe_and_do_not_expose_identifiers() -> None:
@@ -397,9 +396,7 @@ def test_terraform_static_validation_harness_runs_without_cloud_access() -> None
 
 
 def test_infrastructure_quality_workflow_runs_static_validation_without_apply_or_auth() -> None:
-    workflow = (ROOT / ".github/workflows/infrastructure-quality.yml").read_text(
-        encoding="utf-8"
-    )
+    workflow = (ROOT / ".github/workflows/infrastructure-quality.yml").read_text(encoding="utf-8")
 
     expected_pinned_actions = [
         "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
@@ -441,12 +438,12 @@ def test_terraform_static_validation_harness_rejects_forbidden_patterns(tmp_path
     terraform_root.mkdir(parents=True)
     bad_file = terraform_root / "bad.tf"
     bad_file.write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_cloud_run_v2_service_iam_member" "bad" {',
                 '  role   = "roles/run.invoker"',
                 '  member = "allUsers"',
-                '}',
+                "}",
             ]
         ),
         encoding="utf-8",
@@ -593,7 +590,8 @@ def test_terraform_static_validation_harness_rejects_tf_json_cloud_run_env_injec
           {
             "containers": [
               {
-                "image": "example@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "image": "example@sha256:"
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 "env": [
                   {
                     "name": "DATABASE_URL",
@@ -640,7 +638,7 @@ def test_terraform_static_validation_harness_rejects_backend_configuration(tmp_p
     terraform_root.mkdir(parents=True)
     bad_file = terraform_root / "backend.tf"
     bad_file.write_text(
-        '\n'.join(
+        "\n".join(
             [
                 "terraform {",
                 '  backend "gcs" {',
@@ -694,7 +692,7 @@ def test_terraform_static_validation_harness_rejects_infrastructure_workflow_aut
     workflow_dir = tmp_path / ".github" / "workflows"
     workflow_dir.mkdir(parents=True)
     (workflow_dir / "infrastructure-quality.yml").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 "permissions:",
                 "  id-token: write",
@@ -729,7 +727,7 @@ def test_terraform_static_validation_harness_rejects_unpinned_workflow_actions(
     workflow_dir = tmp_path / ".github" / "workflows"
     workflow_dir.mkdir(parents=True)
     (workflow_dir / "terraform-quality.yml").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 "permissions:",
                 "  contents: read",
@@ -762,7 +760,7 @@ def test_terraform_static_validation_harness_rejects_service_account_keys(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "keys.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_service_account_key" "bad" {',
                 "  service_account_id = google_service_account.runtime.name",
@@ -791,7 +789,7 @@ def test_terraform_static_validation_harness_rejects_yaml_infrastructure_workflo
     workflow_dir = tmp_path / ".github" / "workflows"
     workflow_dir.mkdir(parents=True)
     (workflow_dir / "infrastructure-apply.yaml").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 "jobs:",
                 "  bad:",
@@ -821,7 +819,7 @@ def test_terraform_static_validation_harness_rejects_secret_injection_references
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "secret_injection.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_cloud_run_v2_service" "bad" {',
                 "  template {",
@@ -862,7 +860,7 @@ def test_terraform_static_validation_harness_rejects_secret_manager_iam_grants(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "secret_iam.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_secret_manager_secret_iam_member" "bad" {',
                 '  role   = "roles/secretmanager.secretAccessor"',
@@ -892,7 +890,7 @@ def test_terraform_static_validation_harness_rejects_public_cloud_run_ingress(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "public_run.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_cloud_run_v2_service" "bad" {',
                 '  ingress = "INGRESS_TRAFFIC_ALL"',
@@ -921,7 +919,7 @@ def test_terraform_static_validation_harness_rejects_artifact_registry_iam_grant
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "artifact_iam.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_artifact_registry_repository_iam_member" "bad" {',
                 '  role   = "roles/artifactregistry.writer"',
@@ -951,7 +949,7 @@ def test_terraform_static_validation_harness_rejects_disabled_deletion_protectio
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "unsafe_delete.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_sql_database_instance" "bad" {',
                 "  deletion_protection = false",
@@ -980,7 +978,7 @@ def test_terraform_static_validation_harness_rejects_public_cloud_sql_ipv4(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "public_sql.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_sql_database_instance" "bad" {',
                 "  settings {",
@@ -1013,7 +1011,7 @@ def test_terraform_static_validation_harness_rejects_cloud_sql_users(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "sql_user.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_sql_user" "bad" {',
                 '  name     = "app"',
@@ -1043,7 +1041,7 @@ def test_terraform_static_validation_harness_rejects_provider_credentials(
     terraform_root = tmp_path / "infra" / "gcp"
     terraform_root.mkdir(parents=True)
     (terraform_root / "providers.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'provider "google" {',
                 '  credentials = file("credentials.json")',
@@ -1074,7 +1072,7 @@ def test_terraform_static_validation_harness_rejects_project_iam_grants(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "project_iam.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_project_iam_member" "bad" {',
                 '  role   = "roles/cloudsql.client"',
@@ -1104,7 +1102,7 @@ def test_terraform_static_validation_harness_rejects_push_triggered_workflows(
     workflow_dir = tmp_path / ".github" / "workflows"
     workflow_dir.mkdir(parents=True)
     (workflow_dir / "infrastructure-quality.yml").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 "on:",
                 "  push:",
@@ -1133,7 +1131,7 @@ def test_terraform_static_validation_harness_rejects_cloud_run_environment_varia
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "cloud_run_env.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_cloud_run_v2_service" "bad" {',
                 "  template {",
@@ -1169,7 +1167,7 @@ def test_terraform_static_validation_harness_rejects_cloud_run_jobs(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "migration_job.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_cloud_run_v2_job" "migration" {',
                 '  name     = "run-migrations"',
@@ -1199,7 +1197,7 @@ def test_terraform_static_validation_harness_rejects_billing_budget_resources(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "budget.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_billing_budget" "develop" {',
                 '  billing_account = "billingAccounts/000000-000000-000000"',
@@ -1228,7 +1226,7 @@ def test_terraform_static_validation_harness_rejects_logging_export_sinks(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "log_sink.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_logging_project_sink" "export" {',
                 '  name        = "develop-export"',
@@ -1258,7 +1256,7 @@ def test_terraform_static_validation_harness_rejects_monitoring_alert_policies(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "alert.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_monitoring_alert_policy" "readiness" {',
                 '  display_name = "Readiness failure"',
@@ -1288,7 +1286,7 @@ def test_terraform_static_validation_harness_rejects_monitoring_notification_cha
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "notification_channel.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_monitoring_notification_channel" "email" {',
                 '  display_name = "Owner email"',
@@ -1319,7 +1317,7 @@ def test_terraform_static_validation_harness_rejects_cloud_scheduler_jobs(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "scheduler.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_cloud_scheduler_job" "destroy" {',
                 '  name     = "scheduled-destroy"',
@@ -1349,7 +1347,7 @@ def test_terraform_static_validation_harness_rejects_storage_buckets(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "bucket.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_storage_bucket" "state_or_logs" {',
                 '  name     = "unapproved-state-or-log-bucket"',
@@ -1379,7 +1377,7 @@ def test_terraform_static_validation_harness_rejects_load_balancer_forwarding_ru
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "load_balancer.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_global_forwarding_rule" "public" {',
                 '  name       = "public-forwarding-rule"',
@@ -1410,7 +1408,7 @@ def test_terraform_static_validation_harness_rejects_load_balancer_backend_servi
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "load_balancer_backend.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_backend_service" "public" {',
                 '  name                  = "public-backend-service"',
@@ -1440,7 +1438,7 @@ def test_terraform_static_validation_harness_rejects_load_balancer_url_maps(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "load_balancer_url_map.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_url_map" "public" {',
                 '  name            = "public-url-map"',
@@ -1470,7 +1468,7 @@ def test_terraform_static_validation_harness_rejects_load_balancer_target_https_
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "load_balancer_target_proxy.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_target_https_proxy" "public" {',
                 '  name             = "public-target-https-proxy"',
@@ -1501,7 +1499,7 @@ def test_terraform_static_validation_harness_rejects_managed_ssl_certificates(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "managed_ssl_certificate.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_managed_ssl_certificate" "public" {',
                 '  name = "public-managed-certificate"',
@@ -1533,7 +1531,7 @@ def test_terraform_static_validation_harness_rejects_ssl_certificates(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "ssl_certificate.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_ssl_certificate" "public" {',
                 '  name        = "public-ssl-certificate"',
@@ -1564,7 +1562,7 @@ def test_terraform_static_validation_harness_rejects_load_balancer_target_http_p
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "load_balancer_target_http_proxy.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_target_http_proxy" "public" {',
                 '  name    = "public-target-http-proxy"',
@@ -1594,7 +1592,7 @@ def test_terraform_static_validation_harness_rejects_regional_forwarding_rules(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "regional_forwarding_rule.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_forwarding_rule" "public" {',
                 '  name                  = "public-regional-forwarding-rule"',
@@ -1625,7 +1623,7 @@ def test_terraform_static_validation_harness_rejects_public_static_addresses(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "public_static_address.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_address" "public" {',
                 '  name         = "public-static-address"',
@@ -1655,7 +1653,7 @@ def test_terraform_static_validation_harness_rejects_global_public_static_addres
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "global_public_static_address.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_global_address" "public" {',
                 '  name         = "public-global-static-address"',
@@ -1685,12 +1683,12 @@ def test_terraform_static_validation_harness_rejects_load_balancer_backend_bucke
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "load_balancer_backend_bucket.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_backend_bucket" "public" {',
                 '  name        = "public-backend-bucket"',
                 '  bucket_name = "unapproved-public-origin"',
-                '  enable_cdn  = true',
+                "  enable_cdn  = true",
                 "}",
             ]
         ),
@@ -1716,12 +1714,12 @@ def test_terraform_static_validation_harness_rejects_global_network_endpoint_gro
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "global_network_endpoint_group.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_global_network_endpoint_group" "public" {',
                 '  name                  = "public-global-neg"',
                 '  network_endpoint_type = "INTERNET_FQDN_PORT"',
-                '  default_port          = 443',
+                "  default_port          = 443",
                 "}",
             ]
         ),
@@ -1747,12 +1745,12 @@ def test_terraform_static_validation_harness_rejects_network_endpoint_groups(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "network_endpoint_group.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_network_endpoint_group" "public" {',
                 '  name                  = "public-regional-neg"',
                 '  network_endpoint_type = "INTERNET_IP_PORT"',
-                '  default_port          = 443',
+                "  default_port          = 443",
                 "}",
             ]
         ),
@@ -1778,7 +1776,7 @@ def test_terraform_static_validation_harness_rejects_cloud_armor_security_polici
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "cloud_armor_security_policy.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_security_policy" "public_edge" {',
                 '  name = "public-edge-security-policy"',
@@ -1811,14 +1809,14 @@ def test_terraform_static_validation_harness_rejects_region_network_endpoint_gro
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "region_network_endpoint_group.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_region_network_endpoint_group" "public" {',
                 '  name                  = "public-region-neg"',
                 '  network_endpoint_type = "SERVERLESS"',
-                '  cloud_run {',
+                "  cloud_run {",
                 '    service = "unapproved-public-service"',
-                '  }',
+                "  }",
                 "}",
             ]
         ),
@@ -1844,7 +1842,7 @@ def test_terraform_static_validation_harness_rejects_load_balancer_ssl_policies(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "load_balancer_ssl_policy.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_ssl_policy" "public_edge" {',
                 '  name            = "public-edge-ssl-policy"',
@@ -1875,7 +1873,7 @@ def test_terraform_static_validation_harness_rejects_load_balancer_target_ssl_pr
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "load_balancer_target_ssl_proxy.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_target_ssl_proxy" "public_edge" {',
                 '  name             = "public-edge-target-ssl-proxy"',
@@ -1906,7 +1904,7 @@ def test_terraform_static_validation_harness_rejects_load_balancer_target_tcp_pr
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "load_balancer_target_tcp_proxy.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_target_tcp_proxy" "public_edge" {',
                 '  name            = "public-edge-target-tcp-proxy"',
@@ -1936,7 +1934,7 @@ def test_terraform_static_validation_harness_rejects_load_balancer_target_grpc_p
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "load_balancer_target_grpc_proxy.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_target_grpc_proxy" "public_edge" {',
                 '  name    = "public-edge-target-grpc-proxy"',
@@ -1966,7 +1964,7 @@ def test_terraform_static_validation_harness_rejects_legacy_target_pools(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "legacy_target_pool.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_target_pool" "public_edge" {',
                 '  name = "public-edge-target-pool"',
@@ -1996,16 +1994,16 @@ def test_terraform_static_validation_harness_rejects_load_balancer_health_checks
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "load_balancer_health_check.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_health_check" "public_edge" {',
                 '  name               = "public-edge-health-check"',
-                '  check_interval_sec = 5',
-                '  timeout_sec        = 5',
-                '  http_health_check {',
-                '    port         = 80',
+                "  check_interval_sec = 5",
+                "  timeout_sec        = 5",
+                "  http_health_check {",
+                "    port         = 80",
                 '    request_path = "/health"',
-                '  }',
+                "  }",
                 "}",
             ]
         ),
@@ -2031,13 +2029,13 @@ def test_terraform_static_validation_harness_rejects_legacy_http_health_checks(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "legacy_http_health_check.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_http_health_check" "public_edge" {',
                 '  name               = "public-edge-http-health-check"',
-                '  check_interval_sec = 5',
-                '  timeout_sec        = 5',
-                '  port               = 80',
+                "  check_interval_sec = 5",
+                "  timeout_sec        = 5",
+                "  port               = 80",
                 '  request_path       = "/health"',
                 "}",
             ]
@@ -2064,13 +2062,13 @@ def test_terraform_static_validation_harness_rejects_legacy_https_health_checks(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "legacy_https_health_check.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_https_health_check" "public_edge" {',
                 '  name               = "public-edge-https-health-check"',
-                '  check_interval_sec = 5',
-                '  timeout_sec        = 5',
-                '  port               = 443',
+                "  check_interval_sec = 5",
+                "  timeout_sec        = 5",
+                "  port               = 443",
                 '  request_path       = "/health"',
                 "}",
             ]
@@ -2097,7 +2095,7 @@ def test_terraform_static_validation_harness_rejects_cloud_routers(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "cloud_router.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_router" "public_edge" {',
                 '  name    = "public-edge-router"',
@@ -2128,7 +2126,7 @@ def test_terraform_static_validation_harness_rejects_cloud_nat(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "cloud_nat.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_router_nat" "public_edge" {',
                 '  name                               = "public-edge-nat"',
@@ -2161,15 +2159,15 @@ def test_terraform_static_validation_harness_rejects_firewall_rules(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "firewall.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_firewall" "public_edge" {',
                 '  name    = "public-edge-firewall"',
                 '  network = "projects/example/global/networks/public-edge"',
-                '  allow {',
+                "  allow {",
                 '    protocol = "tcp"',
                 '    ports    = ["443"]',
-                '  }',
+                "  }",
                 "}",
             ]
         ),
@@ -2195,20 +2193,20 @@ def test_terraform_static_validation_harness_rejects_authorized_networks(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "cloud_sql_authorized_networks.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_sql_database_instance" "public_edge" {',
                 '  name             = "public-edge-db"',
                 '  database_version = "POSTGRES_16"',
-                '  settings {',
+                "  settings {",
                 '    tier = "db-f1-micro"',
-                '    ip_configuration {',
-                '      authorized_networks {',
+                "    ip_configuration {",
+                "      authorized_networks {",
                 '        name  = "public-edge"',
                 '        value = "203.0.113.0/24"',
-                '      }',
-                '    }',
-                '  }',
+                "      }",
+                "    }",
+                "  }",
                 "}",
             ]
         ),
@@ -2234,17 +2232,17 @@ def test_terraform_static_validation_harness_rejects_broad_cidr_rules(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "broad_cidr.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_network" "public_edge" {',
                 '  name                    = "public-edge-network"',
-                '  auto_create_subnetworks = false',
+                "  auto_create_subnetworks = false",
                 "}",
                 "",
                 'resource "google_compute_subnetwork" "public_edge" {',
                 '  name          = "public-edge-subnet"',
                 '  ip_cidr_range = "0.0.0.0/0"',
-                '  network       = google_compute_network.public_edge.id',
+                "  network       = google_compute_network.public_edge.id",
                 '  region        = "us-east4"',
                 "}",
             ]
@@ -2271,7 +2269,7 @@ def test_terraform_static_validation_harness_rejects_default_vpc_references(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "default_vpc.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_subnetwork" "default_edge" {',
                 '  name          = "default-edge-subnet"',
@@ -2303,11 +2301,11 @@ def test_terraform_static_validation_harness_rejects_default_vpc_resources(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "default_vpc_resource.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_network" "default_edge" {',
                 '  name                    = "default"',
-                '  auto_create_subnetworks = true',
+                "  auto_create_subnetworks = true",
                 "}",
             ]
         ),
@@ -2333,11 +2331,11 @@ def test_terraform_static_validation_harness_rejects_auto_created_subnetworks(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "auto_subnetworks.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_network" "public_edge" {',
                 '  name                    = "auto-subnetwork-edge"',
-                '  auto_create_subnetworks = true',
+                "  auto_create_subnetworks = true",
                 "}",
             ]
         ),
@@ -2363,12 +2361,12 @@ def test_terraform_static_validation_harness_rejects_default_route_retention(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "default_routes.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_network" "public_edge" {',
                 '  name                            = "default-route-edge"',
-                '  auto_create_subnetworks         = false',
-                '  delete_default_routes_on_create = false',
+                "  auto_create_subnetworks         = false",
+                "  delete_default_routes_on_create = false",
                 "}",
             ]
         ),
@@ -2394,7 +2392,7 @@ def test_terraform_static_validation_harness_rejects_custom_routes(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "custom_route.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_route" "public_edge" {',
                 '  name             = "public-edge-default-route"',
@@ -2426,7 +2424,7 @@ def test_terraform_static_validation_harness_rejects_vpn_gateways(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "vpn_gateway.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_vpn_gateway" "public_edge" {',
                 '  name    = "public-edge-vpn-gateway"',
@@ -2457,14 +2455,15 @@ def test_terraform_static_validation_harness_rejects_vpn_tunnels(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "vpn_tunnel.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_vpn_tunnel" "public_edge" {',
                 '  name          = "public-edge-vpn-tunnel"',
                 '  peer_ip       = "203.0.113.10"',
                 '  shared_secret = "placeholder-only"',
                 '  region        = "us-east4"',
-                '  target_vpn_gateway = "projects/example/regions/us-east4/targetVpnGateways/public-edge"',
+                '  target_vpn_gateway = "projects/example/regions/us-east4/targetVpnGateways/'
+                'public-edge"',
                 "}",
             ]
         ),
@@ -2490,7 +2489,7 @@ def test_terraform_static_validation_harness_rejects_ha_vpn_gateways(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "ha_vpn_gateway.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_ha_vpn_gateway" "public_edge" {',
                 '  name    = "public-edge-ha-vpn-gateway"',
@@ -2521,15 +2520,15 @@ def test_terraform_static_validation_harness_rejects_external_vpn_gateways(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "external_vpn_gateway.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_external_vpn_gateway" "public_edge" {',
                 '  name            = "public-edge-external-vpn-gateway"',
                 '  redundancy_type = "SINGLE_IP_INTERNALLY_REDUNDANT"',
-                '  interface {',
-                '    id         = 0',
+                "  interface {",
+                "    id         = 0",
                 '    ip_address = "203.0.113.20"',
-                '  }',
+                "  }",
                 "}",
             ]
         ),
@@ -2555,7 +2554,7 @@ def test_terraform_static_validation_harness_rejects_interconnect_attachments(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "interconnect_attachment.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_interconnect_attachment" "public_edge" {',
                 '  name    = "public-edge-interconnect"',
@@ -2587,7 +2586,7 @@ def test_terraform_static_validation_harness_rejects_vpc_network_peerings(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "network_peering.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_network_peering" "public_edge" {',
                 '  name         = "public-edge-peering"',
@@ -2618,13 +2617,14 @@ def test_terraform_static_validation_harness_rejects_private_service_connect_att
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "service_attachment.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_service_attachment" "public_edge" {',
                 '  name                  = "public-edge-service-attachment"',
                 '  region                = "us-east4"',
                 '  connection_preference = "ACCEPT_AUTOMATIC"',
-                '  target_service        = "projects/example/regions/us-east4/forwardingRules/public-edge"',
+                '  target_service        = "projects/example/regions/us-east4/forwardingRules/'
+                'public-edge"',
                 "}",
             ]
         ),
@@ -2650,15 +2650,15 @@ def test_terraform_static_validation_harness_rejects_packet_mirroring(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "packet_mirroring.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_packet_mirroring" "public_edge" {',
                 '  name        = "public-edge-packet-mirroring"',
                 '  region      = "us-east4"',
                 '  network     = "projects/example/global/networks/develop-vpc"',
-                '  collector_ilb {',
+                "  collector_ilb {",
                 '    url = "projects/example/regions/us-east4/forwardingRules/public-edge"',
-                '  }',
+                "  }",
                 "}",
             ]
         ),
@@ -2684,7 +2684,7 @@ def test_terraform_static_validation_harness_rejects_network_firewall_policies(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "network_firewall_policy.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_network_firewall_policy" "public_edge" {',
                 '  name        = "public-edge-network-firewall-policy"',
@@ -2714,20 +2714,20 @@ def test_terraform_static_validation_harness_rejects_network_firewall_policy_rul
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "network_firewall_policy_rule.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_network_firewall_policy_rule" "public_edge" {',
                 '  firewall_policy = "projects/example/global/firewallPolicies/public-edge"',
-                '  priority        = 1000',
+                "  priority        = 1000",
                 '  action          = "allow"',
                 '  direction       = "INGRESS"',
-                '  match {',
+                "  match {",
                 '    src_ip_ranges = ["203.0.113.0/24"]',
-                '    layer4_configs {',
+                "    layer4_configs {",
                 '      ip_protocol = "tcp"',
                 '      ports       = ["443"]',
-                '    }',
-                '  }',
+                "    }",
+                "  }",
                 "}",
             ]
         ),
@@ -2753,7 +2753,7 @@ def test_terraform_static_validation_harness_rejects_network_firewall_policy_ass
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "network_firewall_policy_association.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_network_firewall_policy_association" "public_edge" {',
                 '  name              = "public-edge-network-firewall-policy-association"',
@@ -2784,7 +2784,7 @@ def test_terraform_static_validation_harness_rejects_hierarchical_firewall_polic
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "hierarchical_firewall_policy.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_firewall_policy" "public_edge" {',
                 '  short_name  = "public-edge-firewall-policy"',
@@ -2814,7 +2814,7 @@ def test_terraform_static_validation_harness_rejects_organization_security_polic
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "organization_security_policy.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_organization_security_policy" "public_edge" {',
                 '  display_name = "public-edge-organization-security-policy"',
@@ -2845,22 +2845,22 @@ def test_terraform_static_validation_harness_rejects_organization_security_polic
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "organization_security_policy_rule.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_organization_security_policy_rule" "public_edge" {',
                 '  policy_id = "organizations/123456789012/securityPolicies/public-edge"',
-                '  priority  = 1000',
+                "  priority  = 1000",
                 '  action    = "allow"',
                 '  direction = "INGRESS"',
-                '  match {',
-                '    config {',
+                "  match {",
+                "    config {",
                 '      src_ip_ranges = ["203.0.113.0/24"]',
-                '      layer4_config {',
+                "      layer4_config {",
                 '        ip_protocol = "tcp"',
                 '        ports       = ["443"]',
-                '      }',
-                '    }',
-                '  }',
+                "      }",
+                "    }",
+                "  }",
                 "}",
             ]
         ),
@@ -2886,9 +2886,10 @@ def test_terraform_static_validation_harness_rejects_organization_security_polic
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "organization_security_policy_association.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
-                'resource "google_compute_organization_security_policy_association" "public_edge" {',
+                'resource "google_compute_organization_security_policy_association" '
+                '"public_edge" {',
                 '  name          = "public-edge-organization-security-policy-association"',
                 '  attachment_id = "folders/123456789012"',
                 '  policy_id     = "organizations/123456789012/securityPolicies/public-edge"',
@@ -2917,18 +2918,18 @@ def test_terraform_static_validation_harness_rejects_cloud_armor_security_policy
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "cloud_armor_security_policy_rule.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_security_policy_rule" "public_edge" {',
                 '  security_policy = "public-edge-security-policy"',
-                '  priority        = 1000',
+                "  priority        = 1000",
                 '  action          = "allow"',
-                '  match {',
+                "  match {",
                 '    versioned_expr = "SRC_IPS_V1"',
-                '    config {',
+                "    config {",
                 '      src_ip_ranges = ["203.0.113.0/24"]',
-                '    }',
-                '  }',
+                "    }",
+                "  }",
                 "}",
             ]
         ),
@@ -2954,13 +2955,14 @@ def test_terraform_static_validation_harness_rejects_network_attachments(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "network_attachment.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_compute_network_attachment" "public_edge" {',
                 '  name                  = "public-edge-network-attachment"',
                 '  region                = "us-east4"',
                 '  connection_preference = "ACCEPT_AUTOMATIC"',
-                '  subnetworks           = ["projects/example/regions/us-east4/subnetworks/public-edge"]',
+                '  subnetworks           = ["projects/example/regions/us-east4/subnetworks/'
+                'public-edge"]',
                 "}",
             ]
         ),
@@ -2986,16 +2988,16 @@ def test_terraform_static_validation_harness_rejects_service_connection_policies
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "service_connection_policy.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_network_connectivity_service_connection_policy" "public_edge" {',
                 '  name          = "public-edge-service-connection-policy"',
                 '  location      = "us-east4"',
                 '  service_class = "gcp-memorystore-redis"',
                 '  network       = "projects/example/global/networks/develop-vpc"',
-                '  psc_config {',
+                "  psc_config {",
                 '    subnetworks = ["projects/example/regions/us-east4/subnetworks/public-edge"]',
-                '  }',
+                "  }",
                 "}",
             ]
         ),
@@ -3021,7 +3023,7 @@ def test_terraform_static_validation_harness_rejects_network_connectivity_hubs(
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
     (terraform_root / "network_connectivity_hub.tf").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'resource "google_network_connectivity_hub" "public_edge" {',
                 '  name        = "public-edge-connectivity-hub"',

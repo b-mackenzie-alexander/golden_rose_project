@@ -20,7 +20,7 @@ Use `ADR-NNNN-short-title.md`, with monotonic numbers. Never renumber an existin
 - `ADR-0006-phase-1-employer-workspace-post-merge-closeout.md` — accepted and implemented post-merge closeout decision for PR #13 defects, deferred human qualification gates, and the bounded remediation lane; PR #14 merged its paired plan and PR #15 merged the exact-head-qualified closeout plus this ADR at `7ae448e`.
 - `ADR-0007-phase-1-draft-employer-revision-boundary.md` — accepted and implemented boundary for revising only draft Employer `display_name` and `employer_type` with expected-version concurrency, command-bound idempotency, minimized audit authority, and localized browser recovery; PR #17 merged the implementation at `1543248`, and PR #18 merged its bounded remediation at `a4d8f90`.
 - `ADR-0008-phase-1-employer-contact-authority-foundation.md` — accepted and implemented backend-only synthetic/local EmployerContact create, bounded parent query, exact read, and typed receipt/audit authority; PR #20 merged the independently reviewed implementation into protected `develop` at `6eb05d5`.
-- `ADR-0009-gcp-develop-deployment-boundary.md` — accepted private, fictional-synthetic-only GCP `develop` planning boundary; it grants no implementation, provisioning, deployment, public-access, live-data, or production authority.
+- `ADR-0009-gcp-develop-deployment-boundary.md` — accepted private, fictional-synthetic-only GCP `develop` implementation boundary; local Terraform validation and the next development/testing cloud implementation lane are approved, while public access, real identity, live/client data, and production remain separately gated.
 
 ## Required sections
 - Status and date

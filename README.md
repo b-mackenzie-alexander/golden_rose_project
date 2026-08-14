@@ -33,8 +33,9 @@ automated hiring, matching, ranking, eligibility, or referral system.
   `/health`, bounded `/readiness`, same-origin static serving, entrypoint/runtime
   behavior, and non-root local image build/inspection evidence.
 - Accepted ADR-0009 targets one private, fictional-synthetic-only Cloud Run +
-  Cloud SQL testing environment after separate Terraform/IaC, provisioning, and
-  deployment approvals. No cloud resource, public access, real identity,
+  Cloud SQL testing environment. Beatrice has now approved local Terraform
+  execution and moving into development/testing cloud implementation once the
+  current scaffold branch is review-qualified. No public access, real identity,
   live/client data, or production claim is currently authorized or present.
 - Terraform/IaC planning now uses the accepted 14-decision private synthetic-only
   GCP `develop` posture: `us-east4` for Cloud Run, Cloud SQL, and Artifact
@@ -44,9 +45,12 @@ automated hiring, matching, ranking, eligibility, or referral system.
   metadata/IAM only; private Cloud SQL and VPC access; private Cloud Run
   invoker IAM; protected GitHub WIF gates; value-safe observability; standard
   labels; intentional teardown runbook support; and local state only until remote
-  state is approved. Terraform implementation, apply, API/resource/service
-  identity provisioning, image push, deployment, real identity, live/client data,
-  and production remain separately gated.
+  state is approved. The current branch implements the repo-local scaffold,
+  provider lockfile, static scanner, and infrastructure-quality workflow, and may
+  run local `terraform fmt`, `terraform init -backend=false`, and
+  `terraform validate`. Terraform plan/apply, cloud authentication/API calls,
+  resource/service-identity provisioning, image push, deployment, real identity,
+  live/client data, and production remain outside this branch.
 - Automated frontend parity/accessibility evidence exists locally, but human
   browser/manual accessibility/fluent-language qualification remains deferred
   until a shared deployed `develop` target exists.
@@ -76,6 +80,8 @@ uv run python scripts/validate_sbom.py build/backend-sbom.cdx.json --spec 1.6 --
 ```
 
 The application must not be started against production settings with synthetic
-authentication. The proposed deployment plan does not itself authorize
-infrastructure creation or startup; public access, real identity integration,
-live-data use, and production remain separately gated.
+authentication. The approved cloud implementation/testing lane must use the
+dedicated GCP deployment/testing project with wholly fictional synthetic data;
+project IDs, billing IDs, domains, user emails, credentials, and secret payloads
+must stay out of tracked source and ordinary docs. Public access, real identity
+integration, live-data use, and production remain separately gated.

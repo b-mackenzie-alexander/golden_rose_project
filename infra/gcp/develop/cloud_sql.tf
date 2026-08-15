@@ -10,6 +10,10 @@ resource "google_sql_database_instance" "develop" {
     disk_size = 10
     disk_type = "PD_SSD"
 
+    backup_configuration {
+      enabled = true
+    }
+
     ip_configuration {
       ipv4_enabled    = false
       private_network = google_compute_network.develop.id
@@ -18,5 +22,8 @@ resource "google_sql_database_instance" "develop" {
     user_labels = local.standard_labels
   }
 
-  depends_on = [google_service_networking_connection.private_service_access]
+  depends_on = [
+    google_project_service.approved["sqladmin.googleapis.com"],
+    google_service_networking_connection.private_service_access,
+  ]
 }

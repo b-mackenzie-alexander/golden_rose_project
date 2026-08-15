@@ -26,4 +26,6 @@ resource "google_artifact_registry_repository" "application_images" {
       keep_count = 10
     }
   }
+
+  depends_on = [google_project_service.approved["artifactregistry.googleapis.com"]]
 }

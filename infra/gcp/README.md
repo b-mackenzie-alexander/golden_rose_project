@@ -2,7 +2,7 @@
 
 This directory contains the repo-local Terraform scaffold for the Golden Rose private `develop` environment. PR #24 merged this validate-without-apply, local-validation, and static-policy surface into protected `develop` at `50451b3`.
 
-Independent post-merge review did not clear this scaffold as a provisioning/deployment baseline. PR #25 merged that documentation-only disposition at `8dc1198`, PR #26 merged the original ADR-0010 plan at `c5a1380`, and PR #27 merged accepted ADR-0011 at `23f97cc7`. No independent reviewer/CODEOWNER exists, so the same-repository CI High remains open while only semantic static-policy validation, deterministic `uv`, Cloud Run/private-SQL declaration, API ordering, Cloud SQL backups, and managed Artifact Registry image authority may begin from a fresh merged-tip branch as validate-without-apply work. Bootstrap implementation, plan, and apply remain blocked.
+PR #29 merged semantic static-policy validation, deterministic `uv`, Cloud Run/private-SQL declaration, API ordering, Cloud SQL backup enablement, and managed Artifact Registry image authority into protected `develop` at `08fe305`. No independent reviewer/CODEOWNER exists; the same-repository-CI High therefore remains open accepted residual risk. Proposed ADR-0012 and its consolidated plan adopt the permanent solo-maintainer posture and place all remaining source-controlled pre-deployment definitions in one later implementation PR. Read-only cloud qualification, Terraform plan, foundation apply, first private synthetic deployment, and qualification remain separate explicit Beatrice-owned gates.
 
 Terraform is executed from `infra/gcp`. The root module declares `module "develop"` in `develop.tf` and loads the intended resource scaffold from `infra/gcp/develop/`; nested files are not relied on through recursive file presence alone. Local review must prove `terraform -chdir=infra/gcp graph` includes the expected `module.develop.google_*` resource nodes.
 
@@ -37,12 +37,11 @@ keys. It also scans every GitHub workflow file for forbidden cloud/deployment
 authority and requires every workflow `uses:` action reference to be pinned to a full
 40-character commit SHA; this is not limited to `infrastructure*` workflow filenames.
 Independent final-head probes on the earlier PR #24 surface proved the original
-implementation was still a lexically bypassable policy boundary. The successor
-ADR-0011 solo-maintainer remediation sequence has now implemented and locally
-qualified semantic/fail-closed parser and adversarial workflow/Terraform tests
-on the current uncommitted remediation branch. Those controls remain local
-quality evidence rather than independent authorization, and they do not clear
-the open same-repository-CI High or grant cloud authority by themselves.
+implementation was still a lexically bypassable policy boundary. The ADR-0011
+solo-maintainer remediation sequence merged through PR #29. Those
+controls remain quality evidence rather than independent authorization, and
+they do not clear the open same-repository-CI High or grant cloud authority by
+themselves. Proposed ADR-0012 governs the next consolidated planning boundary.
 
 ## Explicit non-scope
 
@@ -64,4 +63,4 @@ the open same-repository-CI High or grant cloud authority by themselves.
 
 ## Approval gates
 
-Beatrice has accepted a durable bootstrap/state control plane separate from disposable `develop` workload teardown. The existing non-workload project is the candidate control-plane boundary pending read-only qualification; the dedicated deployment/testing project remains the workload target. A separate reviewed bootstrap/state/WIF packet is required before backend migration, Terraform plan/apply, cloud authentication, or provisioning. Named principals, alert recipients, billing scope, secret injection, migration execution, deployment, real identity, live/client data, public access, and production remain separate evidence and approval gates.
+Beatrice has accepted a durable bootstrap/state control plane separate from disposable `develop` workload teardown. The existing non-workload project is the candidate control-plane boundary pending separately approved read-only qualification; the dedicated deployment/testing project remains the workload target. Proposed ADR-0012's consolidated plan now contains the bootstrap/state/WIF and remaining source-controlled pre-deployment contract. Its later merge would authorize only a request for read-only qualification. Backend migration, Terraform plan, apply, secret injection, migration execution, deployment, real identity, live/client data, public access, and production remain separate evidence and approval gates.

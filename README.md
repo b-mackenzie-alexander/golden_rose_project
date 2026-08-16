@@ -52,18 +52,16 @@ automated hiring, matching, ranking, eligibility, or referral system.
   backend migration, cloud authentication/API calls, resource/service-identity
   provisioning, image push, deployment, real identity, live/client data, and
   production remain separately gated.
-- Independent post-merge review found the merged scaffold is not yet a safe
-  provisioning/deployment baseline. Required CI governance, semantic static
-  policy, deterministic `uv`, Cloud Run/private-SQL connectivity, API ordering,
-  Cloud SQL backup configuration, and managed-registry image binding require a
-  separately reviewed validate-without-apply remediation before bootstrap work.
-  PR #25 merged the documentation-only disposition at `8dc1198`, and PR #26
-  merged the original remediation planning packet at `c5a1380`. Because this is
-  a single-maintainer repository with no independent reviewer/CODEOWNER,
-  PR #27 merged accepted ADR-0011 and its paired plan at `23f97cc7`: the
-  self-authorizing-CI High remains open while only six static
-  validate-without-apply tasks may begin from a fresh merged-tip branch.
-  Bootstrap and cloud/deployment work remain blocked.
+- PR #29 merged the six authorized static remediations at `08fe305`: semantic
+  policy, deterministic `uv`, Direct VPC/private-SQL declaration, API ordering,
+  Cloud SQL backup enablement, and managed-registry digest authority. The
+  self-authorizing same-repository-CI High remains open accepted residual risk.
+  Proposed ADR-0012 reflects the permanent single-maintainer reality: no
+  unavailable second human is required, and agent/CI review is quality evidence
+  rather than independent authorization. Its consolidated plan covers all
+  remaining source-controlled pre-deployment work in one later PR while keeping
+  read-only GCP qualification, Terraform plan, foundation apply, first private
+  synthetic deployment, and qualification as separate explicit owner gates.
 - Automated frontend parity/accessibility evidence exists locally, but human
   browser/manual accessibility/fluent-language qualification remains deferred
   until a shared deployed `develop` target exists.

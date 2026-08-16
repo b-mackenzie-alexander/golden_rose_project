@@ -36,11 +36,13 @@ JSON-form backend, provider credentials, and Cloud Run environment/secret-inject
 keys. It also scans every GitHub workflow file for forbidden cloud/deployment
 authority and requires every workflow `uses:` action reference to be pinned to a full
 40-character commit SHA; this is not limited to `infrastructure*` workflow filenames.
-Independent final-head probes proved that the current implementation is still a
-lexically bypassable policy boundary despite those checks. Do not treat it as
-semantic or fail-closed until the successor ADR-0011 parser and adversarial
-tests are implemented and qualified under the solo-maintainer protocol. That
-protocol is quality evidence, not independent authorization.
+Independent final-head probes on the earlier PR #24 surface proved the original
+implementation was still a lexically bypassable policy boundary. The successor
+ADR-0011 solo-maintainer remediation sequence has now implemented and locally
+qualified semantic/fail-closed parser and adversarial workflow/Terraform tests
+on the current uncommitted remediation branch. Those controls remain local
+quality evidence rather than independent authorization, and they do not clear
+the open same-repository-CI High or grant cloud authority by themselves.
 
 ## Explicit non-scope
 

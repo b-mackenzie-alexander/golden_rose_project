@@ -1,9 +1,26 @@
+import ast
+import ipaddress
 import re
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+
+REQUIRED_TERRAFORM_RELATIVE_FILES = [
+    Path("infra/gcp/versions.tf"),
+    Path("infra/gcp/providers.tf"),
+    Path("infra/gcp/variables.tf"),
+    Path("infra/gcp/locals.tf"),
+    Path("infra/gcp/outputs.tf"),
+    Path("infra/gcp/develop/apis.tf"),
+    Path("infra/gcp/develop/artifact_registry.tf"),
+    Path("infra/gcp/develop/secrets.tf"),
+    Path("infra/gcp/develop/network.tf"),
+    Path("infra/gcp/develop/cloud_sql.tf"),
+    Path("infra/gcp/develop/cloud_run.tf"),
+    Path("infra/gcp/develop/identities.tf"),
+]
 
 
 def _gitignore_entries() -> set[str]:
@@ -12,6 +29,45 @@ def _gitignore_entries() -> set[str]:
         for line in (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
         if line.strip() and not line.startswith("#")
     }
+
+
+def _write_minimal_required_terraform_scaffold(root: Path) -> None:
+    for relative_path in REQUIRED_TERRAFORM_RELATIVE_FILES:
+        path = root / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("", encoding="utf-8")
+
+
+def _write_workflow_fixture(root: Path, name: str, content: str) -> None:
+    workflow_dir = root / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / name).write_text(content, encoding="utf-8")
+
+
+def _current_workflow_text(name: str) -> str:
+    return (ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8")
+
+
+def _remove_named_workflow_step(workflow: str, step_name: str, next_step_name: str) -> str:
+    start = workflow.index(f"      - name: {step_name}")
+    end = workflow.index(f"      - name: {next_step_name}", start)
+    return workflow[:start] + workflow[end:]
+
+
+def _extract_direct_vpc_subnet_cidr_pattern(variables_text: str) -> re.Pattern[str]:
+    match = re.search(r'"(\^.*\$)"', variables_text)
+    assert match is not None
+    return re.compile(ast.literal_eval(f'"{match.group(1)}"'))
+
+
+def _cidr_is_terraform_contract_acceptable(pattern: re.Pattern[str], candidate: str) -> bool:
+    if not pattern.fullmatch(candidate):
+        return False
+    try:
+        network = ipaddress.ip_network(candidate, strict=True)
+    except ValueError:
+        return False
+    return network.prefixlen <= 26
 
 
 def test_terraform_local_state_plan_and_secret_inputs_are_ignored() -> None:
@@ -102,6 +158,65 @@ def test_gcp_terraform_variables_define_required_project_and_region_without_secr
     assert 'contains(["us-east4"], var.region)' in variables
     assert "client" not in variables.lower()
     assert "golden" not in variables.lower()
+
+
+def test_gcp_terraform_variables_require_private_sql_subnet_input_without_committed_default() -> (
+    None
+):
+    root_variables = (ROOT / "infra/gcp/variables.tf").read_text(encoding="utf-8")
+    root_module = (ROOT / "infra/gcp/develop.tf").read_text(encoding="utf-8")
+    develop_variables = (ROOT / "infra/gcp/develop/variables.tf").read_text(encoding="utf-8")
+
+    expected_validation_fragments = [
+        'variable "direct_vpc_subnet_cidr"',
+        "type        = string",
+        "nullable    = false",
+        "can(cidrnetmask(var.direct_vpc_subnet_cidr))",
+        "can(regex(",
+        "cidrhost(var.direct_vpc_subnet_cidr, 0) == split",
+        "10\\\\.",
+        "172\\\\.",
+        "192\\\\.168",
+    ]
+
+    for variables_text in [root_variables, develop_variables]:
+        for fragment in expected_validation_fragments:
+            assert fragment in variables_text
+
+    assert "default =" not in root_variables
+    assert "default =" not in develop_variables
+    assert "direct_vpc_subnet_cidr = var.direct_vpc_subnet_cidr" in root_module
+
+
+def test_gcp_terraform_variables_accept_representative_rfc1918_subnet_ranges() -> None:
+    root_variables = (ROOT / "infra/gcp/variables.tf").read_text(encoding="utf-8")
+    develop_variables = (ROOT / "infra/gcp/develop/variables.tf").read_text(encoding="utf-8")
+
+    accepted = [
+        "10.0.0.0/8",
+        "10.1.0.0/24",
+        "10.24.0.0/26",
+        "172.16.0.0/12",
+        "172.20.0.0/24",
+        "192.168.0.0/16",
+        "192.168.44.0/26",
+    ]
+    rejected = [
+        "8.8.8.0/24",
+        "10.1.0.0/27",
+        "10.1.0.1/24",
+        "172.15.0.0/12",
+        "172.32.0.0/24",
+        "192.169.0.0/24",
+        "10.1.0.0/33",
+    ]
+
+    for variables_text in [root_variables, develop_variables]:
+        pattern = _extract_direct_vpc_subnet_cidr_pattern(variables_text)
+        for candidate in accepted:
+            assert _cidr_is_terraform_contract_acceptable(pattern, candidate), candidate
+        for candidate in rejected:
+            assert not _cidr_is_terraform_contract_acceptable(pattern, candidate), candidate
 
 
 def test_gcp_terraform_outputs_are_value_safe_and_do_not_expose_identifiers() -> None:
@@ -209,6 +324,10 @@ def test_gcp_develop_artifact_registry_is_private_regional_and_cleanup_bounded()
     assert "roles/artifactregistry.admin" not in artifact_registry
     assert "serviceAccount:" not in artifact_registry
     assert "@" not in artifact_registry
+    assert "depends_on" in artifact_registry
+    assert 'google_project_service.approved["artifactregistry.googleapis.com"]' in artifact_registry
+    assert "provisioner" not in artifact_registry.lower()
+    assert "local-exec" not in artifact_registry.lower()
 
 
 def test_gcp_develop_secrets_manage_metadata_only_without_payloads_or_broad_iam() -> None:
@@ -238,14 +357,25 @@ def test_gcp_develop_secrets_manage_metadata_only_without_payloads_or_broad_iam(
     assert "allAuthenticatedUsers" not in secrets
     assert "serviceAccount:" not in secrets
     assert "@" not in secrets
+    assert "depends_on" in secrets
+    assert 'google_project_service.approved["secretmanager.googleapis.com"]' in secrets
+    assert "provisioner" not in secrets.lower()
+    assert "local-exec" not in secrets.lower()
 
 
 def test_gcp_develop_network_uses_dedicated_vpc_and_private_service_access_only() -> None:
     network = (ROOT / "infra/gcp/develop/network.tf").read_text(encoding="utf-8")
 
     assert "google_compute_network" in network
+    assert "google_compute_subnetwork" in network
     assert "auto_create_subnetworks" in network
     assert "delete_default_routes_on_create" in network
+    assert "direct_vpc" in network
+    assert "ip_cidr_range" in network
+    assert "var.direct_vpc_subnet_cidr" in network
+    assert "region" in network
+    assert "var.region" in network
+    assert "network       = google_compute_network.develop.id" in network
     assert "= false" in network
     assert "= true" in network
     assert "google_compute_global_address" in network
@@ -262,6 +392,11 @@ def test_gcp_develop_network_uses_dedicated_vpc_and_private_service_access_only(
     assert "0.0.0.0/0" not in network
     assert "public" not in network.lower()
     assert "external" not in network.lower()
+    assert 'google_project_service.approved["compute.googleapis.com"]' in network
+    assert 'google_project_service.approved["servicenetworking.googleapis.com"]' in network
+    assert "depends_on" in network
+    assert "provisioner" not in network.lower()
+    assert "local-exec" not in network.lower()
 
 
 def test_gcp_develop_cloud_sql_is_private_minimal_postgresql_without_public_ip() -> None:
@@ -282,6 +417,11 @@ def test_gcp_develop_cloud_sql_is_private_minimal_postgresql_without_public_ip()
     assert "google_compute_network.develop.id" in cloud_sql
     assert "deletion_protection" in cloud_sql
     assert "local.standard_labels" in cloud_sql
+    assert "backup_configuration" in cloud_sql
+    assert "enabled = true" in cloud_sql
+    assert "point_in_time_recovery_enabled" not in cloud_sql
+    assert "transaction_log_retention_days" not in cloud_sql
+    assert "start_time" not in cloud_sql
     assert "0.0.0.0/0" not in cloud_sql
     assert "authorized_networks" not in cloud_sql
     assert "public" not in cloud_sql.lower()
@@ -290,10 +430,15 @@ def test_gcp_develop_cloud_sql_is_private_minimal_postgresql_without_public_ip()
     assert 'name = "root"' not in cloud_sql.lower()
     assert "root" not in cloud_sql.lower()
     assert "@" not in cloud_sql
+    assert 'google_project_service.approved["sqladmin.googleapis.com"]' in cloud_sql
+    assert "depends_on" in cloud_sql
+    assert "provisioner" not in cloud_sql.lower()
+    assert "local-exec" not in cloud_sql.lower()
 
 
 def test_gcp_develop_cloud_run_is_private_and_digest_only_without_invoker_iam() -> None:
     cloud_run = (ROOT / "infra/gcp/develop/cloud_run.tf").read_text(encoding="utf-8")
+    develop_locals = (ROOT / "infra/gcp/develop/locals.tf").read_text(encoding="utf-8")
 
     assert "google_cloud_run_v2_service" in cloud_run
     assert "ingress" in cloud_run
@@ -301,8 +446,12 @@ def test_gcp_develop_cloud_run_is_private_and_digest_only_without_invoker_iam() 
     assert "deletion_protection" in cloud_run
     assert "labels" in cloud_run
     assert "local.standard_labels" in cloud_run
+    assert "vpc_access" in cloud_run
+    assert "network_interfaces" in cloud_run
+    assert "google_compute_subnetwork.direct_vpc.id" in cloud_run
+    assert "PRIVATE_RANGES_ONLY" in cloud_run
     assert "image" in cloud_run
-    assert "var.container_image_digest" in cloud_run
+    assert "local.managed_container_image" in cloud_run
     assert "latest" not in cloud_run.lower()
     assert "google_cloud_run_service_iam" not in cloud_run
     assert "google_cloud_run_v2_service_iam" not in cloud_run
@@ -310,6 +459,15 @@ def test_gcp_develop_cloud_run_is_private_and_digest_only_without_invoker_iam() 
     assert "allUsers" not in cloud_run
     assert "allAuthenticatedUsers" not in cloud_run
     assert "serviceAccount:" not in cloud_run
+    assert "connector" not in cloud_run.lower()
+    assert 'google_project_service.approved["run.googleapis.com"]' in cloud_run
+    assert "depends_on" in cloud_run
+    assert "provisioner" not in cloud_run.lower()
+    assert "local-exec" not in cloud_run.lower()
+    assert "managed_container_image" in develop_locals
+    assert "staff-tracer@${var.container_image_digest}" in develop_locals
+    assert "google_artifact_registry_repository.application_images.repository_id" in develop_locals
+    assert "${var.region}-docker.pkg.dev/${var.project_id}" in develop_locals
 
 
 def test_gcp_develop_identities_are_distinct_without_keys_or_broad_project_iam() -> None:
@@ -334,6 +492,10 @@ def test_gcp_develop_identities_are_distinct_without_keys_or_broad_project_iam()
     assert "allAuthenticatedUsers" not in identities
     assert "serviceAccount:" not in identities
     assert "@" not in identities
+    assert "depends_on" in identities
+    assert 'google_project_service.approved["iam.googleapis.com"]' in identities
+    assert "provisioner" not in identities.lower()
+    assert "local-exec" not in identities.lower()
 
 
 def test_gcp_develop_cloud_run_uses_runtime_service_account_without_invoker_grant() -> None:
@@ -357,6 +519,17 @@ def test_gcp_terraform_root_loads_develop_resource_module() -> None:
     assert "project_id" in module
     assert "region" in module
     assert "container_image_digest" in module
+
+
+def test_gcp_container_image_digest_is_digest_only_and_not_arbitrary_reference() -> None:
+    root_variables = (ROOT / "infra/gcp/variables.tf").read_text(encoding="utf-8")
+    develop_variables = (ROOT / "infra/gcp/develop/variables.tf").read_text(encoding="utf-8")
+
+    for variables in (root_variables, develop_variables):
+        assert "sha256:[0-9a-f]{64}$" in variables
+        assert "@sha256:" not in variables
+        assert "docker.pkg.dev" not in variables
+        assert "latest" not in variables.lower()
 
     result = subprocess.run(
         ["terraform", "-chdir=infra/gcp", "graph"],
@@ -406,6 +579,7 @@ def test_infrastructure_quality_workflow_runs_static_validation_without_apply_or
     ]
 
     assert "scripts/validate_terraform_static.py" in workflow
+    assert "uv run --locked python scripts/validate_terraform_static.py" in workflow
     assert "uv run pytest tests/unit/test_terraform_hygiene.py" in workflow
     assert "terraform fmt -check -recursive infra/gcp" in workflow
     assert "terraform -chdir=infra/gcp init -backend=false -input=false" in workflow
@@ -431,6 +605,25 @@ def test_infrastructure_quality_workflow_runs_static_validation_without_apply_or
     assert "id-token: write" not in workflow
     assert "push" not in workflow.lower()
     assert "deploy" not in workflow.lower()
+
+
+def test_required_workflows_use_deterministic_uv_setup_and_report_version() -> None:
+    expected_setup = [
+        'version: "0.12.5"',
+        ('checksum: "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2"'),
+    ]
+
+    workflow_paths = [
+        ROOT / ".github/workflows/infrastructure-quality.yml",
+        ROOT / ".github/workflows/application-quality.yml",
+    ]
+
+    for workflow_path in workflow_paths:
+        workflow = workflow_path.read_text(encoding="utf-8")
+        assert "astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e" in workflow
+        for required_line in expected_setup:
+            assert required_line in workflow
+        assert "uv --version" in workflow
 
 
 def test_application_quality_workflow_installs_terraform_before_full_pytest() -> None:
@@ -507,6 +700,87 @@ def test_terraform_static_validation_harness_rejects_tf_json_forbidden_patterns(
     assert "forbidden" in result.stdout
     assert "bypass.tf.json" in result.stdout
     assert "google_service_account_key" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_unicode_escaped_tf_json_keys(
+    tmp_path: Path,
+) -> None:
+    terraform_root = tmp_path / "infra" / "gcp" / "develop"
+    terraform_root.mkdir(parents=True)
+    bad_file = terraform_root / "unicode_bypass.tf.json"
+    bad_file.write_text(
+        """
+{
+  "resource": {
+    "google_service_account_\\u006bey": {
+      "bad": {
+        "service_account_id": "projects/example/serviceAccounts/example"
+      }
+    }
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "forbidden semantic Terraform construct" in result.stdout
+    assert "unicode_bypass.tf.json" in result.stdout
+    assert "google_service_account_key" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_unicode_escaped_native_hcl_labels(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    terraform_root = tmp_path / "infra" / "gcp" / "develop"
+    bad_file = terraform_root / "unicode_bypass.tf"
+    bad_file.write_text(
+        'resource "google_service_account_\\u006bey" "bad" {}',
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "forbidden semantic Terraform construct" in result.stdout
+    assert "unicode_bypass.tf" in result.stdout
+    assert "google_service_account_key" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_malformed_native_hcl_fail_closed(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    terraform_root = tmp_path / "infra" / "gcp" / "develop"
+    bad_file = terraform_root / "malformed.tf"
+    bad_file.write_text('resource "google_compute_network" "bad" {', encoding="utf-8")
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains malformed Terraform HCL and fails closed" in result.stdout
+    assert "malformed.tf" in result.stdout
 
 
 def test_terraform_static_validation_harness_rejects_tf_json_backend_configuration(
@@ -730,6 +1004,1080 @@ def test_terraform_static_validation_harness_rejects_infrastructure_workflow_aut
     assert "forbidden workflow authority" in result.stdout
     assert "id-token: write" in result.stdout
     assert "google-github-actions/auth" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_yaml_flow_and_quoted_push_triggers(
+    tmp_path: Path,
+) -> None:
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "quoted-trigger.yaml").write_text(
+        "\n".join(
+            [
+                'name: "Quoted push trigger"',
+                '"on": [push]',
+                "permissions:",
+                "  contents: read",
+                "jobs:",
+                "  noop:",
+                "    runs-on: ubuntu-latest",
+                "    steps:",
+                "      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "forbidden semantic workflow trigger" in result.stdout
+    assert "quoted-trigger.yaml" in result.stdout
+    assert "push" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_workflow_and_job_write_permissions(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "write-permissions.yaml").write_text(
+        "\n".join(
+            [
+                'name: "Write permissions bypass"',
+                "on:",
+                "  pull_request:",
+                "permissions:",
+                "  contents: read",
+                "jobs:",
+                "  bad:",
+                "    runs-on: ubuntu-latest",
+                "    permissions:",
+                "      contents: write",
+                "    steps:",
+                "      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "forbidden semantic workflow permissions" in result.stdout
+    assert "write-permissions.yaml" in result.stdout
+    assert "contents: write" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_mutable_job_and_service_containers(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "mutable-containers.yaml").write_text(
+        "\n".join(
+            [
+                'name: "Mutable containers bypass"',
+                "on:",
+                "  pull_request:",
+                "permissions:",
+                "  contents: read",
+                "jobs:",
+                "  bad:",
+                "    runs-on: ubuntu-latest",
+                "    container:",
+                "      image: python:3.12",
+                "    services:",
+                "      postgres:",
+                "        image: postgres:16.10",
+                "    steps:",
+                "      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "forbidden semantic workflow container image" in result.stdout
+    assert "mutable-containers.yaml" in result.stdout
+    assert "python:3.12" in result.stdout
+    assert "postgres:16.10" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_reusable_workflow_references(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "reusable-workflow.yaml").write_text(
+        "\n".join(
+            [
+                'name: "Reusable workflow bypass"',
+                "on:",
+                "  pull_request:",
+                "permissions:",
+                "  contents: read",
+                "jobs:",
+                "  delegated:",
+                "    uses: owner/repo/.github/workflows/deploy.yml@1234567890abcdef1234567890abcdef12345678",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "forbidden semantic reusable workflow reference" in result.stdout
+    assert "reusable-workflow.yaml" in result.stdout
+    assert ".github/workflows/deploy.yml" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_local_action_references(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "local-action.yaml").write_text(
+        "\n".join(
+            [
+                'name: "Local action bypass"',
+                "on:",
+                "  pull_request:",
+                "permissions:",
+                "  contents: read",
+                "jobs:",
+                "  delegated:",
+                "    runs-on: ubuntu-latest",
+                "    steps:",
+                "      - uses: ./.github/actions/unreviewed-local-action",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "unpinned workflow action" in result.stdout
+    assert "local-action.yaml" in result.stdout
+    assert "./.github/actions/unreviewed-local-action" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_malformed_yaml_fail_closed(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "malformed-workflow.yaml").write_text(
+        "\n".join(
+            [
+                "name: malformed workflow",
+                "on:",
+                "  pull_request:",
+                "jobs:",
+                "  broken:",
+                "    steps:",
+                "      - run: [unterminated",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains malformed workflow YAML and fails closed" in result.stdout
+    assert "malformed-workflow.yaml" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_duplicate_yaml_keys(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "duplicate-keys.yaml").write_text(
+        "\n".join(
+            [
+                "name: duplicate keys workflow",
+                "on:",
+                "  pull_request:",
+                "jobs:",
+                "  duplicate:",
+                "    runs-on: ubuntu-latest",
+                "    steps:",
+                "      - run: printf 'first'",
+                "    steps:",
+                "      - run: printf 'second'",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains duplicate workflow YAML key and fails closed" in result.stdout
+    assert "duplicate-keys.yaml" in result.stdout
+    assert "steps" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_duplicate_tf_json_keys(
+    tmp_path: Path,
+) -> None:
+    terraform_root = tmp_path / "infra" / "gcp" / "develop"
+    terraform_root.mkdir(parents=True)
+    bad_file = terraform_root / "duplicate-keys.tf.json"
+    bad_file.write_text(
+        """
+{
+  "resource": {
+    "google_service_account_key": {
+      "bad": {
+        "service_account_id": "projects/example/serviceAccounts/first"
+      }
+    },
+    "google_service_account_key": {
+      "bad": {
+        "service_account_id": "projects/example/serviceAccounts/second"
+      }
+    }
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains duplicate Terraform JSON key and fails closed" in result.stdout
+    assert "duplicate-keys.tf.json" in result.stdout
+    assert "google_service_account_key" in result.stdout
+
+
+def test_terraform_static_validation_harness_redacts_parser_and_policy_violation_values(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "redaction-malformed.yaml").write_text(
+        "\n".join(
+            [
+                "name: redaction malformed workflow",
+                "on:",
+                "  pull_request:",
+                "jobs:",
+                "  broken:",
+                "    steps:",
+                "      - run: [SECRET_CANARY_WORKFLOW",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (workflow_dir / "redaction-policy.yaml").write_text(
+        "\n".join(
+            [
+                "name: redaction policy workflow",
+                "on:",
+                "  pull_request:",
+                "permissions:",
+                "  contents: read",
+                "jobs:",
+                "  bad:",
+                "    runs-on: ubuntu-latest",
+                "    container:",
+                "      image: registry.example.com/SECRET_CANARY_IMAGE:latest",
+                "    steps:",
+                "      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    combined_output = result.stdout + result.stderr
+    assert result.returncode == 1
+    assert "redaction-malformed.yaml" in result.stdout
+    assert "contains malformed workflow YAML and fails closed" in result.stdout
+    assert "redaction-policy.yaml" in result.stdout
+    assert "forbidden semantic workflow container image" in result.stdout
+    assert "SECRET_CANARY_WORKFLOW" not in combined_output
+    assert "SECRET_CANARY_IMAGE" not in combined_output
+
+
+def test_terraform_static_validation_harness_rejects_unknown_workflow_files(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "surprise-quality.yml").write_text(
+        "\n".join(
+            [
+                "name: surprise workflow",
+                "on:",
+                "  pull_request:",
+                "permissions:",
+                "  contents: read",
+                "jobs:",
+                "  verify:",
+                "    runs-on: ubuntu-latest",
+                "    steps:",
+                "      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains unknown workflow file" in result.stdout
+    assert "surprise-quality.yml" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_unknown_workflow_jobs(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "application-quality.yml").write_text(
+        "\n".join(
+            [
+                "name: Application quality",
+                "on:",
+                "  pull_request:",
+                "    branches: [main, develop]",
+                "permissions:",
+                "  contents: read",
+                "jobs:",
+                "  surprise:",
+                "    runs-on: ubuntu-latest",
+                "    steps:",
+                "      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains unknown workflow job" in result.stdout
+    assert "application-quality.yml" in result.stdout
+    assert "surprise" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_unknown_workflow_steps(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "application-quality.yml").write_text(
+        "\n".join(
+            [
+                "name: Application quality",
+                "on:",
+                "  pull_request:",
+                "    branches: [main, develop]",
+                "permissions:",
+                "  contents: read",
+                "jobs:",
+                "  application:",
+                "    runs-on: ubuntu-latest",
+                "    steps:",
+                "      - name: Surprise step",
+                "        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains unknown workflow step" in result.stdout
+    assert "application-quality.yml" in result.stdout
+    assert "Surprise step" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_workflow_runs_on_mutations(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "application-quality.yml").write_text(
+        "\n".join(
+            [
+                "name: Application quality",
+                "on:",
+                "  pull_request:",
+                "    branches: [main, develop]",
+                "permissions:",
+                "  contents: read",
+                "jobs:",
+                "  application:",
+                "    name: application",
+                "    runs-on: ubuntu-24.04",
+                "    steps:",
+                "      - name: Check out repository",
+                "        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow runs-on mutation" in result.stdout
+    assert "application-quality.yml" in result.stdout
+    assert "ubuntu-24.04" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_workflow_if_mutations(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "application-quality.yml").write_text(
+        "\n".join(
+            [
+                "name: Application quality",
+                "on:",
+                "  pull_request:",
+                "    branches: [main, develop]",
+                "permissions:",
+                "  contents: read",
+                "jobs:",
+                "  application:",
+                "    name: application",
+                "    runs-on: ubuntu-latest",
+                "    steps:",
+                "      - name: Upload backend SBOM evidence",
+                "        if: success()",
+                "        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+                "        with:",
+                "          name: backend-sbom-cdx",
+                "          path: build/backend-sbom.cdx.json",
+                "          if-no-files-found: error",
+                "          retention-days: 14",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow if mutation" in result.stdout
+    assert "application-quality.yml" in result.stdout
+    assert "success()" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_workflow_action_with_mutations(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "application-quality.yml").write_text(
+        "\n".join(
+            [
+                "name: Application quality",
+                "on:",
+                "  pull_request:",
+                "    branches: [main, develop]",
+                "permissions:",
+                "  contents: read",
+                "jobs:",
+                "  application:",
+                "    name: application",
+                "    runs-on: ubuntu-latest",
+                "    steps:",
+                "      - name: Upload backend SBOM evidence",
+                "        if: always()",
+                "        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+                "        with:",
+                "          name: backend-sbom-cdx",
+                "          path: build/backend-sbom.cdx.json",
+                "          if-no-files-found: error",
+                "          retention-days: 99",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow action with mutation" in result.stdout
+    assert "application-quality.yml" in result.stdout
+    assert "retention-days" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_workflow_uses_mutations(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "application-quality.yml").write_text(
+        "\n".join(
+            [
+                "name: Application quality",
+                "on:",
+                "  pull_request:",
+                "    branches: [main, develop]",
+                "permissions:",
+                "  contents: read",
+                "jobs:",
+                "  application:",
+                "    name: application",
+                "    runs-on: ubuntu-latest",
+                "    steps:",
+                "      - name: Check out repository",
+                "        uses: evilcorp/evil-action@1111111111111111111111111111111111111111",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow uses mutation" in result.stdout
+    assert "application-quality.yml" in result.stdout
+    assert "Check out repository" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_named_run_step_action_substitution(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "application-quality.yml").write_text(
+        "\n".join(
+            [
+                "name: Application quality",
+                "on:",
+                "  pull_request:",
+                "    branches: [main, develop]",
+                "permissions:",
+                "  contents: read",
+                "jobs:",
+                "  application:",
+                "    name: application",
+                "    runs-on: ubuntu-latest",
+                "    steps:",
+                "      - name: Run application quality gate",
+                "        uses: evilcorp/quality-bypass@1111111111111111111111111111111111111111",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow uses mutation" in result.stdout
+    assert "application-quality.yml" in result.stdout
+    assert "Run application quality gate" in result.stdout
+    assert "evilcorp/quality-bypass" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_missing_quality_gate_step(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow = _remove_named_workflow_step(
+        _current_workflow_text("application-quality.yml"),
+        "Run application quality gate",
+        "Upload backend SBOM evidence",
+    )
+    _write_workflow_fixture(tmp_path, "application-quality.yml", workflow)
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow step inventory mutation" in result.stdout
+    assert "application-quality.yml" in result.stdout
+    assert "missing name:Run application quality gate" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_checkout_only_quality_workflow(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    _write_workflow_fixture(
+        tmp_path,
+        "application-quality.yml",
+        "\n".join(
+            [
+                "name: Application quality",
+                "on:",
+                "  pull_request:",
+                "    branches: [main, develop]",
+                "permissions:",
+                "  contents: read",
+                "jobs:",
+                "  application:",
+                "    name: application",
+                "    runs-on: ubuntu-latest",
+                "    steps:",
+                "      - name: Check out repository",
+                "        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            ]
+        ),
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow step inventory mutation" in result.stdout
+    assert "missing name:Run application quality gate" in result.stdout
+    assert "step order or inventory changed" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_job_level_if_skip(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow = _current_workflow_text("application-quality.yml").replace(
+        "    name: application\n    runs-on: ubuntu-latest",
+        "    name: application\n    if: false\n    runs-on: ubuntu-latest",
+    )
+    _write_workflow_fixture(tmp_path, "application-quality.yml", workflow)
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow job structure mutation" in result.stdout
+    assert "unexpected job if" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_job_continue_on_error(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow = _current_workflow_text("application-quality.yml").replace(
+        "    name: application\n    runs-on: ubuntu-latest",
+        "    name: application\n    continue-on-error: true\n    runs-on: ubuntu-latest",
+    )
+    _write_workflow_fixture(tmp_path, "application-quality.yml", workflow)
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow job structure mutation" in result.stdout
+    assert "unexpected job continue-on-error" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_quality_gate_step_continue_on_error(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow = _current_workflow_text("application-quality.yml").replace(
+        "      - name: Run application quality gate\n        run: |",
+        "      - name: Run application quality gate\n"
+        "        continue-on-error: true\n"
+        "        run: |",
+    )
+    _write_workflow_fixture(tmp_path, "application-quality.yml", workflow)
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow step control mutation" in result.stdout
+    assert "Run application quality gate" in result.stdout
+    assert "unexpected step continue-on-error" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_duplicate_approved_step(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow = _current_workflow_text("application-quality.yml").replace(
+        "      - name: Set up Python 3.12",
+        "      - name: Check out repository\n"
+        "        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262\n\n"
+        "      - name: Set up Python 3.12",
+        1,
+    )
+    _write_workflow_fixture(tmp_path, "application-quality.yml", workflow)
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow step inventory mutation" in result.stdout
+    assert "duplicate name:Check out repository" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_reordered_required_steps(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow = _current_workflow_text("application-quality.yml")
+    python_step_start = workflow.index("      - name: Set up Python 3.12")
+    uv_step_start = workflow.index("      - name: Set up uv", python_step_start)
+    terraform_step_start = workflow.index(
+        "      - name: Set up Terraform for hygiene tests", uv_step_start
+    )
+    python_step = workflow[python_step_start:uv_step_start]
+    uv_step = workflow[uv_step_start:terraform_step_start]
+    workflow = (
+        workflow[:python_step_start] + uv_step + python_step + workflow[terraform_step_start:]
+    )
+    _write_workflow_fixture(tmp_path, "application-quality.yml", workflow)
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow step inventory mutation" in result.stdout
+    assert "step order or inventory changed" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_unknown_workflow_command_mutations(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "branch-policy.yml").write_text(
+        "\n".join(
+            [
+                "name: Branch policy",
+                "on:",
+                "  pull_request:",
+                "    branches: [main, develop]",
+                "permissions:",
+                "  contents: read",
+                "jobs:",
+                "  enforce:",
+                "    name: enforce",
+                "    runs-on: ubuntu-latest",
+                "    steps:",
+                "      - name: Validate source-to-target flow",
+                "        run: echo hacked",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow run mutation" in result.stdout
+    assert "branch-policy.yml" in result.stdout
+    assert "echo hacked" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_workflow_shell_mutations(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "branch-policy.yml").write_text(
+        "\n".join(
+            [
+                "name: Branch policy",
+                "on:",
+                "  pull_request:",
+                "    branches: [main, develop]",
+                "permissions:",
+                "  contents: read",
+                "jobs:",
+                "  enforce:",
+                "    name: enforce",
+                "    runs-on: ubuntu-latest",
+                "    steps:",
+                "      - name: Validate source-to-target flow",
+                "        shell: bash",
+                "        run: |",
+                "          set -euo pipefail",
+                '          case "$BASE_REF" in',
+                "            main)",
+                '              if [[ "$HEAD_REF" == "develop" || "$HEAD_REF" == hotfix/* ]]; then',
+                '                echo "Allowed promotion: $HEAD_REF -> main"',
+                "              else",
+                '                echo "Only develop or hotfix/* may target main; got $HEAD_REF -> main." >&2',
+                "                exit 1",
+                "              fi",
+                "              ;;&",
+                "            develop)",
+                '              if [[ "$HEAD_REF" =~ ^(feat|fix|docs|chore|hotfix|security|ci|test|refactor|spike)/[a-z0-9][a-z0-9._-]*$ ]]; then',
+                '                echo "Allowed integration branch: $HEAD_REF -> develop"',
+                "              else",
+                '                echo "Feature branches targeting develop must use an approved prefix and lowercase slug; got $HEAD_REF." >&2',
+                "                exit 1",
+                "              fi",
+                "              ;;&",
+                "            *)",
+                '              echo "Unexpected protected target branch: $BASE_REF" >&2',
+                "              exit 1",
+                "              ;;&",
+                "          esac",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow shell mutation" in result.stdout
+    assert "branch-policy.yml" in result.stdout
+    assert "bash" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_workflow_working_directory_mutations(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "branch-policy.yml").write_text(
+        "\n".join(
+            [
+                "name: Branch policy",
+                "on:",
+                "  pull_request:",
+                "    branches: [main, develop]",
+                "permissions:",
+                "  contents: read",
+                "jobs:",
+                "  enforce:",
+                "    name: enforce",
+                "    runs-on: ubuntu-latest",
+                "    steps:",
+                "      - name: Validate source-to-target flow",
+                "        working-directory: infra",
+                "        run: |",
+                "          set -euo pipefail",
+                '          case "$BASE_REF" in',
+                "            main)",
+                '              if [[ "$HEAD_REF" == "develop" || "$HEAD_REF" == hotfix/* ]]; then',
+                '                echo "Allowed promotion: $HEAD_REF -> main"',
+                "              else",
+                '                echo "Only develop or hotfix/* may target main; got $HEAD_REF -> main." >&2',
+                "                exit 1",
+                "              fi",
+                "              ;;",
+                "            develop)",
+                '              if [[ "$HEAD_REF" =~ ^(feat|fix|docs|chore|hotfix|security|ci|test|refactor|spike)/[a-z0-9][a-z0-9._-]*$ ]]; then',
+                '                echo "Allowed integration branch: $HEAD_REF -> develop"',
+                "              else",
+                '                echo "Feature branches targeting develop must use an approved prefix and lowercase slug; got $HEAD_REF." >&2',
+                "                exit 1",
+                "              fi",
+                "              ;;",
+                "            *)",
+                '              echo "Unexpected protected target branch: $BASE_REF" >&2',
+                "              exit 1",
+                "              ;;",
+                "          esac",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow working-directory mutation" in result.stdout
+    assert "branch-policy.yml" in result.stdout
+    assert "infra" in result.stdout
 
 
 def test_terraform_static_validation_harness_rejects_unpinned_workflow_actions(

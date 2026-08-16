@@ -3,6 +3,8 @@ resource "google_service_account" "runtime" {
   account_id   = "staff-tracer-runtime"
   display_name = "Develop staff tracer runtime"
   description  = "Runtime identity for the private synthetic develop Cloud Run service."
+
+  depends_on = [google_project_service.approved["iam.googleapis.com"]]
 }
 
 resource "google_service_account" "migration" {
@@ -10,4 +12,6 @@ resource "google_service_account" "migration" {
   account_id   = "staff-tracer-migration"
   display_name = "Develop staff tracer migration job"
   description  = "Migration job identity for private synthetic develop database changes."
+
+  depends_on = [google_project_service.approved["iam.googleapis.com"]]
 }

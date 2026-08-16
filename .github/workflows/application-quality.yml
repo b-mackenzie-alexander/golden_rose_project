@@ -48,6 +48,8 @@ jobs:
         # v6.8.0
         uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
         with:
+          version: "0.12.5"
+          checksum: "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2"
           enable-cache: true
 
       - name: Set up Terraform for hygiene tests
@@ -82,6 +84,7 @@ jobs:
       - name: Run application quality gate
         run: |
           set -euo pipefail
+          uv --version
           test "$(node --version)" = "v22.22.3"
           test "$(npm --version)" = "10.9.8"
           test "$(npm --userconfig apps/web/.npmrc config get registry)" = "https://registry.npmjs.org/"

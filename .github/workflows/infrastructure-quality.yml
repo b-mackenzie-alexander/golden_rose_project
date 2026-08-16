@@ -29,6 +29,9 @@ jobs:
       - name: Set up uv
         # v6.8.0
         uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
+        with:
+          version: "0.12.5"
+          checksum: "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2"
 
       - name: Set up Terraform
         # v3
@@ -43,7 +46,9 @@ jobs:
           terraform -chdir=infra/gcp validate
 
       - name: Run Terraform static validation
-        run: python scripts/validate_terraform_static.py
+        run: uv run --locked python scripts/validate_terraform_static.py
 
       - name: Run Terraform hygiene tests
-        run: uv run pytest tests/unit/test_terraform_hygiene.py
+        run: |
+          uv --version
+          uv run pytest tests/unit/test_terraform_hygiene.py

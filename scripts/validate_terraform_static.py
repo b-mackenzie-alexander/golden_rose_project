@@ -23,6 +23,7 @@ class DuplicateTerraformJsonKeyError(ValueError):
 def _strip_block_scalar(text: str) -> str:
     return text.strip()
 
+
 FORBIDDEN_SUBSTRINGS = [
     'backend "',
     '"backend"',
@@ -673,14 +674,22 @@ def _parse_args() -> argparse.Namespace:
 def _json_contains_forbidden_semantic_construct(node: object, forbidden: str) -> bool:
     if isinstance(node, dict):
         return any(
-            (key == forbidden if forbidden in EXACT_SEMANTIC_FORBIDDEN_CONSTRUCTS else forbidden in key)
+            (
+                key == forbidden
+                if forbidden in EXACT_SEMANTIC_FORBIDDEN_CONSTRUCTS
+                else forbidden in key
+            )
             or _json_contains_forbidden_semantic_construct(value, forbidden)
             for key, value in node.items()
         )
     if isinstance(node, list):
         return any(_json_contains_forbidden_semantic_construct(item, forbidden) for item in node)
     if isinstance(node, str):
-        return node == forbidden if forbidden in EXACT_SEMANTIC_FORBIDDEN_CONSTRUCTS else forbidden in node
+        return (
+            node == forbidden
+            if forbidden in EXACT_SEMANTIC_FORBIDDEN_CONSTRUCTS
+            else forbidden in node
+        )
     return False
 
 
@@ -1361,7 +1370,9 @@ def main() -> int:
             violations.append(
                 f"{path.relative_to(root)} contains forbidden workflow shell mutation {shell_name!r}"
             )
-        for working_directory in _collect_workflow_working_directory_mutations(path, parsed_workflow):
+        for working_directory in _collect_workflow_working_directory_mutations(
+            path, parsed_workflow
+        ):
             violations.append(
                 f"{path.relative_to(root)} contains forbidden workflow working-directory mutation {working_directory!r}"
             )

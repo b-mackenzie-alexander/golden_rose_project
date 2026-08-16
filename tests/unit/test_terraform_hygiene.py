@@ -160,7 +160,9 @@ def test_gcp_terraform_variables_define_required_project_and_region_without_secr
     assert "golden" not in variables.lower()
 
 
-def test_gcp_terraform_variables_require_private_sql_subnet_input_without_committed_default() -> None:
+def test_gcp_terraform_variables_require_private_sql_subnet_input_without_committed_default() -> (
+    None
+):
     root_variables = (ROOT / "infra/gcp/variables.tf").read_text(encoding="utf-8")
     root_module = (ROOT / "infra/gcp/develop.tf").read_text(encoding="utf-8")
     develop_variables = (ROOT / "infra/gcp/develop/variables.tf").read_text(encoding="utf-8")
@@ -323,10 +325,7 @@ def test_gcp_develop_artifact_registry_is_private_regional_and_cleanup_bounded()
     assert "serviceAccount:" not in artifact_registry
     assert "@" not in artifact_registry
     assert "depends_on" in artifact_registry
-    assert (
-        'google_project_service.approved["artifactregistry.googleapis.com"]'
-        in artifact_registry
-    )
+    assert 'google_project_service.approved["artifactregistry.googleapis.com"]' in artifact_registry
     assert "provisioner" not in artifact_registry.lower()
     assert "local-exec" not in artifact_registry.lower()
 
@@ -450,7 +449,7 @@ def test_gcp_develop_cloud_run_is_private_and_digest_only_without_invoker_iam() 
     assert "vpc_access" in cloud_run
     assert "network_interfaces" in cloud_run
     assert "google_compute_subnetwork.direct_vpc.id" in cloud_run
-    assert 'PRIVATE_RANGES_ONLY' in cloud_run
+    assert "PRIVATE_RANGES_ONLY" in cloud_run
     assert "image" in cloud_run
     assert "local.managed_container_image" in cloud_run
     assert "latest" not in cloud_run.lower()
@@ -466,9 +465,9 @@ def test_gcp_develop_cloud_run_is_private_and_digest_only_without_invoker_iam() 
     assert "provisioner" not in cloud_run.lower()
     assert "local-exec" not in cloud_run.lower()
     assert "managed_container_image" in develop_locals
-    assert 'staff-tracer@${var.container_image_digest}' in develop_locals
+    assert "staff-tracer@${var.container_image_digest}" in develop_locals
     assert "google_artifact_registry_repository.application_images.repository_id" in develop_locals
-    assert '${var.region}-docker.pkg.dev/${var.project_id}' in develop_locals
+    assert "${var.region}-docker.pkg.dev/${var.project_id}" in develop_locals
 
 
 def test_gcp_develop_identities_are_distinct_without_keys_or_broad_project_iam() -> None:
@@ -527,8 +526,8 @@ def test_gcp_container_image_digest_is_digest_only_and_not_arbitrary_reference()
     develop_variables = (ROOT / "infra/gcp/develop/variables.tf").read_text(encoding="utf-8")
 
     for variables in (root_variables, develop_variables):
-        assert 'sha256:[0-9a-f]{64}$' in variables
-        assert '@sha256:' not in variables
+        assert "sha256:[0-9a-f]{64}$" in variables
+        assert "@sha256:" not in variables
         assert "docker.pkg.dev" not in variables
         assert "latest" not in variables.lower()
 
@@ -611,10 +610,7 @@ def test_infrastructure_quality_workflow_runs_static_validation_without_apply_or
 def test_required_workflows_use_deterministic_uv_setup_and_report_version() -> None:
     expected_setup = [
         'version: "0.12.5"',
-        (
-            'checksum: '
-            '"68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2"'
-        ),
+        ('checksum: "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2"'),
     ]
 
     workflow_paths = [
@@ -1893,10 +1889,7 @@ def test_terraform_static_validation_harness_rejects_reordered_required_steps(
     python_step = workflow[python_step_start:uv_step_start]
     uv_step = workflow[uv_step_start:terraform_step_start]
     workflow = (
-        workflow[:python_step_start]
-        + uv_step
-        + python_step
-        + workflow[terraform_step_start:]
+        workflow[:python_step_start] + uv_step + python_step + workflow[terraform_step_start:]
     )
     _write_workflow_fixture(tmp_path, "application-quality.yml", workflow)
 
@@ -1980,25 +1973,25 @@ def test_terraform_static_validation_harness_rejects_workflow_shell_mutations(
                 "        shell: bash",
                 "        run: |",
                 "          set -euo pipefail",
-                "          case \"$BASE_REF\" in",
+                '          case "$BASE_REF" in',
                 "            main)",
-                "              if [[ \"$HEAD_REF\" == \"develop\" || \"$HEAD_REF\" == hotfix/* ]]; then",
-                "                echo \"Allowed promotion: $HEAD_REF -> main\"",
+                '              if [[ "$HEAD_REF" == "develop" || "$HEAD_REF" == hotfix/* ]]; then',
+                '                echo "Allowed promotion: $HEAD_REF -> main"',
                 "              else",
-                "                echo \"Only develop or hotfix/* may target main; got $HEAD_REF -> main.\" >&2",
+                '                echo "Only develop or hotfix/* may target main; got $HEAD_REF -> main." >&2',
                 "                exit 1",
                 "              fi",
                 "              ;;&",
                 "            develop)",
-                "              if [[ \"$HEAD_REF\" =~ ^(feat|fix|docs|chore|hotfix|security|ci|test|refactor|spike)/[a-z0-9][a-z0-9._-]*$ ]]; then",
-                "                echo \"Allowed integration branch: $HEAD_REF -> develop\"",
+                '              if [[ "$HEAD_REF" =~ ^(feat|fix|docs|chore|hotfix|security|ci|test|refactor|spike)/[a-z0-9][a-z0-9._-]*$ ]]; then',
+                '                echo "Allowed integration branch: $HEAD_REF -> develop"',
                 "              else",
-                "                echo \"Feature branches targeting develop must use an approved prefix and lowercase slug; got $HEAD_REF.\" >&2",
+                '                echo "Feature branches targeting develop must use an approved prefix and lowercase slug; got $HEAD_REF." >&2',
                 "                exit 1",
                 "              fi",
                 "              ;;&",
                 "            *)",
-                "              echo \"Unexpected protected target branch: $BASE_REF\" >&2",
+                '              echo "Unexpected protected target branch: $BASE_REF" >&2',
                 "              exit 1",
                 "              ;;&",
                 "          esac",
@@ -2046,25 +2039,25 @@ def test_terraform_static_validation_harness_rejects_workflow_working_directory_
                 "        working-directory: infra",
                 "        run: |",
                 "          set -euo pipefail",
-                "          case \"$BASE_REF\" in",
+                '          case "$BASE_REF" in',
                 "            main)",
-                "              if [[ \"$HEAD_REF\" == \"develop\" || \"$HEAD_REF\" == hotfix/* ]]; then",
-                "                echo \"Allowed promotion: $HEAD_REF -> main\"",
+                '              if [[ "$HEAD_REF" == "develop" || "$HEAD_REF" == hotfix/* ]]; then',
+                '                echo "Allowed promotion: $HEAD_REF -> main"',
                 "              else",
-                "                echo \"Only develop or hotfix/* may target main; got $HEAD_REF -> main.\" >&2",
+                '                echo "Only develop or hotfix/* may target main; got $HEAD_REF -> main." >&2',
                 "                exit 1",
                 "              fi",
                 "              ;;",
                 "            develop)",
-                "              if [[ \"$HEAD_REF\" =~ ^(feat|fix|docs|chore|hotfix|security|ci|test|refactor|spike)/[a-z0-9][a-z0-9._-]*$ ]]; then",
-                "                echo \"Allowed integration branch: $HEAD_REF -> develop\"",
+                '              if [[ "$HEAD_REF" =~ ^(feat|fix|docs|chore|hotfix|security|ci|test|refactor|spike)/[a-z0-9][a-z0-9._-]*$ ]]; then',
+                '                echo "Allowed integration branch: $HEAD_REF -> develop"',
                 "              else",
-                "                echo \"Feature branches targeting develop must use an approved prefix and lowercase slug; got $HEAD_REF.\" >&2",
+                '                echo "Feature branches targeting develop must use an approved prefix and lowercase slug; got $HEAD_REF." >&2',
                 "                exit 1",
                 "              fi",
                 "              ;;",
                 "            *)",
-                "              echo \"Unexpected protected target branch: $BASE_REF\" >&2",
+                '              echo "Unexpected protected target branch: $BASE_REF" >&2',
                 "              exit 1",
                 "              ;;",
                 "          esac",

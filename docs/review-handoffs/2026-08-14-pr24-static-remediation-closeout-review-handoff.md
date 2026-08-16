@@ -9,6 +9,8 @@
 **Behind commits vs `origin/develop` at handoff creation:** `0`
 **PR status:** no PR yet; the prior closeout rereviews returned `NOT READY`, this working tree remediates the latest step-level workflow `continue-on-error` High, and fresh independent rereview is required before any stage/commit/push/PR-open closeout
 
+> Supersession addendum (2026-08-15): this historical working-tree handoff cleared, was committed as `13e55740d35036e937daa579398e7d84e241d140`, and opened as PR #29 against `develop`. PR #29's initial `application` run failed at `uv run ruff format --check .` only; backend-SBOM absence was downstream fail-fast output. The current PR recovery formats the two reported Python files and scopes E501 exclusions to their exact policy/workflow fixtures. The recovery itself requires a new commit, exact-head qualification, and latest-head CI evidence.
+
 ## 1. Current branch truth
 
 This handoff covers the exact uncommitted validate-without-apply remediation surface only.

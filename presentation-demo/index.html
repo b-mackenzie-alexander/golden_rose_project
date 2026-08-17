@@ -7,11 +7,20 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <a href="#demo-main" class="skip-link">Skip to main content</a>
+    <a href="#demo-main" class="skip-link" id="skip-link">Skip to main content</a>
 
     <header class="demo-banner" role="banner">
-      <p class="disclaimer">Concept demonstration — fictional synthetic data — local presentation only.</p>
-      <p class="control-note" id="navigation-note">Stakeholder walkthrough: agency workflow, worker view, and employer view.</p>
+      <div class="banner-row">
+        <div>
+          <p class="disclaimer" id="demo-notice">Concept demonstration — fictional synthetic data — local presentation only.</p>
+          <p class="control-note" id="navigation-note">Stakeholder walkthrough: agency workflow, worker view, and employer view.</p>
+        </div>
+        <div class="language-controls" id="demo-language-controls" aria-labelledby="language-label">
+          <span id="language-label" class="language-label">Language</span>
+          <button type="button" class="locale-btn active-locale" data-set-locale="en" aria-pressed="true">English</button>
+          <button type="button" class="locale-btn" data-set-locale="es" aria-pressed="false">Español</button>
+        </div>
+      </div>
     </header>
 
     <div class="shell">

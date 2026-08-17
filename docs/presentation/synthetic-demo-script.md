@@ -3,9 +3,9 @@ Concept demonstration disclaimer: This is a local-only concept demonstration usi
 Screenflow narrative (8 minutes):
 
 1) Agency dashboard
-- Action: open the dashboard and point out the four metrics plus three actionable request cards.
+- Action: open the dashboard, point out the four metrics plus three actionable request cards, then use the language toggle once to show the same pages in Spanish.
 - Value statement: staff can see the immediate queue, concrete due times, and the selected request summary without leaving the agency workflow.
-- Limitation/non-claim: this is a fictional, local concept preview and does not represent live agency production capacity.
+- Limitation/non-claim: this is a fictional, local concept preview and does not represent live agency production capacity; the translation shown is a basic presentation-layer toggle, not a completed legal/content localization program.
 
 2) Open request detail
 - Action: click `Open request overview` on any request card or use the top `Request detail` navigation.
@@ -39,7 +39,9 @@ Screenflow narrative (8 minutes):
 Key on-screen wording during the demo:
 
 - "Concept demonstration — fictional synthetic data — local presentation only."
+- "English" / "Español"
 - "Agency dashboard" / "Request detail" / "Worker view" / "Employer view"
 - "Manual worker and employer intake" / "Add synthetic employer draft" / "Add synthetic worker draft"
+- "Panel de agencia" / "Detalle de solicitud" / "Vista del trabajador" / "Vista del empleador"
 - "Due Today 14:30" / "Due Today 16:00" / "Due Tomorrow 09:30"
 - "Open request overview" / "Open interest request" / "Open update preview"

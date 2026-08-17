@@ -12,6 +12,7 @@ A static, local-only demo that shows one guided workflow:
 - Manual worker/employer intake with synthetic shared-queue drafts
 - Worker opportunity view with an interest-request preview
 - Employer status view with a richer request-status and update preview
+- Basic English/Spanish page translation toggle for stakeholder review
 
 No API calls, no databases, no authentication, no cloud services, and no client/real data are used.
 
@@ -25,7 +26,7 @@ Open:
 
 - http://127.0.0.1:4173/
 
-Use keyboard navigation (Tab/Enter/Space), the top navigation, and the visible request/action controls. The agency dashboard request cards open the detail view, the Add records view demonstrates paper-to-draft worker/employer intake, and the worker/employer views each include one synthetic preview action.
+Use keyboard navigation (Tab/Enter/Space), the top navigation, the visible request/action controls, and the language toggle in the banner. The agency dashboard request cards open the detail view, the Add records view demonstrates paper-to-draft worker/employer intake, and the worker/employer views each include one synthetic preview action.
 
 ## Run tests (artifact-local)
 

@@ -12,11 +12,26 @@ const requiredViews = [
 const requiredInteractionCopy = [
   "Today 14:30",
   "Open request overview",
+  "My work today",
+  "Open searches",
+  "Open until filled",
+  "Full-time office administrator search",
   "Add synthetic employer draft",
   "Add synthetic worker draft",
   "Open worker request page",
   "Open interest request",
   "Open update preview",
+  "Assign to me",
+  "Mark review complete",
+  "Waiting on employer",
+  "Prepare worker outreach",
+  "data-set-locale=\"en\"",
+  "data-set-locale=\"es\"",
+  "Panel operativo de la agencia",
+  "Mi trabajo de hoy",
+  "Búsquedas abiertas",
+  "Registro manual de trabajadores y empleadores",
+  "Abrir solicitud de interés",
 ];
 
 function fail(message) {
@@ -77,7 +92,7 @@ async function main() {
   }
 
   if (!containsAll(combined, requiredInteractionCopy)) {
-    fail("Not all required interaction labels are present in served artifacts.");
+    fail("Not all required interaction or translation labels are present in served artifacts.");
     return;
   }
 

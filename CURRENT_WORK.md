@@ -12,6 +12,7 @@ Turn the completed initial discovery baseline into an approved, narrow first del
 - The agency’s current operation is paper-first and fragmented across workbooks, hosted forms, Trello, calendars, messaging, and manual follow-up.
 - Multiple legacy employer and worker forms overlap. The proposed replacement is one canonical staged workflow, not duplicate forms or response stores.
 - The first usable product should serve agency members: enter employer demand, find/review requests, work an authorized demand queue, and replace manual metric collection with governed operational data.
+- First rollout also needs a staff-operated paper-form scanning/OCR-assist path for employer and worker intake because paper forms and machine-local continuity gaps are an immediate operational pain point. Parsed values must become reviewable drafts only; staff validation/correction is required before database writes.
 - The staff calendar/shift-coverage view must be derived from authoritative operational records, not maintained as a parallel manual store.
 - Client-accepted location direction: organize routine operations and reporting through the authorized-staff NYC demand map and broad client-managed service zones; precise worksite and worker/home location remain sensitive, restricted, and separately governed.
 - Client-accepted staff-plane roles are Owner, delegated Manager, interchangeable Operations Staff, and a separately bounded Platform Administrator. `docs/planning/phase-1-staff-permission-matrix.md` controls command, field, delegation, exact-address, export-denial, and break-glass boundaries; platform maintenance must not create standing access to operational personal data.
@@ -48,6 +49,7 @@ Turn the completed initial discovery baseline into an approved, narrow first del
 - Named staff assignments/delegations, recovery approvers/executors, support contacts/hours, exact-address recipients, access-review owner, and qualified identity-provider configuration.
 - Live renderer/tile/geocoder provider and address-processing posture; synthetic deterministic fixtures remain sufficient for bounded local map implementation.
 - Legacy-field treatment, production retention/disposal, restricted-history recipients, production backup/recovery, and production-data admission.
+- Paper-form scanning/OCR-assisted intake: accepted source forms, scanner/browser/device posture, file-type and malware controls, OCR/parser/vendor privacy, confidence/error handling, staff validation UX, source-document retention/disposal, provenance/audit payloads, and database-write boundaries.
 - Public/legal/fee/retention/consent/receipt/agreement behavior requires counsel documentation and client acceptance before the affected software is validated or released. Public-source research remains suggested guidance and does not block unrelated internal staff-workflow implementation.
 - Interim cloud-billing and final-payment handoff procedure: Beatrice funds approved infrastructure until final payment; then client billing/account/support ownership transfers through a documented continuity check.
 
@@ -55,7 +57,7 @@ The complete discovery inventory and evidence rules are in `docs/planning/phase-
 
 ## Hard stop boundaries
 - Do not collect or import unrestricted live personal data.
-- Do not enable public workflows, uploads, payment, signatures, screening, or vendor integrations.
+- Do not enable public workflows, unrestricted uploads, payment, signatures, screening, or vendor integrations. Any paper-form scan/OCR path must remain staff-only, secure-ingestion-gated, and draft-only until an attributable staff validation command writes approved fields.
 - Do not encode legacy language, protected-trait/proxy criteria, suggested legal research, fee policy, retention rules, or business terms as validated or production behavior before the applicable approval gate.
 - Do not implement automated matching, ranking, eligibility, hiring, or referral decisions.
 - No cloud authentication or inspection, GCP API call, backend migration, Terraform plan/apply, API enablement, provisioning, image push, secret injection, Cloud SQL use, service start, deployment, or client-system change is authorized by this planning branch. Proposed ADR-0012 replaces the unavailable-reviewer deadlock with explicit solo-maintainer gates while retaining the same-repository-CI High as open accepted residual risk.

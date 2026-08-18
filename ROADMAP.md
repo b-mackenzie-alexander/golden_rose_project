@@ -88,6 +88,7 @@
 - [ ] Implement staff authentication and authorization boundary.
 - [ ] Implement employer/contact/worksite/request/shift persistence with migration-managed schema.
 - [ ] Implement staff request entry, detail, correction, and an authorized demand work queue as a mandatory service-time capability.
+- [ ] Plan and implement a staff-only paper-form scan/OCR-assisted intake path for employer and worker forms: parse into reviewable drafts only, require attributable staff validation/correction before database writes, preserve safe provenance, and qualify secure document-ingestion controls before any live scanned form is admitted.
 - [ ] Implement the accepted NYC CDTA map foundation and transparent job-demand/coverage layer with deterministic synthetic geocoder fixtures; do not enable a live geocoder or worker layer without its separate gate.
 - [ ] Implement the accepted derived calendar/coverage view from authoritative request milestones and explicit shift occurrences; keep worker assignment/availability enrichment deferred and do not create a parallel calendar store.
 - [ ] Implement the accepted append-only audit-event envelope, atomic domain/event command boundary, protected changed-field evidence, correction-of-correction behavior, and safe separate operational logging.
@@ -110,7 +111,7 @@
 **Goal:** Add a staged, inclusive worker profile for agency review and controlled referral preparation.
 
 - [ ] Approve worker field inventory, field purpose, visibility, retention, and correction process.
-- [ ] Implement staged worker onboarding with agency review; do not imply automatic eligibility or employment.
+- [ ] Implement staged worker onboarding with agency review, including staff-operated paper-form scan/OCR-assisted draft creation once the secure ingestion and validation boundary is approved; do not imply automatic eligibility or employment.
 - [ ] Achieve English/Spanish functional and accessibility parity across the workflow.
 - [ ] Approve document-upload scope, consent, retention, and staff-access rules.
 - [ ] Implement and qualify a PDF-first secure document-ingestion boundary before enabling uploads.

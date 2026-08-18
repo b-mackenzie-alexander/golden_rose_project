@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Golden Rose synthetic demonstration</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a href="#demo-main" class="skip-link" id="skip-link">Skip to main content</a>
+
+    <header class="demo-banner" role="banner">
+      <div class="banner-row">
+        <div>
+          <p class="disclaimer" id="demo-notice">Concept demonstration — fictional synthetic data — local presentation only.</p>
+          <p class="control-note" id="navigation-note">Stakeholder walkthrough: agency workflow, worker view, and employer view.</p>
+        </div>
+        <div class="language-controls" id="demo-language-controls" aria-labelledby="language-label">
+          <span id="language-label" class="language-label">Language</span>
+          <button type="button" class="locale-btn active-locale" data-set-locale="en" aria-pressed="true">English</button>
+          <button type="button" class="locale-btn" data-set-locale="es" aria-pressed="false">Español</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="shell">
+      <nav id="demo-navigation" class="demo-nav" aria-label="Demo views" aria-describedby="navigation-note">
+        <button type="button" data-switch="dashboard" aria-current="page">Agency dashboard</button>
+        <button type="button" data-switch="workspace">Request detail</button>
+        <button type="button" data-switch="intake">Add records</button>
+        <button type="button" data-switch="worker">Worker view</button>
+        <button type="button" data-switch="employer">Employer view</button>
+      </nav>
+
+      <main id="demo-main" tabindex="-1">
+        <section id="demo-root" aria-live="polite"></section>
+      </main>
+    </div>
+
+    <div id="demo-status-region" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

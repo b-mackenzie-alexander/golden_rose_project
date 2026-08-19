@@ -1,6 +1,6 @@
 # ADR-0012: Solo-maintainer consolidated pre-deployment boundary
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-08-15
 - **Owner:** Beatrice Alexander (engagement owner and sole repository maintainer)
 - **Supersedes on acceptance:** ADR-0011's permanent block on bootstrap/state/WIF and cloud progression; ADR-0011 remains historical authority for the completed six-task static remediation
@@ -130,7 +130,7 @@ Rejected. The self-authorization risk remains High/open; this ADR accepts and co
 
 ## Approval, evidence, and revisit triggers
 
-Beatrice directed the consolidated-plan and permanent solo-maintainer posture on 2026-08-15. This ADR remains **Proposed** until Beatrice reviews and explicitly accepts the completed packet. Acceptance and merge authorize only the paired pre-deployment implementation plan; they do not authorize cloud authentication, inspection, backend migration, Terraform plan/apply, provisioning, image push, secret injection, service start, deployment, live/client data, or production.
+Beatrice directed and accepted the consolidated-plan and permanent solo-maintainer posture on 2026-08-15. Acceptance and merge authorize only the paired pre-deployment implementation plan; they do not authorize cloud authentication, inspection, backend migration, Terraform plan/apply, provisioning, image push, secret injection, service start, deployment, live/client data, or production.
 
 Revisit this decision if:
 

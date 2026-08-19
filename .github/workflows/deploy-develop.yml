@@ -1,0 +1,294 @@
+name: deploy-develop
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_run_id:
+        description: Successful reviewed build-image publish run id
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: deploy
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: develop
+    concurrency:
+      group: deploy-develop
+      cancel-in-progress: false
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out repository
+        # v4.4.0
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Python 3.12
+        # v5.6.0
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        # v6.8.0
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
+        with:
+          version: "0.12.5"
+          checksum: "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2"
+          enable-cache: true
+
+      - name: Enforce protected develop source
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/develop"
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        # v2.1.10
+        uses: google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+          token_format: access_token
+
+      - name: Set up gcloud
+        # v2.1.4
+        uses: google-github-actions/setup-gcloud@77e7a554d41e2ee56fc945c52dfd3f33d12def9a
+
+      - name: Download reviewed publish artifacts
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PUBLISH_RUN_ID: ${{ inputs.publish_run_id }}
+          DEPLOY_COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p build/reviewed-artifacts
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.request
+          import zipfile
+          from io import BytesIO
+          from pathlib import Path
+
+          token = os.environ["GITHUB_TOKEN"]
+          run_id = os.environ["PUBLISH_RUN_ID"]
+          repository = os.environ["GITHUB_REPOSITORY"]
+          if not re.fullmatch(r"[1-9][0-9]{0,19}", run_id):
+              raise SystemExit("publish run id must be a decimal GitHub Actions run id")
+          api_base = f"https://api.github.com/repos/{repository}"
+          headers = {
+              "Authorization": f"Bearer {token}",
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+          }
+          def get_json(url):
+              with urllib.request.urlopen(
+                  urllib.request.Request(url, headers=headers)
+              ) as response:
+                  return json.load(response)
+
+          run_payload = get_json(f"{api_base}/actions/runs/{run_id}")
+          expected_run = {
+              "status": "completed",
+              "conclusion": "success",
+              "event": "workflow_dispatch",
+              "head_branch": "develop",
+              "path": ".github/workflows/build-image.yml",
+          }
+          for key, expected_value in expected_run.items():
+              if run_payload.get(key) != expected_value:
+                  raise SystemExit(
+                      f"publish run {key} must be {expected_value!r}, got {run_payload.get(key)!r}"
+                  )
+          repository_payload = run_payload.get("repository", {})
+          if repository_payload.get("full_name") != repository:
+              raise SystemExit("publish run repository identity mismatch")
+          head_sha = run_payload.get("head_sha")
+          if not isinstance(head_sha, str) or not re.fullmatch(r"[0-9a-f]{40}", head_sha):
+              raise SystemExit("publish run head sha is malformed")
+          deploy_commit_sha = os.environ["DEPLOY_COMMIT_SHA"]
+          if not re.fullmatch(r"[0-9a-f]{40}", deploy_commit_sha):
+              raise SystemExit("deploy commit sha is malformed")
+          if head_sha != deploy_commit_sha:
+              raise SystemExit("publish run head sha must match the deploy commit sha")
+          jobs_payload = get_json(f"{api_base}/actions/runs/{run_id}/jobs")
+          publish_jobs = [
+              job
+              for job in jobs_payload.get("jobs", [])
+              if isinstance(job, dict) and job.get("name") == "publish-image"
+          ]
+          if len(publish_jobs) != 1:
+              raise SystemExit("publish run must contain exactly one publish-image job")
+          publish_job = publish_jobs[0]
+          if publish_job.get("status") != "completed" or publish_job.get("conclusion") != "success":
+              raise SystemExit("publish-image job did not complete successfully")
+          Path("build").mkdir(exist_ok=True)
+          Path("build/reviewed-publish-run.json").write_text(
+              json.dumps(
+                  {
+                      "publish_run_id": run_id,
+                      "workflow_path": run_payload["path"],
+                      "event": run_payload["event"],
+                      "head_branch": run_payload["head_branch"],
+                      "head_sha": head_sha,
+                      "deploy_commit_sha": deploy_commit_sha,
+                      "status": run_payload["status"],
+                      "conclusion": run_payload["conclusion"],
+                      "repository": repository,
+                      "publish_job_name": publish_job["name"],
+                  },
+                  indent=2,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          artifact_targets = {
+              "published-image": "published-image.txt",
+              "image-metadata": "image-metadata.json",
+              "backend-sbom-cdx": "backend-sbom.cdx.json",
+              "frontend-sbom-cdx": "frontend-sbom.cdx.json",
+          }
+          artifacts_payload = get_json(f"{api_base}/actions/runs/{run_id}/artifacts")
+          artifacts = {
+              artifact["name"]: artifact
+              for artifact in artifacts_payload.get("artifacts", [])
+              if isinstance(artifact, dict)
+          }
+          missing = sorted(set(artifact_targets) - set(artifacts))
+          if missing:
+              raise SystemExit(f"missing reviewed publish artifacts: {missing}")
+          output_root = Path("build/reviewed-artifacts")
+          for artifact_name, output_name in artifact_targets.items():
+              download_url = artifacts[artifact_name]["archive_download_url"]
+              with urllib.request.urlopen(
+                  urllib.request.Request(download_url, headers=headers)
+              ) as archive_response:
+                  archive_bytes = archive_response.read()
+              with zipfile.ZipFile(BytesIO(archive_bytes)) as archive:
+                  members = [member for member in archive.namelist() if not member.endswith("/")]
+                  if len(members) != 1:
+                      raise SystemExit(
+                          f"artifact {artifact_name} must contain exactly one file, got {members}"
+                      )
+                  (output_root / output_name).write_bytes(archive.read(members[0]))
+          PY
+
+      - name: Bind reviewed published image evidence
+        env:
+          MANAGED_REPOSITORY: us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer
+        run: |
+          set -euo pipefail
+          PUBLISHED_IMAGE_REF="$(tr -d '\r\n' < build/reviewed-artifacts/published-image.txt)"
+          VERIFIED_IMAGE_REF="$(uv run python scripts/verify_image_provenance.py --mode publish --dockerfile Dockerfile --metadata-path build/reviewed-artifacts/image-metadata.json --backend-sbom-path build/reviewed-artifacts/backend-sbom.cdx.json --frontend-sbom-path build/reviewed-artifacts/frontend-sbom.cdx.json --published-image-repository "$MANAGED_REPOSITORY")"
+          test "$VERIFIED_IMAGE_REF" = "$PUBLISHED_IMAGE_REF"
+          case "$VERIFIED_IMAGE_REF" in
+            "$MANAGED_REPOSITORY"@sha256:*) ;;
+            *)
+              echo "reviewed image reference is not bound to the managed repository" >&2
+              exit 1
+              ;;
+          esac
+          IMAGE_DIGEST="${VERIFIED_IMAGE_REF##*@}"
+          printf 'MANAGED_IMAGE=%s\n' "$VERIFIED_IMAGE_REF" >> "$GITHUB_ENV"
+          printf 'IMAGE_DIGEST=%s\n' "$IMAGE_DIGEST" >> "$GITHUB_ENV"
+
+      - name: Record schema compatibility posture
+        env:
+          PUBLISH_RUN_ID: ${{ inputs.publish_run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          payload = {
+              "publish_run_id": os.environ["PUBLISH_RUN_ID"],
+              "publish_run_identity": json.loads(
+                  Path("build/reviewed-publish-run.json").read_text(encoding="utf-8")
+              ),
+              "image_digest": os.environ["IMAGE_DIGEST"],
+              "migration_precedes_rollout": True,
+              "rollback_without_proven_compatibility_window": False,
+              "recovery_posture": "forward recovery",
+              "qualification_executed": False,
+              "compatibility_evidence": "published-image artifact plus backend/frontend SBOM and metadata evidence from the reviewed publish run",
+          }
+          Path("build/deploy-compatibility.json").write_text(
+              json.dumps(payload, indent=2) + "\n", encoding="utf-8"
+          )
+          PY
+
+      - name: Update migration job to reviewed image
+        run: |
+          set -euo pipefail
+          gcloud run jobs update run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --image "$MANAGED_IMAGE" >/dev/null
+
+      - name: Execute migration job
+        run: |
+          set -euo pipefail
+          gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --wait >/dev/null
+
+      - name: Deploy reviewed service
+        run: |
+          set -euo pipefail
+          gcloud run services update staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --image "$MANAGED_IMAGE" >/dev/null
+
+      - name: Verify readiness gate and record deploy result
+        env:
+          PUBLISH_RUN_ID: ${{ inputs.publish_run_id }}
+        run: |
+          set -euo pipefail
+          READY_STATUS=$(gcloud run services describe staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --format='value(status.conditions[0].status)')
+          test "$READY_STATUS" = "True"
+          mkdir -p build
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          payload = {
+              "publish_run_id": os.environ["PUBLISH_RUN_ID"],
+              "publish_run_identity": json.loads(
+                  Path("build/reviewed-publish-run.json").read_text(encoding="utf-8")
+              ),
+              "image_digest": os.environ["IMAGE_DIGEST"],
+              "migration_executed": True,
+              "deploy_executed": True,
+              "readiness_checked": True,
+              "qualification_executed": False,
+              "result": "success",
+          }
+          Path("build/deploy-result.json").write_text(
+              json.dumps(payload, indent=2) + "\n", encoding="utf-8"
+          )
+          PY
+
+      - name: Upload deploy compatibility evidence
+        if: always()
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: deploy-compatibility
+          path: build/deploy-compatibility.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload deploy result evidence
+        if: always()
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: deploy-result
+          path: build/deploy-result.json
+          if-no-files-found: error
+          retention-days: 14

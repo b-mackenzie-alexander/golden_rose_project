@@ -121,6 +121,7 @@ def test_develop_app_exposes_value_safe_non_production_marker(monkeypatch) -> No
     )
     monkeypatch.setenv("GOLDEN_ROSE_SYNTHETIC_STAFF_ID", str(uuid4()))
     monkeypatch.setenv("GOLDEN_ROSE_DEPLOYMENT_TARGET", "gcp-develop-private-synthetic")
+    monkeypatch.setenv("GOLDEN_ROSE_DEPLOYED_IMAGE_DIGEST", "sha256:" + "a" * 64)
     monkeypatch.setenv(
         "GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL",
         "Non-production develop — fictional synthetic data only",

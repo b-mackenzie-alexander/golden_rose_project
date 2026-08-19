@@ -1,0 +1,227 @@
+name: build-image
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "apps/web/package-lock.json"
+      - "apps/web/**"
+      - "src/**"
+      - "migrations/**"
+      - "scripts/validate_sbom.py"
+      - "scripts/verify_image_provenance.py"
+      - ".github/workflows/build-image.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-validate:
+    name: build-validate
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        # v4.4.0
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Python 3.12
+        # v5.6.0
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        # v6.8.0
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
+        with:
+          version: "0.12.5"
+          checksum: "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2"
+          enable-cache: true
+
+      - name: Set up Node.js 22.22.3
+        # v7.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22.22.3"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Set up Docker Buildx
+        # v3.11.1
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
+
+      - name: Build validation image and evidence
+        run: |
+          set -euo pipefail
+          uv --version
+          test "$(node --version)" = "v22.22.3"
+          test "$(npm --version)" = "10.9.8"
+          test "$(npm --userconfig apps/web/.npmrc config get registry)" = "https://registry.npmjs.org/"
+          test "$(npm --userconfig apps/web/.npmrc config get ignore-scripts)" = "true"
+          uv lock --check
+          uv sync --locked --all-groups
+          npm --userconfig apps/web/.npmrc ci --ignore-scripts --prefix apps/web
+          mkdir -p build
+          npm --userconfig apps/web/.npmrc --prefix apps/web sbom --sbom-format cyclonedx --sbom-type application > build/frontend-sbom.cdx.json
+          uv run python scripts/validate_sbom.py build/frontend-sbom.cdx.json --spec 1.5 --name web --version 0.0.0 --purl 'pkg:npm/%40golden-rose/web@0.0.0'
+          uv run cyclonedx-py environment --pyproject pyproject.toml --output-reproducible --of JSON -o build/backend-sbom.cdx.json
+          uv run python scripts/validate_sbom.py build/backend-sbom.cdx.json --spec 1.6 --name golden-rose --version 0.1.0
+          docker buildx build --load --metadata-file build/image-metadata.json --tag golden-rose:workflow-pr .
+          uv run python scripts/verify_image_provenance.py --mode pr --dockerfile Dockerfile --metadata-path build/image-metadata.json --backend-sbom-path build/backend-sbom.cdx.json --frontend-sbom-path build/frontend-sbom.cdx.json
+
+      - name: Upload backend SBOM evidence
+        if: always()
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: backend-sbom-cdx
+          path: build/backend-sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload frontend SBOM evidence
+        if: always()
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: frontend-sbom-cdx
+          path: build/frontend-sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload image metadata evidence
+        if: always()
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: image-metadata
+          path: build/image-metadata.json
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-image:
+    name: publish-image
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: develop
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out repository
+        # v4.4.0
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Python 3.12
+        # v5.6.0
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        # v6.8.0
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
+        with:
+          version: "0.12.5"
+          checksum: "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2"
+          enable-cache: true
+
+      - name: Set up Node.js 22.22.3
+        # v7.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22.22.3"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Set up Docker Buildx
+        # v3.11.1
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
+
+      - name: Enforce protected develop source
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/develop"
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        # v2.1.10
+        uses: google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_IMAGE_PUBLISHER_SERVICE_ACCOUNT }}
+          token_format: access_token
+
+      - name: Log in to Artifact Registry
+        # v3.5.0
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1
+        with:
+          registry: us-east4-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - name: Build publish image and evidence
+        run: |
+          set -euo pipefail
+          uv --version
+          test "$(node --version)" = "v22.22.3"
+          test "$(npm --version)" = "10.9.8"
+          test "$(npm --userconfig apps/web/.npmrc config get registry)" = "https://registry.npmjs.org/"
+          test "$(npm --userconfig apps/web/.npmrc config get ignore-scripts)" = "true"
+          uv lock --check
+          uv sync --locked --all-groups
+          npm --userconfig apps/web/.npmrc ci --ignore-scripts --prefix apps/web
+          mkdir -p build
+          npm --userconfig apps/web/.npmrc --prefix apps/web sbom --sbom-format cyclonedx --sbom-type application > build/frontend-sbom.cdx.json
+          uv run python scripts/validate_sbom.py build/frontend-sbom.cdx.json --spec 1.5 --name web --version 0.0.0 --purl 'pkg:npm/%40golden-rose/web@0.0.0'
+          uv run cyclonedx-py environment --pyproject pyproject.toml --output-reproducible --of JSON -o build/backend-sbom.cdx.json
+          uv run python scripts/validate_sbom.py build/backend-sbom.cdx.json --spec 1.6 --name golden-rose --version 0.1.0
+          docker buildx build --push --metadata-file build/image-metadata.json --tag us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer:${{ github.sha }} .
+          # never deploy by tag; capture the immutable digest emitted by the publish build
+          uv run python scripts/verify_image_provenance.py --mode publish --dockerfile Dockerfile --metadata-path build/image-metadata.json --backend-sbom-path build/backend-sbom.cdx.json --frontend-sbom-path build/frontend-sbom.cdx.json --published-image-repository us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer > build/published-image.txt
+
+      - name: Upload backend SBOM evidence
+        if: always()
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: backend-sbom-cdx
+          path: build/backend-sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload frontend SBOM evidence
+        if: always()
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: frontend-sbom-cdx
+          path: build/frontend-sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload image metadata evidence
+        if: always()
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: image-metadata
+          path: build/image-metadata.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload published image reference
+        if: always()
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: published-image
+          path: build/published-image.txt
+          if-no-files-found: error
+          retention-days: 14

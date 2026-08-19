@@ -1,18 +1,30 @@
 import ast
 import ipaddress
+import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[2]
 
 REQUIRED_TERRAFORM_RELATIVE_FILES = [
+    Path("infra/gcp/backend.tf"),
     Path("infra/gcp/versions.tf"),
     Path("infra/gcp/providers.tf"),
     Path("infra/gcp/variables.tf"),
     Path("infra/gcp/locals.tf"),
     Path("infra/gcp/outputs.tf"),
+    Path("infra/gcp/bootstrap/versions.tf"),
+    Path("infra/gcp/bootstrap/providers.tf"),
+    Path("infra/gcp/bootstrap/variables.tf"),
+    Path("infra/gcp/bootstrap/state.tf"),
+    Path("infra/gcp/bootstrap/iam.tf"),
+    Path("infra/gcp/bootstrap/wif.tf"),
+    Path("infra/gcp/bootstrap/outputs.tf"),
     Path("infra/gcp/develop/apis.tf"),
     Path("infra/gcp/develop/artifact_registry.tf"),
     Path("infra/gcp/develop/secrets.tf"),
@@ -20,6 +32,10 @@ REQUIRED_TERRAFORM_RELATIVE_FILES = [
     Path("infra/gcp/develop/cloud_sql.tf"),
     Path("infra/gcp/develop/cloud_run.tf"),
     Path("infra/gcp/develop/identities.tf"),
+    Path("infra/gcp/develop/iam.tf"),
+    Path("infra/gcp/develop/migration_job.tf"),
+    Path("infra/gcp/develop/budgets.tf"),
+    Path("infra/gcp/develop/observability.tf"),
 ]
 
 
@@ -70,6 +86,14 @@ def _cidr_is_terraform_contract_acceptable(pattern: re.Pattern[str], candidate: 
     return network.prefixlen <= 26
 
 
+def _normalize_whitespace(text: str) -> str:
+    return " ".join(text.split())
+
+
+def _contains_normalized_fragment(text: str, fragment: str) -> bool:
+    return _normalize_whitespace(fragment) in _normalize_whitespace(text)
+
+
 def test_terraform_local_state_plan_and_secret_inputs_are_ignored() -> None:
     entries = _gitignore_entries()
 
@@ -110,6 +134,163 @@ def test_gcp_terraform_readme_preserves_validate_without_apply_boundary() -> Non
 
     for phrase in required_phrases:
         assert phrase in readme
+
+
+def test_gcp_bootstrap_runbook_documents_bootstrap_migration_and_retirement() -> None:
+    runbook = (ROOT / "deploy/gcp/bootstrap-state-runbook.md").read_text(encoding="utf-8")
+
+    required_phrases = [
+        "local bootstrap",
+        "remote state",
+        "partial backend configuration",
+        "WIF handoff",
+        "bootstrap authority retirement",
+        "emergency recovery",
+        "client handoff",
+        "teardown exclusions",
+    ]
+
+    for phrase in required_phrases:
+        assert phrase in runbook
+
+
+def test_gcp_first_deployment_runbook_documents_recovery_and_secret_boundaries() -> None:
+    runbook = (ROOT / "deploy/gcp/first-deployment-runbook.md").read_text(encoding="utf-8")
+
+    required_phrases = [
+        "out-of-band secret payload custody and injection",
+        "rollback-versus-forward-recovery decision",
+        "Database passwords must be generated without terminal display",
+        "Stop immediately",
+        "Revoke and replace every affected secret value",
+        "teardown/rebuild",
+    ]
+
+    for phrase in required_phrases:
+        assert phrase in runbook
+
+
+def test_gcp_recovery_and_teardown_runbooks_document_failure_handling_boundaries() -> None:
+    rollback_runbook = (ROOT / "deploy/gcp/rollback-forward-recovery-runbook.md").read_text(
+        encoding="utf-8"
+    )
+    teardown_runbook = (ROOT / "deploy/gcp/teardown-rebuild-runbook.md").read_text(encoding="utf-8")
+    bootstrap_runbook = (ROOT / "deploy/gcp/bootstrap-state-runbook.md").read_text(encoding="utf-8")
+
+    rollback_required_phrases = [
+        "schema/image compatibility matrix",
+        "rollback",
+        "forward recovery",
+        "migration lock",
+        "backup/restore",
+        "untested RTO/RPO",
+    ]
+    teardown_required_phrases = [
+        "control-plane/state survival",
+        "deletion protection",
+        "break-glass",
+        "orphan-resource",
+        "No automatic scheduled destroy",
+    ]
+    bootstrap_required_phrases = [
+        "state survival",
+        "workload teardown",
+        "teardown exclusions",
+    ]
+
+    for phrase in rollback_required_phrases:
+        assert phrase in rollback_runbook
+    for phrase in teardown_required_phrases:
+        assert phrase in teardown_runbook
+    for phrase in bootstrap_required_phrases:
+        assert phrase in bootstrap_runbook
+
+
+def test_gcp_terraform_backend_uses_partial_gcs_configuration_without_committed_values() -> None:
+    backend = (ROOT / "infra/gcp/backend.tf").read_text(encoding="utf-8")
+
+    assert 'backend "gcs"' in backend
+    assert "bucket" not in backend
+    assert "prefix" not in backend
+    assert "project" not in backend
+    assert "credentials" not in backend
+    assert "access_token" not in backend
+    assert "impersonate_service_account" not in backend
+
+
+def test_gcp_bootstrap_variables_require_operator_inputs_without_defaults() -> None:
+    variables = (ROOT / "infra/gcp/bootstrap/variables.tf").read_text(encoding="utf-8")
+
+    for variable_name in [
+        "state_project_id",
+        "state_bucket_location",
+        "state_bucket_name",
+        "bootstrap_operator_principal",
+    ]:
+        assert f'variable "{variable_name}"' in variables
+
+    assert "default =" not in variables
+    assert "nullable    = false" in variables
+    assert "credentials" not in variables
+    assert "secret" not in variables.lower()
+
+
+def test_gcp_bootstrap_state_bucket_enforces_recovery_and_lifecycle_controls() -> None:
+    state = (ROOT / "infra/gcp/bootstrap/state.tf").read_text(encoding="utf-8")
+
+    assert 'resource "google_storage_bucket" "terraform_state"' in state
+    assert "uniform_bucket_level_access = true" in state
+    assert 'public_access_prevention    = "enforced"' in state
+    assert "versioning {" in state
+    assert "enabled = true" in state
+    assert _contains_normalized_fragment(state, "force_destroy = false")
+    assert "prevent_destroy = true" in state
+    assert "retention_policy {" in state
+
+
+def test_gcp_bootstrap_wif_contract_requires_exact_github_claims() -> None:
+    wif = (ROOT / "infra/gcp/bootstrap/wif.tf").read_text(encoding="utf-8")
+
+    required_fragments = [
+        'issuer_uri = "https://token.actions.githubusercontent.com"',
+        'attribute.repository == "b-mackenzie-alexander/golden_rose_project"',
+        'attribute.ref == "refs/heads/develop"',
+        'attribute.environment == "develop"',
+        'attribute.event_name != "pull_request"',
+        'attribute.repository_owner == "b-mackenzie-alexander"',
+    ]
+
+    for fragment in required_fragments:
+        assert fragment in wif
+
+    assert "principalSet://iam.googleapis.com" in wif
+    assert "*" not in wif
+
+
+def test_gcp_bootstrap_iam_separates_provisioner_image_publisher_and_deployer() -> None:
+    iam = (ROOT / "infra/gcp/bootstrap/iam.tf").read_text(encoding="utf-8")
+
+    required_fragments = [
+        'resource "google_service_account" "provisioner"',
+        'resource "google_service_account" "image_publisher"',
+        'resource "google_service_account" "deployer"',
+        'resource "google_service_account_iam_member" "provisioner_wif"',
+        'resource "google_service_account_iam_member" "provisioner_token_creator"',
+        'resource "google_service_account_iam_member" "image_publisher_wif"',
+        'resource "google_service_account_iam_member" "image_publisher_token_creator"',
+        'resource "google_service_account_iam_member" "deployer_wif"',
+        'resource "google_service_account_iam_member" "deployer_token_creator"',
+        'role               = "roles/iam.workloadIdentityUser"',
+        'role               = "roles/iam.serviceAccountTokenCreator"',
+        "member             = local.github_principal_set",
+    ]
+
+    for fragment in required_fragments:
+        assert fragment in iam
+
+    assert "google_service_account_key" not in iam
+    assert "roles/owner" not in iam
+    assert "roles/editor" not in iam
 
 
 def test_gcp_terraform_versions_pin_provider_without_backend_or_cloud_identifiers() -> None:
@@ -185,7 +366,9 @@ def test_gcp_terraform_variables_require_private_sql_subnet_input_without_commit
 
     assert "default =" not in root_variables
     assert "default =" not in develop_variables
-    assert "direct_vpc_subnet_cidr = var.direct_vpc_subnet_cidr" in root_module
+    assert _contains_normalized_fragment(
+        root_module, "direct_vpc_subnet_cidr = var.direct_vpc_subnet_cidr"
+    )
 
 
 def test_gcp_terraform_variables_accept_representative_rfc1918_subnet_ranges() -> None:
@@ -401,6 +584,9 @@ def test_gcp_develop_network_uses_dedicated_vpc_and_private_service_access_only(
 
 def test_gcp_develop_cloud_sql_is_private_minimal_postgresql_without_public_ip() -> None:
     cloud_sql = (ROOT / "infra/gcp/develop/cloud_sql.tf").read_text(encoding="utf-8")
+    develop_variables = (ROOT / "infra/gcp/develop/variables.tf").read_text(encoding="utf-8")
+    root_variables = (ROOT / "infra/gcp/variables.tf").read_text(encoding="utf-8")
+    root_module = (ROOT / "infra/gcp/develop.tf").read_text(encoding="utf-8")
 
     assert "google_sql_database_instance" in cloud_sql
     assert "POSTGRES_16" in cloud_sql
@@ -418,15 +604,28 @@ def test_gcp_develop_cloud_sql_is_private_minimal_postgresql_without_public_ip()
     assert "deletion_protection" in cloud_sql
     assert "local.standard_labels" in cloud_sql
     assert "backup_configuration" in cloud_sql
-    assert "enabled = true" in cloud_sql
-    assert "point_in_time_recovery_enabled" not in cloud_sql
-    assert "transaction_log_retention_days" not in cloud_sql
-    assert "start_time" not in cloud_sql
+    assert _contains_normalized_fragment(cloud_sql, "enabled = var.cloud_sql_backup_enabled")
+    assert _contains_normalized_fragment(
+        cloud_sql, "point_in_time_recovery_enabled = var.cloud_sql_point_in_time_recovery_enabled"
+    )
+    assert _contains_normalized_fragment(
+        cloud_sql, "transaction_log_retention_days = var.cloud_sql_transaction_log_retention_days"
+    )
+    assert "backup_retention_settings" in cloud_sql
+    assert "retained_backups = var.cloud_sql_retained_backups" in cloud_sql
+    assert "retention_unit" in cloud_sql and '"COUNT"' in cloud_sql
+    assert _contains_normalized_fragment(cloud_sql, "start_time = var.cloud_sql_backup_start_time")
+    assert "restore_backup_context" not in cloud_sql
+    assert "var.cloud_sql_restore" not in cloud_sql
+    assert "availability_type" not in cloud_sql
+    assert "ENTERPRISE_PLUS" not in cloud_sql
+    assert "recovery" not in cloud_sql.lower() or "recovery_policy_review_status" in cloud_sql
     assert "0.0.0.0/0" not in cloud_sql
     assert "authorized_networks" not in cloud_sql
     assert "public" not in cloud_sql.lower()
     assert "password" not in cloud_sql.lower()
     assert "google_sql_user" not in cloud_sql
+    assert "google_sql_database" in cloud_sql
     assert 'name = "root"' not in cloud_sql.lower()
     assert "root" not in cloud_sql.lower()
     assert "@" not in cloud_sql
@@ -434,6 +633,148 @@ def test_gcp_develop_cloud_sql_is_private_minimal_postgresql_without_public_ip()
     assert "depends_on" in cloud_sql
     assert "provisioner" not in cloud_sql.lower()
     assert "local-exec" not in cloud_sql.lower()
+
+    required_variable_names = [
+        "cloud_sql_backup_enabled",
+        "cloud_sql_backup_start_time",
+        "cloud_sql_point_in_time_recovery_enabled",
+        "cloud_sql_transaction_log_retention_days",
+        "cloud_sql_retained_backups",
+        "cloud_sql_database_name",
+        "cloud_sql_schema_owner_role",
+        "cloud_sql_migrator_role",
+        "cloud_sql_runtime_role",
+        "cloud_sql_recovery_policy_review_status",
+    ]
+    for variable_name in required_variable_names:
+        assert f'variable "{variable_name}"' in develop_variables
+        assert f'variable "{variable_name}"' in root_variables
+        assert any(
+            variable_name in line and f"var.{variable_name}" in line
+            for line in root_module.splitlines()
+        )
+
+    cloud_sql_backup_enabled_section = develop_variables.split(
+        'variable "cloud_sql_backup_enabled"', 1
+    )[1]
+    cloud_sql_database_name_section = develop_variables.split(
+        'variable "cloud_sql_database_name"', 1
+    )[1]
+    assert (
+        "default ="
+        not in cloud_sql_backup_enabled_section.split('variable "cloud_sql_backup_start_time"', 1)[
+            0
+        ]
+    )
+    assert (
+        "default ="
+        not in cloud_sql_database_name_section.split('variable "cloud_sql_schema_owner_role"', 1)[0]
+    )
+
+
+def test_gcp_terraform_outputs_minimize_database_metadata_and_mark_it_sensitive() -> None:
+    outputs = (ROOT / "infra/gcp/outputs.tf").read_text(encoding="utf-8")
+
+    assert 'output "database_contract"' in outputs
+    assert 'output "database_recovery_contract"' in outputs
+    assert "module.develop.database_contract" in outputs
+    assert "module.develop.database_recovery_contract" in outputs
+    assert "sensitive   = true" in outputs or "sensitive = true" in outputs
+    assert "password" not in outputs.lower()
+    assert "secret" not in outputs.lower()
+    assert "private_key" not in outputs.lower()
+
+
+def test_gcp_develop_budgets_model_fixed_thresholds_operator_routing_and_non_cap_posture() -> None:
+    budgets = (ROOT / "infra/gcp/develop/budgets.tf").read_text(encoding="utf-8")
+    develop_variables = (ROOT / "infra/gcp/develop/variables.tf").read_text(encoding="utf-8")
+    root_variables = (ROOT / "infra/gcp/variables.tf").read_text(encoding="utf-8")
+    root_module = (ROOT / "infra/gcp/develop.tf").read_text(encoding="utf-8")
+    outputs = (ROOT / "infra/gcp/outputs.tf").read_text(encoding="utf-8")
+
+    assert 'resource "google_billing_budget" "develop"' in budgets
+    assert _contains_normalized_fragment(budgets, "billing_account = var.billing_account_id")
+    assert "google_monitoring_notification_channel.alerts.name" in budgets
+    assert _contains_normalized_fragment(budgets, "disable_default_iam_recipients = true")
+    assert "threshold_percent = 0.5" in budgets
+    assert "threshold_percent = 0.75" in budgets
+    assert "threshold_percent = 1.0" in budgets
+    assert "projects/${var.project_id}" in budgets
+    assert "alerts are not hard spending caps" in budgets
+    assert "@" not in budgets
+    assert "pubsub" not in budgets.lower()
+
+    assert 'variable "billing_account_id"' in develop_variables
+    assert 'variable "billing_account_id"' in root_variables
+    assert _contains_normalized_fragment(root_module, "billing_account_id = var.billing_account_id")
+
+    assert 'output "cost_guardrail_contract"' in outputs
+    assert "module.develop.cost_guardrail_contract" in outputs
+    assert "@" not in outputs
+
+
+def test_gcp_develop_observability_models_private_alerting_bounded_retention_and_startup_dependencies() -> (
+    None
+):
+    observability = (ROOT / "infra/gcp/develop/observability.tf").read_text(encoding="utf-8")
+    develop_variables = (ROOT / "infra/gcp/develop/variables.tf").read_text(encoding="utf-8")
+    root_variables = (ROOT / "infra/gcp/variables.tf").read_text(encoding="utf-8")
+    root_module = (ROOT / "infra/gcp/develop.tf").read_text(encoding="utf-8")
+    outputs = (ROOT / "infra/gcp/outputs.tf").read_text(encoding="utf-8")
+    cloud_run = (ROOT / "infra/gcp/develop/cloud_run.tf").read_text(encoding="utf-8")
+    migration_job = (ROOT / "infra/gcp/develop/migration_job.tf").read_text(encoding="utf-8")
+
+    required_variable_names = [
+        "alert_notification_email_address",
+        "observability_viewer_principal",
+        "log_retention_days",
+        "cloud_run_request_log_posture",
+    ]
+    for variable_name in required_variable_names:
+        assert f'variable "{variable_name}"' in develop_variables
+        assert f'variable "{variable_name}"' in root_variables
+        assert _contains_normalized_fragment(root_module, f"{variable_name} = var.{variable_name}")
+
+    required_fragments = [
+        'resource "google_monitoring_notification_channel" "alerts"',
+        'resource "google_monitoring_alert_policy" "health_failures"',
+        'resource "google_monitoring_alert_policy" "readiness_failures"',
+        'resource "google_monitoring_alert_policy" "service_error_events"',
+        'resource "google_logging_project_bucket_config" "default"',
+        'resource "google_logging_metric" "health_failure_count"',
+        'resource "google_logging_metric" "readiness_failure_count"',
+        'resource "google_logging_metric" "service_error_count"',
+        'role    = "roles/logging.viewer"',
+        'role    = "roles/monitoring.viewer"',
+        "member  = var.observability_viewer_principal",
+        "retention_days = var.log_retention_days",
+        "var.cloud_run_request_log_posture",
+        'google_project_service.approved["logging.googleapis.com"]',
+        'google_project_service.approved["monitoring.googleapis.com"]',
+    ]
+    for fragment in required_fragments:
+        assert _contains_normalized_fragment(observability, fragment)
+
+    forbidden_fragments = [
+        'resource "google_logging_project_sink"',
+        "request.body",
+        "requestBody",
+        "jsonPayload",
+        "textPayload",
+        "allUsers",
+        "allAuthenticatedUsers",
+    ]
+    for fragment in forbidden_fragments:
+        assert fragment not in observability
+
+    assert "google_billing_budget.develop" in cloud_run
+    assert "google_monitoring_alert_policy.health_failures" in cloud_run
+    assert "google_billing_budget.develop" in migration_job
+    assert "google_monitoring_alert_policy.health_failures" in migration_job
+
+    assert 'output "observability_contract"' in outputs
+    assert "module.develop.observability_contract" in outputs
+    assert "@" not in outputs
 
 
 def test_gcp_develop_cloud_run_is_private_and_digest_only_without_invoker_iam() -> None:
@@ -511,6 +852,107 @@ def test_gcp_develop_cloud_run_uses_runtime_service_account_without_invoker_gran
     assert "allAuthenticatedUsers" not in cloud_run
 
 
+def test_gcp_develop_iam_models_least_privilege_runtime_migration_deployer_and_invoker_contracts() -> (
+    None
+):
+    iam = (ROOT / "infra/gcp/develop/iam.tf").read_text(encoding="utf-8")
+    variables = (ROOT / "infra/gcp/develop/variables.tf").read_text(encoding="utf-8")
+
+    required_variable_names = [
+        "control_plane_project_id",
+        "deployer_principal",
+        "private_invoker_principal",
+    ]
+    for variable_name in required_variable_names:
+        assert f'variable "{variable_name}"' in variables
+
+    required_fragments = [
+        'resource "google_project_iam_member" "runtime_cloudsql_client"',
+        'resource "google_project_iam_member" "runtime_log_writer"',
+        'resource "google_project_iam_member" "runtime_metric_writer"',
+        'resource "google_project_iam_member" "migration_cloudsql_client"',
+        'resource "google_project_iam_member" "migration_log_writer"',
+        'resource "google_project_iam_member" "migration_metric_writer"',
+        'resource "google_secret_manager_secret_iam_member" "runtime_secret_access"',
+        'resource "google_secret_manager_secret_iam_member" "migration_secret_access"',
+        'resource "google_artifact_registry_repository_iam_member" "image_publisher_writer"',
+        'resource "google_cloud_run_v2_service_iam_member" "private_invoker"',
+        'resource "google_service_account_iam_member" "deployer_runtime_user"',
+        'resource "google_service_account_iam_member" "deployer_migration_user"',
+        "roles/cloudsql.client",
+        "roles/logging.logWriter",
+        "roles/monitoring.metricWriter",
+        "roles/secretmanager.secretAccessor",
+        "roles/artifactregistry.writer",
+        "roles/run.invoker",
+        "roles/iam.serviceAccountUser",
+        "serviceAccount:${google_service_account.runtime.email}",
+        "serviceAccount:${google_service_account.migration.email}",
+        "golden-rose-image-publisher@${var.control_plane_project_id}.iam.gserviceaccount.com",
+        "var.private_invoker_principal",
+        "var.deployer_principal",
+    ]
+    for fragment in required_fragments:
+        assert fragment in iam
+
+    forbidden_fragments = [
+        "roles/owner",
+        "roles/editor",
+        "roles/viewer",
+        "roles/secretmanager.admin",
+        "roles/artifactregistry.admin",
+        "roles/run.admin",
+        "google_service_account_key",
+        "allUsers",
+        "allAuthenticatedUsers",
+    ]
+    for fragment in forbidden_fragments:
+        assert fragment not in iam
+
+
+def test_gcp_develop_migration_job_is_one_task_private_and_uses_exact_digest() -> None:
+    migration_job = (ROOT / "infra/gcp/develop/migration_job.tf").read_text(encoding="utf-8")
+
+    required_fragments = [
+        'resource "google_cloud_run_v2_job" "migration"',
+        'name     = "run-migrations"',
+        "service_account = google_service_account.migration.email",
+        "image = local.managed_container_image",
+        'command = ["golden-rose-migrate"]',
+        "max_retries = 0",
+        "task_count  = 1",
+        "parallelism = 1",
+        "google_compute_subnetwork.direct_vpc.id",
+        "PRIVATE_RANGES_ONLY",
+    ]
+    for fragment in required_fragments:
+        assert _contains_normalized_fragment(migration_job, fragment)
+
+    forbidden_fragments = [
+        "google_service_account.runtime.email",
+        "INGRESS_TRAFFIC_ALL",
+        "env {",
+        "value_source",
+        "secret_key_ref",
+        ":latest",
+    ]
+    for fragment in forbidden_fragments:
+        assert fragment not in migration_job
+
+
+def test_gcp_develop_service_does_not_run_migrations_on_web_startup() -> None:
+    cloud_run = (ROOT / "infra/gcp/develop/cloud_run.tf").read_text(encoding="utf-8")
+
+    forbidden_fragments = [
+        "golden-rose-migrate",
+        "alembic",
+        "upgrade head",
+        "google_service_account.migration.email",
+    ]
+    for fragment in forbidden_fragments:
+        assert fragment not in cloud_run
+
+
 def test_gcp_terraform_root_loads_develop_resource_module() -> None:
     module = (ROOT / "infra/gcp/develop.tf").read_text(encoding="utf-8")
 
@@ -521,7 +963,9 @@ def test_gcp_terraform_root_loads_develop_resource_module() -> None:
     assert "container_image_digest" in module
 
 
-def test_gcp_container_image_digest_is_digest_only_and_not_arbitrary_reference() -> None:
+def test_gcp_container_image_digest_is_digest_only_and_not_arbitrary_reference(
+    tmp_path: Path,
+) -> None:
     root_variables = (ROOT / "infra/gcp/variables.tf").read_text(encoding="utf-8")
     develop_variables = (ROOT / "infra/gcp/develop/variables.tf").read_text(encoding="utf-8")
 
@@ -531,12 +975,33 @@ def test_gcp_container_image_digest_is_digest_only_and_not_arbitrary_reference()
         assert "docker.pkg.dev" not in variables
         assert "latest" not in variables.lower()
 
-    result = subprocess.run(
-        ["terraform", "-chdir=infra/gcp", "graph"],
-        cwd=ROOT,
+    graph_root = tmp_path / "graph-probe"
+    shutil.copytree(ROOT / "infra" / "gcp", graph_root)
+    (graph_root / "backend.tf").write_text(
+        "# graph probe omits the partial backend ceremony\n",
+        encoding="utf-8",
+    )
+
+    terraform_env = os.environ | {"TF_DATA_DIR": str(tmp_path / ".tfdata-root")}
+
+    init_result = subprocess.run(
+        ["terraform", f"-chdir={graph_root}", "init", "-backend=false", "-input=false"],
+        cwd=tmp_path,
         check=False,
         text=True,
         capture_output=True,
+        env=terraform_env,
+    )
+
+    assert init_result.returncode == 0, init_result.stdout + init_result.stderr
+
+    result = subprocess.run(
+        ["terraform", f"-chdir={graph_root}", "graph"],
+        cwd=tmp_path,
+        check=False,
+        text=True,
+        capture_output=True,
+        env=terraform_env,
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
@@ -550,6 +1015,9 @@ def test_gcp_container_image_digest_is_digest_only_and_not_arbitrary_reference()
         "module.develop.google_cloud_run_v2_service.staff_tracer",
         "module.develop.google_service_account.runtime",
         "module.develop.google_service_account.migration",
+        "module.develop.google_billing_budget.develop",
+        "module.develop.google_monitoring_notification_channel.alerts",
+        "module.develop.google_logging_project_bucket_config.default",
     ]
     for resource_node in expected_resource_nodes:
         assert resource_node in result.stdout
@@ -637,6 +1105,364 @@ def test_application_quality_workflow_installs_terraform_before_full_pytest() ->
     assert workflow.index(terraform_init) < workflow.index("uv run pytest --cov=golden_rose")
 
 
+def test_build_image_workflow_separates_pull_request_validation_from_publish_authority() -> None:
+    workflow = (ROOT / ".github/workflows/build-image.yml").read_text(encoding="utf-8")
+
+    expected_pinned_actions = [
+        "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+        "astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e",
+        "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+        "docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435",
+        "google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193",
+        "docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1",
+        "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    ]
+
+    assert "pull_request:" in workflow
+    assert "workflow_dispatch:" in workflow
+    assert "build-validate:" in workflow
+    assert "publish-image:" in workflow
+    assert "if: github.event_name == 'pull_request'" in workflow
+    assert "if: github.event_name == 'workflow_dispatch'" in workflow
+    assert "environment: develop" in workflow
+    assert "id-token: write" in workflow
+    assert "google-github-actions/auth" in workflow
+    assert "workload_identity_provider" in workflow
+    assert "docker/login-action" in workflow
+    assert "docker/setup-buildx-action" in workflow
+    assert "scripts/verify_image_provenance.py" in workflow
+    assert "uv run python scripts/validate_sbom.py" in workflow
+    assert "docker buildx build" in workflow
+    assert "--push" in workflow
+    assert "--metadata-file build/image-metadata.json" in workflow
+    assert "us-east4-docker.pkg.dev" in workflow
+    assert "${{ github.sha }}" in workflow
+    assert "docker build -t" not in workflow
+    assert "terraform apply" not in workflow.lower()
+    assert "terraform plan" not in workflow.lower()
+    assert "deploy-develop" not in workflow.lower()
+    for pinned_action in expected_pinned_actions:
+        assert pinned_action in workflow
+
+
+def test_build_image_workflow_verifies_sboms_and_emits_value_safe_artifacts() -> None:
+    workflow = (ROOT / ".github/workflows/build-image.yml").read_text(encoding="utf-8")
+
+    assert "build/backend-sbom.cdx.json" in workflow
+    assert "build/frontend-sbom.cdx.json" in workflow
+    assert "build/image-metadata.json" in workflow
+    assert "build/published-image.txt" in workflow
+    assert "backend-sbom-cdx" in workflow
+    assert "frontend-sbom-cdx" in workflow
+    assert "image-metadata" in workflow
+    assert "published-image" in workflow
+    assert "never deploy by tag" in workflow
+    assert "oauth2accesstoken" in workflow
+    assert "docker.pkg.dev" in workflow
+
+
+def test_deploy_develop_workflow_binds_reviewed_publish_artifacts_and_serializes_migration_before_rollout() -> (
+    None
+):
+    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
+
+    expected_pinned_actions = [
+        "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+        "astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e",
+        "google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193",
+        "google-github-actions/setup-gcloud@77e7a554d41e2ee56fc945c52dfd3f33d12def9a",
+        "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    ]
+
+    assert "workflow_dispatch:" in workflow
+    assert "pull_request:" not in workflow
+    assert "publish_run_id:" in workflow
+    assert "actions: read" in workflow
+    assert "environment: develop" in workflow
+    assert "id-token: write" in workflow
+    assert "concurrency:" in workflow
+    assert "group: deploy-develop" in workflow
+    assert "cancel-in-progress: false" in workflow
+    assert "if: github.event_name == 'workflow_dispatch'" in workflow
+    assert "google-github-actions/auth" in workflow
+    assert "google-github-actions/setup-gcloud" in workflow
+    assert "actions/runs/{run_id}/artifacts" in workflow
+    assert "scripts/verify_image_provenance.py --mode publish" in workflow
+    assert "gcloud run jobs execute" in workflow
+    assert "gcloud run jobs update" in workflow
+    assert "run-migrations" in workflow
+    assert "gcloud run services update" in workflow
+    assert "published-image.txt" in workflow
+    assert "backend-sbom.cdx.json" in workflow
+    assert "frontend-sbom.cdx.json" in workflow
+    assert workflow.index("gcloud run jobs execute") < workflow.index("gcloud run services update")
+    assert workflow.index("gcloud run jobs update") < workflow.index("gcloud run jobs execute")
+    assert "${{ inputs.image_digest }}" not in workflow
+    assert ":latest" not in workflow
+    for pinned_action in expected_pinned_actions:
+        assert pinned_action in workflow
+
+
+def test_deploy_develop_workflow_records_forward_only_readiness_and_qualification_distinction() -> (
+    None
+):
+    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
+
+    assert "build/deploy-compatibility.json" in workflow
+    assert "build/deploy-result.json" in workflow
+    assert "qualification_executed" in workflow
+    assert "false" in workflow
+    assert "forward recovery" in workflow
+    assert "rollback_without_proven_compatibility_window" in workflow
+    assert "publish_run_id" in workflow
+    assert (
+        "published-image artifact plus backend/frontend SBOM and metadata evidence from the reviewed publish run"
+        in workflow
+    )
+    assert "upload-artifact" in workflow
+
+
+def test_terraform_static_validation_harness_rejects_deploy_workflow_without_migration_step(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow = _remove_named_workflow_step(
+        _current_workflow_text("deploy-develop.yml"),
+        "Execute migration job",
+        "Deploy reviewed service",
+    )
+    _write_workflow_fixture(tmp_path, "deploy-develop.yml", workflow)
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow step inventory mutation" in result.stdout
+    assert "missing name:Execute migration job" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_deploy_workflow_job_continue_on_error(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow = _current_workflow_text("deploy-develop.yml").replace(
+        "    name: deploy\n    if: github.event_name == 'workflow_dispatch'\n    runs-on: ubuntu-latest",
+        "    name: deploy\n    if: github.event_name == 'workflow_dispatch'\n    continue-on-error: true\n    runs-on: ubuntu-latest",
+    )
+    _write_workflow_fixture(tmp_path, "deploy-develop.yml", workflow)
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow job structure mutation" in result.stdout
+    assert "unexpected job continue-on-error" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_deploy_workflow_without_environment(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow = _current_workflow_text("deploy-develop.yml").replace(
+        "    environment: develop\n", ""
+    )
+    _write_workflow_fixture(tmp_path, "deploy-develop.yml", workflow)
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow job structure mutation" in result.stdout
+    assert "changed job environment" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_deploy_workflow_without_concurrency(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow = _current_workflow_text("deploy-develop.yml").replace(
+        "    concurrency:\n      group: deploy-develop\n      cancel-in-progress: false\n",
+        "",
+    )
+    _write_workflow_fixture(tmp_path, "deploy-develop.yml", workflow)
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow job structure mutation" in result.stdout
+    assert "changed job concurrency" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_deploy_workflow_reordered_migration_and_rollout(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow = _current_workflow_text("deploy-develop.yml")
+    migration_step_start = workflow.index("      - name: Execute migration job")
+    deploy_step_start = workflow.index(
+        "      - name: Deploy reviewed service", migration_step_start
+    )
+    readiness_step_start = workflow.index(
+        "      - name: Verify readiness gate and record deploy result", deploy_step_start
+    )
+    migration_step = workflow[migration_step_start:deploy_step_start]
+    deploy_step = workflow[deploy_step_start:readiness_step_start]
+    workflow = (
+        workflow[:migration_step_start]
+        + deploy_step
+        + migration_step
+        + workflow[readiness_step_start:]
+    )
+    _write_workflow_fixture(tmp_path, "deploy-develop.yml", workflow)
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow step inventory mutation" in result.stdout
+    assert "step order or inventory changed" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_deploy_workflow_broad_oidc_claim_mutation(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow = _current_workflow_text("deploy-develop.yml").replace(
+        "          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}",
+        "          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_WILDCARD }}",
+    )
+    _write_workflow_fixture(tmp_path, "deploy-develop.yml", workflow)
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow secret reference" in result.stdout
+    assert "GCP_WORKLOAD_IDENTITY_PROVIDER_WILDCARD" in result.stdout
+    assert "workload_identity_provider" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_deploy_workflow_arbitrary_digest_host_and_mutable_tag(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow = _current_workflow_text("deploy-develop.yml").replace(
+        'test "$VERIFIED_IMAGE_REF" = "$PUBLISHED_IMAGE_REF"',
+        'VERIFIED_IMAGE_REF="evil.example.com/rogue/staff-tracer:latest"',
+    )
+    _write_workflow_fixture(tmp_path, "deploy-develop.yml", workflow)
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_deploy_workflow_without_publish_sha_match(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow = _current_workflow_text("deploy-develop.yml").replace(
+        '          if head_sha != deploy_commit_sha:\n              raise SystemExit("publish run head sha must match the deploy commit sha")\n',
+        "",
+    )
+    _write_workflow_fixture(tmp_path, "deploy-develop.yml", workflow)
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "must match reviewed executable script" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_deploy_workflow_without_image_equality_guard(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow = _current_workflow_text("deploy-develop.yml").replace(
+        '          test "$VERIFIED_IMAGE_REF" = "$PUBLISHED_IMAGE_REF"\n',
+        "",
+    )
+    _write_workflow_fixture(tmp_path, "deploy-develop.yml", workflow)
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "must match reviewed executable script" in result.stdout
+
+
+def test_terraform_static_validation_rejects_image_guard_replaced_by_comment(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow = _current_workflow_text("deploy-develop.yml").replace(
+        '          test "$VERIFIED_IMAGE_REF" = "$PUBLISHED_IMAGE_REF"',
+        '          # test "$VERIFIED_IMAGE_REF" = "$PUBLISHED_IMAGE_REF"',
+    )
+    _write_workflow_fixture(tmp_path, "deploy-develop.yml", workflow)
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "must match reviewed executable script" in result.stdout
+
+
 def test_terraform_static_validation_harness_rejects_forbidden_patterns(tmp_path: Path) -> None:
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
@@ -665,6 +1491,55 @@ def test_terraform_static_validation_harness_rejects_forbidden_patterns(tmp_path
     assert "forbidden" in result.stdout
     assert "allUsers" in result.stdout
     assert "roles/run.invoker" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_unlisted_manifest_resource_type(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+
+    policy_dir = tmp_path / "infra" / "policy"
+    policy_dir.mkdir(parents=True)
+    (policy_dir / "predeployment-authority-manifest.json").write_text(
+        """
+{
+  "terraform": {
+    "resource_types": {
+      "google_compute_network": {
+        "max_count": 1
+      }
+    }
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    terraform_root = tmp_path / "infra" / "gcp" / "develop"
+    bad_file = terraform_root / "unexpected_resource.tf"
+    bad_file.write_text(
+        "\n".join(
+            [
+                'resource "google_pubsub_topic" "unexpected" {',
+                '  name = "unexpected-topic"',
+                "}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "unlisted Terraform resource type" in result.stdout
+    assert "google_pubsub_topic" in result.stdout
+    assert "unexpected_resource.tf" in result.stdout
 
 
 def test_terraform_static_validation_harness_rejects_tf_json_forbidden_patterns(
@@ -702,6 +1577,53 @@ def test_terraform_static_validation_harness_rejects_tf_json_forbidden_patterns(
     assert "google_service_account_key" in result.stdout
 
 
+def test_terraform_static_validation_harness_rejects_workflow_file_not_listed_in_manifest(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+
+    policy_dir = tmp_path / "infra" / "policy"
+    policy_dir.mkdir(parents=True)
+    (policy_dir / "predeployment-authority-manifest.json").write_text(
+        """
+{
+  "terraform": {
+    "resource_types": {
+      "google_compute_network": {
+        "max_count": 1
+      }
+    }
+  },
+  "workflows": {
+    "files": {
+      "infrastructure-quality.yml": {}
+    }
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "repository-hygiene.yml").write_text(
+        _current_workflow_text("repository-hygiene.yml"),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "workflow file not listed in manifest" in result.stdout
+    assert "repository-hygiene.yml" in result.stdout
+
+
 def test_terraform_static_validation_harness_rejects_unicode_escaped_tf_json_keys(
     tmp_path: Path,
 ) -> None:
@@ -737,6 +1659,59 @@ def test_terraform_static_validation_harness_rejects_unicode_escaped_tf_json_key
     assert "google_service_account_key" in result.stdout
 
 
+def test_terraform_static_validation_harness_rejects_workflow_script_not_listed_in_manifest(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+
+    policy_dir = tmp_path / "infra" / "policy"
+    policy_dir.mkdir(parents=True)
+    (policy_dir / "predeployment-authority-manifest.json").write_text(
+        """
+{
+  "terraform": {
+    "resource_types": {
+      "google_compute_network": {
+        "max_count": 1
+      }
+    }
+  },
+  "workflows": {
+    "files": {
+      "application-quality.yml": {}
+    }
+  },
+  "scripts": {
+    "entrypoints": [
+      "apps/web/scripts/validate-lockfile.mjs",
+      "apps/web/scripts/validate-lockfile.test.mjs"
+    ]
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "application-quality.yml").write_text(
+        _current_workflow_text("application-quality.yml"),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "workflow script entrypoint not listed in manifest" in result.stdout
+    assert "scripts/validate_sbom.py" in result.stdout
+
+
 def test_terraform_static_validation_harness_rejects_unicode_escaped_native_hcl_labels(
     tmp_path: Path,
 ) -> None:
@@ -762,6 +1737,59 @@ def test_terraform_static_validation_harness_rejects_unicode_escaped_native_hcl_
     assert "google_service_account_key" in result.stdout
 
 
+def test_terraform_static_validation_harness_rejects_workflow_deployment_path_not_listed_in_manifest(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+
+    policy_dir = tmp_path / "infra" / "policy"
+    policy_dir.mkdir(parents=True)
+    (policy_dir / "predeployment-authority-manifest.json").write_text(
+        """
+{
+  "terraform": {
+    "resource_types": {
+      "google_compute_network": {
+        "max_count": 1
+      }
+    }
+  },
+  "workflows": {
+    "files": {
+      "infrastructure-quality.yml": {}
+    }
+  },
+  "scripts": {
+    "entrypoints": [
+      "scripts/validate_terraform_static.py"
+    ]
+  },
+  "protected_deployment_paths": []
+}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "infrastructure-quality.yml").write_text(
+        _current_workflow_text("infrastructure-quality.yml"),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "workflow deployment path not listed in manifest" in result.stdout
+    assert "infra/gcp" in result.stdout
+
+
 def test_terraform_static_validation_harness_rejects_malformed_native_hcl_fail_closed(
     tmp_path: Path,
 ) -> None:
@@ -781,6 +1809,178 @@ def test_terraform_static_validation_harness_rejects_malformed_native_hcl_fail_c
     assert result.returncode == 1
     assert "contains malformed Terraform HCL and fails closed" in result.stdout
     assert "malformed.tf" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_workflow_step_not_listed_in_manifest(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+
+    policy_dir = tmp_path / "infra" / "policy"
+    policy_dir.mkdir(parents=True)
+    (policy_dir / "predeployment-authority-manifest.json").write_text(
+        """
+{
+  "terraform": {
+    "resource_types": {
+      "google_compute_network": {
+        "max_count": 1
+      }
+    }
+  },
+  "workflows": {
+    "files": {
+      "infrastructure-quality.yml": {
+        "jobs": {
+          "static-validation": {
+            "steps": [
+              "name:Check out repository"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "scripts": {
+    "entrypoints": [
+      "scripts/validate_terraform_static.py"
+    ]
+  },
+  "protected_deployment_paths": [
+    "infra/gcp"
+  ]
+}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    workflow_dir = tmp_path / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "infrastructure-quality.yml").write_text(
+        _current_workflow_text("infrastructure-quality.yml"),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "workflow step not listed in manifest" in result.stdout
+    assert "name:Set up uv" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_manifest_deploy_order_drift(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    manifest = (ROOT / "infra/policy/predeployment-authority-manifest.json").read_text(
+        encoding="utf-8"
+    )
+    manifest = manifest.replace(
+        '              "name:Enforce protected develop source",\n              "name:Authenticate to Google Cloud",',
+        '              "name:Authenticate to Google Cloud",\n              "name:Enforce protected develop source",',
+    )
+    policy_dir = tmp_path / "infra" / "policy"
+    policy_dir.mkdir(parents=True, exist_ok=True)
+    (policy_dir / "predeployment-authority-manifest.json").write_text(manifest, encoding="utf-8")
+    _write_workflow_fixture(
+        tmp_path, "deploy-develop.yml", _current_workflow_text("deploy-develop.yml")
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "workflow step order drifted for deploy-develop.yml:deploy" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "old_fragment, new_fragment, expected_fragment",
+    [
+        (
+            'role   = "roles/storage.objectAdmin"',
+            'role   = "roles/storage.admin"',
+            "roles/storage.admin",
+        ),
+        (
+            "member = var.recovery_authority_principal",
+            'member = "user:unexpected@example.com"',
+            "recovery_authority_principal",
+        ),
+        (
+            'count  = var.bootstrap_operator_status == "bootstrap-active" ? 1 : 0\n',
+            "",
+            "bootstrap-active",
+        ),
+    ],
+)
+def test_terraform_static_validation_harness_rejects_state_bucket_iam_drift(
+    tmp_path: Path, old_fragment: str, new_fragment: str, expected_fragment: str
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    bootstrap_dir = tmp_path / "infra" / "gcp" / "bootstrap"
+    (bootstrap_dir / "state.tf").write_text(
+        (ROOT / "infra/gcp/bootstrap/state.tf").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (bootstrap_dir / "iam.tf").write_text(
+        (ROOT / "infra/gcp/bootstrap/iam.tf")
+        .read_text(encoding="utf-8")
+        .replace(old_fragment, new_fragment, 1),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert expected_fragment in result.stdout
+
+
+def test_terraform_static_validation_binds_each_state_iam_resource_to_its_principal(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    bootstrap_dir = tmp_path / "infra" / "gcp" / "bootstrap"
+    (bootstrap_dir / "state.tf").write_text(
+        (ROOT / "infra/gcp/bootstrap/state.tf").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    (bootstrap_dir / "iam.tf").write_text(
+        (ROOT / "infra/gcp/bootstrap/iam.tf")
+        .read_text(encoding="utf-8")
+        .replace("member = var.state_authority_principal", "member = var.placeholder", 1)
+        .replace(
+            "member = var.recovery_authority_principal", "member = var.state_authority_principal", 1
+        )
+        .replace("member = var.placeholder", "member = var.recovery_authority_principal", 1),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "state_authority_object_admin" in result.stdout
 
 
 def test_terraform_static_validation_harness_rejects_tf_json_backend_configuration(
@@ -817,7 +2017,8 @@ def test_terraform_static_validation_harness_rejects_tf_json_backend_configurati
     )
 
     assert result.returncode == 1
-    assert "forbidden" in result.stdout
+    assert "approved partial backend path" in result.stdout
+    assert "committed backend value" in result.stdout
     assert "backend.tf.json" in result.stdout
     assert "backend" in result.stdout
 
@@ -944,7 +2145,7 @@ def test_terraform_static_validation_harness_rejects_backend_configuration(tmp_p
     )
 
     assert result.returncode == 1
-    assert "forbidden" in result.stdout
+    assert "committed backend value" in result.stdout
     assert "backend" in result.stdout
 
 
@@ -1001,7 +2202,7 @@ def test_terraform_static_validation_harness_rejects_infrastructure_workflow_aut
     )
 
     assert result.returncode == 1
-    assert "forbidden workflow authority" in result.stdout
+    assert "forbidden semantic workflow permissions" in result.stdout
     assert "id-token: write" in result.stdout
     assert "google-github-actions/auth" in result.stdout
 
@@ -1876,6 +3077,41 @@ def test_terraform_static_validation_harness_rejects_duplicate_approved_step(
     assert "duplicate name:Check out repository" in result.stdout
 
 
+def test_application_quality_gate_requires_fail_closed_authority_downgrade_proof() -> None:
+    workflow = (ROOT / ".github/workflows/application-quality.yml").read_text(encoding="utf-8")
+
+    assert "if uv run alembic downgrade base 2> build/alembic-downgrade.stderr; then" in workflow
+    assert "database authority lifecycle downgrade unexpectedly succeeded" in workflow
+    assert (
+        "database authority lifecycle downgrade is intentionally unsupported without "
+        "an operator-reviewed role handoff"
+    ) in workflow
+
+
+def test_terraform_static_validation_harness_rejects_authority_downgrade_proof_mutation(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow = _current_workflow_text("application-quality.yml").replace(
+        'grep -F "database authority lifecycle downgrade is intentionally unsupported without an operator-reviewed role handoff" build/alembic-downgrade.stderr',
+        "true",
+        1,
+    )
+    _write_workflow_fixture(tmp_path, "application-quality.yml", workflow)
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow run mutation" in result.stdout
+    assert "name:Run application quality gate ->" in result.stdout
+
+
 def test_terraform_static_validation_harness_rejects_reordered_required_steps(
     tmp_path: Path,
 ) -> None:
@@ -2520,12 +3756,12 @@ def test_terraform_static_validation_harness_rejects_cloud_run_environment_varia
     assert "env {" in result.stdout
 
 
-def test_terraform_static_validation_harness_rejects_cloud_run_jobs(
+def test_terraform_static_validation_harness_rejects_cloud_run_jobs_outside_approved_migration_path(
     tmp_path: Path,
 ) -> None:
     terraform_root = tmp_path / "infra" / "gcp" / "develop"
     terraform_root.mkdir(parents=True)
-    (terraform_root / "migration_job.tf").write_text(
+    (terraform_root / "other_job.tf").write_text(
         "\n".join(
             [
                 'resource "google_cloud_run_v2_job" "migration" {',
@@ -2548,6 +3784,51 @@ def test_terraform_static_validation_harness_rejects_cloud_run_jobs(
     assert result.returncode == 1
     assert "forbidden" in result.stdout
     assert "google_cloud_run_v2_job" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_migration_job_with_runtime_identity(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    terraform_root = tmp_path / "infra" / "gcp" / "develop"
+    (terraform_root / "migration_job.tf").write_text(
+        "\n".join(
+            [
+                'resource "google_cloud_run_v2_job" "migration" {',
+                "  project  = var.project_id",
+                '  name     = "run-migrations"',
+                "  location = var.region",
+                "  template {",
+                "    template {",
+                "      service_account = google_service_account.runtime.email",
+                "      max_retries = 0",
+                "      containers {",
+                "        image = local.managed_container_image",
+                '        command = ["golden-rose-migrate"]',
+                "      }",
+                "    }",
+                "    task_count  = 1",
+                "    parallelism = 1",
+                "  }",
+                "}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert (
+        "missing required migration job fragment" in result.stdout
+        or "runtime.email" in result.stdout
+    )
 
 
 def test_terraform_static_validation_harness_rejects_billing_budget_resources(
@@ -2728,6 +4009,227 @@ def test_terraform_static_validation_harness_rejects_storage_buckets(
     assert result.returncode == 1
     assert "forbidden" in result.stdout
     assert "google_storage_bucket" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_bootstrap_state_bucket_missing_controls(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    terraform_root = tmp_path / "infra" / "gcp" / "bootstrap"
+    (terraform_root / "state.tf").write_text(
+        "\n".join(
+            [
+                'resource "google_storage_bucket" "terraform_state" {',
+                "  name     = var.state_bucket_name",
+                "  project  = var.state_project_id",
+                "  location = var.state_bucket_location",
+                "}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "bootstrap state bucket missing required controls" in result.stdout
+    assert "versioning" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_bootstrap_workload_references(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    terraform_root = tmp_path / "infra" / "gcp" / "bootstrap"
+    (terraform_root / "state.tf").write_text(
+        "\n".join(
+            [
+                'resource "google_storage_bucket" "terraform_state" {',
+                "  name                        = var.state_bucket_name",
+                "  project                     = var.state_project_id",
+                "  location                    = var.state_bucket_location",
+                "  uniform_bucket_level_access = true",
+                '  public_access_prevention    = "enforced"',
+                "  force_destroy               = false",
+                "  versioning {",
+                "    enabled = true",
+                "  }",
+                "  retention_policy {",
+                "    retention_period = 604800",
+                "    is_locked        = false",
+                "  }",
+                "  lifecycle {",
+                "    prevent_destroy = true",
+                "  }",
+                "  depends_on = [module.develop]",
+                "}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "bootstrap root references disposable workload" in result.stdout
+    assert "module.develop" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_unbounded_bootstrap_authority(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    terraform_root = tmp_path / "infra" / "gcp" / "bootstrap"
+    (terraform_root / "iam.tf").write_text(
+        "\n".join(
+            [
+                'resource "google_storage_bucket_iam_binding" "bootstrap_admin" {',
+                "  bucket = var.state_bucket_name",
+                '  role   = "roles/storage.admin"',
+                '  members = ["user:bootstrap@example.com"]',
+                "}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "unbounded bootstrap authority" in result.stdout
+    assert "google_storage_bucket_iam_binding" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_bootstrap_wif_wildcard_repository_claim(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    bootstrap_root = tmp_path / "infra" / "gcp" / "bootstrap"
+    wif = (ROOT / "infra" / "gcp" / "bootstrap" / "wif.tf").read_text(encoding="utf-8")
+    wif = wif.replace(
+        'attribute.repository == "b-mackenzie-alexander/golden_rose_project"',
+        'attribute.repository == "b-mackenzie-alexander/*"',
+    )
+    (bootstrap_root / "wif.tf").write_text(wif, encoding="utf-8")
+    (bootstrap_root / "iam.tf").write_text(
+        'resource "google_service_account_iam_member" "provisioner_wif" {\n'
+        "  member = local.github_principal_set\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "wildcard GitHub claim" in result.stdout
+    assert "attribute.repository" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_bootstrap_wif_missing_environment_claim(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    bootstrap_root = tmp_path / "infra" / "gcp" / "bootstrap"
+    wif = (ROOT / "infra" / "gcp" / "bootstrap" / "wif.tf").read_text(encoding="utf-8")
+    wif = wif.replace('  attribute.environment == "develop" &&\n', "")
+    (bootstrap_root / "wif.tf").write_text(wif, encoding="utf-8")
+    (bootstrap_root / "iam.tf").write_text(
+        'resource "google_service_account_iam_member" "provisioner_wif" {\n'
+        "  member = local.github_principal_set\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "missing exact GitHub claim" in result.stdout
+    assert "attribute.environment" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_bootstrap_wif_principal_set_broadening(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    bootstrap_root = tmp_path / "infra" / "gcp" / "bootstrap"
+    (bootstrap_root / "wif.tf").write_text(
+        (ROOT / "infra" / "gcp" / "bootstrap" / "wif.tf").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (bootstrap_root / "iam.tf").write_text(
+        'resource "google_service_account_iam_member" "provisioner_wif" {\n'
+        '  member = "principalSet://iam.googleapis.com/projects/test/locations/global/workloadIdentityPools/pool/attribute.repository_owner/b-mackenzie-alexander"\n'
+        "}\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "principal-set broadening" in result.stdout
+    assert "attribute.repository_owner" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_bootstrap_wif_tag_ref_claim(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    bootstrap_root = tmp_path / "infra" / "gcp" / "bootstrap"
+    wif = (ROOT / "infra" / "gcp" / "bootstrap" / "wif.tf").read_text(encoding="utf-8")
+    wif = wif.replace('attribute.ref == "refs/heads/develop"', 'attribute.ref == "refs/tags/v1"')
+    (bootstrap_root / "wif.tf").write_text(wif, encoding="utf-8")
+    (bootstrap_root / "iam.tf").write_text(
+        (ROOT / "infra" / "gcp" / "bootstrap" / "iam.tf").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "missing exact GitHub claim" in result.stdout
+    assert 'attribute.ref == "refs/heads/develop"' in result.stdout
 
 
 def test_terraform_static_validation_harness_rejects_load_balancer_forwarding_rules(

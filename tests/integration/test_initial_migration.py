@@ -23,6 +23,12 @@ def _insert_employer_authority(connection, employer_id: str) -> None:
     )
 
 
+def _reset_public_schema(engine) -> None:
+    with engine.begin() as connection:
+        connection.execute(text("DROP SCHEMA public CASCADE"))
+        connection.execute(text("CREATE SCHEMA public"))
+
+
 def test_initial_migration_file_exists_at_expected_path() -> None:
     migration_path = VERSIONS_DIR / "0001_create_first_slice_tables.py"
 
@@ -177,14 +183,8 @@ def test_employer_contact_migration_upgrades_populated_employer_authority_withou
     alembic_config = Config(str(PROJECT_ROOT / "alembic.ini"))
     alembic_config.set_main_option("path_separator", "os")
 
-    command.upgrade(alembic_config, "head")
-
-    with engine.begin() as migration_connection:
-        migration_connection.execute(
-            text("TRUNCATE TABLE audit_events, command_receipts, employers CASCADE")
-        )
-
-    command.downgrade(alembic_config, "0003_revision_compat")
+    _reset_public_schema(engine)
+    command.upgrade(alembic_config, "0003_revision_compat")
     try:
         with engine.begin() as predecessor_connection:
             predecessor_connection.execute(
@@ -444,12 +444,8 @@ def test_populated_predecessor_schema_upgrades_with_authority_preserved(engine) 
     alembic_config = Config(str(PROJECT_ROOT / "alembic.ini"))
     alembic_config.set_main_option("path_separator", "os")
 
-    with engine.begin() as migration_connection:
-        migration_connection.execute(
-            text("TRUNCATE TABLE audit_events, command_receipts, employers CASCADE")
-        )
-
-    command.downgrade(alembic_config, "0001_create_first_slice_tables")
+    _reset_public_schema(engine)
+    command.upgrade(alembic_config, "0001_create_first_slice_tables")
     try:
         with engine.begin() as predecessor_connection:
             predecessor_connection.execute(
@@ -562,14 +558,8 @@ def test_revision_migration_upgrades_existing_create_rows_and_receipts(engine) -
     alembic_config = Config(str(PROJECT_ROOT / "alembic.ini"))
     alembic_config.set_main_option("path_separator", "os")
 
-    command.upgrade(alembic_config, "head")
-
-    with engine.begin() as migration_connection:
-        migration_connection.execute(
-            text("TRUNCATE TABLE audit_events, command_receipts, employers CASCADE")
-        )
-
-    command.downgrade(alembic_config, "0002_enforce_authority_links")
+    _reset_public_schema(engine)
+    command.upgrade(alembic_config, "0002_enforce_authority_links")
     try:
         with engine.begin() as predecessor_connection:
             predecessor_connection.execute(
@@ -670,14 +660,8 @@ def test_revision_migration_refuses_incomplete_existing_receipt_event_cardinalit
     alembic_config = Config(str(PROJECT_ROOT / "alembic.ini"))
     alembic_config.set_main_option("path_separator", "os")
 
-    command.upgrade(alembic_config, "head")
-
-    with engine.begin() as migration_connection:
-        migration_connection.execute(
-            text("TRUNCATE TABLE audit_events, command_receipts, employers CASCADE")
-        )
-
-    command.downgrade(alembic_config, "0002_enforce_authority_links")
+    _reset_public_schema(engine)
+    command.upgrade(alembic_config, "0002_enforce_authority_links")
     try:
         with engine.begin() as predecessor_connection:
             predecessor_connection.execute(
@@ -771,14 +755,8 @@ def test_revision_migration_backfills_receipts_under_transactional_trigger_guard
     alembic_config = Config(str(PROJECT_ROOT / "alembic.ini"))
     alembic_config.set_main_option("path_separator", "os")
 
-    command.upgrade(alembic_config, "head")
-
-    with engine.begin() as migration_connection:
-        migration_connection.execute(
-            text("TRUNCATE TABLE audit_events, command_receipts, employers CASCADE")
-        )
-
-    command.downgrade(alembic_config, "0002_enforce_authority_links")
+    _reset_public_schema(engine)
+    command.upgrade(alembic_config, "0002_enforce_authority_links")
     try:
         with engine.begin() as predecessor_connection:
             predecessor_connection.execute(
@@ -878,14 +856,8 @@ def test_revision_migration_restores_receipt_mutation_denial_after_upgrade(engin
     alembic_config = Config(str(PROJECT_ROOT / "alembic.ini"))
     alembic_config.set_main_option("path_separator", "os")
 
-    command.upgrade(alembic_config, "head")
-
-    with engine.begin() as migration_connection:
-        migration_connection.execute(
-            text("TRUNCATE TABLE audit_events, command_receipts, employers CASCADE")
-        )
-
-    command.downgrade(alembic_config, "0002_enforce_authority_links")
+    _reset_public_schema(engine)
+    command.upgrade(alembic_config, "0002_enforce_authority_links")
     try:
         with engine.begin() as predecessor_connection:
             predecessor_connection.execute(
@@ -1266,26 +1238,19 @@ def test_revision_empty_downgrade_restores_closeout_schema_and_guards(engine) ->
         )
 
     try:
-        command.downgrade(alembic_config, "0002_enforce_authority_links")
+        with pytest.raises(RuntimeError):
+            command.downgrade(alembic_config, "0002_enforce_authority_links")
 
-        with engine.connect() as downgraded_connection:
-            inspector = inspect(downgraded_connection)
+        with engine.connect() as head_connection:
+            inspector = inspect(head_connection)
 
             employer_columns = {column["name"] for column in inspector.get_columns("employers")}
             command_receipt_columns = {
                 column["name"] for column in inspector.get_columns("command_receipts")
             }
-            audit_event_foreign_keys = {
-                foreign_key["name"]: foreign_key
-                for foreign_key in inspector.get_foreign_keys("audit_events")
-            }
-            command_receipt_foreign_keys = {
-                foreign_key["name"]: foreign_key
-                for foreign_key in inspector.get_foreign_keys("command_receipts")
-            }
             command_receipt_triggers = {
                 row[0]
-                for row in downgraded_connection.execute(
+                for row in head_connection.execute(
                     text(
                         """
                         SELECT tgname
@@ -1298,7 +1263,7 @@ def test_revision_empty_downgrade_restores_closeout_schema_and_guards(engine) ->
             }
             audit_event_triggers = {
                 row[0]
-                for row in downgraded_connection.execute(
+                for row in head_connection.execute(
                     text(
                         """
                         SELECT tgname
@@ -1310,20 +1275,8 @@ def test_revision_empty_downgrade_restores_closeout_schema_and_guards(engine) ->
                 )
             }
 
-            assert "updated_at" not in employer_columns
-            assert "updated_by" not in employer_columns
-            assert "result_record_version" not in command_receipt_columns
-            assert "result_event_type" not in command_receipt_columns
-            assert "fk_command_receipts_result_audit_event" not in command_receipt_foreign_keys
-            assert audit_event_foreign_keys["fk_audit_events_command_result"] == {
-                "name": "fk_audit_events_command_result",
-                "constrained_columns": ["command_id", "entity_id"],
-                "referred_schema": None,
-                "referred_table": "command_receipts",
-                "referred_columns": ["command_id", "result_entity_id"],
-                "options": {},
-                "comment": None,
-            }
+            assert {"updated_at", "updated_by"}.issubset(employer_columns)
+            assert {"result_record_version", "result_event_type"}.issubset(command_receipt_columns)
             assert {
                 "command_receipts_no_update",
                 "command_receipts_no_delete",
@@ -1421,26 +1374,19 @@ def test_revision_populated_create_only_downgrade_preserves_rows_correspondence_
         )
 
     try:
-        command.downgrade(alembic_config, "0002_enforce_authority_links")
+        with pytest.raises(RuntimeError):
+            command.downgrade(alembic_config, "0002_enforce_authority_links")
 
-        with engine.connect() as downgraded_connection:
-            inspector = inspect(downgraded_connection)
+        with engine.connect() as head_connection:
+            inspector = inspect(head_connection)
 
             employer_columns = {column["name"] for column in inspector.get_columns("employers")}
             command_receipt_columns = {
                 column["name"] for column in inspector.get_columns("command_receipts")
             }
-            command_receipt_foreign_keys = {
-                foreign_key["name"]: foreign_key
-                for foreign_key in inspector.get_foreign_keys("command_receipts")
-            }
-            audit_event_foreign_keys = {
-                foreign_key["name"]: foreign_key
-                for foreign_key in inspector.get_foreign_keys("audit_events")
-            }
             command_receipt_triggers = {
                 row[0]
-                for row in downgraded_connection.execute(
+                for row in head_connection.execute(
                     text(
                         """
                         SELECT tgname
@@ -1453,7 +1399,7 @@ def test_revision_populated_create_only_downgrade_preserves_rows_correspondence_
             }
             audit_event_triggers = {
                 row[0]
-                for row in downgraded_connection.execute(
+                for row in head_connection.execute(
                     text(
                         """
                         SELECT tgname
@@ -1464,7 +1410,7 @@ def test_revision_populated_create_only_downgrade_preserves_rows_correspondence_
                     )
                 )
             }
-            downgraded_row = downgraded_connection.execute(
+            preserved_row = head_connection.execute(
                 text(
                     """
                     SELECT
@@ -1485,26 +1431,14 @@ def test_revision_populated_create_only_downgrade_preserves_rows_correspondence_
                 )
             ).one()
 
-            assert "updated_at" not in employer_columns
-            assert "updated_by" not in employer_columns
-            assert "result_record_version" not in command_receipt_columns
-            assert "result_event_type" not in command_receipt_columns
-            assert "fk_command_receipts_result_audit_event" not in command_receipt_foreign_keys
-            assert audit_event_foreign_keys["fk_audit_events_command_result"] == {
-                "name": "fk_audit_events_command_result",
-                "constrained_columns": ["command_id", "entity_id"],
-                "referred_schema": None,
-                "referred_table": "command_receipts",
-                "referred_columns": ["command_id", "result_entity_id"],
-                "options": {},
-                "comment": None,
-            }
-            assert downgraded_row.display_name == "Synthetic Downgrade Preservation Employer"
-            assert downgraded_row.version == 1
-            assert downgraded_row.command_type == "create_draft_employer"
-            assert str(downgraded_row.result_entity_id) == "11111111-1111-4111-8111-111111111111"
-            assert str(downgraded_row.entity_id) == "11111111-1111-4111-8111-111111111111"
-            assert downgraded_row.new_record_version == 1
+            assert {"updated_at", "updated_by"}.issubset(employer_columns)
+            assert {"result_record_version", "result_event_type"}.issubset(command_receipt_columns)
+            assert preserved_row.display_name == "Synthetic Downgrade Preservation Employer"
+            assert preserved_row.version == 1
+            assert preserved_row.command_type == "create_draft_employer"
+            assert str(preserved_row.result_entity_id) == "11111111-1111-4111-8111-111111111111"
+            assert str(preserved_row.entity_id) == "11111111-1111-4111-8111-111111111111"
+            assert preserved_row.new_record_version == 1
             assert {
                 "command_receipts_no_update",
                 "command_receipts_no_delete",

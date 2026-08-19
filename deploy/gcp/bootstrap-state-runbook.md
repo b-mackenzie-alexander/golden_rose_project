@@ -1,0 +1,67 @@
+# Bootstrap state runbook
+
+This runbook covers the one-time local bootstrap of the durable Terraform state bucket and the later migration to remote state. It is intentionally value-safe: operator-held project, bucket, location, and principal inputs stay out of tracked source.
+
+## Scope
+
+- local bootstrap only
+- durable remote state bucket for later approved use
+- partial backend configuration in `infra/gcp/backend.tf`
+- no secret payloads in source, state, plans, logs, or ordinary docs
+- no Terraform plan/apply against workload resources from this runbook without a later explicit gate
+
+## Ceremony sequence
+
+1. local bootstrap in `infra/gcp/bootstrap` with operator-held values
+2. create the durable remote state bucket with lifecycle protection and recovery controls
+3. verify remote state access before any migration
+4. migrate the root module from local bootstrap to remote state using the partial backend configuration plus operator-held backend values
+5. complete the later WIF handoff after the reviewed trust contract exists
+6. perform bootstrap authority retirement so the one-time bootstrap operator path does not remain standing authority
+
+## Exact GitHub WIF trust contract
+
+- only `b-mackenzie-alexander/golden_rose_project` may federate
+- only `refs/heads/develop` may federate
+- only the reviewed `develop` deployment environment may federate
+- pull-request subjects may not impersonate bootstrap-reviewed automation identities
+- wildcard repository, owner, ref, or environment claims are forbidden
+- principal-set broadening beyond the exact reviewed repository is forbidden
+- provisioner, image-publisher, and deployer identities stay separate
+- service-account keys remain forbidden; the handoff stays keyless
+
+## Required operator-held values
+
+- control-plane project identifier
+- state bucket name
+- state bucket location
+- bootstrap operator principal
+- backend configuration values supplied at init time rather than committed in source
+
+## Recovery and governance
+
+- preserve remote state versioning and retention posture
+- keep emergency recovery documented and operator-approved
+- keep state survival explicit across workload teardown and rebuild; the durable control plane is not part of the disposable workload lifecycle
+- document state access ownership and client handoff expectations separately from workload teardown
+- keep teardown exclusions explicit: the disposable workload root must not destroy the lifecycle-independent state bucket
+
+## Relationship to workload recovery and teardown
+
+- use `deploy/gcp/rollback-forward-recovery-runbook.md` for workload rollback-versus-forward-recovery decisions
+- use `deploy/gcp/teardown-rebuild-runbook.md` for disposable workload teardown/rebuild
+- keep bootstrap/state survival outside those workload procedures unless an explicit reviewed break-glass change says otherwise
+
+## Boundaries
+
+- no secret payloads in Terraform source or state
+- no client or live data
+- no workload deployment, image push, migration execution, or service start
+- no silent reuse of bootstrap authority after WIF handoff
+
+## Later database-authority gate prerequisites
+
+- apply reviewed database authority migrations only after the separate deployment gate exists
+- keep the non-login `golden_rose_schema_owner` authority distinct from the migration and runtime capability roles
+- treat runtime access as bounded DML only; no runtime DDL, trigger administration, truncate, or role-management authority
+- run `python scripts/verify_database_authority.py` against the reviewed target before treating database authority as qualified

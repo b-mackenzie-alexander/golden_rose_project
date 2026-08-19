@@ -54,6 +54,7 @@ def test_develop_requires_explicit_private_synthetic_cloud_posture() -> None:
         synthetic_staff_id=uuid4(),
         deployment_target="gcp-develop-private-synthetic",
         public_environment_label="Non-production develop — fictional synthetic data only",
+        deployed_image_digest="sha256:" + "a" * 64,
     )
 
     assert settings.environment == "develop"
@@ -71,6 +72,7 @@ def test_develop_requires_explicit_private_synthetic_cloud_posture() -> None:
                 synthetic_staff_id=uuid4(),
                 deployment_target=unsafe_target,
                 public_environment_label="Non-production develop — fictional synthetic data only",
+                deployed_image_digest="sha256:" + "a" * 64,
             )
 
         assert "develop deployment target" in str(unsafe_posture.value)
@@ -83,11 +85,33 @@ def test_develop_requires_explicit_private_synthetic_cloud_posture() -> None:
             synthetic_staff_id=uuid4(),
             deployment_target="gcp-develop-private-synthetic",
             public_environment_label="Production",
+            deployed_image_digest="sha256:" + "a" * 64,
         )
 
     unlabeled_message = str(unlabeled_posture.value)
     assert "non-production" in unlabeled_message
     assert "synthetic" in unlabeled_message
+
+    with pytest.raises(ValidationError, match="deployed_image_digest"):
+        Settings(
+            environment="develop",
+            auth_mode="synthetic",
+            database_url="postgresql+psycopg://test:test@127.0.0.1:55432/golden_rose",
+            synthetic_staff_id=uuid4(),
+            deployment_target="gcp-develop-private-synthetic",
+            public_environment_label="Non-production develop — fictional synthetic data only",
+        )
+
+    with pytest.raises(ValidationError, match="immutable sha256"):
+        Settings(
+            environment="develop",
+            auth_mode="synthetic",
+            database_url="postgresql+psycopg://test:test@127.0.0.1:55432/golden_rose",
+            synthetic_staff_id=uuid4(),
+            deployment_target="gcp-develop-private-synthetic",
+            public_environment_label="Non-production develop — fictional synthetic data only",
+            deployed_image_digest="staff-tracer:latest",
+        )
 
 
 def test_settings_repr_redacts_database_url() -> None:

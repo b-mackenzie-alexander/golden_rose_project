@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -10,6 +11,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 TERRAFORM_ROOT = ROOT / "infra" / "gcp"
+MANIFEST_RELATIVE_PATH = Path("infra/policy/predeployment-authority-manifest.json")
 
 
 class DuplicateWorkflowYamlKeyError(yaml.YAMLError):
@@ -25,8 +27,6 @@ def _strip_block_scalar(text: str) -> str:
 
 
 FORBIDDEN_SUBSTRINGS = [
-    'backend "',
-    '"backend"',
     "credentials =",
     '"credentials"',
     "impersonate_service_account",
@@ -35,20 +35,11 @@ FORBIDDEN_SUBSTRINGS = [
     "auto_create_subnetworks = true",
     "roles/owner",
     "roles/editor",
-    "roles/run.invoker",
-    "google_billing_budget",
     "google_cloud_scheduler_job",
-    "google_cloud_run_v2_job",
-    "google_artifact_registry_repository_iam",
     "google_compute_ha_vpn_gateway",
     "google_logging_project_sink",
-    "google_monitoring_alert_policy",
-    "google_monitoring_notification_channel",
-    "google_project_iam",
     "google_service_account_key",
     "google_secret_manager_secret_version",
-    "google_secret_manager_secret_iam",
-    "google_storage_bucket",
     "env {",
     '"env"',
     '"value_source"',
@@ -118,9 +109,6 @@ FORBIDDEN_ARTIFACT_PATTERNS = [
 
 FORBIDDEN_WORKFLOW_SUBSTRINGS = [
     "push:",
-    "id-token: write",
-    "google-github-actions/auth",
-    "workload_identity_provider",
     "terraform plan",
     "terraform apply",
     "gcloud auth",
@@ -130,29 +118,23 @@ WORKFLOW_USES_PATTERN = re.compile(r"^\s*(?:-\s*)?uses:\s*([^\s#]+)", re.MULTILI
 PINNED_ACTION_PATTERN = re.compile(r"^[^@\s]+@[0-9a-f]{40}$")
 FORBIDDEN_WORKFLOW_SECRET_PATTERN = re.compile(r"secrets\.(?!GITHUB_TOKEN\b)[A-Za-z0-9_]+")
 SENSITIVE_VALUE_PATTERN = re.compile(r"secret|token|password|canary", re.IGNORECASE)
+RESOURCE_BLOCK_PATTERN = re.compile(r'resource\s+"([^"]+)"\s+"([^"]+)"')
+WORKFLOW_SCRIPT_PATH_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9_./-])((?:scripts|apps/web/scripts)/[A-Za-z0-9_./-]+\.(?:py|sh|bash|mjs))"
+)
 
 JSON_SEMANTIC_FORBIDDEN_SUBSTRINGS = [
-    "backend",
     "credentials",
     "impersonate_service_account",
     "allUsers",
     "allAuthenticatedUsers",
     "roles/owner",
     "roles/editor",
-    "roles/run.invoker",
-    "google_billing_budget",
     "google_cloud_scheduler_job",
-    "google_cloud_run_v2_job",
-    "google_artifact_registry_repository_iam",
     "google_compute_ha_vpn_gateway",
     "google_logging_project_sink",
-    "google_monitoring_alert_policy",
-    "google_monitoring_notification_channel",
-    "google_project_iam",
     "google_service_account_key",
     "google_secret_manager_secret_version",
-    "google_secret_manager_secret_iam",
-    "google_storage_bucket",
     "env",
     "value_source",
     "secret_key_ref",
@@ -203,7 +185,6 @@ JSON_SEMANTIC_FORBIDDEN_SUBSTRINGS = [
 ]
 
 EXACT_SEMANTIC_FORBIDDEN_CONSTRUCTS = {
-    "backend",
     "credentials",
     "env",
     "value_source",
@@ -212,11 +193,19 @@ EXACT_SEMANTIC_FORBIDDEN_CONSTRUCTS = {
 }
 
 REQUIRED_FILES = [
+    TERRAFORM_ROOT / "backend.tf",
     TERRAFORM_ROOT / "versions.tf",
     TERRAFORM_ROOT / "providers.tf",
     TERRAFORM_ROOT / "variables.tf",
     TERRAFORM_ROOT / "locals.tf",
     TERRAFORM_ROOT / "outputs.tf",
+    TERRAFORM_ROOT / "bootstrap" / "versions.tf",
+    TERRAFORM_ROOT / "bootstrap" / "providers.tf",
+    TERRAFORM_ROOT / "bootstrap" / "variables.tf",
+    TERRAFORM_ROOT / "bootstrap" / "state.tf",
+    TERRAFORM_ROOT / "bootstrap" / "iam.tf",
+    TERRAFORM_ROOT / "bootstrap" / "wif.tf",
+    TERRAFORM_ROOT / "bootstrap" / "outputs.tf",
     TERRAFORM_ROOT / "develop" / "apis.tf",
     TERRAFORM_ROOT / "develop" / "artifact_registry.tf",
     TERRAFORM_ROOT / "develop" / "secrets.tf",
@@ -224,10 +213,16 @@ REQUIRED_FILES = [
     TERRAFORM_ROOT / "develop" / "cloud_sql.tf",
     TERRAFORM_ROOT / "develop" / "cloud_run.tf",
     TERRAFORM_ROOT / "develop" / "identities.tf",
+    TERRAFORM_ROOT / "develop" / "iam.tf",
+    TERRAFORM_ROOT / "develop" / "migration_job.tf",
+    TERRAFORM_ROOT / "develop" / "budgets.tf",
+    TERRAFORM_ROOT / "develop" / "observability.tf",
 ]
 
 ALLOWED_WORKFLOW_FILENAMES = {
     "application-quality.yml",
+    "build-image.yml",
+    "deploy-develop.yml",
     "branch-policy.yml",
     "infrastructure-quality.yml",
     "repository-hygiene.yml",
@@ -235,6 +230,8 @@ ALLOWED_WORKFLOW_FILENAMES = {
 
 ALLOWED_WORKFLOW_JOB_NAMES = {
     "application-quality.yml": {"application"},
+    "build-image.yml": {"build-validate", "publish-image"},
+    "deploy-develop.yml": {"deploy"},
     "branch-policy.yml": {"enforce"},
     "infrastructure-quality.yml": {"static-validation"},
     "repository-hygiene.yml": {"check"},
@@ -252,6 +249,49 @@ ALLOWED_WORKFLOW_STEP_IDENTIFIERS = {
         "name:Run application quality gate",
         "name:Upload backend SBOM evidence",
         "name:Upload frontend SBOM evidence",
+    },
+    ("build-image.yml", "build-validate"): {
+        "name:Check out repository",
+        "name:Set up Python 3.12",
+        "name:Set up uv",
+        "name:Set up Node.js 22.22.3",
+        "name:Set up Docker Buildx",
+        "name:Build validation image and evidence",
+        "name:Upload backend SBOM evidence",
+        "name:Upload frontend SBOM evidence",
+        "name:Upload image metadata evidence",
+    },
+    ("build-image.yml", "publish-image"): {
+        "name:Check out repository",
+        "name:Set up Python 3.12",
+        "name:Set up uv",
+        "name:Set up Node.js 22.22.3",
+        "name:Set up Docker Buildx",
+        "name:Enforce protected develop source",
+        "name:Authenticate to Google Cloud",
+        "name:Log in to Artifact Registry",
+        "name:Build publish image and evidence",
+        "name:Upload backend SBOM evidence",
+        "name:Upload frontend SBOM evidence",
+        "name:Upload image metadata evidence",
+        "name:Upload published image reference",
+    },
+    ("deploy-develop.yml", "deploy"): {
+        "name:Check out repository",
+        "name:Set up Python 3.12",
+        "name:Set up uv",
+        "name:Enforce protected develop source",
+        "name:Authenticate to Google Cloud",
+        "name:Set up gcloud",
+        "name:Download reviewed publish artifacts",
+        "name:Bind reviewed published image evidence",
+        "name:Record schema compatibility posture",
+        "name:Update migration job to reviewed image",
+        "name:Execute migration job",
+        "name:Deploy reviewed service",
+        "name:Verify readiness gate and record deploy result",
+        "name:Upload deploy compatibility evidence",
+        "name:Upload deploy result evidence",
     },
     ("branch-policy.yml", "enforce"): {
         "name:Validate source-to-target flow",
@@ -285,6 +325,49 @@ REQUIRED_WORKFLOW_STEP_ORDER = {
         "name:Upload backend SBOM evidence",
         "name:Upload frontend SBOM evidence",
     ],
+    ("build-image.yml", "build-validate"): [
+        "name:Check out repository",
+        "name:Set up Python 3.12",
+        "name:Set up uv",
+        "name:Set up Node.js 22.22.3",
+        "name:Set up Docker Buildx",
+        "name:Build validation image and evidence",
+        "name:Upload backend SBOM evidence",
+        "name:Upload frontend SBOM evidence",
+        "name:Upload image metadata evidence",
+    ],
+    ("build-image.yml", "publish-image"): [
+        "name:Check out repository",
+        "name:Set up Python 3.12",
+        "name:Set up uv",
+        "name:Set up Node.js 22.22.3",
+        "name:Set up Docker Buildx",
+        "name:Enforce protected develop source",
+        "name:Authenticate to Google Cloud",
+        "name:Log in to Artifact Registry",
+        "name:Build publish image and evidence",
+        "name:Upload backend SBOM evidence",
+        "name:Upload frontend SBOM evidence",
+        "name:Upload image metadata evidence",
+        "name:Upload published image reference",
+    ],
+    ("deploy-develop.yml", "deploy"): [
+        "name:Check out repository",
+        "name:Set up Python 3.12",
+        "name:Set up uv",
+        "name:Enforce protected develop source",
+        "name:Authenticate to Google Cloud",
+        "name:Set up gcloud",
+        "name:Download reviewed publish artifacts",
+        "name:Bind reviewed published image evidence",
+        "name:Record schema compatibility posture",
+        "name:Update migration job to reviewed image",
+        "name:Execute migration job",
+        "name:Deploy reviewed service",
+        "name:Verify readiness gate and record deploy result",
+        "name:Upload deploy compatibility evidence",
+        "name:Upload deploy result evidence",
+    ],
     ("branch-policy.yml", "enforce"): [
         "name:Validate source-to-target flow",
     ],
@@ -306,6 +389,9 @@ REQUIRED_WORKFLOW_STEP_ORDER = {
 
 ALLOWED_WORKFLOW_JOB_RUNS_ON = {
     ("application-quality.yml", "application"): "ubuntu-latest",
+    ("build-image.yml", "build-validate"): "ubuntu-latest",
+    ("build-image.yml", "publish-image"): "ubuntu-latest",
+    ("deploy-develop.yml", "deploy"): "ubuntu-latest",
     ("branch-policy.yml", "enforce"): "ubuntu-latest",
     ("infrastructure-quality.yml", "static-validation"): "ubuntu-latest",
     ("repository-hygiene.yml", "check"): "ubuntu-latest",
@@ -313,6 +399,9 @@ ALLOWED_WORKFLOW_JOB_RUNS_ON = {
 
 ALLOWED_WORKFLOW_JOB_NAME = {
     ("application-quality.yml", "application"): "application",
+    ("build-image.yml", "build-validate"): "build-validate",
+    ("build-image.yml", "publish-image"): "publish-image",
+    ("deploy-develop.yml", "deploy"): "deploy",
     ("branch-policy.yml", "enforce"): "enforce",
     ("infrastructure-quality.yml", "static-validation"): "Terraform static validation",
     ("repository-hygiene.yml", "check"): "check",
@@ -320,6 +409,36 @@ ALLOWED_WORKFLOW_JOB_NAME = {
 
 ALLOWED_WORKFLOW_JOB_TIMEOUT_MINUTES = {
     ("application-quality.yml", "application"): 30,
+}
+
+ALLOWED_WORKFLOW_JOB_IF = {
+    ("build-image.yml", "build-validate"): "github.event_name == 'pull_request'",
+    ("build-image.yml", "publish-image"): "github.event_name == 'workflow_dispatch'",
+    ("deploy-develop.yml", "deploy"): "github.event_name == 'workflow_dispatch'",
+}
+
+ALLOWED_WORKFLOW_JOB_PERMISSIONS = {
+    ("build-image.yml", "publish-image"): {
+        "contents": "read",
+        "id-token": "write",
+    },
+    ("deploy-develop.yml", "deploy"): {
+        "actions": "read",
+        "contents": "read",
+        "id-token": "write",
+    },
+}
+
+ALLOWED_WORKFLOW_JOB_ENVIRONMENT = {
+    ("build-image.yml", "publish-image"): "develop",
+    ("deploy-develop.yml", "deploy"): "develop",
+}
+
+ALLOWED_WORKFLOW_JOB_CONCURRENCY = {
+    ("deploy-develop.yml", "deploy"): {
+        "group": "deploy-develop",
+        "cancel-in-progress": False,
+    },
 }
 
 ALLOWED_WORKFLOW_JOB_SERVICES = {
@@ -356,6 +475,15 @@ ALLOWED_WORKFLOW_JOB_ENV = {
 ALLOWED_WORKFLOW_STEP_IF = {
     ("application-quality.yml", "application", "name:Upload backend SBOM evidence"): "always()",
     ("application-quality.yml", "application", "name:Upload frontend SBOM evidence"): "always()",
+    ("build-image.yml", "build-validate", "name:Upload backend SBOM evidence"): "always()",
+    ("build-image.yml", "build-validate", "name:Upload frontend SBOM evidence"): "always()",
+    ("build-image.yml", "build-validate", "name:Upload image metadata evidence"): "always()",
+    ("build-image.yml", "publish-image", "name:Upload backend SBOM evidence"): "always()",
+    ("build-image.yml", "publish-image", "name:Upload frontend SBOM evidence"): "always()",
+    ("build-image.yml", "publish-image", "name:Upload image metadata evidence"): "always()",
+    ("build-image.yml", "publish-image", "name:Upload published image reference"): "always()",
+    ("deploy-develop.yml", "deploy", "name:Upload deploy compatibility evidence"): "always()",
+    ("deploy-develop.yml", "deploy", "name:Upload deploy result evidence"): "always()",
 }
 
 ALLOWED_WORKFLOW_STEP_WITH = {
@@ -404,6 +532,183 @@ ALLOWED_WORKFLOW_STEP_WITH = {
     ): {
         "name": "frontend-sbom-cdx",
         "path": "build/frontend-sbom.cdx.json",
+        "if-no-files-found": "error",
+        "retention-days": 14,
+    },
+    (
+        "build-image.yml",
+        "build-validate",
+        "name:Set up Python 3.12",
+    ): {"python-version": "3.12"},
+    (
+        "build-image.yml",
+        "build-validate",
+        "name:Set up uv",
+    ): {
+        "version": "0.12.5",
+        "checksum": "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2",
+        "enable-cache": True,
+    },
+    (
+        "build-image.yml",
+        "build-validate",
+        "name:Set up Node.js 22.22.3",
+    ): {
+        "node-version": "22.22.3",
+        "cache": "npm",
+        "cache-dependency-path": "apps/web/package-lock.json",
+    },
+    (
+        "build-image.yml",
+        "build-validate",
+        "name:Upload backend SBOM evidence",
+    ): {
+        "name": "backend-sbom-cdx",
+        "path": "build/backend-sbom.cdx.json",
+        "if-no-files-found": "error",
+        "retention-days": 14,
+    },
+    (
+        "build-image.yml",
+        "build-validate",
+        "name:Upload frontend SBOM evidence",
+    ): {
+        "name": "frontend-sbom-cdx",
+        "path": "build/frontend-sbom.cdx.json",
+        "if-no-files-found": "error",
+        "retention-days": 14,
+    },
+    (
+        "build-image.yml",
+        "build-validate",
+        "name:Upload image metadata evidence",
+    ): {
+        "name": "image-metadata",
+        "path": "build/image-metadata.json",
+        "if-no-files-found": "error",
+        "retention-days": 14,
+    },
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Set up Python 3.12",
+    ): {"python-version": "3.12"},
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Set up uv",
+    ): {
+        "version": "0.12.5",
+        "checksum": "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2",
+        "enable-cache": True,
+    },
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Set up Node.js 22.22.3",
+    ): {
+        "node-version": "22.22.3",
+        "cache": "npm",
+        "cache-dependency-path": "apps/web/package-lock.json",
+    },
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Authenticate to Google Cloud",
+    ): {
+        "workload_identity_provider": "${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}",
+        "service_account": "${{ vars.GCP_IMAGE_PUBLISHER_SERVICE_ACCOUNT }}",
+        "token_format": "access_token",
+    },
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Log in to Artifact Registry",
+    ): {
+        "registry": "us-east4-docker.pkg.dev",
+        "username": "oauth2accesstoken",
+        "password": "${{ steps.auth.outputs.access_token }}",
+    },
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Upload backend SBOM evidence",
+    ): {
+        "name": "backend-sbom-cdx",
+        "path": "build/backend-sbom.cdx.json",
+        "if-no-files-found": "error",
+        "retention-days": 14,
+    },
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Upload frontend SBOM evidence",
+    ): {
+        "name": "frontend-sbom-cdx",
+        "path": "build/frontend-sbom.cdx.json",
+        "if-no-files-found": "error",
+        "retention-days": 14,
+    },
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Upload image metadata evidence",
+    ): {
+        "name": "image-metadata",
+        "path": "build/image-metadata.json",
+        "if-no-files-found": "error",
+        "retention-days": 14,
+    },
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Upload published image reference",
+    ): {
+        "name": "published-image",
+        "path": "build/published-image.txt",
+        "if-no-files-found": "error",
+        "retention-days": 14,
+    },
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Set up Python 3.12",
+    ): {"python-version": "3.12"},
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Set up uv",
+    ): {
+        "version": "0.12.5",
+        "checksum": "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2",
+        "enable-cache": True,
+    },
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Authenticate to Google Cloud",
+    ): {
+        "workload_identity_provider": "${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}",
+        "service_account": "${{ vars.GCP_DEPLOYER_SERVICE_ACCOUNT }}",
+        "token_format": "access_token",
+    },
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Upload deploy compatibility evidence",
+    ): {
+        "name": "deploy-compatibility",
+        "path": "build/deploy-compatibility.json",
+        "if-no-files-found": "error",
+        "retention-days": 14,
+    },
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Upload deploy result evidence",
+    ): {
+        "name": "deploy-result",
+        "path": "build/deploy-result.json",
         "if-no-files-found": "error",
         "retention-days": 14,
     },
@@ -467,6 +772,136 @@ ALLOWED_WORKFLOW_STEP_USES = {
         "application-quality.yml",
         "application",
         "name:Upload frontend SBOM evidence",
+    ): "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    (
+        "build-image.yml",
+        "build-validate",
+        "name:Check out repository",
+    ): "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+    (
+        "build-image.yml",
+        "build-validate",
+        "name:Set up Python 3.12",
+    ): "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+    (
+        "build-image.yml",
+        "build-validate",
+        "name:Set up uv",
+    ): "astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e",
+    (
+        "build-image.yml",
+        "build-validate",
+        "name:Set up Node.js 22.22.3",
+    ): "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+    (
+        "build-image.yml",
+        "build-validate",
+        "name:Set up Docker Buildx",
+    ): "docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435",
+    (
+        "build-image.yml",
+        "build-validate",
+        "name:Upload backend SBOM evidence",
+    ): "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    (
+        "build-image.yml",
+        "build-validate",
+        "name:Upload frontend SBOM evidence",
+    ): "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    (
+        "build-image.yml",
+        "build-validate",
+        "name:Upload image metadata evidence",
+    ): "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Check out repository",
+    ): "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Set up Python 3.12",
+    ): "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Set up uv",
+    ): "astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e",
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Set up Node.js 22.22.3",
+    ): "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Set up Docker Buildx",
+    ): "docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435",
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Authenticate to Google Cloud",
+    ): "google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193",
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Log in to Artifact Registry",
+    ): "docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1",
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Upload backend SBOM evidence",
+    ): "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Upload frontend SBOM evidence",
+    ): "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Upload image metadata evidence",
+    ): "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Upload published image reference",
+    ): "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Check out repository",
+    ): "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Set up Python 3.12",
+    ): "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Set up uv",
+    ): "astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e",
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Authenticate to Google Cloud",
+    ): "google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193",
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Set up gcloud",
+    ): "google-github-actions/setup-gcloud@77e7a554d41e2ee56fc945c52dfd3f33d12def9a",
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Upload deploy compatibility evidence",
+    ): "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Upload deploy result evidence",
     ): "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
     (
         "infrastructure-quality.yml",
@@ -552,12 +987,172 @@ uv run mypy src tests
 uv run bandit -q -r src
 uv run alembic upgrade head
 uv run pytest --cov=golden_rose --cov-report=term-missing --cov-fail-under=95
-uv run alembic downgrade base
+if uv run alembic downgrade base 2> build/alembic-downgrade.stderr; then
+  echo "database authority lifecycle downgrade unexpectedly succeeded" >&2
+  exit 1
+fi
+grep -F "database authority lifecycle downgrade is intentionally unsupported without an operator-reviewed role handoff" build/alembic-downgrade.stderr
 uv run alembic upgrade head
 uv run pip-audit --skip-editable
 mkdir -p build
 uv run cyclonedx-py environment --pyproject pyproject.toml --output-reproducible --of JSON -o build/backend-sbom.cdx.json
 uv run python scripts/validate_sbom.py build/backend-sbom.cdx.json --spec 1.6 --name golden-rose --version 0.1.0
+"""
+    ),
+    (
+        "build-image.yml",
+        "build-validate",
+        "name:Build validation image and evidence",
+    ): _strip_block_scalar(
+        """
+set -euo pipefail
+uv --version
+test "$(node --version)" = "v22.22.3"
+test "$(npm --version)" = "10.9.8"
+test "$(npm --userconfig apps/web/.npmrc config get registry)" = "https://registry.npmjs.org/"
+test "$(npm --userconfig apps/web/.npmrc config get ignore-scripts)" = "true"
+uv lock --check
+uv sync --locked --all-groups
+npm --userconfig apps/web/.npmrc ci --ignore-scripts --prefix apps/web
+mkdir -p build
+npm --userconfig apps/web/.npmrc --prefix apps/web sbom --sbom-format cyclonedx --sbom-type application > build/frontend-sbom.cdx.json
+uv run python scripts/validate_sbom.py build/frontend-sbom.cdx.json --spec 1.5 --name web --version 0.0.0 --purl 'pkg:npm/%40golden-rose/web@0.0.0'
+uv run cyclonedx-py environment --pyproject pyproject.toml --output-reproducible --of JSON -o build/backend-sbom.cdx.json
+uv run python scripts/validate_sbom.py build/backend-sbom.cdx.json --spec 1.6 --name golden-rose --version 0.1.0
+docker buildx build --load --metadata-file build/image-metadata.json --tag golden-rose:workflow-pr .
+uv run python scripts/verify_image_provenance.py --mode pr --dockerfile Dockerfile --metadata-path build/image-metadata.json --backend-sbom-path build/backend-sbom.cdx.json --frontend-sbom-path build/frontend-sbom.cdx.json
+"""
+    ),
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Enforce protected develop source",
+    ): _strip_block_scalar(
+        """
+set -euo pipefail
+test "$GITHUB_REF" = "refs/heads/develop"
+"""
+    ),
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Build publish image and evidence",
+    ): _strip_block_scalar(
+        """
+set -euo pipefail
+uv --version
+test "$(node --version)" = "v22.22.3"
+test "$(npm --version)" = "10.9.8"
+test "$(npm --userconfig apps/web/.npmrc config get registry)" = "https://registry.npmjs.org/"
+test "$(npm --userconfig apps/web/.npmrc config get ignore-scripts)" = "true"
+uv lock --check
+uv sync --locked --all-groups
+npm --userconfig apps/web/.npmrc ci --ignore-scripts --prefix apps/web
+mkdir -p build
+npm --userconfig apps/web/.npmrc --prefix apps/web sbom --sbom-format cyclonedx --sbom-type application > build/frontend-sbom.cdx.json
+uv run python scripts/validate_sbom.py build/frontend-sbom.cdx.json --spec 1.5 --name web --version 0.0.0 --purl 'pkg:npm/%40golden-rose/web@0.0.0'
+uv run cyclonedx-py environment --pyproject pyproject.toml --output-reproducible --of JSON -o build/backend-sbom.cdx.json
+uv run python scripts/validate_sbom.py build/backend-sbom.cdx.json --spec 1.6 --name golden-rose --version 0.1.0
+docker buildx build --push --metadata-file build/image-metadata.json --tag us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer:${{ github.sha }} .
+# never deploy by tag; capture the immutable digest emitted by the publish build
+uv run python scripts/verify_image_provenance.py --mode publish --dockerfile Dockerfile --metadata-path build/image-metadata.json --backend-sbom-path build/backend-sbom.cdx.json --frontend-sbom-path build/frontend-sbom.cdx.json --published-image-repository us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer > build/published-image.txt
+"""
+    ),
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Enforce protected develop source",
+    ): _strip_block_scalar(
+        """
+set -euo pipefail
+test "$GITHUB_REF" = "refs/heads/develop"
+"""
+    ),
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Download reviewed publish artifacts",
+    ): _strip_block_scalar(
+        """
+set -euo pipefail
+mkdir -p build/reviewed-artifacts
+python - <<'PY'
+"""
+    ),
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Bind reviewed published image evidence",
+    ): _strip_block_scalar(
+        """
+set -euo pipefail
+PUBLISHED_IMAGE_REF="$(tr -d '\r\n' < build/reviewed-artifacts/published-image.txt)"
+VERIFIED_IMAGE_REF="$(uv run python scripts/verify_image_provenance.py --mode publish --dockerfile Dockerfile --metadata-path build/reviewed-artifacts/image-metadata.json --backend-sbom-path build/reviewed-artifacts/backend-sbom.cdx.json --frontend-sbom-path build/reviewed-artifacts/frontend-sbom.cdx.json --published-image-repository "$MANAGED_REPOSITORY")"
+test "$VERIFIED_IMAGE_REF" = "$PUBLISHED_IMAGE_REF"
+case "$VERIFIED_IMAGE_REF" in
+  "$MANAGED_REPOSITORY"@sha256:*) ;;
+  *)
+    echo "reviewed image reference is not bound to the managed repository" >&2
+    exit 1
+    ;;
+esac
+IMAGE_DIGEST="${VERIFIED_IMAGE_REF##*@}"
+printf 'MANAGED_IMAGE=%s\n' "$VERIFIED_IMAGE_REF" >> "$GITHUB_ENV"
+printf 'IMAGE_DIGEST=%s\n' "$IMAGE_DIGEST" >> "$GITHUB_ENV"
+"""
+    ),
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Record schema compatibility posture",
+    ): _strip_block_scalar(
+        """
+set -euo pipefail
+mkdir -p build
+python - <<'PY'
+"""
+    ),
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Update migration job to reviewed image",
+    ): _strip_block_scalar(
+        """
+set -euo pipefail
+gcloud run jobs update run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --image "$MANAGED_IMAGE" >/dev/null
+"""
+    ),
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Execute migration job",
+    ): _strip_block_scalar(
+        """
+set -euo pipefail
+gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --wait >/dev/null
+"""
+    ),
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Deploy reviewed service",
+    ): _strip_block_scalar(
+        """
+set -euo pipefail
+gcloud run services update staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --image "$MANAGED_IMAGE" >/dev/null
+"""
+    ),
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Verify readiness gate and record deploy result",
+    ): _strip_block_scalar(
+        """
+set -euo pipefail
+READY_STATUS=$(gcloud run services describe staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --format='value(status.conditions[0].status)')
+test "$READY_STATUS" = "True"
+mkdir -p build
+python - <<'PY'
 """
     ),
     (
@@ -633,6 +1228,90 @@ test -f .gitignore
     ),
 }
 
+EXACT_WORKFLOW_RUN_SHA256 = {
+    ("deploy-develop.yml", "deploy", "name:Download reviewed publish artifacts"): (
+        "f4f33283d7a6a4aa4727c757e8dcbb93d457f285bdc238586c04894bec9a1237"
+    ),
+    ("deploy-develop.yml", "deploy", "name:Bind reviewed published image evidence"): (
+        "b608fcbb381b994b1d5b02260b128422a341a388be615d53ba79bca9258dbd2c"
+    ),
+    ("deploy-develop.yml", "deploy", "name:Record schema compatibility posture"): (
+        "d4301a36a3a26ba93c302605793a7c49200d971859bf2b25f3f1d06119c044ab"
+    ),
+    ("deploy-develop.yml", "deploy", "name:Verify readiness gate and record deploy result"): (
+        "a572724cf1bdea18b6240546344e4ea5d1f203b0948901887f5d174406c27e5f"
+    ),
+}
+
+ALLOWED_WORKFLOW_STEP_RUN_SUBSTRINGS = {
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Download reviewed publish artifacts",
+    ): [
+        "PUBLISH_RUN_ID",
+        "DEPLOY_COMMIT_SHA",
+        'repository = os.environ["GITHUB_REPOSITORY"]',
+        'f"{api_base}/actions/runs/{run_id}"',
+        '"path": ".github/workflows/build-image.yml"',
+        '"head_branch": "develop"',
+        '"conclusion": "success"',
+        'deploy_commit_sha = os.environ["DEPLOY_COMMIT_SHA"]',
+        "if head_sha != deploy_commit_sha:",
+        '"deploy_commit_sha": deploy_commit_sha',
+        '"publish_job_name": publish_job["name"]',
+        'f"{api_base}/actions/runs/{run_id}/artifacts"',
+        '"published-image": "published-image.txt"',
+        '"backend-sbom-cdx": "backend-sbom.cdx.json"',
+        '"frontend-sbom-cdx": "frontend-sbom.cdx.json"',
+    ],
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Bind reviewed published image evidence",
+    ): [
+        "PUBLISHED_IMAGE_REF",
+        "VERIFIED_IMAGE_REF",
+        "scripts/verify_image_provenance.py --mode publish",
+        'test "$VERIFIED_IMAGE_REF" = "$PUBLISHED_IMAGE_REF"',
+        'case "$VERIFIED_IMAGE_REF" in',
+        '"$MANAGED_REPOSITORY"@sha256:*) ;;',
+        'IMAGE_DIGEST="${VERIFIED_IMAGE_REF##*@}"',
+        'printf \'MANAGED_IMAGE=%s\\n\' "$VERIFIED_IMAGE_REF" >> "$GITHUB_ENV"',
+        'printf \'IMAGE_DIGEST=%s\\n\' "$IMAGE_DIGEST" >> "$GITHUB_ENV"',
+    ],
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Record schema compatibility posture",
+    ): [
+        "build/deploy-compatibility.json",
+        '"publish_run_id": os.environ["PUBLISH_RUN_ID"]',
+        '"rollback_without_proven_compatibility_window": False',
+        '"recovery_posture": "forward recovery"',
+        '"qualification_executed": False',
+    ],
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Update migration job to reviewed image",
+    ): [
+        "gcloud run jobs update run-migrations --project",
+        '--image "$MANAGED_IMAGE"',
+    ],
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Verify readiness gate and record deploy result",
+    ): [
+        "gcloud run services describe staff-tracer --project",
+        "build/deploy-result.json",
+        '"publish_run_id": os.environ["PUBLISH_RUN_ID"]',
+        '"qualification_executed": False',
+        '"result": "success"',
+    ],
+}
+
 ALLOWED_WORKFLOW_STEP_SHELL = {}
 
 ALLOWED_WORKFLOW_STEP_WORKING_DIRECTORY = {}
@@ -641,7 +1320,10 @@ ALLOWED_WORKFLOW_STEP_CONTINUE_ON_ERROR = {}
 
 ALLOWED_WORKFLOW_STEP_TIMEOUT_MINUTES = {}
 
-ALLOWED_WORKFLOW_STEP_ID = {}
+ALLOWED_WORKFLOW_STEP_ID = {
+    ("build-image.yml", "publish-image", "name:Authenticate to Google Cloud"): "auth",
+    ("deploy-develop.yml", "deploy", "name:Authenticate to Google Cloud"): "auth",
+}
 
 ALLOWED_WORKFLOW_STEP_ENV = {
     (
@@ -662,6 +1344,32 @@ ALLOWED_WORKFLOW_STEP_ENV = {
         "check",
         "name:Scan for secrets",
     ): {"GITHUB_TOKEN": "${{ secrets.GITHUB_TOKEN }}"},
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Download reviewed publish artifacts",
+    ): {
+        "GITHUB_TOKEN": "${{ github.token }}",
+        "PUBLISH_RUN_ID": "${{ inputs.publish_run_id }}",
+        "DEPLOY_COMMIT_SHA": "${{ github.sha }}",
+    },
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Bind reviewed published image evidence",
+    ): {
+        "MANAGED_REPOSITORY": "us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer"
+    },
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Record schema compatibility posture",
+    ): {"PUBLISH_RUN_ID": "${{ inputs.publish_run_id }}"},
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Verify readiness gate and record deploy result",
+    ): {"PUBLISH_RUN_ID": "${{ inputs.publish_run_id }}"},
 }
 
 
@@ -703,6 +1411,14 @@ def _normalize_hcl_scalar(value: str) -> str:
     return stripped
 
 
+def _normalize_whitespace(text: str) -> str:
+    return " ".join(text.split())
+
+
+def _contains_normalized_fragment(text: str, fragment: str) -> bool:
+    return _normalize_whitespace(fragment) in _normalize_whitespace(text)
+
+
 def _hcl_contains_forbidden_semantic_construct(node: object, forbidden: str) -> bool:
     if isinstance(node, dict):
         return any(
@@ -734,21 +1450,35 @@ def _workflow_contains_forbidden_push_trigger(node: object) -> bool:
     return node == "push"
 
 
-def _collect_forbidden_workflow_permissions(node: object) -> list[str]:
+def _collect_forbidden_workflow_permissions(path: Path, node: object) -> list[str]:
     violations: list[str] = []
-    if isinstance(node, dict):
-        for key, value in node.items():
-            if key == "permissions":
-                if isinstance(value, str) and value == "write-all":
-                    violations.append("permissions: write-all")
-                if isinstance(value, dict):
-                    for permission_name, permission_value in value.items():
-                        if permission_value == "write":
-                            violations.append(f"{permission_name}: write")
-            violations.extend(_collect_forbidden_workflow_permissions(value))
-    elif isinstance(node, list):
-        for item in node:
-            violations.extend(_collect_forbidden_workflow_permissions(item))
+    if not isinstance(node, dict):
+        return violations
+
+    workflow_permissions = node.get("permissions")
+    if isinstance(workflow_permissions, str) and workflow_permissions == "write-all":
+        violations.append("permissions: write-all")
+    if isinstance(workflow_permissions, dict):
+        for permission_name, permission_value in workflow_permissions.items():
+            if permission_value == "write":
+                violations.append(f"{permission_name}: write")
+
+    jobs = node.get("jobs")
+    if not isinstance(jobs, dict):
+        return violations
+    for job_name, job in jobs.items():
+        if not isinstance(job, dict):
+            continue
+        permissions = job.get("permissions")
+        allowed_permissions = ALLOWED_WORKFLOW_JOB_PERMISSIONS.get((path.name, str(job_name)))
+        if allowed_permissions is not None:
+            continue
+        if isinstance(permissions, str) and permissions == "write-all":
+            violations.append("permissions: write-all")
+        if isinstance(permissions, dict):
+            for permission_name, permission_value in permissions.items():
+                if permission_value == "write":
+                    violations.append(f"{permission_name}: write")
     return violations
 
 
@@ -896,15 +1626,15 @@ def _collect_workflow_job_structure_mutations(path: Path, node: object) -> list[
         return []
     violations: list[str] = []
     guarded_fields = {
-        "if": {},
+        "if": ALLOWED_WORKFLOW_JOB_IF,
         "continue-on-error": {},
         "needs": {},
-        "permissions": {},
-        "environment": {},
+        "permissions": ALLOWED_WORKFLOW_JOB_PERMISSIONS,
+        "environment": ALLOWED_WORKFLOW_JOB_ENVIRONMENT,
         "defaults": {},
         "container": {},
         "strategy": {},
-        "concurrency": {},
+        "concurrency": ALLOWED_WORKFLOW_JOB_CONCURRENCY,
         "uses": {},
         "services": ALLOWED_WORKFLOW_JOB_SERVICES,
         "env": ALLOWED_WORKFLOW_JOB_ENV,
@@ -1056,11 +1786,22 @@ def _collect_workflow_run_mutations(path: Path, node: object) -> list[str]:
             if identifier is None or not isinstance(step, dict):
                 continue
             actual_run = step.get("run")
-            expected_run = ALLOWED_WORKFLOW_STEP_RUN.get((path.name, str(job_name), identifier))
+            workflow_step_key = (path.name, str(job_name), identifier)
+            expected_run = ALLOWED_WORKFLOW_STEP_RUN.get(workflow_step_key)
             if expected_run is None:
                 if actual_run is not None:
                     violations.append(f"{identifier} -> {str(actual_run).strip()}")
             elif not isinstance(actual_run, str) or actual_run.strip() != expected_run.strip():
+                expected_digest = EXACT_WORKFLOW_RUN_SHA256.get(workflow_step_key)
+                if expected_digest is not None and isinstance(actual_run, str):
+                    observed_digest = hashlib.sha256(actual_run.strip().encode()).hexdigest()
+                    if observed_digest == expected_digest:
+                        continue
+                    violations.append(f"{identifier} must match reviewed executable script exactly")
+                    continue
+                if workflow_step_key in ALLOWED_WORKFLOW_STEP_RUN_SUBSTRINGS:
+                    violations.append(f"{identifier} must match reviewed executable script exactly")
+                    continue
                 violations.append(f"{identifier} -> {str(actual_run).strip()}")
     return violations
 
@@ -1217,21 +1958,817 @@ def _json_object_pairs_with_duplicate_key_rejection(
     return mapping
 
 
+def _load_predeployment_authority_manifest(root: Path) -> dict[object, object] | None:
+    manifest_path = root / MANIFEST_RELATIVE_PATH
+    if not manifest_path.exists():
+        return None
+
+    try:
+        manifest = json.loads(
+            manifest_path.read_text(encoding="utf-8"),
+            object_pairs_hook=_json_object_pairs_with_duplicate_key_rejection,
+        )
+    except DuplicateTerraformJsonKeyError as exc:
+        raise ValueError(
+            f"{manifest_path.relative_to(root)} contains duplicate manifest key and fails closed: {exc}"
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"{manifest_path.relative_to(root)} contains malformed manifest JSON and fails closed: {exc.msg}"
+        ) from exc
+
+    if not isinstance(manifest, dict):
+        raise ValueError(
+            f"{manifest_path.relative_to(root)} must be a JSON object with terraform resource contracts"
+        )
+
+    terraform = manifest.get("terraform")
+    if not isinstance(terraform, dict):
+        raise ValueError(f"{manifest_path.relative_to(root)} must define an object at 'terraform'")
+
+    resource_types = terraform.get("resource_types")
+    if not isinstance(resource_types, dict):
+        raise ValueError(
+            f"{manifest_path.relative_to(root)} must define an object at 'terraform.resource_types'"
+        )
+
+    for resource_type, contract in resource_types.items():
+        if not isinstance(resource_type, str):
+            raise ValueError(
+                f"{manifest_path.relative_to(root)} contains a non-string Terraform resource type key"
+            )
+        if not isinstance(contract, dict):
+            raise ValueError(
+                f"{manifest_path.relative_to(root)} must define an object contract for {resource_type!r}"
+            )
+        max_count = contract.get("max_count")
+        if not isinstance(max_count, int) or max_count < 1:
+            raise ValueError(
+                f"{manifest_path.relative_to(root)} must define a positive integer max_count for {resource_type!r}"
+            )
+
+    workflows = manifest.get("workflows")
+    if workflows is not None:
+        if not isinstance(workflows, dict):
+            raise ValueError(
+                f"{manifest_path.relative_to(root)} must define an object at 'workflows'"
+            )
+        workflow_files = workflows.get("files")
+        if workflow_files is None or not isinstance(workflow_files, dict):
+            raise ValueError(
+                f"{manifest_path.relative_to(root)} must define an object at 'workflows.files'"
+            )
+        for workflow_name in workflow_files:
+            if not isinstance(workflow_name, str):
+                raise ValueError(
+                    f"{manifest_path.relative_to(root)} contains a non-string workflow file key"
+                )
+            workflow_contract = workflow_files[workflow_name]
+            if not isinstance(workflow_contract, dict):
+                raise ValueError(
+                    f"{manifest_path.relative_to(root)} must define an object contract for workflow file {workflow_name!r}"
+                )
+            jobs = workflow_contract.get("jobs")
+            if jobs is not None:
+                if not isinstance(jobs, dict):
+                    raise ValueError(
+                        f"{manifest_path.relative_to(root)} must define an object at 'workflows.files.{workflow_name}.jobs'"
+                    )
+                for job_name, job_contract in jobs.items():
+                    if not isinstance(job_name, str):
+                        raise ValueError(
+                            f"{manifest_path.relative_to(root)} contains a non-string workflow job key"
+                        )
+                    if not isinstance(job_contract, dict):
+                        raise ValueError(
+                            f"{manifest_path.relative_to(root)} must define an object contract for workflow job {job_name!r}"
+                        )
+                    steps = job_contract.get("steps")
+                    if steps is not None:
+                        if not isinstance(steps, list):
+                            raise ValueError(
+                                f"{manifest_path.relative_to(root)} must define a list at 'workflows.files.{workflow_name}.jobs.{job_name}.steps'"
+                            )
+                        for step_identifier in steps:
+                            if not isinstance(step_identifier, str):
+                                raise ValueError(
+                                    f"{manifest_path.relative_to(root)} contains a non-string workflow step identifier"
+                                )
+
+    scripts = manifest.get("scripts")
+    if scripts is not None:
+        if not isinstance(scripts, dict):
+            raise ValueError(
+                f"{manifest_path.relative_to(root)} must define an object at 'scripts'"
+            )
+        entrypoints = scripts.get("entrypoints")
+        if entrypoints is None or not isinstance(entrypoints, list):
+            raise ValueError(
+                f"{manifest_path.relative_to(root)} must define a list at 'scripts.entrypoints'"
+            )
+        for entrypoint in entrypoints:
+            if not isinstance(entrypoint, str):
+                raise ValueError(
+                    f"{manifest_path.relative_to(root)} contains a non-string script entrypoint"
+                )
+
+    protected_deployment_paths = manifest.get("protected_deployment_paths")
+    if protected_deployment_paths is not None:
+        if not isinstance(protected_deployment_paths, list):
+            raise ValueError(
+                f"{manifest_path.relative_to(root)} must define a list at 'protected_deployment_paths'"
+            )
+        for protected_path in protected_deployment_paths:
+            if not isinstance(protected_path, str):
+                raise ValueError(
+                    f"{manifest_path.relative_to(root)} contains a non-string protected deployment path"
+                )
+
+    return manifest
+
+
+def _collect_manifest_workflow_contract_violations(
+    root: Path, manifest: dict[object, object]
+) -> list[str]:
+    violations: list[str] = []
+    workflows = manifest.get("workflows")
+    workflow_files = workflows.get("files") if isinstance(workflows, dict) else None
+    if not isinstance(workflow_files, dict):
+        return violations
+    for (workflow_name, job_name), expected_steps in REQUIRED_WORKFLOW_STEP_ORDER.items():
+        workflow_contract = workflow_files.get(workflow_name)
+        if not isinstance(workflow_contract, dict):
+            continue
+        jobs = workflow_contract.get("jobs")
+        if not isinstance(jobs, dict):
+            continue
+        job_contract = jobs.get(job_name)
+        if not isinstance(job_contract, dict):
+            continue
+        manifest_steps = job_contract.get("steps")
+        if manifest_steps != expected_steps:
+            violations.append(
+                f"{MANIFEST_RELATIVE_PATH} workflow step order drifted for {workflow_name}:{job_name}"
+            )
+    return violations
+
+
+def _collect_declared_terraform_resource_types(
+    terraform_config_paths: list[Path],
+) -> tuple[list[tuple[Path, str]], dict[str, int]]:
+    occurrences: list[tuple[Path, str]] = []
+    counts: dict[str, int] = {}
+
+    for path in sorted(terraform_config_paths):
+        text = path.read_text(encoding="utf-8")
+        if path.name.endswith(".tf.json"):
+            try:
+                parsed = json.loads(
+                    text,
+                    object_pairs_hook=_json_object_pairs_with_duplicate_key_rejection,
+                )
+            except (DuplicateTerraformJsonKeyError, json.JSONDecodeError):
+                continue
+            resources = parsed.get("resource") if isinstance(parsed, dict) else None
+            if not isinstance(resources, dict):
+                continue
+            for resource_type, instances in resources.items():
+                if not isinstance(resource_type, str) or not isinstance(instances, dict):
+                    continue
+                instance_count = len(instances)
+                if instance_count < 1:
+                    continue
+                occurrences.append((path, resource_type))
+                counts[resource_type] = counts.get(resource_type, 0) + instance_count
+            continue
+
+        if path.suffix != ".tf":
+            continue
+        for match in RESOURCE_BLOCK_PATTERN.finditer(text):
+            resource_type = match.group(1)
+            occurrences.append((path, resource_type))
+            counts[resource_type] = counts.get(resource_type, 0) + 1
+
+    return occurrences, counts
+
+
+def _collect_backend_configuration_violations(
+    root: Path, terraform_config_paths: list[Path]
+) -> list[str]:
+    violations: list[str] = []
+    allowed_backend_path = Path("infra/gcp/backend.tf")
+    forbidden_backend_value_tokens = [
+        "bucket",
+        "prefix",
+        "project",
+        "credentials",
+        "access_token",
+        "impersonate_service_account",
+    ]
+
+    for path in sorted(terraform_config_paths):
+        relative_path = path.relative_to(root)
+        text = path.read_text(encoding="utf-8")
+        if 'backend "gcs"' in text:
+            if relative_path != allowed_backend_path:
+                violations.append(
+                    f"{relative_path} contains backend configuration outside the approved partial backend path"
+                )
+                continue
+            for token in forbidden_backend_value_tokens:
+                if re.search(rf"\b{re.escape(token)}\s*=", text):
+                    violations.append(f"{relative_path} contains committed backend value {token!r}")
+
+        if path.name.endswith(".tf.json"):
+            try:
+                parsed = json.loads(
+                    text,
+                    object_pairs_hook=_json_object_pairs_with_duplicate_key_rejection,
+                )
+            except (DuplicateTerraformJsonKeyError, json.JSONDecodeError):
+                continue
+            terraform_blocks = parsed.get("terraform") if isinstance(parsed, dict) else None
+            if not isinstance(terraform_blocks, list):
+                continue
+            for terraform_block in terraform_blocks:
+                if not isinstance(terraform_block, dict) or "backend" not in terraform_block:
+                    continue
+                violations.append(
+                    f"{relative_path} contains backend configuration outside the approved partial backend path"
+                )
+                backend_blocks = terraform_block.get("backend")
+                if not isinstance(backend_blocks, list):
+                    continue
+                for backend_block in backend_blocks:
+                    if not isinstance(backend_block, dict):
+                        continue
+                    for backend_type, backend_values in backend_block.items():
+                        if backend_type != "gcs" or not isinstance(backend_values, dict):
+                            continue
+                        for token in forbidden_backend_value_tokens:
+                            if token in backend_values:
+                                violations.append(
+                                    f"{relative_path} contains committed backend value {token!r}"
+                                )
+
+    return violations
+
+
+def _collect_bootstrap_state_bucket_violations(
+    root: Path, terraform_config_paths: list[Path]
+) -> list[str]:
+    violations: list[str] = []
+    allowed_state_bucket_path = Path("infra/gcp/bootstrap/state.tf")
+    required_control_patterns = [
+        (r"uniform_bucket_level_access\s*=\s*true", "uniform_bucket_level_access = true"),
+        (r'public_access_prevention\s*=\s*"enforced"', 'public_access_prevention = "enforced"'),
+        (r"versioning\s*\{", "versioning {"),
+        (r"enabled\s*=\s*true", "enabled = true"),
+        (r"force_destroy\s*=\s*false", "force_destroy = false"),
+        (r"retention_policy\s*\{", "retention_policy {"),
+        (r"prevent_destroy\s*=\s*true", "prevent_destroy = true"),
+    ]
+
+    for path in sorted(terraform_config_paths):
+        relative_path = path.relative_to(root)
+        resource_occurrences, _ = _collect_declared_terraform_resource_types([path])
+        resource_types = [
+            resource_type
+            for candidate_path, resource_type in resource_occurrences
+            if candidate_path == path
+        ]
+        if "google_storage_bucket" not in resource_types:
+            continue
+
+        if relative_path != allowed_state_bucket_path:
+            violations.append(
+                f"{relative_path} contains forbidden google_storage_bucket outside the approved bootstrap state root"
+            )
+            continue
+
+        text = path.read_text(encoding="utf-8")
+        missing_controls = [
+            label
+            for pattern, label in required_control_patterns
+            if re.search(pattern, text) is None
+        ]
+        if missing_controls:
+            violations.append(
+                f"{relative_path} contains bootstrap state bucket missing required controls: {', '.join(missing_controls)}"
+            )
+
+    return violations
+
+
+def _collect_bootstrap_boundary_violations(
+    root: Path, terraform_config_paths: list[Path]
+) -> list[str]:
+    violations: list[str] = []
+    bootstrap_root = Path("infra/gcp/bootstrap")
+    bootstrap_state_bucket_declared = any(
+        path.relative_to(root) == bootstrap_root / "state.tf"
+        and "google_storage_bucket" in path.read_text(encoding="utf-8")
+        for path in terraform_config_paths
+    )
+
+    for path in sorted(terraform_config_paths):
+        relative_path = path.relative_to(root)
+        if bootstrap_root not in relative_path.parents:
+            continue
+
+        text = path.read_text(encoding="utf-8")
+        if "module.develop" in text or "../develop" in text:
+            violations.append(
+                f"{relative_path} contains bootstrap root references disposable workload 'module.develop'"
+            )
+
+        resource_occurrences, _ = _collect_declared_terraform_resource_types([path])
+        resource_types = [
+            resource_type
+            for candidate_path, resource_type in resource_occurrences
+            if candidate_path == path
+        ]
+        for forbidden_type in [
+            "google_storage_bucket_iam_binding",
+            "google_storage_bucket_iam_policy",
+            "google_project_iam_binding",
+            "google_project_iam_member",
+            "google_project_iam_policy",
+        ]:
+            if forbidden_type in resource_types:
+                violations.append(
+                    f"{relative_path} contains unbounded bootstrap authority {forbidden_type!r}"
+                )
+
+        if relative_path == bootstrap_root / "iam.tf" and bootstrap_state_bucket_declared:
+            required_fragments = [
+                'resource "google_storage_bucket_iam_member" "state_authority_object_admin"',
+                'resource "google_storage_bucket_iam_member" "recovery_authority_object_admin"',
+                'resource "google_storage_bucket_iam_member" "bootstrap_operator_object_admin"',
+                'count  = var.bootstrap_operator_status == "bootstrap-active" ? 1 : 0',
+                'role   = "roles/storage.objectAdmin"',
+                "member = var.state_authority_principal",
+                "member = var.recovery_authority_principal",
+                "member = var.bootstrap_operator_principal",
+            ]
+            for fragment in required_fragments:
+                if fragment not in text:
+                    violations.append(
+                        f"{relative_path} missing reviewed state-bucket IAM fragment {fragment!r}"
+                    )
+            state_iam_contracts = {
+                "state_authority_object_admin": {
+                    "bucket": "google_storage_bucket.terraform_state.name",
+                    "role": "roles/storage.objectAdmin",
+                    "member": "var.state_authority_principal",
+                    "count": None,
+                },
+                "recovery_authority_object_admin": {
+                    "bucket": "google_storage_bucket.terraform_state.name",
+                    "role": "roles/storage.objectAdmin",
+                    "member": "var.recovery_authority_principal",
+                    "count": None,
+                },
+                "bootstrap_operator_object_admin": {
+                    "bucket": "google_storage_bucket.terraform_state.name",
+                    "role": "roles/storage.objectAdmin",
+                    "member": "var.bootstrap_operator_principal",
+                    "count": 'var.bootstrap_operator_status == "bootstrap-active" ? 1 : 0',
+                },
+            }
+            resource_pattern = re.compile(
+                r'resource\s+"google_storage_bucket_iam_member"\s+"(?P<name>[^"]+)"\s*\{(?P<body>.*?)^\}',
+                re.MULTILINE | re.DOTALL,
+            )
+            observed_resource_names: set[str] = set()
+            for match in resource_pattern.finditer(text):
+                resource_name = match.group("name")
+                body = match.group("body")
+                observed_resource_names.add(resource_name)
+                expected = state_iam_contracts.get(resource_name)
+                if expected is None:
+                    violations.append(
+                        f"{relative_path} contains unreviewed state-bucket IAM resource {resource_name!r}"
+                    )
+                    continue
+                for attribute in ("bucket", "role", "member"):
+                    expected_value = expected[attribute]
+                    if not re.search(
+                        rf"^\s*{attribute}\s*=\s*(?:\"{re.escape(str(expected_value))}\"|{re.escape(str(expected_value))})\s*$",
+                        body,
+                        re.MULTILINE,
+                    ):
+                        violations.append(
+                            f"{relative_path} state-bucket IAM resource {resource_name!r} "
+                            f"must bind {attribute} to {expected_value!r}"
+                        )
+                expected_count = expected["count"]
+                if expected_count is None:
+                    if re.search(r"^\s*count\s*=", body, re.MULTILINE):
+                        violations.append(
+                            f"{relative_path} state-bucket IAM resource {resource_name!r} must not have count"
+                        )
+                elif not re.search(
+                    rf"^\s*count\s*=\s*{re.escape(str(expected_count))}\s*$",
+                    body,
+                    re.MULTILINE,
+                ):
+                    violations.append(
+                        f"{relative_path} state-bucket IAM resource {resource_name!r} "
+                        "must retain its reviewed active-only count"
+                    )
+            if observed_resource_names != set(state_iam_contracts):
+                violations.append(
+                    f"{relative_path} state-bucket IAM resource inventory drifted from reviewed authority boundary"
+                )
+
+            forbidden_fragments = [
+                'role   = "roles/storage.admin"',
+                'role   = "roles/storage.objectCreator"',
+                'role   = "roles/storage.objectViewer"',
+                "allUsers",
+                "allAuthenticatedUsers",
+            ]
+            for fragment in forbidden_fragments:
+                if fragment in text:
+                    violations.append(
+                        f"{relative_path} contains forbidden state-bucket IAM fragment {fragment!r}"
+                    )
+
+    return violations
+
+
+def _collect_bootstrap_wif_violations(root: Path) -> list[str]:
+    violations: list[str] = []
+    wif_path = root / "infra" / "gcp" / "bootstrap" / "wif.tf"
+    iam_path = root / "infra" / "gcp" / "bootstrap" / "iam.tf"
+
+    if wif_path.exists():
+        wif_text = wif_path.read_text(encoding="utf-8")
+        required_claims = [
+            'attribute.repository == "b-mackenzie-alexander/golden_rose_project"',
+            'attribute.repository_owner == "b-mackenzie-alexander"',
+            'attribute.ref == "refs/heads/develop"',
+            'attribute.environment == "develop"',
+            'attribute.event_name != "pull_request"',
+        ]
+        for claim in required_claims:
+            if claim not in wif_text:
+                violations.append(
+                    f"{wif_path.relative_to(root)} missing exact GitHub claim {claim!r}"
+                )
+
+        wildcard_claim_patterns = [
+            (r'attribute\.repository\s*==\s*"[^"]*\*[^"]*"', "attribute.repository"),
+            (r'attribute\.repository_owner\s*==\s*"[^"]*\*[^"]*"', "attribute.repository_owner"),
+            (r'attribute\.ref\s*==\s*"[^"]*\*[^"]*"', "attribute.ref"),
+            (r'attribute\.environment\s*==\s*"[^"]*\*[^"]*"', "attribute.environment"),
+        ]
+        for pattern, attribute_name in wildcard_claim_patterns:
+            if re.search(pattern, wif_text):
+                violations.append(
+                    f"{wif_path.relative_to(root)} contains wildcard GitHub claim {attribute_name}"
+                )
+
+    if iam_path.exists():
+        iam_text = iam_path.read_text(encoding="utf-8")
+        if "attribute.repository_owner/" in iam_text:
+            violations.append(
+                f"{iam_path.relative_to(root)} contains principal-set broadening via attribute.repository_owner"
+            )
+        broad_principal_patterns = [
+            r'principalSet://[^"]*/attribute\.repository/[^"\n]*\*',
+            r'principalSet://[^"]*/attribute\.ref/[^"\n]*\*',
+            r'principalSet://[^"]*/attribute\.environment/[^"\n]*\*',
+        ]
+        for pattern in broad_principal_patterns:
+            if re.search(pattern, iam_text):
+                violations.append(f"{iam_path.relative_to(root)} contains principal-set broadening")
+
+    return violations
+
+
+def _collect_develop_iam_violations(root: Path, terraform_config_paths: list[Path]) -> list[str]:
+    violations: list[str] = []
+    allowed_iam_path = Path("infra/gcp/develop/iam.tf")
+    allowed_bootstrap_iam_path = Path("infra/gcp/bootstrap/iam.tf")
+    allowed_observability_path = Path("infra/gcp/develop/observability.tf")
+    managed_iam_resource_prefixes = [
+        "google_project_iam_",
+        "google_secret_manager_secret_iam_",
+        "google_artifact_registry_repository_iam_",
+        "google_cloud_run_v2_service_iam_",
+        "google_service_account_iam_",
+        "google_storage_bucket_iam_",
+    ]
+
+    for path in sorted(terraform_config_paths):
+        relative_path = path.relative_to(root)
+        text = path.read_text(encoding="utf-8")
+        resource_occurrences, _ = _collect_declared_terraform_resource_types([path])
+        resource_types = [
+            resource_type
+            for candidate_path, resource_type in resource_occurrences
+            if candidate_path == path
+        ]
+
+        for resource_type in resource_types:
+            if not any(
+                resource_type.startswith(prefix) for prefix in managed_iam_resource_prefixes
+            ):
+                continue
+            if relative_path not in {
+                allowed_iam_path,
+                allowed_bootstrap_iam_path,
+                allowed_observability_path,
+            }:
+                violations.append(
+                    f"{relative_path} contains forbidden {resource_type!r} outside the approved develop IAM path"
+                )
+                if "roles/run.invoker" in text:
+                    violations.append(f"{relative_path} contains forbidden 'roles/run.invoker'")
+
+        if relative_path != allowed_iam_path:
+            continue
+
+        forbidden_broad_types = [
+            "google_project_iam_binding",
+            "google_project_iam_policy",
+            "google_secret_manager_secret_iam_binding",
+            "google_secret_manager_secret_iam_policy",
+            "google_artifact_registry_repository_iam_binding",
+            "google_artifact_registry_repository_iam_policy",
+            "google_cloud_run_v2_service_iam_binding",
+            "google_cloud_run_v2_service_iam_policy",
+            "google_service_account_iam_binding",
+            "google_service_account_iam_policy",
+        ]
+        for forbidden_type in forbidden_broad_types:
+            if forbidden_type in resource_types:
+                violations.append(
+                    f"{relative_path} contains forbidden broad IAM construct {forbidden_type!r}"
+                )
+
+        required_fragments = [
+            'resource "google_project_iam_member" "runtime_cloudsql_client"',
+            'resource "google_project_iam_member" "runtime_log_writer"',
+            'resource "google_project_iam_member" "runtime_metric_writer"',
+            'resource "google_project_iam_member" "migration_cloudsql_client"',
+            'resource "google_project_iam_member" "migration_log_writer"',
+            'resource "google_project_iam_member" "migration_metric_writer"',
+            'resource "google_secret_manager_secret_iam_member" "runtime_secret_access"',
+            'resource "google_secret_manager_secret_iam_member" "migration_secret_access"',
+            'resource "google_artifact_registry_repository_iam_member" "image_publisher_writer"',
+            'resource "google_cloud_run_v2_service_iam_member" "private_invoker"',
+            'resource "google_service_account_iam_member" "deployer_runtime_user"',
+            'resource "google_service_account_iam_member" "deployer_migration_user"',
+            'role    = "roles/cloudsql.client"',
+            'role    = "roles/logging.logWriter"',
+            'role    = "roles/monitoring.metricWriter"',
+            'role      = "roles/secretmanager.secretAccessor"',
+            'role       = "roles/artifactregistry.writer"',
+            'role     = "roles/run.invoker"',
+            'role               = "roles/iam.serviceAccountUser"',
+            'member  = "serviceAccount:${google_service_account.runtime.email}"',
+            'member  = "serviceAccount:${google_service_account.migration.email}"',
+            'member     = "serviceAccount:golden-rose-image-publisher@${var.control_plane_project_id}.iam.gserviceaccount.com"',
+            "member   = var.private_invoker_principal",
+            "member             = var.deployer_principal",
+        ]
+        for fragment in required_fragments:
+            if fragment not in text:
+                violations.append(
+                    f"{relative_path} missing required least-privilege IAM fragment {fragment!r}"
+                )
+
+        forbidden_fragments = [
+            "roles/viewer",
+            "roles/secretmanager.admin",
+            "roles/artifactregistry.admin",
+            "roles/run.admin",
+        ]
+        for fragment in forbidden_fragments:
+            if fragment in text:
+                violations.append(f"{relative_path} contains forbidden broad IAM role {fragment!r}")
+
+    return violations
+
+
+def _collect_migration_job_violations(root: Path, terraform_config_paths: list[Path]) -> list[str]:
+    violations: list[str] = []
+    allowed_job_path = Path("infra/gcp/develop/migration_job.tf")
+
+    for path in sorted(terraform_config_paths):
+        relative_path = path.relative_to(root)
+        text = path.read_text(encoding="utf-8")
+        resource_occurrences, _ = _collect_declared_terraform_resource_types([path])
+        resource_types = [
+            resource_type
+            for candidate_path, resource_type in resource_occurrences
+            if candidate_path == path
+        ]
+
+        if "google_cloud_run_v2_job" not in resource_types:
+            continue
+
+        if relative_path != allowed_job_path:
+            violations.append(
+                f"{relative_path} contains forbidden 'google_cloud_run_v2_job' outside the approved migration job path"
+            )
+            continue
+
+        required_fragments = [
+            'resource "google_cloud_run_v2_job" "migration"',
+            'name     = "run-migrations"',
+            "service_account = google_service_account.migration.email",
+            "image = local.managed_container_image",
+            'command = ["golden-rose-migrate"]',
+            "max_retries = 0",
+            "task_count  = 1",
+            "parallelism = 1",
+            "subnetwork = google_compute_subnetwork.direct_vpc.id",
+            'egress = "PRIVATE_RANGES_ONLY"',
+        ]
+        for fragment in required_fragments:
+            if not _contains_normalized_fragment(text, fragment):
+                violations.append(
+                    f"{relative_path} missing required migration job fragment {fragment!r}"
+                )
+
+        forbidden_fragments = [
+            "google_service_account.runtime.email",
+            "INGRESS_TRAFFIC_ALL",
+            "env {",
+            "value_source",
+            "secret_key_ref",
+            ":latest",
+        ]
+        for fragment in forbidden_fragments:
+            if fragment in text:
+                violations.append(
+                    f"{relative_path} contains forbidden migration job fragment {fragment!r}"
+                )
+
+    return violations
+
+
+def _collect_budget_observability_violations(
+    root: Path, terraform_config_paths: list[Path]
+) -> list[str]:
+    violations: list[str] = []
+    allowed_budget_path = Path("infra/gcp/develop/budgets.tf")
+    allowed_observability_path = Path("infra/gcp/develop/observability.tf")
+    budget_resource_types = {"google_billing_budget"}
+    observability_resource_types = {
+        "google_logging_metric",
+        "google_logging_project_bucket_config",
+        "google_monitoring_alert_policy",
+        "google_monitoring_notification_channel",
+    }
+
+    for path in sorted(terraform_config_paths):
+        relative_path = path.relative_to(root)
+        text = path.read_text(encoding="utf-8")
+        resource_occurrences, _ = _collect_declared_terraform_resource_types([path])
+        resource_types = {
+            resource_type
+            for candidate_path, resource_type in resource_occurrences
+            if candidate_path == path
+        }
+
+        if budget_resource_types & resource_types and relative_path != allowed_budget_path:
+            violations.append(
+                f"{relative_path} contains forbidden 'google_billing_budget' outside the approved budgets path"
+            )
+
+        if (
+            observability_resource_types & resource_types
+            and relative_path != allowed_observability_path
+        ):
+            observed = sorted(observability_resource_types & resource_types)[0]
+            violations.append(
+                f"{relative_path} contains forbidden {observed!r} outside the approved observability path"
+            )
+
+        if relative_path == allowed_budget_path:
+            required_fragments = [
+                'resource "google_billing_budget" "develop"',
+                "billing_account = var.billing_account_id",
+                'projects = ["projects/${var.project_id}"]',
+                "google_monitoring_notification_channel.alerts.name",
+                "disable_default_iam_recipients = true",
+                "threshold_percent = 0.5",
+                "threshold_percent = 0.75",
+                "threshold_percent = 1.0",
+            ]
+            for fragment in required_fragments:
+                if not _contains_normalized_fragment(text, fragment):
+                    violations.append(
+                        f"{relative_path} missing required budget contract fragment {fragment!r}"
+                    )
+
+            for forbidden_fragment in ["pubsub_topic", "pubsubTopic"]:
+                if forbidden_fragment in text:
+                    violations.append(
+                        f"{relative_path} contains forbidden budget routing fragment {forbidden_fragment!r}"
+                    )
+
+        if relative_path == allowed_observability_path:
+            required_fragments = [
+                'resource "google_monitoring_notification_channel" "alerts"',
+                'resource "google_monitoring_alert_policy" "health_failures"',
+                'resource "google_monitoring_alert_policy" "readiness_failures"',
+                'resource "google_monitoring_alert_policy" "service_error_events"',
+                'resource "google_logging_project_bucket_config" "default"',
+                'resource "google_logging_metric" "health_failure_count"',
+                'resource "google_logging_metric" "readiness_failure_count"',
+                'resource "google_logging_metric" "service_error_count"',
+                'role    = "roles/logging.viewer"',
+                'role    = "roles/monitoring.viewer"',
+                "member  = var.observability_viewer_principal",
+                "retention_days = var.log_retention_days",
+                "var.cloud_run_request_log_posture",
+            ]
+            for fragment in required_fragments:
+                if not _contains_normalized_fragment(text, fragment):
+                    violations.append(
+                        f"{relative_path} missing required observability contract fragment {fragment!r}"
+                    )
+
+            for forbidden_fragment in [
+                'resource "google_logging_project_sink"',
+                "request.body",
+                "requestBody",
+                "jsonPayload",
+                "textPayload",
+                "allUsers",
+                "allAuthenticatedUsers",
+            ]:
+                if forbidden_fragment in text:
+                    violations.append(
+                        f"{relative_path} contains forbidden observability fragment {forbidden_fragment!r}"
+                    )
+
+    return violations
+
+
 def main() -> int:
     args = _parse_args()
     root = args.root.resolve()
     terraform_root = root / "infra" / "gcp"
     required_files = [root / path.relative_to(ROOT) for path in REQUIRED_FILES]
-
-    violations: list[str] = []
-    for pattern in FORBIDDEN_ARTIFACT_PATTERNS:
-        for path in sorted(terraform_root.rglob(pattern)):
-            violations.append(f"{path.relative_to(root)} is a forbidden Terraform artifact")
-
     terraform_config_paths = [
         *terraform_root.rglob("*.tf"),
         *terraform_root.rglob("*.tf.json"),
     ]
+
+    violations: list[str] = []
+    try:
+        manifest = _load_predeployment_authority_manifest(root)
+    except ValueError as exc:
+        violations.append(str(exc))
+        manifest = None
+
+    if manifest is not None:
+        violations.extend(_collect_manifest_workflow_contract_violations(root, manifest))
+        terraform_contract = manifest.get("terraform")
+        resource_contracts = (
+            terraform_contract.get("resource_types")
+            if isinstance(terraform_contract, dict)
+            else None
+        )
+        if isinstance(resource_contracts, dict):
+            resource_occurrences, resource_counts = _collect_declared_terraform_resource_types(
+                terraform_config_paths
+            )
+            for path, resource_type in resource_occurrences:
+                if resource_type not in resource_contracts:
+                    violations.append(
+                        f"{path.relative_to(root)} contains unlisted Terraform resource type {resource_type!r}"
+                    )
+            for resource_type, count in sorted(resource_counts.items()):
+                if resource_type not in resource_contracts:
+                    continue
+                contract = resource_contracts.get(resource_type)
+                max_count = contract.get("max_count") if isinstance(contract, dict) else None
+                if isinstance(max_count, int) and count > max_count:
+                    violations.append(
+                        "predeployment authority manifest exceeded Terraform resource type "
+                        f"cardinality {resource_type!r}: {count} > {max_count}"
+                    )
+
+    for pattern in FORBIDDEN_ARTIFACT_PATTERNS:
+        for path in sorted(terraform_root.rglob(pattern)):
+            violations.append(f"{path.relative_to(root)} is a forbidden Terraform artifact")
+
+    violations.extend(_collect_backend_configuration_violations(root, terraform_config_paths))
+    violations.extend(_collect_bootstrap_state_bucket_violations(root, terraform_config_paths))
+    violations.extend(_collect_bootstrap_boundary_violations(root, terraform_config_paths))
+    violations.extend(_collect_bootstrap_wif_violations(root))
+    violations.extend(_collect_develop_iam_violations(root, terraform_config_paths))
+    violations.extend(_collect_migration_job_violations(root, terraform_config_paths))
+    violations.extend(_collect_budget_observability_violations(root, terraform_config_paths))
+
     for path in sorted(terraform_config_paths):
         text = path.read_text(encoding="utf-8")
         for forbidden in FORBIDDEN_SUBSTRINGS:
@@ -1276,6 +2813,47 @@ def main() -> int:
         *(root / ".github" / "workflows").glob("*.yml"),
         *(root / ".github" / "workflows").glob("*.yaml"),
     ]
+    workflow_files_contract: dict[object, object] | None = None
+    if manifest is not None:
+        workflows_contract = manifest.get("workflows")
+        workflow_files_contract = (
+            workflows_contract.get("files") if isinstance(workflows_contract, dict) else None
+        )
+        if isinstance(workflow_files_contract, dict):
+            for path in sorted(workflow_paths):
+                if path.name not in workflow_files_contract:
+                    violations.append(
+                        f"{path.relative_to(root)} is a workflow file not listed in manifest"
+                    )
+        scripts_contract = manifest.get("scripts")
+        script_entrypoints = (
+            scripts_contract.get("entrypoints") if isinstance(scripts_contract, dict) else None
+        )
+        if isinstance(script_entrypoints, list):
+            allowed_script_entrypoints = {
+                entrypoint for entrypoint in script_entrypoints if isinstance(entrypoint, str)
+            }
+            for path in sorted(workflow_paths):
+                text = path.read_text(encoding="utf-8")
+                for script_path in sorted(set(WORKFLOW_SCRIPT_PATH_PATTERN.findall(text))):
+                    if script_path not in allowed_script_entrypoints:
+                        violations.append(
+                            f"{path.relative_to(root)} contains workflow script entrypoint not listed in manifest {script_path!r}"
+                        )
+        protected_paths = manifest.get("protected_deployment_paths")
+        if isinstance(protected_paths, list):
+            allowed_protected_paths = {
+                protected_path
+                for protected_path in protected_paths
+                if isinstance(protected_path, str)
+            }
+            for path in sorted(workflow_paths):
+                text = path.read_text(encoding="utf-8")
+                for protected_path in ["infra/gcp", "deploy/gcp"]:
+                    if protected_path in text and protected_path not in allowed_protected_paths:
+                        violations.append(
+                            f"{path.relative_to(root)} contains workflow deployment path not listed in manifest {protected_path!r}"
+                        )
     for path in sorted(workflow_paths):
         text = path.read_text(encoding="utf-8")
         if path.name not in ALLOWED_WORKFLOW_FILENAMES:
@@ -1315,7 +2893,38 @@ def main() -> int:
             violations.append(
                 f"{path.relative_to(root)} contains forbidden semantic workflow trigger 'push'"
             )
-        for forbidden_permission in _collect_forbidden_workflow_permissions(parsed_workflow):
+        if manifest is not None and isinstance(workflow_files_contract, dict):
+            workflow_contract = workflow_files_contract.get(path.name)
+            workflow_jobs = (
+                workflow_contract.get("jobs") if isinstance(workflow_contract, dict) else None
+            )
+            actual_jobs = parsed_workflow.get("jobs") if isinstance(parsed_workflow, dict) else None
+            if isinstance(workflow_jobs, dict) and isinstance(actual_jobs, dict):
+                for job_name, job_payload in actual_jobs.items():
+                    normalized_job_name = str(job_name)
+                    if normalized_job_name not in workflow_jobs:
+                        violations.append(
+                            f"{path.relative_to(root)} contains workflow job not listed in manifest {normalized_job_name!r}"
+                        )
+                        continue
+                    job_contract = workflow_jobs.get(normalized_job_name)
+                    step_contract = (
+                        job_contract.get("steps") if isinstance(job_contract, dict) else None
+                    )
+                    if not isinstance(step_contract, list) or not isinstance(job_payload, dict):
+                        continue
+                    allowed_steps = {
+                        step_identifier
+                        for step_identifier in step_contract
+                        if isinstance(step_identifier, str)
+                    }
+                    for step in job_payload.get("steps", []):
+                        identifier = _workflow_step_identifier(step)
+                        if identifier is not None and identifier not in allowed_steps:
+                            violations.append(
+                                f"{path.relative_to(root)} contains workflow step not listed in manifest {identifier!r}"
+                            )
+        for forbidden_permission in _collect_forbidden_workflow_permissions(path, parsed_workflow):
             violations.append(
                 f"{path.relative_to(root)} contains forbidden semantic workflow permissions "
                 f"{forbidden_permission!r}"

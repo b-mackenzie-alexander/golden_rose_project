@@ -37,7 +37,7 @@ automated hiring, matching, ranking, eligibility, or referral system.
   Terraform scaffold into `develop` at `50451b3`; no cloud resource or running
   shared system exists. No public access, real identity, live/client data, or
   production claim is currently authorized or present.
-- Terraform/IaC planning now uses the accepted 14-decision private synthetic-only
+- Terraform/IaC implementation now follows the accepted 14-decision private synthetic-only
   GCP `develop` posture: `us-east4` for Cloud Run, Cloud SQL, and Artifact
   Registry; Terraform-managed APIs; split bootstrap/WIF provisioning identity;
   separate runtime/migration identities; private Artifact Registry digest
@@ -47,21 +47,37 @@ automated hiring, matching, ranking, eligibility, or referral system.
   labels; intentional teardown runbook support; and local state only until remote
   state is approved. Beatrice accepted a durable bootstrap/state control plane
   separate from disposable workload teardown; the existing non-workload project
-  is the candidate boundary pending read-only qualification. A separate reviewed
-  plan is required before implementing that contract. Terraform plan/apply,
+  is the candidate boundary pending read-only qualification. The source-controlled
+  implementation lane through clean-room local qualification is now complete on
+  `feat/consolidated-predeployment-foundation` and awaiting independent review
+  handoff before commit/push/PR closeout. Terraform plan/apply,
   backend migration, cloud authentication/API calls, resource/service-identity
   provisioning, image push, deployment, real identity, live/client data, and
   production remain separately gated.
+- Source-controlled Gate 2 read-only verification tooling now exists: `scripts/verify_gcp_foundation.py`
+  evaluates live foundation/effective-authority posture against the reviewed
+  contract without adding any mutation mode, and `deploy/gcp/evidence-template.md`
+  defines the minimized redacted evidence shape for that later qualification step.
+- Source-controlled private-synthetic qualification tooling now also exists:
+  `scripts/qualify_develop_deployment.py` keeps health/readiness separate from
+  bounded workflow qualification, requires authenticated private access, uses
+  newly generated fictional values only, and emits minimized evidence without
+  leaking submitted identifiers, cursors, tokens, DSNs, or raw bodies.
 - PR #29 merged the six authorized static remediations at `08fe305`: semantic
   policy, deterministic `uv`, Direct VPC/private-SQL declaration, API ordering,
   Cloud SQL backup enablement, and managed-registry digest authority. The
   self-authorizing same-repository-CI High remains open accepted residual risk.
-  Proposed ADR-0012 reflects the permanent single-maintainer reality: no
+  Accepted ADR-0012 reflects the permanent single-maintainer reality: no
   unavailable second human is required, and agent/CI review is quality evidence
   rather than independent authorization. Its consolidated plan covers all
   remaining source-controlled pre-deployment work in one later PR while keeping
   read-only GCP qualification, Terraform plan, foundation apply, first private
   synthetic deployment, and qualification as separate explicit owner gates.
+- The current branch also carries a reviewed local clean-room qualification
+  harness that exercises the approved pre-deployment bundle against a disposable
+  repo copy plus Docker-backed synthetic PostgreSQL, including Terraform/static
+  checks, service-backed tests, provenance/SBOM checks, and source-repo Git/Gitleaks
+  hygiene. That evidence is local-only and does not imply cloud qualification.
 - Automated frontend parity/accessibility evidence exists locally, but human
   browser/manual accessibility/fluent-language qualification remains deferred
   until a shared deployed `develop` target exists.

@@ -20,6 +20,7 @@ dependencies = [
 
 [project.scripts]
 golden-rose-run = "golden_rose.runtime:main"
+golden-rose-migrate = "golden_rose.migration_runtime:main"
 
 [dependency-groups]
 dev = [
@@ -62,7 +63,11 @@ select = ["E", "F", "I", "B", "UP", "N", "C4", "SIM"]
 # These policy fixtures intentionally preserve exact CI commands and workflow
 # snippets, including immutable digests and long shell invocations.
 "scripts/validate_terraform_static.py" = ["E501"]
+"scripts/verify_database_authority.py" = ["E501"]
+"migrations/versions/0005_database_authority.py" = ["E501"]
 "tests/unit/test_terraform_hygiene.py" = ["E501"]
+"tests/unit/test_container_contract.py" = ["E501"]
+"tests/unit/test_verify_gcp_foundation.py" = ["E501"]
 
 [tool.pytest.ini_options]
 addopts = "-ra"

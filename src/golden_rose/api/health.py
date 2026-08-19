@@ -5,6 +5,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import text
 
+from golden_rose.config import Settings
+
 router = APIRouter(tags=["runtime-health"])
 
 
@@ -19,9 +21,11 @@ class ReadinessResponse(BaseModel):
 
     status: Literal["ready"]
     schema_revision: str
+    deployment_target: str
+    deployed_image_digest: str
 
 
-EXPECTED_SCHEMA_REVISION = "0004_employer_contact_authority"
+EXPECTED_SCHEMA_REVISION = "0005_database_authority"
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -33,6 +37,7 @@ def get_health(response: Response) -> HealthResponse:
 @router.get("/readiness", response_model=ReadinessResponse)
 def get_readiness(request: Request, response: Response) -> ReadinessResponse | JSONResponse:
     try:
+        settings = Settings()  # type: ignore[call-arg]
         engine = request.app.state.db_engine
         with engine.connect() as connection:
             schema_revision = connection.execute(
@@ -59,4 +64,9 @@ def get_readiness(request: Request, response: Response) -> ReadinessResponse | J
         )
 
     response.headers["Cache-Control"] = "no-store"
-    return ReadinessResponse(status="ready", schema_revision=schema_revision)
+    return ReadinessResponse(
+        status="ready",
+        schema_revision=schema_revision,
+        deployment_target=settings.deployment_target or "",
+        deployed_image_digest=settings.deployed_image_digest or "",
+    )

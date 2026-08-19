@@ -23,5 +23,12 @@ resource "google_cloud_run_v2_service" "staff_tracer" {
     }
   }
 
-  depends_on = [google_project_service.approved["run.googleapis.com"]]
+  depends_on = [
+    google_project_service.approved["run.googleapis.com"],
+    google_billing_budget.develop,
+    google_monitoring_alert_policy.health_failures,
+    google_monitoring_alert_policy.readiness_failures,
+    google_monitoring_alert_policy.service_error_events,
+    google_logging_project_bucket_config.default,
+  ]
 }

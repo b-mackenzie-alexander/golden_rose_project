@@ -30,7 +30,7 @@ class FakeScalarResult:
 
 
 class FakeConnection:
-    def __init__(self, revision: str = "0004_employer_contact_authority") -> None:
+    def __init__(self, revision: str = "0005_database_authority") -> None:
         self.revision = revision
         self.statements: list[str] = []
 
@@ -65,6 +65,22 @@ def _set_local_env(monkeypatch) -> None:
     monkeypatch.setenv("GOLDEN_ROSE_SYNTHETIC_STAFF_ID", str(uuid4()))
 
 
+def _set_develop_env(monkeypatch) -> None:
+    monkeypatch.setenv("GOLDEN_ROSE_ENVIRONMENT", "develop")
+    monkeypatch.setenv("GOLDEN_ROSE_AUTH_MODE", "synthetic")
+    monkeypatch.setenv(
+        "GOLDEN_ROSE_DATABASE_URL",
+        "postgresql+psycopg://test:test@127.0.0.1:55432/golden_rose",
+    )
+    monkeypatch.setenv("GOLDEN_ROSE_SYNTHETIC_STAFF_ID", str(uuid4()))
+    monkeypatch.setenv("GOLDEN_ROSE_DEPLOYMENT_TARGET", "gcp-develop-private-synthetic")
+    monkeypatch.setenv(
+        "GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL",
+        "Non-production develop — fictional synthetic data only",
+    )
+    monkeypatch.setenv("GOLDEN_ROSE_DEPLOYED_IMAGE_DIGEST", "sha256:" + "a" * 64)
+
+
 def test_health_is_database_independent_and_value_safe(monkeypatch) -> None:
     _set_local_env(monkeypatch)
     fake_engine: Any = FakeEngine()
@@ -81,7 +97,7 @@ def test_health_is_database_independent_and_value_safe(monkeypatch) -> None:
 
 
 def test_readiness_checks_database_schema_without_business_mutation(monkeypatch) -> None:
-    _set_local_env(monkeypatch)
+    _set_develop_env(monkeypatch)
     connection = FakeConnection()
     engine: Any = ReadinessEngine(connection)
     app = create_app(engine_factory=lambda: engine)
@@ -93,7 +109,9 @@ def test_readiness_checks_database_schema_without_business_mutation(monkeypatch)
     assert response.headers["Cache-Control"] == "no-store"
     assert response.json() == {
         "status": "ready",
-        "schema_revision": "0004_employer_contact_authority",
+        "schema_revision": "0005_database_authority",
+        "deployment_target": "gcp-develop-private-synthetic",
+        "deployed_image_digest": "sha256:" + "a" * 64,
     }
     assert len(connection.statements) == 1
     statement = connection.statements[0].lower()
@@ -113,7 +131,7 @@ def test_readiness_failure_is_static_and_value_safe(monkeypatch) -> None:
                 "psycopg postgresql+psycopg://sensitive-user:sensitive-pass@db/sensitive"
             )
 
-    _set_local_env(monkeypatch)
+    _set_develop_env(monkeypatch)
     engine: Any = BrokenEngine()
     app = create_app(engine_factory=lambda: engine)
 
@@ -164,7 +182,7 @@ def test_health_and_readiness_do_not_run_synthetic_qualification(monkeypatch) ->
     )
     monkeypatch.setattr(search_employers_module, "search_employers", explode_if_qualification_runs)
 
-    _set_local_env(monkeypatch)
+    _set_develop_env(monkeypatch)
     connection = FakeConnection()
     engine: Any = ReadinessEngine(connection)
     app = create_app(engine_factory=lambda: engine)

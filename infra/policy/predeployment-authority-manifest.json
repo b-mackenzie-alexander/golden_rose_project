@@ -1,0 +1,212 @@
+{
+  "terraform": {
+    "resource_types": {
+      "google_artifact_registry_repository": {
+        "max_count": 1
+      },
+      "google_artifact_registry_repository_iam_member": {
+        "max_count": 1
+      },
+      "google_billing_budget": {
+        "max_count": 1
+      },
+      "google_cloud_run_v2_service": {
+        "max_count": 1
+      },
+      "google_cloud_run_v2_service_iam_member": {
+        "max_count": 1
+      },
+      "google_cloud_run_v2_job": {
+        "max_count": 1
+      },
+      "google_compute_global_address": {
+        "max_count": 1
+      },
+      "google_compute_network": {
+        "max_count": 1
+      },
+      "google_compute_subnetwork": {
+        "max_count": 1
+      },
+      "google_iam_workload_identity_pool": {
+        "max_count": 1
+      },
+      "google_iam_workload_identity_pool_provider": {
+        "max_count": 1
+      },
+      "google_logging_metric": {
+        "max_count": 3
+      },
+      "google_logging_project_bucket_config": {
+        "max_count": 1
+      },
+      "google_project_service": {
+        "max_count": 1
+      },
+      "google_project_iam_member": {
+        "max_count": 8
+      },
+      "google_monitoring_alert_policy": {
+        "max_count": 3
+      },
+      "google_monitoring_notification_channel": {
+        "max_count": 1
+      },
+      "google_secret_manager_secret": {
+        "max_count": 1
+      },
+      "google_secret_manager_secret_iam_member": {
+        "max_count": 6
+      },
+      "google_service_account": {
+        "max_count": 5
+      },
+      "google_service_account_iam_member": {
+        "max_count": 8
+      },
+      "google_service_networking_connection": {
+        "max_count": 1
+      },
+      "google_sql_database_instance": {
+        "max_count": 1
+      },
+      "google_sql_database": {
+        "max_count": 1
+      },
+      "google_storage_bucket": {
+        "max_count": 1
+      },
+      "google_storage_bucket_iam_member": {
+        "max_count": 3
+      }
+    }
+  },
+  "workflows": {
+    "files": {
+      "application-quality.yml": {
+        "jobs": {
+          "application": {
+            "steps": [
+              "name:Check out repository",
+              "name:Set up Python 3.12",
+              "name:Set up uv",
+              "name:Set up Terraform for hygiene tests",
+              "name:Set up Node.js 22.22.3",
+              "name:Wait for PostgreSQL health",
+              "name:Initialize Terraform providers for hygiene tests",
+              "name:Run application quality gate",
+              "name:Upload backend SBOM evidence",
+              "name:Upload frontend SBOM evidence"
+            ]
+          }
+        }
+      },
+      "build-image.yml": {
+        "jobs": {
+          "build-validate": {
+            "steps": [
+              "name:Check out repository",
+              "name:Set up Python 3.12",
+              "name:Set up uv",
+              "name:Set up Node.js 22.22.3",
+              "name:Set up Docker Buildx",
+              "name:Build validation image and evidence",
+              "name:Upload backend SBOM evidence",
+              "name:Upload frontend SBOM evidence",
+              "name:Upload image metadata evidence"
+            ]
+          },
+          "publish-image": {
+            "steps": [
+              "name:Check out repository",
+              "name:Set up Python 3.12",
+              "name:Set up uv",
+              "name:Set up Node.js 22.22.3",
+              "name:Set up Docker Buildx",
+              "name:Enforce protected develop source",
+              "name:Authenticate to Google Cloud",
+              "name:Log in to Artifact Registry",
+              "name:Build publish image and evidence",
+              "name:Upload backend SBOM evidence",
+              "name:Upload frontend SBOM evidence",
+              "name:Upload image metadata evidence",
+              "name:Upload published image reference"
+            ]
+          }
+        }
+      },
+      "deploy-develop.yml": {
+        "jobs": {
+          "deploy": {
+            "steps": [
+              "name:Check out repository",
+              "name:Set up Python 3.12",
+              "name:Set up uv",
+              "name:Enforce protected develop source",
+              "name:Authenticate to Google Cloud",
+              "name:Set up gcloud",
+              "name:Download reviewed publish artifacts",
+              "name:Bind reviewed published image evidence",
+              "name:Record schema compatibility posture",
+              "name:Update migration job to reviewed image",
+              "name:Execute migration job",
+              "name:Deploy reviewed service",
+              "name:Verify readiness gate and record deploy result",
+              "name:Upload deploy compatibility evidence",
+              "name:Upload deploy result evidence"
+            ]
+          }
+        }
+      },
+      "branch-policy.yml": {
+        "jobs": {
+          "enforce": {
+            "steps": [
+              "name:Validate source-to-target flow"
+            ]
+          }
+        }
+      },
+      "infrastructure-quality.yml": {
+        "jobs": {
+          "static-validation": {
+            "steps": [
+              "name:Check out repository",
+              "name:Set up Python",
+              "name:Set up uv",
+              "name:Set up Terraform",
+              "name:Run Terraform local validation",
+              "name:Run Terraform static validation",
+              "name:Run Terraform hygiene tests"
+            ]
+          }
+        }
+      },
+      "repository-hygiene.yml": {
+        "jobs": {
+          "check": {
+            "steps": [
+              "uses:actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+              "name:Check whitespace and confidential-path guardrails",
+              "name:Scan for secrets"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "scripts": {
+    "entrypoints": [
+      "apps/web/scripts/validate-lockfile.mjs",
+      "apps/web/scripts/validate-lockfile.test.mjs",
+      "scripts/qualify_develop_deployment.py",
+      "scripts/verify_gcp_foundation.py",
+      "scripts/verify_image_provenance.py",
+      "scripts/validate_sbom.py",
+      "scripts/validate_terraform_static.py"
+    ]
+  },
+  "protected_deployment_paths": [
+    "infra/gcp"
+  ]
+}

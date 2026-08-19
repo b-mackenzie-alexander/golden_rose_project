@@ -68,7 +68,6 @@ def test_create_employer_contact_creates_authority_contact_receipt_and_event_ato
 ) -> None:
     alembic_config = Config(str(PROJECT_ROOT / "alembic.ini"))
     alembic_config.set_main_option("path_separator", "os")
-    command.downgrade(alembic_config, "0002_enforce_authority_links")
     command.upgrade(alembic_config, "head")
 
     inspector = inspect(session.connection())

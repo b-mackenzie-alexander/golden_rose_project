@@ -987,7 +987,11 @@ uv run mypy src tests
 uv run bandit -q -r src
 uv run alembic upgrade head
 uv run pytest --cov=golden_rose --cov-report=term-missing --cov-fail-under=95
-uv run alembic downgrade base
+if uv run alembic downgrade base 2> build/alembic-downgrade.stderr; then
+  echo "database authority lifecycle downgrade unexpectedly succeeded" >&2
+  exit 1
+fi
+grep -F "database authority lifecycle downgrade is intentionally unsupported without an operator-reviewed role handoff" build/alembic-downgrade.stderr
 uv run alembic upgrade head
 uv run pip-audit --skip-editable
 mkdir -p build

@@ -15,6 +15,7 @@ def _set_minimal_runtime_env(monkeypatch, port: str = "8080") -> None:
         "GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL",
         "Non-production fictional synthetic develop environment",
     )
+    monkeypatch.setenv("GOLDEN_ROSE_DEPLOYED_IMAGE_DIGEST", "sha256:" + "a" * 64)
     monkeypatch.setenv(
         "GOLDEN_ROSE_DATABASE_URL",
         "postgresql+psycopg://test:test@127.0.0.1:55432/golden_rose",

@@ -258,3 +258,26 @@ The independent rereview is complete. The next steps are:
 3. rerun final-head verification on the committed range
 4. push the branch
 5. open/update the PR with evidence tied to that committed head
+
+## 12. Application-quality remediation addendum — 2026-08-19
+
+PR #33 was opened against `develop` at `a59c23b` and its Application quality job failed before its post-pytest migration checks:
+- the develop-only environment-marker and runtime tests omitted the now-required fictional immutable image digest, so `Settings` rejected their intended develop configuration;
+- after those fixtures were corrected, local CI-parity reproduction reached the stale `alembic downgrade base` command. Migration `0005_database_authority` intentionally refuses downgrade without an operator-reviewed role handoff, so requiring its success contradicted the reviewed migration boundary.
+
+The current working-tree remediation:
+- supplies a synthetic `sha256:` digest in both affected develop test fixtures;
+- makes Application quality prove the expected downgrade refusal, require its exact safe message, and then re-upgrade;
+- updates the static workflow contract and adds a regression that requires that fail-closed proof.
+
+Observed local verification on this remediation: CI-pinned `uv==0.12.5` lock/sync; frontend verification (`116 passed`), audit, and SBOM validation; repository Ruff format/check, mypy, Bandit; full pytest coverage (`552 passed`, `95.92%`); expected downgrade refusal/re-upgrade; pip-audit; backend SBOM validation; static policy regression; and `git diff --check` all passed. No cloud action occurred.
+
+This addendum describes an uncommitted working tree. It requires a fresh independent rereview of the exact current files, then a closeout commit, final-head exact-range quality/security verification, and push to update existing PR #33. It does not authorize merge, cloud access, Terraform plan/apply, deployment, secret injection, or live data.
+
+### Addendum rereview closure
+
+The initial independent rereview found one Medium coverage gap: the source test established the downgrade-proof text in the live workflow but did not prove that a mutated proof fails static validation. The remediation adds a fixture-driven regression that changes the required refusal-message `grep` to `true`, invokes the static validator against that isolated fixture, and requires its named Application-quality run-mutation failure. The focused proof passed (`2 passed`), the complete Terraform-hygiene suite passed (`182 passed`), and the follow-up independent rereview accepted the exact uncommitted surface with no Blocker, High, or Medium finding. Final-head verification remains required after the closeout commit.
+
+### Final-head local evidence
+
+The closeout commit passed the full local Application quality sequence with CI-pinned tools: `553 passed` at `95.92%` coverage, the expected authority-downgrade refusal/re-upgrade proof, repository Ruff format/check, mypy, Bandit, static workflow validation, Terraform formatting, frontend verify (`116 passed`), frontend/backend SBOM validation, and dependency audits. Exact-range and working-tree Gitleaks scans found no leaks, and `git diff --check origin/develop...HEAD` passed. The remaining action is to push this exact head to update PR #33 and assess the remote required checks. Local Docker test-service teardown awaits container-lifecycle confirmation and is not a source-control gate.

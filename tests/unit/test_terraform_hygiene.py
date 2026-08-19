@@ -3077,6 +3077,41 @@ def test_terraform_static_validation_harness_rejects_duplicate_approved_step(
     assert "duplicate name:Check out repository" in result.stdout
 
 
+def test_application_quality_gate_requires_fail_closed_authority_downgrade_proof() -> None:
+    workflow = (ROOT / ".github/workflows/application-quality.yml").read_text(encoding="utf-8")
+
+    assert "if uv run alembic downgrade base 2> build/alembic-downgrade.stderr; then" in workflow
+    assert "database authority lifecycle downgrade unexpectedly succeeded" in workflow
+    assert (
+        "database authority lifecycle downgrade is intentionally unsupported without "
+        "an operator-reviewed role handoff"
+    ) in workflow
+
+
+def test_terraform_static_validation_harness_rejects_authority_downgrade_proof_mutation(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow = _current_workflow_text("application-quality.yml").replace(
+        'grep -F "database authority lifecycle downgrade is intentionally unsupported without an operator-reviewed role handoff" build/alembic-downgrade.stderr',
+        "true",
+        1,
+    )
+    _write_workflow_fixture(tmp_path, "application-quality.yml", workflow)
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "contains forbidden workflow run mutation" in result.stdout
+    assert "name:Run application quality gate ->" in result.stdout
+
+
 def test_terraform_static_validation_harness_rejects_reordered_required_steps(
     tmp_path: Path,
 ) -> None:

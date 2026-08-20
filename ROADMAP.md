@@ -37,8 +37,10 @@
 - [x] Prepare, review, accept, and merge ADR-0011 plus `.hermes/plans/2026-08-14_174830-pr24-solo-maintainer-remediation-amendment-plan.md`. PR #27 merged the accepted successor packet into protected `develop` at `23f97cc7e5a0137da942e4f7aa69c77c56e24210`; it retains the self-authorizing-CI finding as High/open accepted residual risk, prohibits review/CODEOWNER theater, and grants no cloud authority.
 - [x] Implement, qualify, and merge the six static remediation tasks: semantic Terraform/workflow policy; deterministic `uv`; Direct VPC private-SQL declaration; API ordering; Cloud SQL automated backups; and managed-registry digest authority. PR #29 merged into protected `develop` at `08fe305`; all required statuses passed. The same-repository-CI High remains open accepted residual risk and required checks remain quality evidence rather than independent authorization.
 - [x] Review, accept, and merge proposed ADR-0012 plus `.hermes/plans/2026-08-15_210257-consolidated-predeployment-foundation-plan.md`. PR #30 merged the packet into protected `develop` at `f9b7903`; it adopts the permanent solo-maintainer posture, consolidates bootstrap/state/WIF, remaining IAM/runtime/database authority, budgets/observability, immutable workflows, recovery/teardown, and gate evidence into one later pre-deployment implementation PR, and grants no cloud authority by itself.
-- [ ] Close out the consolidated source-controlled pre-deployment PR. Separate authorization was granted and Tasks 1-15 are complete in the locally rereviewed working tree: authority manifest/static boundary; bootstrap/state/WIF; least-privilege IAM; serialized migration runtime; PostgreSQL authority lifecycle/drift verification; Cloud SQL recovery contracts; budgets/observability; immutable build/deploy workflows; foundation/deployment qualification tooling; secret/tester/recovery runbooks; and clean-room local qualification. Final remediation includes exact deploy-publish provenance binding, complete IAM/key inventories, clean migration bootstrap, direct PUBLIC ACL/function-owner checks, descriptor-anchored evidence writes with parent-identity revalidation, and the Application quality recovery: develop fixtures carry the required fictional digest while CI proves the intentional fail-closed 0005 downgrade rather than requiring an unsafe successful downgrade. PR #33 is open against `develop`; the remaining closeout steps are fresh remediation rereview, commit, exact-head quality/security/range verification, push, PR review, and merge. No unavailable secondary human reviewer is required; agent/separate-session review is quality evidence, Beatrice dispositions Blocker/High findings, and the same-repository-CI High remains open. These steps grant no cloud authority.
-- [ ] After the consolidated implementation merges, proceed through separate explicit gates for read-only GCP qualification, reviewed Terraform plan, foundation apply, first private synthetic deployment, and qualification. Project IDs, billing IDs, user emails, domains, principals, credentials, plans, state, and secret payloads must stay out of tracked source.
+- [x] Close out and merge the consolidated source-controlled pre-deployment PR. PR #33 merged into protected `develop` at `3c0118a`; its source contracts and local/CI evidence are historical, and its branch is retired. No cloud action occurred.
+- [ ] Review and merge accepted ADR-0013 plus `.hermes/plans/2026-08-20_002931-post-pr33-deployment-path-remediation-plan.md`. The post-merge audit found F1-F17 deployment-path defects, including four Blockers. Beatrice accepted the seven owner decisions on 2026-08-20: staged `foundation → migration → service` authority; Terraform-only configuration ownership; IAM-private internet-reachable named-tester access; viewer/exact-job deploy execution; direct-workflow `workflow_ref` WIF separation; mandatory digest-bound Cosign/SLSA/SBOM evidence; and authenticated `/readiness` uptime monitoring. Planning acceptance grants no implementation or cloud authority until the documentation-only packet merges.
+- [ ] Implement, independently rereview, qualify, and merge the bounded F1-F17 no-cloud remediation from the exact ADR-0013 planning merge. All Blocker/High findings require remediation or explicit Beatrice disposition; the same-repository-CI High remains open accepted residual risk.
+- [ ] After the ADR-0013 F1-F17 remediation merges, proceed through separate explicit gates for read-only GCP qualification, reviewed bootstrap/backend work, staged Terraform plans/applies, immutable publication, secret/database preparation, migration execution, service activation, and qualification. Project IDs, billing IDs, user emails, domains, principals, credentials, plans, state, and secret payloads must stay out of tracked source.
 - [ ] Establish and qualify the isolated GCP non-production environment with wholly fictional synthetic data only: Artifact Registry, Secret Manager metadata and out-of-band payload injection, Cloud Run, Cloud SQL, Logging/Monitoring, and GitHub Workload Identity Federation. Any client/live-derived data admission requires a new reviewed decision and is prohibited under ADR-0009.
 - [ ] Verify non-production deployment by immutable image digest, least-privilege runtime/deployment identities, budget/alert routing, migration/rollback, backup/restore, log redaction, and environment teardown/rebuild evidence.
 
@@ -136,3 +138,150 @@
 - Public job publication, public or individual-level mapping, precise-location features, third-party mapping/geocoding, and automated geographic ranking.
 - Payment, e-signature, background/identity/credit screening, messaging, and calendar vendors.
 - Legacy-response migration or unrestricted production-data collection.
+
+## Delivery date tracker — August 20 to September 7, 2026
+
+**Purpose:** At-a-glance schedule control for the private fictional-synthetic cloud `develop` target, controlled staff-pilot decision, and production-activation backstop. A checked item means the named evidence exists; elapsed time or partial effort is not completion.
+
+**Schedule rule:** The project is on track at the end of a date only when every item marked **Critical checkpoint** for that date is checked. If a critical item remains open, record the blocker in `NOTES.md`, carry it forward explicitly, and reduce feature scope before reducing security, governance, or qualification depth.
+
+**Authority rule:** This tracker records schedule evidence; it does not grant cloud, Terraform, secret, migration, deployment, live-data, or production authority. Every ADR-0013 gate still requires its separate explicit approval.
+
+### Thursday, August 20 — lock the remediation planning packet
+
+- [x] Accept the seven ADR-0013 deployment-path decisions.
+- [x] Accept mandatory keyless digest-bound Cosign/SLSA/SBOM evidence and limited Sigstore transparency metadata.
+- [x] Create accepted ADR-0013 and amend the F1-F17 remediation plan.
+- [x] Reconcile `CURRENT_WORK.md`, this roadmap, security/architecture/technical/decision docs, `AGENTS.md`, and the planning-review handoff.
+- [ ] Complete independent planning review across Terraform/gates, IAM/WIF, workflow/supply chain, monitoring, and documentation.
+- [ ] Remediate or explicitly disposition every planning Blocker/High finding.
+- [ ] Publish and merge the documentation-only ADR-0013 packet through protected `develop`.
+- [ ] Re-fetch/prune and verify a clean exact planning-merge tip before implementation.
+
+**Critical checkpoint:** ADR-0013 and its paired plan are reviewed and merged; implementation has not begun from an unmerged planning surface.
+
+### Friday, August 21 — close the deployment Blockers first
+
+- [ ] Create `fix/post-pr33-deployment-path-remediation` from the exact ADR-0013 planning merge.
+- [ ] Complete exact-node RED → GREEN coverage for required `foundation → migration → service` staging.
+- [ ] Prove the foundation graph contains no executable Cloud Run job or service.
+- [ ] Wire exact runtime and migration configuration plus distinct Secret Manager references without payloads in Terraform.
+- [ ] Remove imperative Cloud Run configuration mutation from the deploy workflow.
+- [ ] Replace broad deploy authority with exact-job `roles/run.jobsExecutor` and exact job/service `roles/run.viewer`.
+- [ ] Enforce direct-workflow `workflow_ref` separation for publisher and deploy executor; remove dormant GitHub provisioner WIF and unnecessary Token Creator authority.
+- [ ] Run focused no-cloud tests, locked static validation, both Terraform root validations, and diff hygiene for the day’s nodes.
+
+**Critical checkpoint:** F1-F3 and F7 have source-level GREEN evidence; no cloud command or service start has occurred.
+
+### Saturday, August 22 — finish the no-cloud remediation surface
+
+- [ ] Implement the accepted IAM-private internet-reachable named-tester ingress contract without public/broad invocation.
+- [ ] Add Billing Budgets API management/dependency and provider-valid Cloud SQL recovery bounds.
+- [ ] Correct stage-aware foundation-verifier API, IAM, budget-channel, and live-response representations.
+- [ ] Make deploy evidence failure-safe, non-mutating, typed-Ready-aware, and explicit that Gate 6 qualification has not run.
+- [ ] Add bootstrap provider-schema CI validation and stage-aware Terraform expansion/cardinality policy.
+- [ ] Implement keyless exact-digest Cosign signature and signed SLSA v1, image-SBOM, and checksum-bound application-SBOM verification at publish and deploy boundaries.
+- [ ] Enforce the reviewed request-log minimization posture or record a narrow truthful disposition.
+- [ ] Add authenticated Cloud Monitoring `/readiness` uptime evidence with exact monitoring-service-agent invocation and provisional repeated-failure routing.
+- [ ] Reconcile remediation docs and prepare the exact implementation review handoff.
+- [ ] Run the complete local no-cloud qualification bundle.
+
+**Critical checkpoint:** F1-F17 have implemented evidence or an explicit accepted residual-risk disposition; no undispositioned Blocker/High remains in the working tree.
+
+### Sunday, August 23 — review, merge, and qualify cloud facts read-only
+
+- [ ] Complete independent Terraform/gate, IAM/WIF, database/runtime, workflow/supply-chain, monitoring, and documentation reviews.
+- [ ] Remediate every substantiated Blocker/High and all unaccepted Medium findings.
+- [ ] Pass exact-head quality/security checks, exact-range Gitleaks, `git diff --check`, and final cross-lane rereview.
+- [ ] Push the exact reviewed head, pass protected CI, resolve review conversations, and merge the remediation PR with Beatrice’s approval.
+- [ ] Rebaseline from the exact remediation merge and confirm a clean worktree.
+- [ ] Separately authorize Gate 2 read-only GCP qualification with named projects and commands.
+- [ ] Complete value-safe read-only project, billing, IAM, API, quota, region, CIDR, and resource-collision qualification.
+- [ ] Record every Gate 2 blocker and operator-held Gate 3 input without committing identifiers or sensitive output.
+
+**Critical checkpoint:** The F1-F17 remediation is merged and Gate 2 facts are sufficient to prepare—not apply—the exact foundation plan.
+
+### Monday, August 24 — bootstrap, plan, and apply foundation only
+
+- [ ] Approve the exact bootstrap/backend ceremony, state controls, billing exposure, non-secret inputs, and plan-artifact custody.
+- [ ] Complete the reviewed local-bootstrap → remote-state → WIF-handoff → bootstrap-authority-retirement sequence.
+- [ ] Produce the exact `foundation` Terraform plan and confirm it contains no Cloud Run job or service.
+- [ ] Review resource inventory, IAM, APIs, budgets, networking, private SQL, secret metadata, logs, recovery controls, costs, and destruction/replacement actions.
+- [ ] Obtain explicit Gate 4 approval for the exact saved foundation plan.
+- [ ] Apply only the approved foundation plan.
+- [ ] Run foundation-mode verification for effective IAM, no public invoker/database path, no service-account keys, state controls, budgets, alerts, logging, labels, deletion protection, and teardown inventory.
+- [ ] Stop before image publication, secret payloads, database logins, migration job, service, or tester access.
+
+**Critical checkpoint:** The verified foundation exists with no executable workload and no unresolved foundation Blocker/High.
+
+### Tuesday, August 25 — activate and qualify private cloud develop
+
+- [ ] Publish the reviewed `linux/amd64` image once and capture its immutable digest.
+- [ ] Verify exact-workflow keyless signature, transparency inclusion, SLSA provenance, image SBOM, and backend/frontend SBOM bindings.
+- [ ] Separately approve and complete out-of-band secret-version and database-role preparation without exposing payloads.
+- [ ] Produce, review, approve, and apply the exact `migration` plan.
+- [ ] Verify the configured migration job identity, digest, environment, secret references, network, and database authority before execution.
+- [ ] Explicitly authorize and execute the migration once; capture advisory-lock, schema-version, and compatibility evidence.
+- [ ] Produce, review, approve, and apply the exact `service` plan only after successful migration evidence.
+- [ ] Verify exact named invokers, runtime configuration, ready revision/digest, and typed Cloud Run `Ready` condition.
+- [ ] Verify approved tester access succeeds and unauthenticated/unapproved access fails.
+- [ ] Run Gate 6 foundation, database, bounded synthetic application, log, alert, cost, recovery, browser, accessibility, and English/Spanish qualification.
+- [ ] Record the result as either **qualified private GCP develop with fictional synthetic data** or **not qualified**, with exact blockers and cleanup disposition.
+- [ ] Do not describe the target as production-ready or admit live/client-derived data.
+
+**Critical checkpoint:** A functioning private synthetic `develop` target is qualified by evidence, or the project has a truthful blocker record and recovery plan without weakening controls.
+
+### August 26–30 — stabilize the staff-pilot candidate
+
+- [ ] Freeze the narrow agency-facing pilot scope; defer public and unrelated feature work.
+- [ ] Define the exact staff cohort, data classification, support owner, incident path, manual fallback, and client acceptance owner.
+- [ ] Implement and qualify real staff identity, MFA, session, recovery, deprovisioning, and server-enforced authorization before live use.
+- [ ] Complete only the minimum end-to-end employer-demand workflow required for the pilot; do not represent unimplemented dashboard/request/shift behavior as available.
+- [ ] Polish the released staff workflow’s loading, empty, success, error, conflict, unknown-outcome, recovery, keyboard, responsive, and bilingual states.
+- [ ] Complete human browser, manual accessibility, and fluent English/Spanish review on the controlled shared target.
+- [ ] Verify monitoring/alert delivery, backup/restore or teardown/rebuild, rollback/forward recovery, support documentation, and staff training material.
+- [ ] Complete a client walkthrough and disposition every pilot-blocking finding.
+- [ ] Decide whether August 31 production activation criteria are actually satisfied.
+
+**Critical checkpoint:** The staff-pilot candidate has real identity and operational-readiness evidence; cosmetic polish has not displaced security, workflow correctness, or recovery work.
+
+### Monday, August 31 — ideal production go/no-go
+
+- [ ] Confirm the production release is the qualified immutable artifact, not an unreviewed rebuild.
+- [ ] Confirm production data purpose/minimization, access, retention/disposal, audit-history recipients, backups, incident handling, support, and client acceptance are explicitly approved.
+- [ ] Confirm no unresolved Blocker/High security, privacy, authorization, migration, recovery, accessibility, language, or operational finding remains.
+- [ ] Record an explicit Beatrice/client production go decision for the narrow staff-only workflow.
+- [ ] If every production gate passes, activate only the approved narrow staff workflow and record rollback/support evidence.
+- [ ] If any production gate fails, keep the target non-production, record the blocker, and activate the September 7 backstop plan without relabeling the pilot as production.
+
+**Critical checkpoint:** Production status is evidence-based and explicitly approved; schedule pressure does not convert a test target into production.
+
+### September 1–6 — backstop remediation and production qualification
+
+- [ ] Resolve every August 31 production blocker through reviewed, test-first work.
+- [ ] Re-run security/privacy, authorization, migration, dependency, secret, backup/recovery, monitoring, accessibility, and language gates on the final candidate.
+- [ ] Complete client acceptance, named support coverage, staff training, manual fallback, and incident/recovery rehearsal.
+- [ ] Promote only the qualified immutable candidate through the protected `develop → main` release path.
+- [ ] Freeze nonessential feature work until production activation and initial stability evidence are complete.
+
+**Critical checkpoint:** The September 7 candidate is fully qualified with no schedule-based control exceptions.
+
+### Monday, September 7 — production activation backstop
+
+- [ ] Reconfirm the exact artifact, production configuration, identity/IAM, secrets, database migration, monitoring, backup/recovery, support, and acceptance evidence.
+- [ ] Obtain explicit final production activation approval.
+- [ ] Activate only the approved narrow agency-facing workflow.
+- [ ] Verify post-activation health/readiness, access, logs, alerts, core staff workflow, and rollback/forward-recovery posture.
+- [ ] Record client acceptance, known limitations, deferred public/worker features, support ownership, and next review date.
+
+**Critical checkpoint:** The narrow staff workflow is operating under approved production controls, or activation remains blocked with a truthful documented reason.
+
+### Schedule protection — first work to defer
+
+If any critical checkpoint is at risk, defer these before compressing a security or governance gate:
+
+- [ ] Public worker/employer portals and public job publication remain deferred.
+- [ ] Worker-facing onboarding/profile expansion remains deferred unless required by the accepted narrow pilot.
+- [ ] OCR/uploads, maps/geocoding, worker-supply overlays, automated comparison, broad reporting/export, and external integrations remain deferred.
+- [ ] Decorative animation, marketing polish, and other nonessential visual enhancements remain deferred.
+- [ ] No deferred item is silently reintroduced without an accepted plan and updated schedule impact.

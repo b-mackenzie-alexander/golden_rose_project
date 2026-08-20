@@ -48,9 +48,10 @@ automated hiring, matching, ranking, eligibility, or referral system.
   state is approved. Beatrice accepted a durable bootstrap/state control plane
   separate from disposable workload teardown; the existing non-workload project
   is the candidate boundary pending read-only qualification. The source-controlled
-  implementation lane through clean-room local qualification is now complete on
-  `feat/consolidated-predeployment-foundation` and awaiting independent review
-  handoff before commit/push/PR closeout. Terraform plan/apply,
+  implementation lane merged through PR #33 at `3c0118a`. A post-merge audit
+  found F1-F17 deployment-path defects, including four Blockers; accepted
+  ADR-0013 and its paired plan now govern a documentation-gated no-cloud
+  remediation before any read-only qualification or Terraform progression. Terraform plan/apply,
   backend migration, cloud authentication/API calls, resource/service-identity
   provisioning, image push, deployment, real identity, live/client data, and
   production remain separately gated.
@@ -73,6 +74,13 @@ automated hiring, matching, ranking, eligibility, or referral system.
   remaining source-controlled pre-deployment work in one later PR while keeping
   read-only GCP qualification, Terraform plan, foundation apply, first private
   synthetic deployment, and qualification as separate explicit owner gates.
+- Accepted ADR-0013 adds the required post-PR33 boundary: staged
+  `foundation → migration → service` Terraform authority; Terraform-only
+  configuration ownership; IAM-private internet-reachable named testers;
+  exact viewer/job-executor and direct-workflow WIF authority; keyless
+  digest-bound Cosign/SLSA/SBOM verification; and authenticated `/readiness`
+  availability monitoring. Its implementation is not authorized until the
+  documentation-only packet merges.
 - The current branch also carries a reviewed local clean-room qualification
   harness that exercises the approved pre-deployment bundle against a disposable
   repo copy plus Docker-backed synthetic PostgreSQL, including Terraform/static

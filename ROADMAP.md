@@ -156,10 +156,10 @@
 - [x] Reconcile `CURRENT_WORK.md`, this roadmap, security/architecture/technical/decision docs, `AGENTS.md`, and the planning-review handoff.
 - [x] Merge the initial documentation-only ADR-0013 packet through protected `develop` as PR #34 at `63caa40`; re-fetch/prune and verify the clean exact planning-merge tip.
 - [x] Complete independent planning review across Terraform/gates, IAM/WIF, workflow/supply chain, monitoring, and documentation; it found plan-executability Blocker/High findings requiring this follow-up documentation amendment.
-- [ ] Amend ADR-0013, the remediation plan, handoff, and living docs to remediate or explicitly disposition every planning Blocker/High finding; independently rereview the amended packet.
-- [ ] Publish and merge the amended documentation-only planning packet through protected `develop`.
+- [x] Amend ADR-0013, the remediation plan, handoff, and living docs to remediate or explicitly disposition every planning Blocker/High finding; independently rereview the amended packet. The final independent working-tree review returned CLEAN, retaining only the accepted same-repository-CI High residual risk.
+- [x] Publish and merge the amended documentation-only planning packet through protected `develop` as PR #35 at `db1f293`.
 
-**Critical checkpoint:** PR #34 is historical merged planning context; the amended ADR-0013 packet is independently rereviewed and merged, and implementation has not begun from an unmerged planning surface.
+**Critical checkpoint:** PR #34 and PR #35 are historical merged planning context; the amended ADR-0013 packet is independently rereviewed and merged, and implementation has not begun from an unmerged planning surface.
 
 ### Friday, August 21 — close the deployment Blockers first
 

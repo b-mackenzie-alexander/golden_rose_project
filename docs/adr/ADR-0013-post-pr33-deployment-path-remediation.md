@@ -6,6 +6,8 @@
 - **Amends:** ADR-0009 and ADR-0012 for post-PR33 deployment staging, automation authority, tester ingress, WIF identity, provenance, and availability evidence
 - **Related:** `.hermes/plans/2026-08-20_002931-post-pr33-deployment-path-remediation-plan.md`, PR #33 merge `3c0118abb8b84472141992d2238033b1312d5af2`
 
+> **Publication status:** The initial accepted ADR-0013 packet merged as PR #34 at `develop@63caa4088da44d5f98663bfc2578a0f93444a0fc`. The proof-node clarifications below are a separate, currently unmerged documentation-only amendment on `docs/post-pr34-planning-review-remediation`. They authorize no remediation implementation, cloud action, or later gate until they pass independent review and merge through protected `develop`.
+
 ## Context and evidence posture
 
 PR #33 merged the consolidated source-controlled pre-deployment implementation into protected `develop` at `3c0118abb8b84472141992d2238033b1312d5af2`. Its local and protected-check evidence established substantial no-cloud source contracts, but a post-merge audit found deployment-path defects that prevent truthful Terraform planning, foundation apply, workload activation, or qualification.
@@ -33,6 +35,8 @@ The workload root will require a no-default `deployment_stage` with exactly thre
 
 Each transition requires a separately reviewed saved Terraform plan and explicit approval. Static policy and graph tests must reject invalid stages, broad boolean shortcuts, arbitrary resource expansion, and stage/resource mismatches. Reverse transitions require an explicit destruction review and never serve as automatic schema rollback.
 
+The no-cloud remediation must prove the stage contract with a narrow local evaluator for the only approved stage expressions; a plain configuration graph is not sufficient evidence of evaluated instance absence. At Gate 3+ each saved plan must yield a value-safe receipt containing the stage, source revision, Terraform plan hash, provider-lock digest, non-secret-input digest, evaluated inventory, approval reference, and—where a workload exists—the authorized immutable image digest. `foundation` must neither require nor resolve an image digest; `migration` and `service` must require it. The migration/service executor must reject a missing, wrong-stage, wrong-source, wrong-plan-hash, wrong-lock, or wrong-digest receipt. No workflow success or publication artifact substitutes for this transition evidence.
+
 ### 2. Keep Terraform as sole configuration authority
 
 For the first private fictional-synthetic target, Terraform alone creates and configures Cloud Run resources, including image digest, environment values, secret references, identities, ingress, IAM, network attachment, scaling, timeout, and retry settings.
@@ -51,6 +55,8 @@ The deploy workflow may not create resources, mutate configuration, repair drift
 The first fictional-synthetic staff service will use `INGRESS_TRAFFIC_ALL` at the network layer while retaining the Cloud Run IAM invoker check. Exact service-level named tester principals receive invocation authority. `allUsers`, `allAuthenticatedUsers`, disabled invoker checks, and broad project-level invocation are prohibited.
 
 Approved technical testers use individual Google identities through a loopback Cloud Run proxy or a bounded identity-token qualification procedure. This must be described as **IAM-private and internet-reachable**, not internal-network-only. It is a technical develop-test perimeter and does not satisfy production staff identity, MFA, session, recovery, or business authorization.
+
+The first target uses an operator-held, review-bound set of exact individual tester identities. Terraform, verification, and Gate 5C/6 evidence must reject substituted, additional, empty, group, domain, principal-set, or public invokers. A later group-based access model requires a separate ADR amendment with membership-governance controls.
 
 ### 4. Narrow deploy-executor authority to existing-resource operations
 
@@ -86,6 +92,8 @@ The protected publication workflow will produce keyless Cosign signatures and si
 
 Publication and deployment independently verify the signature and attestations before migration or service activation. Tags, ordinary BuildKit metadata, workflow success, artifact names, and unsigned files are not sufficient authority.
 
+Verification is required for every evidence class, not provenance alone: image-SBOM and application-SBOM checksum attestations must independently reject missing signature, wrong subject/predicate/media type, wrong certificate identity, wrong OIDC issuer, absent transparency proof, and digest mismatch. The image-level SBOM must be schema-valid, identify the same `linux/amd64` immutable image, and contain a nonempty final-image component inventory.
+
 The limited public Sigstore transparency metadata is accepted. Secret payloads, credentials, application content, and operator-held environment identifiers must not enter signing, provenance, SBOM, logs, chat, or ordinary evidence.
 
 This evidence proves signing identity, subject digest, source/build claims, and attached evidence integrity. It does not prove vulnerability freedom, independent review, deployment correctness, or production readiness.
@@ -95,6 +103,8 @@ This evidence proves signing identity, subject digest, source/build claims, and 
 Cloud Monitoring will perform an authenticated HTTPS uptime check against the exact IAM-private staff service `/readiness` endpoint using Service Agent Authentication. The Monitoring service agent receives only exact service-level invocation authority through `roles/run.servicesInvoker` or the current narrow equivalent containing `run.routes.invoke`.
 
 The check sends no business record, request body, synthetic staff identity, query data, or application secret. It validates a stable readiness response and records success/failure and latency. Repeated failure routes to an operator-held notification channel using provisional develop triggers that are not an SLA.
+
+The uptime-check resource, its alert, and the Monitoring service-agent invocation binding exist only in `service`; they must be absent from `foundation` and `migration`. Gate 6 qualification also writes a minimized failure result before the first request and updates it atomically on a handled failure without retaining URLs, tokens, generated identities, identifiers, request/response bodies, or raw exception text.
 
 Request-derived 5xx alerts remain complementary. Private Service Directory checks, a separate synthetic-monitor function, and unauthenticated health access are not required for the first target.
 

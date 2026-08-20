@@ -14,15 +14,15 @@
 
 - **Audit base:** protected `develop@3c0118abb8b84472141992d2238033b1312d5af2`, the PR #33 squash merge.
 - **Repository state at plan drafting:** local `develop`, `origin/develop`, and the live remote `develop` ref matched; the worktree was clean.
-- **Planning status:** accepted by Beatrice on 2026-08-20 as a documentation-only packet; implementation remains blocked until this plan and accepted `docs/adr/ADR-0013-post-pr33-deployment-path-remediation.md` pass planning review, publish through the protected planning workflow, and merge.
-- **Required decision amendment:** accepted ADR-0013 records the changed Gate 4/5 staging, Terraform-only configuration ownership, IAM-private tester ingress, narrowed deploy-executor role, direct-workflow WIF separation, mandatory Sigstore provenance/SBOM, and authenticated availability evidence. ADR-0012 remains the prior authority until ADR-0013 merges.
+- **Planning status:** the initial packet was accepted by Beatrice on 2026-08-20 and merged as PR #34 at `develop@63caa4088da44d5f98663bfc2578a0f93444a0fc`. This post-PR34 amendment remains documentation-only; implementation stays blocked until the amended ADR/plan packet passes fresh independent review, publishes through the protected planning workflow, and merges.
+- **Required decision amendment:** merged ADR-0013 superseded ADR-0012 for the changed Gate 4/5 staging, Terraform-only configuration ownership, IAM-private tester ingress, narrowed deploy-executor role, direct-workflow WIF separation, mandatory Sigstore provenance/SBOM, and authenticated availability evidence. The unmerged amendment adds exact planning-review remediation nodes; it grants no implementation or cloud authority until it merges.
 - **Implementation branch after activation:** fresh `fix/post-pr33-deployment-path-remediation` from the exact planning-packet merge tip.
 - **Review truth:** the same-repository-CI High remains open accepted residual risk. Agent and CI evidence do not become independent authorization.
 - **Cloud truth:** no GCP authentication or inspection, backend migration, Terraform plan/apply, API enablement, provisioning, image push, secret action, Cloud SQL use, service start, deployment, or live qualification is authorized by this plan or its implementation PR.
 
 ## Accepted owner decisions
 
-Beatrice explicitly accepted the following decisions on 2026-08-20. They are planning authority only until ADR-0013 and this plan merge:
+Beatrice explicitly accepted the following decisions on 2026-08-20. PR #34 merged the initial planning authority; this amendment preserves the decisions while adding required proof nodes and is not implementation authority until it merges:
 
 1. **Staged Terraform authority:** use one workload root with a required no-default `deployment_stage` enum (`foundation`, `migration`, `service`). Gate 4 applies only `foundation`; Gate 5 separately reviews/applies `migration`, executes the configured job, then separately reviews/applies `service`. No broad `workload_enabled` boolean and no imperative resource creation.
 2. **First-deployment execution:** Terraform is the sole resource/configuration authority. The build workflow publishes and attests the immutable artifact. The deploy workflow verifies existing Terraform-managed configuration, executes the already configured migration job without overrides, inspects typed readiness, and emits evidence; it does not create resources, mutate configuration, or repair drift.
@@ -150,15 +150,18 @@ Passing one gate never grants the next.
 - `test_service_stage_contract_requires_job_and_service`
 - `test_static_validator_rejects_unconditional_executable_workload_resources`
 - `test_static_validator_rejects_boolean_workload_shortcut`
+- `test_foundation_stage_does_not_require_or_resolve_container_image_digest`
+- `test_local_stage_inventory_evaluator_rejects_job_or_service_in_foundation`
 
 **Steps:**
 
 1. Add failing source-contract tests for the exact enum and monotonic stage order.
 2. Run each exact node and confirm a behavioral RED against the unconditional current resources—not an import/setup failure.
-3. Add root/module `deployment_stage` variables with one exact allowlist and no default.
+3. Add root/module `deployment_stage` variables with one exact allowlist and no default. Make the image digest nullable only for `foundation`, require it for `migration` and `service`, and ensure the foundation path never resolves the managed image local.
 4. Extend semantic policy so reviewed stage expressions are allowlisted exactly and arbitrary `count`/`for_each` expansion remains rejected.
 5. Require the manifest to declare stage ownership for executable resources instead of relying only on block count.
-6. Run focused tests and the complete Terraform hygiene suite.
+6. Add a narrow local evaluator for the only reviewed stage expressions and make it prove the evaluated foundation/migration/service inventories; do not call a configuration graph an inventory proof.
+7. Run focused tests and the complete Terraform hygiene suite.
 
 **Commands:**
 
@@ -196,16 +199,18 @@ terraform fmt -check -recursive infra/gcp
 - `test_stage_outputs_do_not_reference_absent_resources_unsafely`
 - `test_foundation_verifier_mode_rejects_present_workload`
 - `test_deployment_verifier_mode_requires_expected_job_and_service`
+- `test_stage_plan_receipt_rejects_wrong_stage_source_lock_or_image_digest`
 
 **Steps:**
 
-1. Build graph probes from clean copied roots with partial backend omitted exactly as existing graph tests do.
+1. Build graph probes from clean copied roots with partial backend omitted exactly as existing graph tests do; treat them as structural evidence only, not evaluated inventory evidence.
 2. Confirm RED because current Terraform always includes both resources.
 3. Gate migration job creation on `migration` or `service`; gate service and service-level invoker IAM on `service` only.
 4. Make outputs stage-safe without leaking endpoints, project IDs, principals, or secret references.
 5. Add explicit verifier modes (`foundation`, `migration`, `service`) so Gate 4 expects no executable workload and Gate 5 expects only the stage-authorized inventory.
 6. Ensure teardown/rebuild semantics cover monotonic promotion and an explicitly reviewed reverse transition; do not automate schema rollback.
-7. Run clean-copy init/validate/graph for every stage with fictional shape-valid non-secret inputs.
+7. Define the Gate 3+ saved-plan receipt contract: stage, source SHA, plan hash, provider-lock digest, non-secret-input digest, evaluated inventory, approval reference, and workload image digest where applicable. A later separately approved saved plan must be inspected through `terraform show -json` before approval/apply; this remediation task only tests/parses the value-safe receipt shape and does not run `terraform plan`.
+8. Run clean-copy init/validate/graph for every stage with fictional shape-valid non-secret inputs.
 
 **Expected GREEN:** Gate 4’s plan can be proven free of job/service resources; later stages add only their reviewed resource set.
 
@@ -217,6 +222,7 @@ terraform fmt -check -recursive infra/gcp
 
 **Files:**
 - Modify: `infra/gcp/develop/secrets.tf`
+- Modify: `infra/gcp/develop/iam.tf`
 - Modify: `infra/gcp/develop/cloud_run.tf`
 - Modify: `infra/gcp/develop/migration_job.tf`
 - Modify: `infra/gcp/develop/variables.tf`
@@ -247,11 +253,12 @@ terraform fmt -check -recursive infra/gcp
 - `test_static_validator_allows_only_reviewed_secret_reference_shapes`
 - `test_static_validator_rejects_literal_secret_values_and_unlisted_env_names`
 - `test_static_validator_rejects_cross_wired_runtime_and_migration_database_secrets`
+- `test_runtime_and_migration_secret_iam_is_per_secret_and_rejects_collection_wide_access`
 
 **Steps:**
 
 1. Replace the broad prohibition on any Cloud Run env/secret reference with an exact allowlist; retain rejection of literal payloads, unknown secret IDs, unknown env names, `value` for payload-bearing settings, and arbitrary version selectors.
-2. Split runtime and migration database secret metadata so each identity can receive only its own login material.
+2. Split runtime and migration database secret metadata so each identity can receive only its own login material, and replace collection-wide secret IAM with explicit or narrowly keyed per-secret bindings. Shared synthetic-staff identity access requires an exact separately justified binding.
 3. Add exact secret-reference blocks and exact non-secret env blocks to the stage-authorized resources.
 4. Bind image and `GOLDEN_ROSE_DEPLOYED_IMAGE_DIGEST` to the same Terraform input.
 5. Update the runbook with a non-echoing, source-controlled reference-binding ceremony and exact value-safe verification. Do not include payload commands or identifiers.
@@ -290,6 +297,7 @@ terraform fmt -check -recursive infra/gcp
 - `test_deploy_executor_cannot_update_resources_override_jobs_impersonate_service_accounts_publish_images_manage_iam_read_secrets_or_provision_foundation`
 - `test_foundation_verifier_rejects_substituted_wif_pool_or_provider`
 - `test_foundation_verifier_requires_exact_authority_specific_workflow_claims`
+- `test_wif_provider_requires_workflow_dispatch_event`
 
 **Steps:**
 
@@ -301,6 +309,7 @@ terraform fmt -check -recursive infra/gcp
 6. Grant the deploy executor only exact-job `roles/run.jobsExecutor` and exact job/service `roles/run.viewer`; reject `roles/run.developer`, `roles/run.admin`, `roles/run.jobsExecutorWithOverrides`, and service-account-user/token-creator authority.
 7. Derive expected deploy-executor/publisher principals from `control_plane_project_id` plus reviewed account names rather than accepting arbitrary caller strings as authority.
 8. Extend foundation verification to validate exact pool/provider/workflow/ref/environment conditions and all effective bindings.
+9. Add literal negative fixtures for `push`, `schedule`, `pull_request`, and missing event claims; only `workflow_dispatch` is accepted.
 
 **Expected GREEN:** a qualifying publisher workflow cannot impersonate deploy executor/provisioner, the provisioner has no dormant GitHub WIF path, and the deploy executor can inspect the exact resources and execute only the configured migration job without overrides or configuration mutation.
 
@@ -398,15 +407,18 @@ terraform fmt -check -recursive infra/gcp
 - `test_qualification_contract_requires_reviewed_authenticated_proxy_or_token_path`
 - `test_foundation_verifier_distinguishes_network_reachability_from_iam_privacy`
 - `test_private_tester_runbook_does_not_claim_internal_network_privacy`
+- `test_tester_authority_rejects_substituted_extra_empty_group_domain_principal_set_and_public_invokers`
+- `test_qualification_failure_writes_minimized_atomic_failure_evidence`
 
 **Steps:**
 
 1. Implement only the ingress model accepted in ADR-0013.
-2. For IAM-private ingress, retain Cloud Run IAM authentication, exact named principal/group, and denial of broad/public invokers; document network reachability honestly.
-3. Define the operator-held authenticated tester/proxy procedure without endpoints, emails, or token values in tracked source.
+2. For IAM-private ingress, retain Cloud Run IAM authentication and only exact review-bound individual tester identities; reject group, domain, principal-set, broad, and public invokers. Document network reachability honestly.
+3. Define an operator-held, review-bound tester-authority artifact/fingerprint and authenticated tester/proxy procedure without endpoints, emails, or token values in tracked source. Terraform and the verifier must compare the effective binding to that reviewed authority rather than an arbitrary caller-provided principal.
 4. Keep bearer tokens off command lines and out of evidence.
-5. Add live Gate 6 checks for both network reachability and IAM denial/allow behavior.
-6. If internal-only is selected instead, replace these paths/tests with the accepted in-project runner/load-balancer/VPN/IAP resources and recalculate cost/authority before implementation.
+5. Initialize a minimized failure qualification result before the first request, atomically update the failed boundary and teardown/rebuild disposition on handled failure, then exit nonzero without raw transport/error values.
+6. Add live Gate 6 checks for both network reachability and IAM denial/allow behavior.
+7. If internal-only is selected instead, replace these paths/tests with the accepted in-project runner/load-balancer/VPN/IAP resources and recalculate cost/authority before implementation.
 
 **Expected GREEN:** the documented qualification path is viable under the exact Terraform ingress/IAM contract and remains non-public at the authorization layer.
 
@@ -434,16 +446,18 @@ terraform fmt -check -recursive infra/gcp
 - `test_always_uploads_do_not_fail_when_early_stage_evidence_is_absent`
 - `test_deploy_evidence_never_claims_gate6_qualification`
 - `test_privileged_jobs_have_bounded_timeouts`
+- `test_deploy_rejects_missing_or_mismatched_reviewed_stage_plan_receipt`
 
 **Steps:**
 
 1. Write the failure-result skeleton before the first cloud mutation, with `result=failed`, current stage, `qualification_executed=false`, and no sensitive values.
 2. Use trap/finalization behavior that preserves the primary failure and uploads whatever bounded evidence exists without a second missing-file failure.
-3. Verify the migration job/service are already Terraform-created and configured for the reviewed digest before execution/readiness inspection; do not let gcloud introduce unmodeled image, env, secret-reference, IAM, ingress, scaling, or network drift.
-4. Select Cloud Run condition `type=Ready`, bind the ready revision/image digest to reviewed evidence, and keep `/readiness` plus bounded workflow qualification in Gate 6.
-5. Capture pre-migration job/service digest and schema-compatibility posture as recovery evidence; do not automate unsafe rollback.
-6. Add bounded job timeout and command-level timeouts where current CLIs support them.
-7. Preserve serialization and publish-run head-SHA binding.
+3. Verify a value-safe reviewed-stage-plan receipt before execution: exact stage, source SHA, plan hash, provider-lock digest, approval reference, evaluated inventory, and authorized image digest. Reject a missing, wrong-stage, wrong-source, wrong-plan-hash, wrong-lock, or wrong-digest receipt; publication evidence alone is insufficient.
+4. Verify the migration job/service are already Terraform-created and configured for the reviewed digest before execution/readiness inspection; do not let gcloud introduce unmodeled image, env, secret-reference, IAM, ingress, scaling, or network drift.
+5. Select Cloud Run condition `type=Ready`, bind the ready revision/image digest to reviewed evidence, and keep `/readiness` plus bounded workflow qualification in Gate 6.
+6. Capture pre-migration job/service digest and schema-compatibility posture as recovery evidence; do not automate unsafe rollback.
+7. Add bounded job timeout and command-level timeouts where current CLIs support them.
+8. Preserve serialization and publish-run head-SHA binding.
 
 **Expected GREEN:** every failure stage yields a value-safe primary result, deployment success means only deployment readiness, and qualification remains explicitly false/pending.
 
@@ -502,6 +516,10 @@ terraform fmt -check -recursive infra/gcp
 - `test_deploy_rejects_valid_sbom_from_different_digest`
 - `test_deploy_rejects_unsigned_or_untrusted_provenance`
 - `test_local_pr_mode_does_not_overclaim_publish_attestation`
+- `test_deploy_rejects_unsigned_or_untrusted_image_sbom_attestation`
+- `test_deploy_rejects_unsigned_or_untrusted_application_sbom_checksum_attestation`
+- `test_deploy_rejects_wrong_attestation_subject_predicate_identity_issuer_or_transparency_proof`
+- `test_image_sbom_is_schema_valid_linux_amd64_digest_bound_and_nonempty`
 
 **Steps:**
 
@@ -509,9 +527,9 @@ terraform fmt -check -recursive infra/gcp
 2. Pin the Cosign installer/action and Cosign version immutably.
 3. Sign the exact pushed digest keylessly and require the exact protected build-workflow certificate identity, GitHub Actions OIDC issuer, and transparency-log inclusion.
 4. Generate and sign SLSA v1 provenance bound to the exact repository commit and reviewed builder.
-5. Generate and validate an image-level SBOM, then bind it to the same digest through a signed in-toto/OCI-compatible attestation.
+5. Generate and validate an image-level SBOM with a dedicated validator mode or verifier: schema-valid, `linux/amd64`, root identity equal to the immutable digest, and nonempty final-image component inventory. Reject application-only, wrong-platform, or wrong-digest documents before signing.
 6. Bind validated backend/frontend CycloneDX SBOM checksums to a signed in-toto attestation on the same digest.
-7. Verify signature, subject, identity, issuer, transparency inclusion, provenance, image SBOM, and application SBOM checksums immediately after publication and independently before migration execution.
+7. Verify signature, subject, identity, issuer, transparency inclusion, provenance, image SBOM, and application SBOM checksums immediately after publication and independently before migration execution. Require the same trust checks for every attestation class.
 8. Keep signing/provenance output value-safe and prevent secret-bearing build arguments or application content from entering attestations.
 9. Make `linux/amd64` target explicit in build commands and tests so local ARM and CI builds share one intended deployment architecture.
 
@@ -543,13 +561,15 @@ terraform fmt -check -recursive infra/gcp
 - `test_availability_alert_detects_repeated_authenticated_readiness_failure`
 - `test_foundation_verifier_requires_authenticated_readiness_uptime_check`
 - `test_alert_evidence_does_not_claim_approved_slo_or_rto`
+- `test_uptime_check_and_monitoring_invoker_are_absent_before_service_stage`
+- `test_service_stage_has_exactly_one_uptime_check_and_monitoring_invoker`
 
 **Steps:**
 
 1. Confirm what Cloud Run request-log fields can be excluded or routed under the chosen ingress/access model.
 2. Implement an exact exclusion/minimization control or remove the unsupported stronger marker; never leave a documentary value that implies behavior.
-3. Add an HTTPS Cloud Monitoring uptime check targeting the exact Cloud Run service `/readiness` endpoint with Service Agent Authentication.
-4. Grant the Monitoring service agent only exact service-level `roles/run.servicesInvoker` or the current narrow equivalent containing `run.routes.invoke`; continue to reject public/broad invokers.
+3. Add an HTTPS Cloud Monitoring uptime check targeting the exact Cloud Run service `/readiness` endpoint with Service Agent Authentication only in `service`; foundation and migration must contain neither the check nor its alert/invoker dependencies.
+4. Grant the Monitoring service agent only exact service-level `roles/run.servicesInvoker` or the current narrow equivalent containing `run.routes.invoke`, only in `service`; continue to reject public/broad invokers.
 5. Send no business/synthetic-user payload, query data, request body, or application secret; validate only stable readiness status/content and latency.
 6. Alert on repeated check failure through the operator-held route. Keep thresholds as provisional develop review triggers, not SLOs or client commitments.
 7. Retain request-derived 5xx alerts as complementary evidence and reject an unnecessary Service Directory private check, synthetic-monitor function, or unauthenticated health path for this target.
@@ -581,6 +601,7 @@ terraform fmt -check -recursive infra/gcp
 - Modify: `deploy/gcp/private-tester-access.md`
 - Modify: `deploy/gcp/rollback-forward-recovery-runbook.md`
 - Modify: `deploy/gcp/teardown-rebuild-runbook.md`
+- Create: `deploy/gcp/staged-plan-approval.md`
 - Add completion/supersession notice: `docs/review-handoffs/2026-08-16-consolidated-predeployment-closeout-review-handoff.md`
 - Create: `docs/review-handoffs/2026-08-20-post-pr33-deployment-path-remediation-review-handoff.md`
 
@@ -599,8 +620,9 @@ terraform fmt -check -recursive infra/gcp
 1. Search authoritative Markdown for stale feature branch, open PR #33, “awaiting review,” “local closeout pending,” “proposed ADR-0012,” and pre-remediation Gate 4/5 language.
 2. Update current/living surfaces; add notices to historical surfaces.
 3. Append observed test/review evidence only after all commands finish; do not edit while final-head gates run.
-4. Create a handoff with exact base/head, changed-path manifest, finding ledger/dispositions, component reviews, test evidence, deferred Gate 2+ facts, and explicit no-cloud statement.
-5. Run path-reference and diff hygiene.
+4. Create `deploy/gcp/staged-plan-approval.md` as the value-safe procedure for every future stage transition: saved binary plan custody, JSON inventory, source/lock/non-secret-input/plan digests, stage and workload digest binding, explicit approval record, post-apply verifier, and reverse-transition destruction review. It must preserve the separate approval boundary and contain no live values.
+5. Create a handoff with exact base/head, changed-path manifest, finding ledger/dispositions, component reviews, test evidence, deferred Gate 2+ facts, and explicit no-cloud statement.
+6. Run path-reference and diff hygiene.
 
 **Expected GREEN:** no authoritative living surface presents PR #33 as open or the deployment path as ready for plan/apply.
 
@@ -621,8 +643,8 @@ terraform fmt -check -recursive infra/gcp
 4. Terraform formatting.
 5. Clean-checkout workload root `init -backend=false -input=false -lockfile=readonly` and `validate`.
 6. Clean-checkout bootstrap root `init -backend=false -input=false -lockfile=readonly` and `validate`.
-7. Clean-copy graph probes for `foundation`, `migration`, and `service` stages.
-8. Focused verifier/provenance/qualification/workflow tests.
+7. Clean-copy graph probes plus local evaluated-inventory checks for `foundation`, `migration`, and `service` stages.
+8. Focused verifier/provenance/qualification/workflow tests, including stage-plan-receipt, per-secret IAM, tester-authority, qualification-failure-evidence, monitoring-stage, and every-attestation trust-boundary matrices.
 9. Full Python format/lint/mypy/Bandit/application suite with disposable PostgreSQL and expected fail-closed downgrade proof.
 10. Frontend lock validation, verify/build, audit, and schema-validated SBOM.
 11. Backend dependency audit and schema-validated SBOM.
@@ -646,7 +668,8 @@ terraform fmt -check -recursive infra/gcp
 - zero undispositioned Blocker/High findings;
 - all Medium findings remediated or explicitly accepted with scope/mitigation;
 - both Terraform roots provider-schema valid;
-- stage graphs match the revised gate model;
+- stage graphs and evaluated inventories match the revised gate model;
+- future Gate 3+ transition records require the reviewed stage-plan receipt and explicit approval before apply or deploy execution;
 - no environment identifier, principal, backend value, plan, state, endpoint, credential, or payload in the committed range;
 - clean exact-range secret scan and diff hygiene;
 - no cloud authentication, plan/apply, provisioning, image push, secret action, service start, deployment, or live data;

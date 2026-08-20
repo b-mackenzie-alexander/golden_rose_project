@@ -2,8 +2,8 @@
 
 **Date:** 2026-08-20
 **Review base:** protected `develop@3c0118abb8b84472141992d2238033b1312d5af2`
-**Current branch:** `develop`
-**Packet status:** accepted by Beatrice; uncommitted documentation-only review surface
+**Current branch at initial review:** `develop`
+**Packet status:** historical initial planning review surface; PR #34 merged it into `develop` at `63caa4088da44d5f98663bfc2578a0f93444a0fc`
 **Cloud status:** no cloud action authorized or performed
 
 ## Objective
@@ -96,3 +96,11 @@ This planning packet authorizes no GCP authentication or inspection, backend mig
 - No unavailable second-human prerequisite is introduced.
 - No environment-specific or secret material appears in the packet.
 - Review outcome is recorded as quality evidence, not independent authorization.
+
+## Post-PR34 independent-review addendum
+
+The initial packet merged before the independent component reviews completed. Those reviews found plan-executability gaps, not new cloud facts and not a claim that F1-F17 are remediated: evaluated stage inventory cannot be proven by a configuration graph alone; foundation image input and per-secret runtime/migration IAM lack exact nodes; every transition lacks a review-bound saved-plan receipt; tester authority is caller-supplied and permits groups despite the individual-identity ADR; WIF lacks literal event-negative tests; the deploy path lacks exact receipt/attestation matrices; monitoring resources are not explicitly `service`-stage-only; qualification failure lacks minimized durable evidence; and living docs retained pre-merge wording.
+
+`docs/post-pr34-planning-review-remediation` is the follow-up documentation-only branch. Its required outcome is an amended ADR/plan/handoff/living-doc packet with all Blocker/High findings remediated or explicitly accepted, followed by fresh independent rereview. This addendum grants no remediation implementation, cloud, Terraform, secret, publication, migration, service, tester-access, qualification, or production authority.
+
+The amended packet passed fresh independent component and status rereviews with no new Blocker/High finding. The same-repository-CI High remains explicitly accepted residual risk. Protected merge of the amendment remains required before any fresh implementation branch may be created.

@@ -2,6 +2,8 @@
 
 This runbook covers the one-time local bootstrap of the durable Terraform state bucket and the later migration to remote state. It is intentionally value-safe: operator-held project, bucket, location, and principal inputs stay out of tracked source.
 
+Current source status: the no-cloud deployment-path remediation is implemented locally on `fix/post-pr33-deployment-path-remediation` through Task 11, but this runbook remains future operator guidance only until the remediation review surface is committed, reviewed, merged, and the later cloud gates are explicitly approved.
+
 ## Scope
 
 - local bootstrap only
@@ -24,10 +26,14 @@ This runbook covers the one-time local bootstrap of the durable Terraform state 
 - only `b-mackenzie-alexander/golden_rose_project` may federate
 - only `refs/heads/develop` may federate
 - only the reviewed `develop` deployment environment may federate
-- pull-request subjects may not impersonate bootstrap-reviewed automation identities
+- only `workflow_dispatch` subjects may impersonate bootstrap-reviewed automation identities
+- `workflow_ref` must be exactly `b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop` for the image-publisher identity
+- `workflow_ref` must be exactly `b-mackenzie-alexander/golden_rose_project/.github/workflows/deploy-develop.yml@refs/heads/develop` for the deployer identity
 - wildcard repository, owner, ref, or environment claims are forbidden
-- principal-set broadening beyond the exact reviewed repository is forbidden
+- principal-set broadening beyond the exact reviewed workflow ref is forbidden
+- provisioner GitHub WIF remains disabled until a separately accepted Terraform-apply workflow exists
 - provisioner, image-publisher, and deployer identities stay separate
+- ordinary GitHub WIF paths do not receive `roles/iam.serviceAccountTokenCreator` unless a later reviewed operation proves it necessary
 - service-account keys remain forbidden; the handoff stays keyless
 
 ## Required operator-held values

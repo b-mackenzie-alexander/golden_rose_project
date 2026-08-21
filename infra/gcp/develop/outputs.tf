@@ -38,9 +38,12 @@ output "cost_guardrail_contract" {
 output "observability_contract" {
   description = "Value-safe reviewed observability contract for the private synthetic develop environment."
   value = {
-    log_retention_days        = var.log_retention_days
-    request_log_posture       = var.cloud_run_request_log_posture
-    startup_dependency        = true
-    broad_export_sink_modeled = false
+    log_retention_days                = var.log_retention_days
+    request_log_posture               = var.cloud_run_request_log_posture
+    startup_dependency                = true
+    broad_export_sink_modeled         = false
+    authenticated_readiness_uptime    = var.deployment_stage == "service"
+    readiness_alert_is_review_trigger = true
+    approved_service_level_commitment = false
   }
 }

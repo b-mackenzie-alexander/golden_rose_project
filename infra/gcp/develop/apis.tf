@@ -1,5 +1,6 @@
 locals {
   approved_project_services = toset([
+    "billingbudgets.googleapis.com",
     "cloudresourcemanager.googleapis.com",
     "iam.googleapis.com",
     "serviceusage.googleapis.com",

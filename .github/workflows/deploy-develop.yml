@@ -16,6 +16,7 @@ jobs:
     name: deploy
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: develop
     concurrency:
       group: deploy-develop
@@ -60,6 +61,32 @@ jobs:
       - name: Set up gcloud
         # v2.1.4
         uses: google-github-actions/setup-gcloud@77e7a554d41e2ee56fc945c52dfd3f33d12def9a
+
+      - name: Initialize failed deploy result
+        env:
+          PUBLISH_RUN_ID: ${{ inputs.publish_run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p build/reviewed-artifacts build
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          skeleton = {
+              "publish_run_id": os.environ["PUBLISH_RUN_ID"],
+              "result": "failed",
+              "current_stage": "pre_deploy_validation",
+              "qualification_executed": False,
+              "recovery_disposition": "forward recovery or teardown/rebuild required",
+          }
+          Path("build/deploy-result.json").write_text(
+              json.dumps(skeleton, indent=2) + "\n", encoding="utf-8"
+          )
+          Path("build/deploy-compatibility.json").write_text(
+              json.dumps(skeleton, indent=2) + "\n", encoding="utf-8"
+          )
+          PY
 
       - name: Download reviewed publish artifacts
         env:
@@ -153,8 +180,13 @@ jobs:
           artifact_targets = {
               "published-image": "published-image.txt",
               "image-metadata": "image-metadata.json",
+              "image-sbom-cdx": "image-sbom.cdx.json",
               "backend-sbom-cdx": "backend-sbom.cdx.json",
               "frontend-sbom-cdx": "frontend-sbom.cdx.json",
+              "publish-signature-verification": "publish-signature-verification.json",
+              "publish-provenance-verification": "publish-provenance-verification.json",
+              "publish-application-sbom-verification": "publish-application-sbom-verification.json",
+              "reviewed-stage-plan-receipt": "reviewed-stage-plan-receipt.json",
           }
           artifacts_payload = get_json(f"{api_base}/actions/runs/{run_id}/artifacts")
           artifacts = {
@@ -187,7 +219,7 @@ jobs:
         run: |
           set -euo pipefail
           PUBLISHED_IMAGE_REF="$(tr -d '\r\n' < build/reviewed-artifacts/published-image.txt)"
-          VERIFIED_IMAGE_REF="$(uv run python scripts/verify_image_provenance.py --mode publish --dockerfile Dockerfile --metadata-path build/reviewed-artifacts/image-metadata.json --backend-sbom-path build/reviewed-artifacts/backend-sbom.cdx.json --frontend-sbom-path build/reviewed-artifacts/frontend-sbom.cdx.json --published-image-repository "$MANAGED_REPOSITORY")"
+          VERIFIED_IMAGE_REF="$(uv run python scripts/verify_image_provenance.py --mode publish --dockerfile Dockerfile --metadata-path build/reviewed-artifacts/image-metadata.json --backend-sbom-path build/reviewed-artifacts/backend-sbom.cdx.json --frontend-sbom-path build/reviewed-artifacts/frontend-sbom.cdx.json --published-image-repository "$MANAGED_REPOSITORY" --signature-verification-path build/reviewed-artifacts/publish-signature-verification.json --provenance-verification-path build/reviewed-artifacts/publish-provenance-verification.json --image-sbom-path build/reviewed-artifacts/image-sbom.cdx.json --application-sbom-verification-path build/reviewed-artifacts/publish-application-sbom-verification.json)"
           test "$VERIFIED_IMAGE_REF" = "$PUBLISHED_IMAGE_REF"
           case "$VERIFIED_IMAGE_REF" in
             "$MANAGED_REPOSITORY"@sha256:*) ;;
@@ -221,49 +253,135 @@ jobs:
               "rollback_without_proven_compatibility_window": False,
               "recovery_posture": "forward recovery",
               "qualification_executed": False,
-              "compatibility_evidence": "published-image artifact plus backend/frontend SBOM and metadata evidence from the reviewed publish run",
+              "compatibility_evidence": "published-image artifact plus backend/frontend SBOM, image SBOM, signature/provenance verification, and metadata evidence from the reviewed publish run",
           }
           Path("build/deploy-compatibility.json").write_text(
               json.dumps(payload, indent=2) + "\n", encoding="utf-8"
           )
           PY
 
-      - name: Update migration job to reviewed image
+      - name: Validate reviewed stage plan receipt
+        env:
+          PUBLISH_RUN_ID: ${{ inputs.publish_run_id }}
+          DEPLOY_COMMIT_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          gcloud run jobs update run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --image "$MANAGED_IMAGE" >/dev/null
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path("build/reviewed-artifacts/reviewed-stage-plan-receipt.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          required_fields = {
+              "stage",
+              "source_sha",
+              "plan_hash",
+              "provider_lock_digest",
+              "approval_reference",
+              "evaluated_inventory",
+              "workload_image_digest",
+          }
+          missing = sorted(required_fields - set(receipt))
+          if missing:
+              raise SystemExit(f"reviewed stage plan receipt missing required fields: {missing}")
+          if receipt["stage"] != "service":
+              raise SystemExit("reviewed stage plan receipt stage must be service")
+          if receipt["source_sha"] != os.environ["DEPLOY_COMMIT_SHA"]:
+              raise SystemExit("reviewed stage plan receipt source sha must match deploy commit sha")
+          inventory = receipt["evaluated_inventory"]
+          if inventory.get("google_cloud_run_v2_job", 0) < 1:
+              raise SystemExit("reviewed stage plan receipt must include the migration job inventory")
+          if inventory.get("google_cloud_run_v2_service", 0) < 1:
+              raise SystemExit("reviewed stage plan receipt must include the service inventory")
+          if receipt["workload_image_digest"] != os.environ["IMAGE_DIGEST"]:
+              raise SystemExit("reviewed stage plan receipt digest must match the reviewed image digest")
+          PY
+
+      - name: Verify migration job already matches reviewed image
+        run: |
+          set -euo pipefail
+          CURRENT_JOB_IMAGE=$(gcloud run jobs describe run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --format='value(template.template.containers[0].image)')
+          test "$CURRENT_JOB_IMAGE" = "$MANAGED_IMAGE"
 
       - name: Execute migration job
         run: |
           set -euo pipefail
-          gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --wait >/dev/null
+          if ! gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --wait >/dev/null; then
+            python - <<'PY'
+            import json
+            from pathlib import Path
 
-      - name: Deploy reviewed service
+            path = Path("build/deploy-result.json")
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["current_stage"] = "migration_execution"
+            payload["recovery_disposition"] = "forward recovery or teardown/rebuild required"
+            path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+            PY
+            exit 1
+          fi
+
+      - name: Verify service already matches reviewed image
         run: |
           set -euo pipefail
-          gcloud run services update staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --image "$MANAGED_IMAGE" >/dev/null
+          CURRENT_SERVICE_IMAGE=$(gcloud run services describe staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --format='value(spec.template.spec.containers[0].image)')
+          test "$CURRENT_SERVICE_IMAGE" = "$MANAGED_IMAGE"
 
       - name: Verify readiness gate and record deploy result
         env:
           PUBLISH_RUN_ID: ${{ inputs.publish_run_id }}
         run: |
           set -euo pipefail
-          READY_STATUS=$(gcloud run services describe staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --format='value(status.conditions[0].status)')
-          test "$READY_STATUS" = "True"
+          if ! SERVICE_JSON=$(gcloud run services describe staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --format=json); then
+            python - <<'PY'
+            import json
+            from pathlib import Path
+
+            path = Path("build/deploy-result.json")
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["current_stage"] = "service_readiness"
+            payload["recovery_disposition"] = "forward recovery or teardown/rebuild required"
+            path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+            PY
+            exit 1
+          fi
+          export SERVICE_JSON
           mkdir -p build
           python - <<'PY'
           import json
           import os
           from pathlib import Path
 
+          service = json.loads(os.environ["SERVICE_JSON"])
+          ready_condition = next(
+              (
+                  condition
+                  for condition in service.get("status", {}).get("conditions", [])
+                  if condition.get("type") == "Ready"
+              ),
+              None,
+          )
+          if not ready_condition or ready_condition.get("status") != "True":
+              raise SystemExit("cloud run ready condition must be True")
+          ready_revision = service.get("status", {}).get("latestReadyRevisionName")
+          ready_image = service.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [{}])[0].get("image")
+          if ready_image is None or "@" not in ready_image:
+              raise SystemExit("ready service image must remain digest-bound")
+          if ready_image.split("@", 1)[1] != os.environ["IMAGE_DIGEST"]:
+              raise SystemExit("ready service digest must match reviewed image digest")
           payload = {
               "publish_run_id": os.environ["PUBLISH_RUN_ID"],
               "publish_run_identity": json.loads(
                   Path("build/reviewed-publish-run.json").read_text(encoding="utf-8")
               ),
               "image_digest": os.environ["IMAGE_DIGEST"],
+              "ready_revision": ready_revision,
+              "ready_image": ready_image,
               "migration_executed": True,
-              "deploy_executed": True,
+              "deploy_executed": False,
               "readiness_checked": True,
               "qualification_executed": False,
               "result": "success",

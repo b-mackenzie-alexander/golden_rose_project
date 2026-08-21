@@ -2,6 +2,8 @@
 
 This runbook defines the controlled disposal and reconstruction of the private fictional-synthetic `develop` workload environment while preserving the lifecycle-independent control plane and remote state. It does not authorize any automatic scheduled destroy or unreviewed cloud mutation from this source-controlled branch.
 
+Current source status: the teardown/rebuild source contracts are implemented locally on `fix/post-pr33-deployment-path-remediation`, but this runbook remains future operator guidance only until the remediation review surface is merged and the later operational gates are explicitly approved.
+
 ## Scope
 
 - disposable workload teardown and rebuild only

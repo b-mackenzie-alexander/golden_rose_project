@@ -2,12 +2,15 @@
 
 This runbook defines the human/operator ceremony for the first private fictional-synthetic `develop` deployment after the separate cloud-read, Terraform-plan, and foundation-apply gates are complete. It is intentionally value-safe: project IDs, domains, tester identities, secret payloads, passwords, tokens, and exact private endpoints stay in operator-held records rather than tracked source.
 
+Current source status: the no-cloud deployment-path remediation is implemented locally on `fix/post-pr33-deployment-path-remediation` through Task 11, but this runbook remains future operator guidance only until committed-head review, merge, and the later cloud gates are explicitly approved.
+
 ## Scope
 
 - first private fictional-synthetic `develop` deployment only
 - out-of-band secret payload custody and injection
 - private tester access while application auth remains synthetic
 - rollback/forward-recovery coordination inputs before first traffic
+- deployment/readiness evidence distinct from later Gate 6 qualification evidence
 - no Terraform secret payload handling
 - no chat, commit, artifact, or ordinary-log secret handling
 
@@ -84,9 +87,9 @@ If later deployment wiring uses a different secret-to-environment mapping, updat
 
 While application auth remains synthetic, platform-level access to the private Cloud Run service is the only tester gate. The private tester ceremony must therefore:
 
-- use named tester identities or an approved named tester group recorded outside public evidence
+- use only reviewed named tester user identities recorded outside public evidence
 - grant access only at the reviewed Cloud Run service boundary
-- preserve the reviewed private ingress posture
+- preserve the reviewed IAM-authenticated internet-reachable ingress posture
 - avoid `allUsers` and `allAuthenticatedUsers`
 - avoid broad project-level convenience bindings
 - end with explicit access removal or review-triggered retention in the private operator record

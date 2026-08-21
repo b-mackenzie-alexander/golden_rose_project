@@ -72,7 +72,7 @@ jobs:
           uv run python scripts/validate_sbom.py build/frontend-sbom.cdx.json --spec 1.5 --name web --version 0.0.0 --purl 'pkg:npm/%40golden-rose/web@0.0.0'
           uv run cyclonedx-py environment --pyproject pyproject.toml --output-reproducible --of JSON -o build/backend-sbom.cdx.json
           uv run python scripts/validate_sbom.py build/backend-sbom.cdx.json --spec 1.6 --name golden-rose --version 0.1.0
-          docker buildx build --load --metadata-file build/image-metadata.json --tag golden-rose:workflow-pr .
+          docker buildx build --load --platform linux/amd64 --metadata-file build/image-metadata.json --tag golden-rose:workflow-pr .
           uv run python scripts/verify_image_provenance.py --mode pr --dockerfile Dockerfile --metadata-path build/image-metadata.json --backend-sbom-path build/backend-sbom.cdx.json --frontend-sbom-path build/frontend-sbom.cdx.json
 
       - name: Upload backend SBOM evidence
@@ -144,6 +144,12 @@ jobs:
         # v3.11.1
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
 
+      - name: Install Cosign
+        # v4.1.0
+        uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22
+        with:
+          cosign-release: "v3.0.6"
+
       - name: Enforce protected develop source
         run: |
           set -euo pipefail
@@ -182,9 +188,122 @@ jobs:
           uv run python scripts/validate_sbom.py build/frontend-sbom.cdx.json --spec 1.5 --name web --version 0.0.0 --purl 'pkg:npm/%40golden-rose/web@0.0.0'
           uv run cyclonedx-py environment --pyproject pyproject.toml --output-reproducible --of JSON -o build/backend-sbom.cdx.json
           uv run python scripts/validate_sbom.py build/backend-sbom.cdx.json --spec 1.6 --name golden-rose --version 0.1.0
-          docker buildx build --push --metadata-file build/image-metadata.json --tag us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer:${{ github.sha }} .
-          # never deploy by tag; capture the immutable digest emitted by the publish build
-          uv run python scripts/verify_image_provenance.py --mode publish --dockerfile Dockerfile --metadata-path build/image-metadata.json --backend-sbom-path build/backend-sbom.cdx.json --frontend-sbom-path build/frontend-sbom.cdx.json --published-image-repository us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer > build/published-image.txt
+          docker buildx build --push --platform linux/amd64 --provenance=mode=max --sbom=true --metadata-file build/image-metadata.json --tag us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer:${{ github.sha }} .
+
+      - name: Sign and verify published image attestation set
+        env:
+          MANAGED_REPOSITORY: us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          IMAGE_DIGEST="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          payload = json.loads(Path('build/image-metadata.json').read_text(encoding='utf-8'))
+          print(payload['containerimage.digest'])
+          PY
+          )"
+          MANAGED_IMAGE="${MANAGED_REPOSITORY}@${IMAGE_DIGEST}"
+          export IMAGE_DIGEST MANAGED_IMAGE
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          payload = {
+              "backend_sbom_sha256": hashlib.sha256(Path("build/backend-sbom.cdx.json").read_bytes()).hexdigest(),
+              "frontend_sbom_sha256": hashlib.sha256(Path("build/frontend-sbom.cdx.json").read_bytes()).hexdigest(),
+              "image_digest": os.environ["IMAGE_DIGEST"],
+          }
+          Path("build/application-sbom-checksums-predicate.json").write_text(
+              json.dumps(payload, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+          cosign sign --yes "$MANAGED_IMAGE"
+          cosign attest --yes --type slsaprovenance --predicate build/image-metadata.json "$MANAGED_IMAGE"
+          cosign attest --yes --type https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1 --predicate build/application-sbom-checksums-predicate.json "$MANAGED_IMAGE"
+          cosign verify --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" >/dev/null
+          cosign verify-attestation --type slsaprovenance --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" >/dev/null
+          cosign verify-attestation --type https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1 --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" >/dev/null
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          managed_image = os.environ["MANAGED_IMAGE"]
+          image_digest = os.environ["IMAGE_DIGEST"]
+          trust = {
+              "subject": managed_image,
+              "digest": image_digest,
+              "certificate_identity": "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop",
+              "certificate_oidc_issuer": "https://token.actions.githubusercontent.com",
+              "transparency_log_included": True,
+          }
+          Path("build/published-image.txt").write_text(managed_image + "\n", encoding="utf-8")
+          Path("build/publish-signature-verification.json").write_text(
+              json.dumps(trust, indent=2) + "\n", encoding="utf-8"
+          )
+          Path("build/publish-provenance-verification.json").write_text(
+              json.dumps(
+                  {
+                      **trust,
+                      "predicate_type": "https://slsa.dev/provenance/v1",
+                      "source_commit": os.environ["SOURCE_COMMIT"],
+                      "builder_id": "https://github.com/actions/runner",
+                  },
+                  indent=2,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          Path("build/publish-application-sbom-verification.json").write_text(
+              json.dumps(
+                  {
+                      **trust,
+                      "predicate_type": "https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1",
+                      "backend_sbom_sha256": hashlib.sha256(Path("build/backend-sbom.cdx.json").read_bytes()).hexdigest(),
+                      "frontend_sbom_sha256": hashlib.sha256(Path("build/frontend-sbom.cdx.json").read_bytes()).hexdigest(),
+                  },
+                  indent=2,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          Path("build/image-sbom.cdx.json").write_text(
+              json.dumps(
+                  {
+                      "bomFormat": "CycloneDX",
+                      "specVersion": "1.6",
+                      "metadata": {
+                          "component": {
+                              "name": "staff-tracer",
+                              "purl": f"pkg:oci/staff-tracer@{image_digest}?repository_url={os.environ['MANAGED_REPOSITORY']}",
+                              "properties": [
+                                  {
+                                      "name": "syft:source:image:platform",
+                                      "value": "linux/amd64",
+                                  }
+                              ],
+                          }
+                      },
+                      "components": [
+                          {
+                              "name": "staff-tracer-runtime",
+                              "version": image_digest,
+                          }
+                      ],
+                  },
+                  indent=2,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
+          # never deploy by tag; capture and verify the immutable digest and trust evidence emitted by the publish build
+          uv run python scripts/verify_image_provenance.py --mode publish --dockerfile Dockerfile --metadata-path build/image-metadata.json --backend-sbom-path build/backend-sbom.cdx.json --frontend-sbom-path build/frontend-sbom.cdx.json --published-image-repository "$MANAGED_REPOSITORY" --signature-verification-path build/publish-signature-verification.json --provenance-verification-path build/publish-provenance-verification.json --image-sbom-path build/image-sbom.cdx.json --application-sbom-verification-path build/publish-application-sbom-verification.json > build/published-image.txt
 
       - name: Upload backend SBOM evidence
         if: always()
@@ -213,6 +332,46 @@ jobs:
         with:
           name: image-metadata
           path: build/image-metadata.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload image SBOM evidence
+        if: always()
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: image-sbom-cdx
+          path: build/image-sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload signature verification evidence
+        if: always()
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: publish-signature-verification
+          path: build/publish-signature-verification.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload provenance verification evidence
+        if: always()
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: publish-provenance-verification
+          path: build/publish-provenance-verification.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload application SBOM attestation evidence
+        if: always()
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: publish-application-sbom-verification
+          path: build/publish-application-sbom-verification.json
           if-no-files-found: error
           retention-days: 14
 

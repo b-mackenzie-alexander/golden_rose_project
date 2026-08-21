@@ -39,8 +39,8 @@
 - [x] Review, accept, and merge proposed ADR-0012 plus `.hermes/plans/2026-08-15_210257-consolidated-predeployment-foundation-plan.md`. PR #30 merged the packet into protected `develop` at `f9b7903`; it adopts the permanent solo-maintainer posture, consolidates bootstrap/state/WIF, remaining IAM/runtime/database authority, budgets/observability, immutable workflows, recovery/teardown, and gate evidence into one later pre-deployment implementation PR, and grants no cloud authority by itself.
 - [x] Close out and merge the consolidated source-controlled pre-deployment PR. PR #33 merged into protected `develop` at `3c0118a`; its source contracts and local/CI evidence are historical, and its branch is retired. No cloud action occurred.
 - [x] Review, accept, and merge the initial ADR-0013 planning packet as PR #34 at `63caa40`. The post-merge audit found F1-F17 deployment-path defects, including four Blockers; the accepted decisions cover staged `foundation → migration → service` authority, Terraform-only configuration ownership, IAM-private internet-reachable named testers, viewer/exact-job deploy execution, direct-workflow `workflow_ref` WIF separation, digest-bound Cosign/SLSA/SBOM evidence, and authenticated `/readiness` uptime monitoring. Initial planning merge grants no implementation or cloud authority.
-- [ ] Amend, independently rereview, and merge the post-PR34 ADR-0013 planning packet so evaluated-stage proof, stage-safe image inputs, per-secret IAM, staged-plan receipts, tester authority, attestation matrices, service-stage monitoring, qualification-failure evidence, and living-doc status are executable before any implementation branch is created.
-- [ ] Implement, independently rereview, qualify, and merge the bounded F1-F17 no-cloud remediation from the exact ADR-0013 planning merge. All Blocker/High findings require remediation or explicit Beatrice disposition; the same-repository-CI High remains open accepted residual risk.
+- [x] Amend, independently rereview, and merge the post-PR34 ADR-0013 planning packet so evaluated-stage proof, stage-safe image inputs, per-secret IAM, staged-plan receipts, tester authority, attestation matrices, service-stage monitoring, qualification-failure evidence, and living-doc status are executable before any implementation branch is created. PR #35 merged the amended packet into protected `develop` at `db1f293`; the packet is historical planning context and grants no cloud authority.
+- [ ] Implement, independently rereview, qualify, and merge the bounded F1-F17 no-cloud remediation from the exact ADR-0013 planning merge. The active local branch `fix/post-pr33-deployment-path-remediation` was created from `develop@fd7b89d` and now carries Tasks 1–12 plus Task 13 pre-closeout qualification as an uncommitted no-cloud review surface; current observed evidence includes `307 passed` across the four remediation suites, locked static validation, both Terraform root `init -backend=false -input=false -lockfile=readonly` / `validate` passes, exact application-quality local CI parity with Docker-backed PostgreSQL (`634 passed`, `95.92%` coverage, expected fail-closed downgrade proof, frontend/backend SBOM validation, dependency audits, Ruff, mypy, Bandit), local `linux/amd64` Buildx image build plus PR-mode provenance verification, working-tree Gitleaks, and clean `git diff --check`. Closeout commit, exact-head rerun, push/PR, and merge remain pending. All Blocker/High findings require remediation or explicit Beatrice disposition; the same-repository-CI High remains open accepted residual risk.
 - [ ] After the ADR-0013 F1-F17 remediation merges, proceed through separate explicit gates for read-only GCP qualification, reviewed bootstrap/backend work, staged Terraform plans/applies, immutable publication, secret/database preparation, migration execution, service activation, and qualification. Project IDs, billing IDs, user emails, domains, principals, credentials, plans, state, and secret payloads must stay out of tracked source.
 - [ ] Establish and qualify the isolated GCP non-production environment with wholly fictional synthetic data only: Artifact Registry, Secret Manager metadata and out-of-band payload injection, Cloud Run, Cloud SQL, Logging/Monitoring, and GitHub Workload Identity Federation. Any client/live-derived data admission requires a new reviewed decision and is prohibited under ADR-0009.
 - [ ] Verify non-production deployment by immutable image digest, least-privilege runtime/deployment identities, budget/alert routing, migration/rollback, backup/restore, log redaction, and environment teardown/rebuild evidence.
@@ -163,29 +163,29 @@
 
 ### Friday, August 21 — close the deployment Blockers first
 
-- [ ] Create `fix/post-pr33-deployment-path-remediation` from the exact ADR-0013 planning merge.
-- [ ] Complete exact-node RED → GREEN coverage for required `foundation → migration → service` staging.
-- [ ] Prove the foundation graph contains no executable Cloud Run job or service.
-- [ ] Wire exact runtime and migration configuration plus distinct Secret Manager references without payloads in Terraform.
-- [ ] Remove imperative Cloud Run configuration mutation from the deploy workflow.
-- [ ] Replace broad deploy authority with exact-job `roles/run.jobsExecutor` and exact job/service `roles/run.viewer`.
-- [ ] Enforce direct-workflow `workflow_ref` separation for publisher and deploy executor; remove dormant GitHub provisioner WIF and unnecessary Token Creator authority.
-- [ ] Run focused no-cloud tests, locked static validation, both Terraform root validations, and diff hygiene for the day’s nodes.
+- [x] Create `fix/post-pr33-deployment-path-remediation` from the exact ADR-0013 planning merge.
+- [x] Complete exact-node RED → GREEN coverage for required `foundation → migration → service` staging.
+- [x] Prove the foundation graph contains no executable Cloud Run job or service.
+- [x] Wire exact runtime and migration configuration plus distinct Secret Manager references without payloads in Terraform.
+- [x] Remove imperative Cloud Run configuration mutation from the deploy workflow.
+- [x] Replace broad deploy authority with exact-job `roles/run.jobsExecutor` and exact job/service `roles/run.viewer`.
+- [x] Enforce direct-workflow `workflow_ref` separation for publisher and deploy executor; remove dormant GitHub provisioner WIF and unnecessary Token Creator authority.
+- [x] Run focused no-cloud tests, locked static validation, both Terraform root validations, and diff hygiene for the day’s nodes.
 
 **Critical checkpoint:** F1-F3 and F7 have source-level GREEN evidence; no cloud command or service start has occurred.
 
 ### Saturday, August 22 — finish the no-cloud remediation surface
 
-- [ ] Implement the accepted IAM-private internet-reachable named-tester ingress contract without public/broad invocation.
-- [ ] Add Billing Budgets API management/dependency and provider-valid Cloud SQL recovery bounds.
-- [ ] Correct stage-aware foundation-verifier API, IAM, budget-channel, and live-response representations.
-- [ ] Make deploy evidence failure-safe, non-mutating, typed-Ready-aware, and explicit that Gate 6 qualification has not run.
-- [ ] Add bootstrap provider-schema CI validation and stage-aware Terraform expansion/cardinality policy.
-- [ ] Implement keyless exact-digest Cosign signature and signed SLSA v1, image-SBOM, and checksum-bound application-SBOM verification at publish and deploy boundaries.
-- [ ] Enforce the reviewed request-log minimization posture or record a narrow truthful disposition.
-- [ ] Add authenticated Cloud Monitoring `/readiness` uptime evidence with exact monitoring-service-agent invocation and provisional repeated-failure routing.
-- [ ] Reconcile remediation docs and prepare the exact implementation review handoff.
-- [ ] Run the complete local no-cloud qualification bundle.
+- [x] Implement the accepted IAM-private internet-reachable named-tester ingress contract without public/broad invocation.
+- [x] Add Billing Budgets API management/dependency and provider-valid Cloud SQL recovery bounds.
+- [x] Correct stage-aware foundation-verifier API, IAM, budget-channel, and live-response representations.
+- [x] Make deploy evidence failure-safe, non-mutating, typed-Ready-aware, and explicit that Gate 6 qualification has not run.
+- [x] Add bootstrap provider-schema CI validation and stage-aware Terraform expansion/cardinality policy.
+- [x] Implement keyless exact-digest Cosign signature and signed SLSA v1, image-SBOM, and checksum-bound application-SBOM verification at publish and deploy boundaries.
+- [x] Enforce the reviewed request-log minimization posture or record a narrow truthful disposition.
+- [x] Add authenticated Cloud Monitoring `/readiness` uptime evidence with exact monitoring-service-agent invocation and provisional repeated-failure routing.
+- [x] Reconcile remediation docs and prepare the exact implementation review handoff.
+- [x] Run the complete local no-cloud qualification bundle.
 
 **Critical checkpoint:** F1-F17 have implemented evidence or an explicit accepted residual-risk disposition; no undispositioned Blocker/High remains in the working tree.
 

@@ -28,15 +28,25 @@ Region: us-east4
 - Evidence must not include submitted names, UUIDs, command IDs, cursors, raw bodies, DSNs, tokens, or exception payloads.
 - Cleanup must state teardown/rebuild disposition without inventing product delete semantics.
 
+## Image provenance posture
+- Deploy evidence must bind to one immutable `sha256:` image digest; tags alone are not acceptable proof.
+- Record whether signature, provenance, image SBOM, and application SBOM attestation verification all matched the exact reviewed digest.
+- Record the reviewed GitHub Actions certificate identity and OIDC issuer without copying raw certificate bundles or Rekor payloads.
+- Do not claim publication or attestation verification occurred unless the reviewed workflow emitted those exact evidence artifacts.
+
 ## Foundation checks
+- Stage mode is recorded as foundation, migration, or service and the expected workload absence/presence is evaluated accordingly.
 - Project labels and inventory match the reviewed develop posture.
 - Only approved APIs are enabled.
+- Budget evidence preserves raw notification-channel resource names and compares them separately from human display names.
 - Cloud Run invoker access remains private and named.
+- Authenticated `/readiness` uptime evidence exists only in service and uses the reviewed monitoring service-agent path.
 - Cloud SQL remains private-path only.
 - No service-account keys exist.
 - Project/service-account IAM matches the reviewed effective-authority contract.
 - State bucket versioning/access/recovery posture is intact.
 - Budget, alert route, and logging posture are present.
+- Availability alerts are provisional develop review triggers, not SLOs or client commitments.
 
 ## Violations
 - [REDACTED or none]

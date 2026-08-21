@@ -42,8 +42,10 @@ jobs:
       - name: Run Terraform local validation
         run: |
           terraform fmt -check -recursive infra/gcp
-          terraform -chdir=infra/gcp init -backend=false -input=false
+          terraform -chdir=infra/gcp init -backend=false -input=false -lockfile=readonly
           terraform -chdir=infra/gcp validate
+          terraform -chdir=infra/gcp/bootstrap init -backend=false -input=false -lockfile=readonly
+          terraform -chdir=infra/gcp/bootstrap validate
 
       - name: Run Terraform static validation
         run: uv run --locked python scripts/validate_terraform_static.py

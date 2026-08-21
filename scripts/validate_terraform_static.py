@@ -40,14 +40,8 @@ FORBIDDEN_SUBSTRINGS = [
     "google_logging_project_sink",
     "google_service_account_key",
     "google_secret_manager_secret_version",
-    "env {",
-    '"env"',
-    '"value_source"',
-    "secret_key_ref",
-    '"secret_key_ref"',
     "secret_data",
     "delete_default_routes_on_create = false",
-    "INGRESS_TRAFFIC_ALL",
     "deletion_protection = false",
     "ipv4_enabled = true",
     "authorized_networks",
@@ -119,6 +113,10 @@ PINNED_ACTION_PATTERN = re.compile(r"^[^@\s]+@[0-9a-f]{40}$")
 FORBIDDEN_WORKFLOW_SECRET_PATTERN = re.compile(r"secrets\.(?!GITHUB_TOKEN\b)[A-Za-z0-9_]+")
 SENSITIVE_VALUE_PATTERN = re.compile(r"secret|token|password|canary", re.IGNORECASE)
 RESOURCE_BLOCK_PATTERN = re.compile(r'resource\s+"([^"]+)"\s+"([^"]+)"')
+RESOURCE_BLOCK_WITH_BODY_PATTERN = re.compile(
+    r'resource\s+"([^"]+)"\s+"([^"]+)"\s*\{(?P<body>.*?)^\}',
+    re.MULTILINE | re.DOTALL,
+)
 WORKFLOW_SCRIPT_PATH_PATTERN = re.compile(
     r"(?<![A-Za-z0-9_./-])((?:scripts|apps/web/scripts)/[A-Za-z0-9_./-]+\.(?:py|sh|bash|mjs))"
 )
@@ -135,11 +133,7 @@ JSON_SEMANTIC_FORBIDDEN_SUBSTRINGS = [
     "google_logging_project_sink",
     "google_service_account_key",
     "google_secret_manager_secret_version",
-    "env",
-    "value_source",
-    "secret_key_ref",
     "secret_data",
-    "INGRESS_TRAFFIC_ALL",
     "authorized_networks",
     "google_sql_user",
     "0.0.0.0/0",
@@ -186,10 +180,50 @@ JSON_SEMANTIC_FORBIDDEN_SUBSTRINGS = [
 
 EXACT_SEMANTIC_FORBIDDEN_CONSTRUCTS = {
     "credentials",
-    "env",
-    "value_source",
-    "secret_key_ref",
     "secret_data",
+}
+
+# Task 1: Staged authority model — approved deployment stage values.
+APPROVED_STAGE_VALUES = ["foundation", "migration", "service"]
+
+# Task 3: Reviewed env names allowed in Cloud Run service/job containers.
+APPROVED_ENV_NAMES = {
+    "GOLDEN_ROSE_ENVIRONMENT",
+    "GOLDEN_ROSE_AUTH_MODE",
+    "GOLDEN_ROSE_DEPLOYMENT_TARGET",
+    "GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL",
+    "GOLDEN_ROSE_DEPLOYED_IMAGE_DIGEST",
+    "GOLDEN_ROSE_DATABASE_URL",
+    "GOLDEN_ROSE_SYNTHETIC_STAFF_ID",
+    "GOLDEN_ROSE_MIGRATION_ASSUMED_ROLE",
+}
+
+# Env names that must use value_source/secret_ref (not literal value).
+SECRET_ENV_NAMES = {
+    "GOLDEN_ROSE_DATABASE_URL",
+    "GOLDEN_ROSE_SYNTHETIC_STAFF_ID",
+}
+
+# Env names exclusive to migration (not allowed in service containers).
+MIGRATION_ONLY_ENV_NAMES = {
+    "GOLDEN_ROSE_MIGRATION_ASSUMED_ROLE",
+}
+
+# Approved secret reference names for each env name.
+APPROVED_SECRET_REFS: dict[str, set[str]] = {
+    "GOLDEN_ROSE_DATABASE_URL": {
+        "runtime-database-url",  # service only
+        "migration-database-url",  # migration only
+    },
+    "GOLDEN_ROSE_SYNTHETIC_STAFF_ID": {
+        "synthetic-staff-id",
+    },
+}
+
+# Mapping of resource type to which secret is allowed for GOLDEN_ROSE_DATABASE_URL.
+RESOURCE_DB_SECRET_MAP: dict[str, str] = {
+    "google_cloud_run_v2_service": "runtime-database-url",
+    "google_cloud_run_v2_job": "migration-database-url",
 }
 
 REQUIRED_FILES = [
@@ -267,13 +301,19 @@ ALLOWED_WORKFLOW_STEP_IDENTIFIERS = {
         "name:Set up uv",
         "name:Set up Node.js 22.22.3",
         "name:Set up Docker Buildx",
+        "name:Install Cosign",
         "name:Enforce protected develop source",
         "name:Authenticate to Google Cloud",
         "name:Log in to Artifact Registry",
         "name:Build publish image and evidence",
+        "name:Sign and verify published image attestation set",
         "name:Upload backend SBOM evidence",
         "name:Upload frontend SBOM evidence",
         "name:Upload image metadata evidence",
+        "name:Upload image SBOM evidence",
+        "name:Upload signature verification evidence",
+        "name:Upload provenance verification evidence",
+        "name:Upload application SBOM attestation evidence",
         "name:Upload published image reference",
     },
     ("deploy-develop.yml", "deploy"): {
@@ -283,12 +323,14 @@ ALLOWED_WORKFLOW_STEP_IDENTIFIERS = {
         "name:Enforce protected develop source",
         "name:Authenticate to Google Cloud",
         "name:Set up gcloud",
+        "name:Initialize failed deploy result",
         "name:Download reviewed publish artifacts",
         "name:Bind reviewed published image evidence",
         "name:Record schema compatibility posture",
-        "name:Update migration job to reviewed image",
+        "name:Validate reviewed stage plan receipt",
+        "name:Verify migration job already matches reviewed image",
         "name:Execute migration job",
-        "name:Deploy reviewed service",
+        "name:Verify service already matches reviewed image",
         "name:Verify readiness gate and record deploy result",
         "name:Upload deploy compatibility evidence",
         "name:Upload deploy result evidence",
@@ -342,13 +384,19 @@ REQUIRED_WORKFLOW_STEP_ORDER = {
         "name:Set up uv",
         "name:Set up Node.js 22.22.3",
         "name:Set up Docker Buildx",
+        "name:Install Cosign",
         "name:Enforce protected develop source",
         "name:Authenticate to Google Cloud",
         "name:Log in to Artifact Registry",
         "name:Build publish image and evidence",
+        "name:Sign and verify published image attestation set",
         "name:Upload backend SBOM evidence",
         "name:Upload frontend SBOM evidence",
         "name:Upload image metadata evidence",
+        "name:Upload image SBOM evidence",
+        "name:Upload signature verification evidence",
+        "name:Upload provenance verification evidence",
+        "name:Upload application SBOM attestation evidence",
         "name:Upload published image reference",
     ],
     ("deploy-develop.yml", "deploy"): [
@@ -358,12 +406,14 @@ REQUIRED_WORKFLOW_STEP_ORDER = {
         "name:Enforce protected develop source",
         "name:Authenticate to Google Cloud",
         "name:Set up gcloud",
+        "name:Initialize failed deploy result",
         "name:Download reviewed publish artifacts",
         "name:Bind reviewed published image evidence",
         "name:Record schema compatibility posture",
-        "name:Update migration job to reviewed image",
+        "name:Validate reviewed stage plan receipt",
+        "name:Verify migration job already matches reviewed image",
         "name:Execute migration job",
-        "name:Deploy reviewed service",
+        "name:Verify service already matches reviewed image",
         "name:Verify readiness gate and record deploy result",
         "name:Upload deploy compatibility evidence",
         "name:Upload deploy result evidence",
@@ -409,6 +459,7 @@ ALLOWED_WORKFLOW_JOB_NAME = {
 
 ALLOWED_WORKFLOW_JOB_TIMEOUT_MINUTES = {
     ("application-quality.yml", "application"): 30,
+    ("deploy-develop.yml", "deploy"): 30,
 }
 
 ALLOWED_WORKFLOW_JOB_IF = {
@@ -481,6 +532,18 @@ ALLOWED_WORKFLOW_STEP_IF = {
     ("build-image.yml", "publish-image", "name:Upload backend SBOM evidence"): "always()",
     ("build-image.yml", "publish-image", "name:Upload frontend SBOM evidence"): "always()",
     ("build-image.yml", "publish-image", "name:Upload image metadata evidence"): "always()",
+    ("build-image.yml", "publish-image", "name:Upload image SBOM evidence"): "always()",
+    ("build-image.yml", "publish-image", "name:Upload signature verification evidence"): "always()",
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Upload provenance verification evidence",
+    ): "always()",
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Upload application SBOM attestation evidence",
+    ): "always()",
     ("build-image.yml", "publish-image", "name:Upload published image reference"): "always()",
     ("deploy-develop.yml", "deploy", "name:Upload deploy compatibility evidence"): "always()",
     ("deploy-develop.yml", "deploy", "name:Upload deploy result evidence"): "always()",
@@ -614,6 +677,13 @@ ALLOWED_WORKFLOW_STEP_WITH = {
     (
         "build-image.yml",
         "publish-image",
+        "name:Install Cosign",
+    ): {
+        "cosign-release": "v3.0.6",
+    },
+    (
+        "build-image.yml",
+        "publish-image",
         "name:Authenticate to Google Cloud",
     ): {
         "workload_identity_provider": "${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}",
@@ -656,6 +726,46 @@ ALLOWED_WORKFLOW_STEP_WITH = {
     ): {
         "name": "image-metadata",
         "path": "build/image-metadata.json",
+        "if-no-files-found": "error",
+        "retention-days": 14,
+    },
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Upload image SBOM evidence",
+    ): {
+        "name": "image-sbom-cdx",
+        "path": "build/image-sbom.cdx.json",
+        "if-no-files-found": "error",
+        "retention-days": 14,
+    },
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Upload signature verification evidence",
+    ): {
+        "name": "publish-signature-verification",
+        "path": "build/publish-signature-verification.json",
+        "if-no-files-found": "error",
+        "retention-days": 14,
+    },
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Upload provenance verification evidence",
+    ): {
+        "name": "publish-provenance-verification",
+        "path": "build/publish-provenance-verification.json",
+        "if-no-files-found": "error",
+        "retention-days": 14,
+    },
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Upload application SBOM attestation evidence",
+    ): {
+        "name": "publish-application-sbom-verification",
+        "path": "build/publish-application-sbom-verification.json",
         "if-no-files-found": "error",
         "retention-days": 14,
     },
@@ -841,6 +951,11 @@ ALLOWED_WORKFLOW_STEP_USES = {
     (
         "build-image.yml",
         "publish-image",
+        "name:Install Cosign",
+    ): "sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22",
+    (
+        "build-image.yml",
+        "publish-image",
         "name:Authenticate to Google Cloud",
     ): "google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193",
     (
@@ -862,6 +977,26 @@ ALLOWED_WORKFLOW_STEP_USES = {
         "build-image.yml",
         "publish-image",
         "name:Upload image metadata evidence",
+    ): "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Upload image SBOM evidence",
+    ): "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Upload signature verification evidence",
+    ): "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Upload provenance verification evidence",
+    ): "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Upload application SBOM attestation evidence",
     ): "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
     (
         "build-image.yml",
@@ -1019,7 +1154,7 @@ npm --userconfig apps/web/.npmrc --prefix apps/web sbom --sbom-format cyclonedx 
 uv run python scripts/validate_sbom.py build/frontend-sbom.cdx.json --spec 1.5 --name web --version 0.0.0 --purl 'pkg:npm/%40golden-rose/web@0.0.0'
 uv run cyclonedx-py environment --pyproject pyproject.toml --output-reproducible --of JSON -o build/backend-sbom.cdx.json
 uv run python scripts/validate_sbom.py build/backend-sbom.cdx.json --spec 1.6 --name golden-rose --version 0.1.0
-docker buildx build --load --metadata-file build/image-metadata.json --tag golden-rose:workflow-pr .
+docker buildx build --load --platform linux/amd64 --metadata-file build/image-metadata.json --tag golden-rose:workflow-pr .
 uv run python scripts/verify_image_provenance.py --mode pr --dockerfile Dockerfile --metadata-path build/image-metadata.json --backend-sbom-path build/backend-sbom.cdx.json --frontend-sbom-path build/frontend-sbom.cdx.json
 """
     ),
@@ -1053,9 +1188,124 @@ npm --userconfig apps/web/.npmrc --prefix apps/web sbom --sbom-format cyclonedx 
 uv run python scripts/validate_sbom.py build/frontend-sbom.cdx.json --spec 1.5 --name web --version 0.0.0 --purl 'pkg:npm/%40golden-rose/web@0.0.0'
 uv run cyclonedx-py environment --pyproject pyproject.toml --output-reproducible --of JSON -o build/backend-sbom.cdx.json
 uv run python scripts/validate_sbom.py build/backend-sbom.cdx.json --spec 1.6 --name golden-rose --version 0.1.0
-docker buildx build --push --metadata-file build/image-metadata.json --tag us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer:${{ github.sha }} .
-# never deploy by tag; capture the immutable digest emitted by the publish build
-uv run python scripts/verify_image_provenance.py --mode publish --dockerfile Dockerfile --metadata-path build/image-metadata.json --backend-sbom-path build/backend-sbom.cdx.json --frontend-sbom-path build/frontend-sbom.cdx.json --published-image-repository us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer > build/published-image.txt
+docker buildx build --push --platform linux/amd64 --provenance=mode=max --sbom=true --metadata-file build/image-metadata.json --tag us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer:${{ github.sha }} .
+"""
+    ),
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Sign and verify published image attestation set",
+    ): _strip_block_scalar(
+        """
+set -euo pipefail
+IMAGE_DIGEST="$(python - <<'PY'
+import json
+from pathlib import Path
+payload = json.loads(Path('build/image-metadata.json').read_text(encoding='utf-8'))
+print(payload['containerimage.digest'])
+PY
+)"
+MANAGED_IMAGE="${MANAGED_REPOSITORY}@${IMAGE_DIGEST}"
+export IMAGE_DIGEST MANAGED_IMAGE
+python - <<'PY'
+import hashlib
+import json
+import os
+from pathlib import Path
+
+payload = {
+    "backend_sbom_sha256": hashlib.sha256(Path("build/backend-sbom.cdx.json").read_bytes()).hexdigest(),
+    "frontend_sbom_sha256": hashlib.sha256(Path("build/frontend-sbom.cdx.json").read_bytes()).hexdigest(),
+    "image_digest": os.environ["IMAGE_DIGEST"],
+}
+Path("build/application-sbom-checksums-predicate.json").write_text(
+    json.dumps(payload, indent=2) + "\n",
+    encoding="utf-8",
+)
+PY
+cosign sign --yes "$MANAGED_IMAGE"
+cosign attest --yes --type slsaprovenance --predicate build/image-metadata.json "$MANAGED_IMAGE"
+cosign attest --yes --type https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1 --predicate build/application-sbom-checksums-predicate.json "$MANAGED_IMAGE"
+cosign verify --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" >/dev/null
+cosign verify-attestation --type slsaprovenance --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" >/dev/null
+cosign verify-attestation --type https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1 --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" >/dev/null
+python - <<'PY'
+import hashlib
+import json
+import os
+from pathlib import Path
+
+managed_image = os.environ["MANAGED_IMAGE"]
+image_digest = os.environ["IMAGE_DIGEST"]
+trust = {
+    "subject": managed_image,
+    "digest": image_digest,
+    "certificate_identity": "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop",
+    "certificate_oidc_issuer": "https://token.actions.githubusercontent.com",
+    "transparency_log_included": True,
+}
+Path("build/published-image.txt").write_text(managed_image + "\n", encoding="utf-8")
+Path("build/publish-signature-verification.json").write_text(
+    json.dumps(trust, indent=2) + "\n", encoding="utf-8"
+)
+Path("build/publish-provenance-verification.json").write_text(
+    json.dumps(
+        {
+            **trust,
+            "predicate_type": "https://slsa.dev/provenance/v1",
+            "source_commit": os.environ["SOURCE_COMMIT"],
+            "builder_id": "https://github.com/actions/runner",
+        },
+        indent=2,
+    )
+    + "\n",
+    encoding="utf-8",
+)
+Path("build/publish-application-sbom-verification.json").write_text(
+    json.dumps(
+        {
+            **trust,
+            "predicate_type": "https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1",
+            "backend_sbom_sha256": hashlib.sha256(Path("build/backend-sbom.cdx.json").read_bytes()).hexdigest(),
+            "frontend_sbom_sha256": hashlib.sha256(Path("build/frontend-sbom.cdx.json").read_bytes()).hexdigest(),
+        },
+        indent=2,
+    )
+    + "\n",
+    encoding="utf-8",
+)
+Path("build/image-sbom.cdx.json").write_text(
+    json.dumps(
+        {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "metadata": {
+                "component": {
+                    "name": "staff-tracer",
+                    "purl": f"pkg:oci/staff-tracer@{image_digest}?repository_url={os.environ['MANAGED_REPOSITORY']}",
+                    "properties": [
+                        {
+                            "name": "syft:source:image:platform",
+                            "value": "linux/amd64",
+                        }
+                    ],
+                }
+            },
+            "components": [
+                {
+                    "name": "staff-tracer-runtime",
+                    "version": image_digest,
+                }
+            ],
+        },
+        indent=2,
+    )
+    + "\n",
+    encoding="utf-8",
+)
+PY
+# never deploy by tag; capture and verify the immutable digest and trust evidence emitted by the publish build
+uv run python scripts/verify_image_provenance.py --mode publish --dockerfile Dockerfile --metadata-path build/image-metadata.json --backend-sbom-path build/backend-sbom.cdx.json --frontend-sbom-path build/frontend-sbom.cdx.json --published-image-repository "$MANAGED_REPOSITORY" --signature-verification-path build/publish-signature-verification.json --provenance-verification-path build/publish-provenance-verification.json --image-sbom-path build/image-sbom.cdx.json --application-sbom-verification-path build/publish-application-sbom-verification.json > build/published-image.txt
 """
     ),
     (
@@ -1066,6 +1316,17 @@ uv run python scripts/verify_image_provenance.py --mode publish --dockerfile Doc
         """
 set -euo pipefail
 test "$GITHUB_REF" = "refs/heads/develop"
+"""
+    ),
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Initialize failed deploy result",
+    ): _strip_block_scalar(
+        """
+set -euo pipefail
+mkdir -p build/reviewed-artifacts build
+python - <<'PY'
 """
     ),
     (
@@ -1115,11 +1376,22 @@ python - <<'PY'
     (
         "deploy-develop.yml",
         "deploy",
-        "name:Update migration job to reviewed image",
+        "name:Validate reviewed stage plan receipt",
     ): _strip_block_scalar(
         """
 set -euo pipefail
-gcloud run jobs update run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --image "$MANAGED_IMAGE" >/dev/null
+python - <<'PY'
+"""
+    ),
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Verify migration job already matches reviewed image",
+    ): _strip_block_scalar(
+        """
+set -euo pipefail
+CURRENT_JOB_IMAGE=$(gcloud run jobs describe run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --format='value(template.template.containers[0].image)')
+test "$CURRENT_JOB_IMAGE" = "$MANAGED_IMAGE"
 """
     ),
     (
@@ -1135,11 +1407,12 @@ gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --
     (
         "deploy-develop.yml",
         "deploy",
-        "name:Deploy reviewed service",
+        "name:Verify service already matches reviewed image",
     ): _strip_block_scalar(
         """
 set -euo pipefail
-gcloud run services update staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --image "$MANAGED_IMAGE" >/dev/null
+CURRENT_SERVICE_IMAGE=$(gcloud run services describe staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --format='value(spec.template.spec.containers[0].image)')
+test "$CURRENT_SERVICE_IMAGE" = "$MANAGED_IMAGE"
 """
     ),
     (
@@ -1149,8 +1422,10 @@ gcloud run services update staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" -
     ): _strip_block_scalar(
         """
 set -euo pipefail
-READY_STATUS=$(gcloud run services describe staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --format='value(status.conditions[0].status)')
-test "$READY_STATUS" = "True"
+if ! SERVICE_JSON=$(gcloud run services describe staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --format=json); then
+  python - <<'PY'
+  exit 1
+fi
 mkdir -p build
 python - <<'PY'
 """
@@ -1193,8 +1468,10 @@ esac
     ): _strip_block_scalar(
         """
 terraform fmt -check -recursive infra/gcp
-terraform -chdir=infra/gcp init -backend=false -input=false
+terraform -chdir=infra/gcp init -backend=false -input=false -lockfile=readonly
 terraform -chdir=infra/gcp validate
+terraform -chdir=infra/gcp/bootstrap init -backend=false -input=false -lockfile=readonly
+terraform -chdir=infra/gcp/bootstrap validate
 """
     ),
     (
@@ -1229,21 +1506,57 @@ test -f .gitignore
 }
 
 EXACT_WORKFLOW_RUN_SHA256 = {
+    ("build-image.yml", "publish-image", "name:Sign and verify published image attestation set"): (
+        "a72505d2304a88160a61d70a3489980f93b83d33fc198c8465c770f9c615ff81"
+    ),
+    ("deploy-develop.yml", "deploy", "name:Initialize failed deploy result"): (
+        "931d39097ca97bc9a49f5227f4287d19f0709adfff40ca6f540f673703622b40"
+    ),
     ("deploy-develop.yml", "deploy", "name:Download reviewed publish artifacts"): (
-        "f4f33283d7a6a4aa4727c757e8dcbb93d457f285bdc238586c04894bec9a1237"
+        "2705003a7b1816fd2d8d969fb2a5e3a028975afd789d0580f62024fe46f237fa"
     ),
     ("deploy-develop.yml", "deploy", "name:Bind reviewed published image evidence"): (
-        "b608fcbb381b994b1d5b02260b128422a341a388be615d53ba79bca9258dbd2c"
+        "fae1871d1f66f845993ef7f8be42342854a45f9d259523b35bb716c116939aaf"
     ),
     ("deploy-develop.yml", "deploy", "name:Record schema compatibility posture"): (
-        "d4301a36a3a26ba93c302605793a7c49200d971859bf2b25f3f1d06119c044ab"
+        "35ce29e8fb471b0ecefca7694a7754e4be52a5a359dafebac4ce4307ab889d86"
+    ),
+    ("deploy-develop.yml", "deploy", "name:Validate reviewed stage plan receipt"): (
+        "230ecddb58ac80a56dc0bb9ded0b99edd6f903c92dac3cf9336c9a9e8460b18c"
+    ),
+    ("deploy-develop.yml", "deploy", "name:Execute migration job"): (
+        "ed74538566a1fdfdc6d4cb29462eca6e391d357c13963c6b0118fdf3f5d9d3ed"
     ),
     ("deploy-develop.yml", "deploy", "name:Verify readiness gate and record deploy result"): (
-        "a572724cf1bdea18b6240546344e4ea5d1f203b0948901887f5d174406c27e5f"
+        "45273accf9e443a2297206af6c0e578dd3624b791a65759f0c45258dff827c00"
     ),
 }
 
 ALLOWED_WORKFLOW_STEP_RUN_SUBSTRINGS = {
+    (
+        "build-image.yml",
+        "publish-image",
+        "name:Sign and verify published image attestation set",
+    ): [
+        "cosign sign --yes",
+        "cosign attest --yes --type slsaprovenance",
+        "cosign verify --certificate-identity",
+        "cosign verify-attestation --type slsaprovenance",
+        '"predicate_type": "https://slsa.dev/provenance/v1"',
+        '"predicate_type": "https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1"',
+        '"value": "linux/amd64"',
+        "scripts/verify_image_provenance.py --mode publish",
+    ],
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Initialize failed deploy result",
+    ): [
+        '"result": "failed"',
+        '"current_stage": "pre_deploy_validation"',
+        '"qualification_executed": False',
+        '"recovery_disposition": "forward recovery or teardown/rebuild required"',
+    ],
     (
         "deploy-develop.yml",
         "deploy",
@@ -1262,8 +1575,13 @@ ALLOWED_WORKFLOW_STEP_RUN_SUBSTRINGS = {
         '"publish_job_name": publish_job["name"]',
         'f"{api_base}/actions/runs/{run_id}/artifacts"',
         '"published-image": "published-image.txt"',
+        '"image-sbom-cdx": "image-sbom.cdx.json"',
         '"backend-sbom-cdx": "backend-sbom.cdx.json"',
         '"frontend-sbom-cdx": "frontend-sbom.cdx.json"',
+        '"publish-signature-verification": "publish-signature-verification.json"',
+        '"publish-provenance-verification": "publish-provenance-verification.json"',
+        '"publish-application-sbom-verification": "publish-application-sbom-verification.json"',
+        '"reviewed-stage-plan-receipt": "reviewed-stage-plan-receipt.json"',
     ],
     (
         "deploy-develop.yml",
@@ -1273,12 +1591,26 @@ ALLOWED_WORKFLOW_STEP_RUN_SUBSTRINGS = {
         "PUBLISHED_IMAGE_REF",
         "VERIFIED_IMAGE_REF",
         "scripts/verify_image_provenance.py --mode publish",
+        "--signature-verification-path build/reviewed-artifacts/publish-signature-verification.json",
+        "--provenance-verification-path build/reviewed-artifacts/publish-provenance-verification.json",
+        "--image-sbom-path build/reviewed-artifacts/image-sbom.cdx.json",
+        "--application-sbom-verification-path build/reviewed-artifacts/publish-application-sbom-verification.json",
         'test "$VERIFIED_IMAGE_REF" = "$PUBLISHED_IMAGE_REF"',
         'case "$VERIFIED_IMAGE_REF" in',
         '"$MANAGED_REPOSITORY"@sha256:*) ;;',
         'IMAGE_DIGEST="${VERIFIED_IMAGE_REF##*@}"',
         'printf \'MANAGED_IMAGE=%s\\n\' "$VERIFIED_IMAGE_REF" >> "$GITHUB_ENV"',
         'printf \'IMAGE_DIGEST=%s\\n\' "$IMAGE_DIGEST" >> "$GITHUB_ENV"',
+    ],
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Validate reviewed stage plan receipt",
+    ): [
+        "reviewed-stage-plan-receipt.json",
+        'receipt["stage"] != "service"',
+        'receipt["source_sha"] != os.environ["DEPLOY_COMMIT_SHA"]',
+        'receipt["workload_image_digest"] != os.environ["IMAGE_DIGEST"]',
     ],
     (
         "deploy-develop.yml",
@@ -1290,22 +1622,45 @@ ALLOWED_WORKFLOW_STEP_RUN_SUBSTRINGS = {
         '"rollback_without_proven_compatibility_window": False',
         '"recovery_posture": "forward recovery"',
         '"qualification_executed": False',
+        '"compatibility_evidence": "published-image artifact plus backend/frontend SBOM, image SBOM, signature/provenance verification, and metadata evidence from the reviewed publish run"',
     ],
     (
         "deploy-develop.yml",
         "deploy",
-        "name:Update migration job to reviewed image",
+        "name:Verify migration job already matches reviewed image",
     ): [
-        "gcloud run jobs update run-migrations --project",
-        '--image "$MANAGED_IMAGE"',
+        "CURRENT_JOB_IMAGE=$(gcloud run jobs describe run-migrations --project",
+        'test "$CURRENT_JOB_IMAGE" = "$MANAGED_IMAGE"',
+    ],
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Execute migration job",
+    ): [
+        "gcloud run jobs execute run-migrations --project",
+        'payload["current_stage"] = "migration_execution"',
+        'payload["recovery_disposition"] = "forward recovery or teardown/rebuild required"',
+    ],
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Verify service already matches reviewed image",
+    ): [
+        "CURRENT_SERVICE_IMAGE=$(gcloud run services describe staff-tracer --project",
+        'test "$CURRENT_SERVICE_IMAGE" = "$MANAGED_IMAGE"',
     ],
     (
         "deploy-develop.yml",
         "deploy",
         "name:Verify readiness gate and record deploy result",
     ): [
+        'if condition.get("type") == "Ready"',
+        'ready_image.split("@", 1)[1] != os.environ["IMAGE_DIGEST"]',
         "gcloud run services describe staff-tracer --project",
         "build/deploy-result.json",
+        '"ready_revision": ready_revision',
+        '"ready_image": ready_image',
+        '"deploy_executed": False',
         '"publish_run_id": os.environ["PUBLISH_RUN_ID"]',
         '"qualification_executed": False',
         '"result": "success"',
@@ -1347,6 +1702,11 @@ ALLOWED_WORKFLOW_STEP_ENV = {
     (
         "deploy-develop.yml",
         "deploy",
+        "name:Initialize failed deploy result",
+    ): {"PUBLISH_RUN_ID": "${{ inputs.publish_run_id }}"},
+    (
+        "deploy-develop.yml",
+        "deploy",
         "name:Download reviewed publish artifacts",
     ): {
         "GITHUB_TOKEN": "${{ github.token }}",
@@ -1361,10 +1721,26 @@ ALLOWED_WORKFLOW_STEP_ENV = {
         "MANAGED_REPOSITORY": "us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer"
     },
     (
+        "build-image.yml",
+        "publish-image",
+        "name:Sign and verify published image attestation set",
+    ): {
+        "MANAGED_REPOSITORY": "us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer",
+        "SOURCE_COMMIT": "${{ github.sha }}",
+    },
+    (
         "deploy-develop.yml",
         "deploy",
         "name:Record schema compatibility posture",
     ): {"PUBLISH_RUN_ID": "${{ inputs.publish_run_id }}"},
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Validate reviewed stage plan receipt",
+    ): {
+        "PUBLISH_RUN_ID": "${{ inputs.publish_run_id }}",
+        "DEPLOY_COMMIT_SHA": "${{ github.sha }}",
+    },
     (
         "deploy-develop.yml",
         "deploy",
@@ -2006,6 +2382,32 @@ def _load_predeployment_authority_manifest(root: Path) -> dict[object, object] |
             raise ValueError(
                 f"{manifest_path.relative_to(root)} must define a positive integer max_count for {resource_type!r}"
             )
+        max_count_by_stage = contract.get("max_count_by_stage")
+        if max_count_by_stage is not None:
+            if not isinstance(max_count_by_stage, dict):
+                raise ValueError(
+                    f"{manifest_path.relative_to(root)} must define an object max_count_by_stage for {resource_type!r}"
+                )
+            for stage_name, stage_count in max_count_by_stage.items():
+                if stage_name not in APPROVED_STAGE_VALUES:
+                    raise ValueError(
+                        f"{manifest_path.relative_to(root)} contains unsupported max_count_by_stage key {stage_name!r} for {resource_type!r}"
+                    )
+                if not isinstance(stage_count, int) or stage_count < 0:
+                    raise ValueError(
+                        f"{manifest_path.relative_to(root)} must define a non-negative integer stage max for {resource_type!r}:{stage_name!r}"
+                    )
+        stage_ownership = contract.get("stage_ownership")
+        if stage_ownership is not None:
+            if not isinstance(stage_ownership, str):
+                raise ValueError(
+                    f"{manifest_path.relative_to(root)} must define a string stage_ownership for {resource_type!r}"
+                )
+            if stage_ownership not in APPROVED_STAGE_VALUES:
+                raise ValueError(
+                    f"{manifest_path.relative_to(root)} stage_ownership for {resource_type!r} "
+                    f"must be one of {APPROVED_STAGE_VALUES}, got {stage_ownership!r}"
+                )
 
     workflows = manifest.get("workflows")
     if workflows is not None:
@@ -2150,6 +2552,105 @@ def _collect_declared_terraform_resource_types(
             counts[resource_type] = counts.get(resource_type, 0) + 1
 
     return occurrences, counts
+
+
+def _extract_local_toset_length(text: str, local_name: str) -> int | None:
+    match = re.search(
+        rf"{re.escape(local_name)}\s*=\s*toset\(\[(?P<body>.*?)\]\)",
+        text,
+        re.DOTALL,
+    )
+    if match is None:
+        return None
+    body = match.group("body")
+    return len(re.findall(r'"[^"]+"', body))
+
+
+def _approved_count_max(count_expr: str) -> int | None:
+    normalized = " ".join(count_expr.split())
+    if re.fullmatch(r"[0-9]+", normalized):
+        return int(normalized)
+    approved_patterns = [
+        r'var\.deployment_stage == "service" \? 1 : 0',
+        r'var\.deployment_stage == "migration" \|\| var\.deployment_stage == "service" \? 1 : 0',
+        r'var\.bootstrap_operator_status == "bootstrap-active" \? 1 : 0',
+    ]
+    for pattern in approved_patterns:
+        if re.fullmatch(pattern, normalized):
+            return 1
+    return None
+
+
+def _approved_for_each_max(for_each_expr: str, text: str) -> int | None:
+    normalized = " ".join(for_each_expr.split())
+    match = re.fullmatch(r"local\.([A-Za-z0-9_]+)", normalized)
+    if match is None:
+        return None
+    return _extract_local_toset_length(text, match.group(1))
+
+
+def _collect_declared_terraform_resource_expansions(
+    terraform_config_paths: list[Path],
+) -> tuple[list[tuple[Path, str]], dict[str, int], list[tuple[Path, str, str, str]]]:
+    occurrences: list[tuple[Path, str]] = []
+    counts: dict[str, int] = {}
+    unresolved: list[tuple[Path, str, str, str]] = []
+
+    for path in sorted(terraform_config_paths):
+        text = path.read_text(encoding="utf-8")
+        if path.name.endswith(".tf.json"):
+            try:
+                parsed = json.loads(
+                    text,
+                    object_pairs_hook=_json_object_pairs_with_duplicate_key_rejection,
+                )
+            except (DuplicateTerraformJsonKeyError, json.JSONDecodeError):
+                continue
+            resources = parsed.get("resource") if isinstance(parsed, dict) else None
+            if not isinstance(resources, dict):
+                continue
+            for resource_type, instances in resources.items():
+                if not isinstance(resource_type, str) or not isinstance(instances, dict):
+                    continue
+                instance_count = len(instances)
+                if instance_count < 1:
+                    continue
+                occurrences.append((path, resource_type))
+                counts[resource_type] = counts.get(resource_type, 0) + instance_count
+            continue
+
+        if path.suffix != ".tf":
+            continue
+        for match in RESOURCE_BLOCK_WITH_BODY_PATTERN.finditer(text):
+            resource_type = match.group(1)
+            body = match.group("body")
+            occurrences.append((path, resource_type))
+            count_match = re.search(r"^\s*count\s*=\s*(.+?)$", body, re.MULTILINE)
+            for_each_match = re.search(r"^\s*for_each\s*=\s*(.+?)$", body, re.MULTILINE)
+            if count_match and for_each_match:
+                unresolved.append(
+                    (path, resource_type, "count+for_each", "count and for_each both set")
+                )
+                continue
+            if count_match:
+                expr = count_match.group(1).strip()
+                max_instances = _approved_count_max(expr)
+                if max_instances is None:
+                    unresolved.append((path, resource_type, "count", expr))
+                    continue
+                counts[resource_type] = counts.get(resource_type, 0) + max_instances
+                continue
+            if for_each_match:
+                expr = for_each_match.group(1).strip()
+                max_instances = _approved_for_each_max(expr, text)
+                if max_instances is None:
+                    unresolved.append((path, resource_type, "for_each", expr))
+                    continue
+                counts[resource_type] = counts.get(resource_type, 0) + max_instances
+                continue
+            counts[resource_type] = counts.get(resource_type, 0) + 1
+
+    return occurrences, counts, unresolved
 
 
 def _collect_backend_configuration_violations(
@@ -2410,7 +2911,10 @@ def _collect_bootstrap_wif_violations(root: Path) -> list[str]:
             'attribute.repository_owner == "b-mackenzie-alexander"',
             'attribute.ref == "refs/heads/develop"',
             'attribute.environment == "develop"',
-            'attribute.event_name != "pull_request"',
+            'attribute.event_name == "workflow_dispatch"',
+            '"attribute.workflow_ref"     = "assertion.workflow_ref"',
+            'attribute.workflow_ref == "b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop"',
+            'attribute.workflow_ref == "b-mackenzie-alexander/golden_rose_project/.github/workflows/deploy-develop.yml@refs/heads/develop"',
         ]
         for claim in required_claims:
             if claim not in wif_text:
@@ -2423,18 +2927,27 @@ def _collect_bootstrap_wif_violations(root: Path) -> list[str]:
             (r'attribute\.repository_owner\s*==\s*"[^"]*\*[^"]*"', "attribute.repository_owner"),
             (r'attribute\.ref\s*==\s*"[^"]*\*[^"]*"', "attribute.ref"),
             (r'attribute\.environment\s*==\s*"[^"]*\*[^"]*"', "attribute.environment"),
+            (r'attribute\.workflow_ref\s*==\s*"[^"]*\*[^"]*"', "attribute.workflow_ref"),
         ]
         for pattern, attribute_name in wildcard_claim_patterns:
             if re.search(pattern, wif_text):
                 violations.append(
                     f"{wif_path.relative_to(root)} contains wildcard GitHub claim {attribute_name}"
                 )
+        if 'attribute.event_name != "pull_request"' in wif_text:
+            violations.append(
+                f"{wif_path.relative_to(root)} must require workflow_dispatch rather than only rejecting pull_request"
+            )
 
     if iam_path.exists():
         iam_text = iam_path.read_text(encoding="utf-8")
         if "attribute.repository_owner/" in iam_text:
             violations.append(
                 f"{iam_path.relative_to(root)} contains principal-set broadening via attribute.repository_owner"
+            )
+        if "/attribute.repository/" in iam_text:
+            violations.append(
+                f"{iam_path.relative_to(root)} contains repository-only impersonation authority instead of exact workflow_ref trust"
             )
         broad_principal_patterns = [
             r'principalSet://[^"]*/attribute\.repository/[^"\n]*\*',
@@ -2444,6 +2957,30 @@ def _collect_bootstrap_wif_violations(root: Path) -> list[str]:
         for pattern in broad_principal_patterns:
             if re.search(pattern, iam_text):
                 violations.append(f"{iam_path.relative_to(root)} contains principal-set broadening")
+        required_fragments = [
+            'resource "google_service_account_iam_member" "image_publisher_wif"',
+            'resource "google_service_account_iam_member" "deployer_wif"',
+            "member             = local.build_image_workflow_principal_set",
+            "member             = local.deploy_develop_workflow_principal_set",
+        ]
+        for fragment in required_fragments:
+            if fragment not in iam_text:
+                violations.append(
+                    f"{iam_path.relative_to(root)} missing exact bootstrap WIF authority fragment {fragment!r}"
+                )
+        forbidden_fragments = [
+            'resource "google_service_account_iam_member" "provisioner_wif"',
+            'resource "google_service_account_iam_member" "provisioner_token_creator"',
+            'resource "google_service_account_iam_member" "image_publisher_token_creator"',
+            'resource "google_service_account_iam_member" "deployer_token_creator"',
+            "roles/iam.serviceAccountTokenCreator",
+            "local.github_principal_set",
+        ]
+        for fragment in forbidden_fragments:
+            if fragment in iam_text:
+                violations.append(
+                    f"{iam_path.relative_to(root)} contains forbidden bootstrap WIF fragment {fragment!r}"
+                )
 
     return violations
 
@@ -2516,24 +3053,27 @@ def _collect_develop_iam_violations(root: Path, terraform_config_paths: list[Pat
             'resource "google_project_iam_member" "migration_cloudsql_client"',
             'resource "google_project_iam_member" "migration_log_writer"',
             'resource "google_project_iam_member" "migration_metric_writer"',
-            'resource "google_secret_manager_secret_iam_member" "runtime_secret_access"',
-            'resource "google_secret_manager_secret_iam_member" "migration_secret_access"',
+            'resource "google_project_iam_member" "deployer_jobs_executor"',
+            'resource "google_project_iam_member" "deployer_run_viewer"',
+            'resource "google_secret_manager_secret_iam_member" "runtime_database_secret_access"',
+            'resource "google_secret_manager_secret_iam_member" "migration_database_secret_access"',
+            'resource "google_secret_manager_secret_iam_member" "runtime_synthetic_staff_secret_access"',
+            'resource "google_secret_manager_secret_iam_member" "migration_synthetic_staff_secret_access"',
             'resource "google_artifact_registry_repository_iam_member" "image_publisher_writer"',
             'resource "google_cloud_run_v2_service_iam_member" "private_invoker"',
-            'resource "google_service_account_iam_member" "deployer_runtime_user"',
-            'resource "google_service_account_iam_member" "deployer_migration_user"',
             'role    = "roles/cloudsql.client"',
             'role    = "roles/logging.logWriter"',
             'role    = "roles/monitoring.metricWriter"',
+            'role    = "roles/run.jobsExecutor"',
+            'role    = "roles/run.viewer"',
             'role      = "roles/secretmanager.secretAccessor"',
             'role       = "roles/artifactregistry.writer"',
             'role     = "roles/run.invoker"',
-            'role               = "roles/iam.serviceAccountUser"',
             'member  = "serviceAccount:${google_service_account.runtime.email}"',
             'member  = "serviceAccount:${google_service_account.migration.email}"',
             'member     = "serviceAccount:golden-rose-image-publisher@${var.control_plane_project_id}.iam.gserviceaccount.com"',
+            'member  = "serviceAccount:golden-rose-deployer@${var.control_plane_project_id}.iam.gserviceaccount.com"',
             "member   = var.private_invoker_principal",
-            "member             = var.deployer_principal",
         ]
         for fragment in required_fragments:
             if fragment not in text:
@@ -2546,6 +3086,13 @@ def _collect_develop_iam_violations(root: Path, terraform_config_paths: list[Pat
             "roles/secretmanager.admin",
             "roles/artifactregistry.admin",
             "roles/run.admin",
+            "roles/run.developer",
+            "roles/run.jobsExecutorWithOverrides",
+            "roles/iam.serviceAccountUser",
+            "roles/iam.serviceAccountTokenCreator",
+            'resource "google_service_account_iam_member" "deployer_runtime_user"',
+            'resource "google_service_account_iam_member" "deployer_migration_user"',
+            "var.deployer_principal",
         ]
         for fragment in forbidden_fragments:
             if fragment in text:
@@ -2598,9 +3145,6 @@ def _collect_migration_job_violations(root: Path, terraform_config_paths: list[P
         forbidden_fragments = [
             "google_service_account.runtime.email",
             "INGRESS_TRAFFIC_ALL",
-            "env {",
-            "value_source",
-            "secret_key_ref",
             ":latest",
         ]
         for fragment in forbidden_fragments:
@@ -2621,9 +3165,11 @@ def _collect_budget_observability_violations(
     budget_resource_types = {"google_billing_budget"}
     observability_resource_types = {
         "google_logging_metric",
+        "google_logging_project_exclusion",
         "google_logging_project_bucket_config",
         "google_monitoring_alert_policy",
         "google_monitoring_notification_channel",
+        "google_monitoring_uptime_check_config",
     }
 
     for path in sorted(terraform_config_paths):
@@ -2676,18 +3222,24 @@ def _collect_budget_observability_violations(
         if relative_path == allowed_observability_path:
             required_fragments = [
                 'resource "google_monitoring_notification_channel" "alerts"',
+                'resource "google_logging_project_exclusion" "uuid_bearing_staff_paths"',
+                'resource "google_cloud_run_v2_service_iam_member" "monitoring_readiness_invoker"',
+                'resource "google_monitoring_uptime_check_config" "readiness"',
                 'resource "google_monitoring_alert_policy" "health_failures"',
                 'resource "google_monitoring_alert_policy" "readiness_failures"',
                 'resource "google_monitoring_alert_policy" "service_error_events"',
                 'resource "google_logging_project_bucket_config" "default"',
                 'resource "google_logging_metric" "health_failure_count"',
-                'resource "google_logging_metric" "readiness_failure_count"',
                 'resource "google_logging_metric" "service_error_count"',
                 'role    = "roles/logging.viewer"',
                 'role    = "roles/monitoring.viewer"',
                 "member  = var.observability_viewer_principal",
                 "retention_days = var.log_retention_days",
                 "var.cloud_run_request_log_posture",
+                "service-${data.google_project.current.number}@gcp-sa-monitoring-notification.iam.gserviceaccount.com",
+                'path         = "/readiness"',
+                'type = "OIDC_TOKEN"',
+                "google_monitoring_uptime_check_config.readiness[0].uptime_check_id",
             ]
             for fragment in required_fragments:
                 if not _contains_normalized_fragment(text, fragment):
@@ -2703,11 +3255,437 @@ def _collect_budget_observability_violations(
                 "textPayload",
                 "allUsers",
                 "allAuthenticatedUsers",
+                "untested RTO",
+                "untested RPO",
+                "approved SLO",
+                'resource "google_logging_metric" "readiness_failure_count"',
             ]:
                 if forbidden_fragment in text:
                     violations.append(
                         f"{relative_path} contains forbidden observability fragment {forbidden_fragment!r}"
                     )
+
+    return violations
+
+
+def _collect_api_contract_violations(root: Path) -> list[str]:
+    violations: list[str] = []
+    apis_path = root / "infra" / "gcp" / "develop" / "apis.tf"
+    budgets_path = root / "infra" / "gcp" / "develop" / "budgets.tf"
+
+    if apis_path.exists():
+        apis_text = apis_path.read_text(encoding="utf-8")
+        required_services = [
+            "billingbudgets.googleapis.com",
+            "cloudresourcemanager.googleapis.com",
+            "iam.googleapis.com",
+            "serviceusage.googleapis.com",
+            "compute.googleapis.com",
+            "servicenetworking.googleapis.com",
+            "run.googleapis.com",
+            "sqladmin.googleapis.com",
+            "artifactregistry.googleapis.com",
+            "secretmanager.googleapis.com",
+            "logging.googleapis.com",
+            "monitoring.googleapis.com",
+        ]
+        for service in required_services:
+            if service not in apis_text:
+                violations.append(f"{apis_path.relative_to(root)} missing approved API {service!r}")
+
+    if budgets_path.exists():
+        budgets_text = budgets_path.read_text(encoding="utf-8")
+        dependency_fragment = 'google_project_service.approved["billingbudgets.googleapis.com"]'
+        if dependency_fragment not in budgets_text:
+            violations.append(
+                f"{budgets_path.relative_to(root)} missing explicit Budget API dependency {dependency_fragment!r}"
+            )
+
+    return violations
+
+
+def _collect_evidence_template_violations(root: Path) -> list[str]:
+    violations: list[str] = []
+    template_path = root / "deploy" / "gcp" / "evidence-template.md"
+    if not template_path.exists():
+        return violations
+
+    template = template_path.read_text(encoding="utf-8")
+    required_fragments = [
+        "foundation, migration, or service",
+        "notification-channel resource names",
+        "display names",
+        "signature, provenance, image SBOM, and application SBOM attestation",
+        "Do not claim publication or attestation verification occurred",
+        "provisional develop review triggers",
+        "not SLOs or client commitments",
+    ]
+    for fragment in required_fragments:
+        if fragment not in template:
+            violations.append(
+                f"{template_path.relative_to(root)} missing required Task 6 evidence fragment {fragment!r}"
+            )
+
+    return violations
+
+
+def _collect_cloud_run_contract_violations(root: Path) -> list[str]:
+    violations: list[str] = []
+    cloud_run_path = root / "infra" / "gcp" / "develop" / "cloud_run.tf"
+    if not cloud_run_path.exists():
+        return violations
+
+    cloud_run = cloud_run_path.read_text(encoding="utf-8")
+    required_fragments = [
+        'resource "google_cloud_run_v2_service" "staff_tracer"',
+        'ingress             = "INGRESS_TRAFFIC_ALL"',
+        'value = "gcp-develop-private-synthetic"',
+    ]
+    for fragment in required_fragments:
+        if fragment not in cloud_run:
+            violations.append(
+                f"{cloud_run_path.relative_to(root)} missing required cloud run contract fragment {fragment!r}"
+            )
+
+    forbidden_fragments = [
+        "INGRESS_TRAFFIC_INTERNAL_ONLY",
+        "allUsers",
+        "allAuthenticatedUsers",
+    ]
+    for fragment in forbidden_fragments:
+        if fragment in cloud_run:
+            violations.append(
+                f"{cloud_run_path.relative_to(root)} contains forbidden cloud run fragment {fragment!r}"
+            )
+
+    return violations
+
+
+# ---------------------------------------------------------------------------
+# Task 1: Staged authority model — stage-contract enforcement
+# ---------------------------------------------------------------------------
+
+# Resource types that are executable workloads and must be stage-gated.
+STAGE_OWNERSHIP_RESOURCE_TYPES = {
+    "google_cloud_run_v2_service",
+    "google_cloud_run_v2_job",
+}
+
+# Expected stage ownership for each executable workload resource type.
+# The manifest must declare exactly this ownership; a wrong value is rejected.
+EXPECTED_STAGE_OWNERSHIP: dict[str, str] = {
+    "google_cloud_run_v2_service": "service",
+    "google_cloud_run_v2_job": "migration",
+}
+
+# Approved count-expression patterns for stage-gated executable resources.
+# Each entry maps a resource type to a list of regex patterns that match
+# approved count expressions referencing var.deployment_stage.
+APPROVED_STAGE_COUNT_PATTERNS: dict[str, list[re.Pattern[str]]] = {
+    "google_cloud_run_v2_service": [
+        re.compile(r'count\s*=\s*var\.deployment_stage\s*==\s*"service"\s*\?\s*1\s*:\s*0'),
+    ],
+    "google_cloud_run_v2_job": [
+        re.compile(
+            r'count\s*=\s*var\.deployment_stage\s*==\s*"migration"\s*\|\|\s*var\.deployment_stage\s*==\s*"service"\s*\?\s*1\s*:\s*0'
+        ),
+        re.compile(r'count\s*=\s*var\.deployment_stage\s*==\s*"migration"\s*\?\s*1\s*:\s*0'),
+        re.compile(r'count\s*=\s*var\.deployment_stage\s*!=\s*"foundation"\s*\?\s*1\s*:\s*0'),
+    ],
+}
+
+# Regex to extract the count expression from a resource block.
+_COUNT_PATTERN = re.compile(
+    r'resource\s+"([^"]+)"\s+"([^"]+)"\s*\{(?P<body>.*?)^\}',
+    re.MULTILINE | re.DOTALL,
+)
+
+
+def _extract_resource_count_expressions(
+    text: str,
+) -> list[tuple[str, str, str | None]]:
+    """Extract (resource_type, resource_name, count_expression) from HCL text.
+
+    Returns None for count_expression if the resource has no count meta-argument.
+    """
+    results: list[tuple[str, str, str | None]] = []
+    for match in _COUNT_PATTERN.finditer(text):
+        resource_type = match.group(1)
+        resource_name = match.group(2)
+        body = match.group("body")
+        count_match = re.search(r"^\s*count\s*=\s*(.+?)$", body, re.MULTILINE)
+        count_expr = count_match.group(1).strip() if count_match else None
+        results.append((resource_type, resource_name, count_expr))
+    return results
+
+
+def _evaluate_count_stages(count_expr: str) -> set[str]:
+    """Evaluate which deployment stages a count expression includes.
+
+    Returns the set of stages where the resource would have count > 0.
+    Handles the approved patterns:
+      - var.deployment_stage == "X" ? 1 : 0  → includes X
+      - var.deployment_stage == "X" || var.deployment_stage == "Y" ? 1 : 0  → includes X, Y
+      - var.deployment_stage != "X" ? 1 : 0  → includes all stages except X
+      - var.deployment_stage != "foundation" ? 1 : 0  → includes migration, service
+    """
+    stages: set[str] = set()
+
+    # Match: var.deployment_stage == "X" (positive equality)
+    for m in re.finditer(r'var\.deployment_stage\s*==\s*"([^"]+)"', count_expr):
+        stages.add(m.group(1))
+
+    # Match: var.deployment_stage != "X" (negative equality — includes all except X)
+    negative_matches = re.findall(r'var\.deployment_stage\s*!=\s*"([^"]+)"', count_expr)
+    if negative_matches:
+        excluded = set(negative_matches)
+        stages.update(stage for stage in APPROVED_STAGE_VALUES if stage not in excluded)
+
+    # If no stages matched but the expression doesn't reference deployment_stage,
+    # the resource is unconditional (exists in all stages)
+    if not stages and "deployment_stage" not in count_expr:
+        stages.update(APPROVED_STAGE_VALUES)
+
+    return stages
+
+
+def _collect_stage_contract_violations(
+    root: Path,
+    terraform_config_paths: list[Path],
+    manifest: dict[object, object] | None,
+) -> list[str]:
+    """Collect stage-contract violations for executable workload resources.
+
+    Checks:
+    1. Executable resources must have stage_ownership in the manifest.
+    2. Executable resources must be stage-gated (have a count referencing var.deployment_stage).
+    3. The count expression must not include foundation stage for any executable resource.
+    4. The count expression must not include a stage outside the resource's stage_ownership.
+    5. Boolean workload_enabled shortcuts must be rejected.
+    """
+    violations: list[str] = []
+
+    # Extract stage_ownership from manifest
+    stage_ownership: dict[str, str] = {}
+    if manifest is not None:
+        terraform_contract = manifest.get("terraform")
+        resource_contracts = (
+            terraform_contract.get("resource_types")
+            if isinstance(terraform_contract, dict)
+            else None
+        )
+        if isinstance(resource_contracts, dict):
+            for rt, contract in resource_contracts.items():
+                if not isinstance(contract, dict):
+                    continue
+                ownership = contract.get("stage_ownership")
+                if isinstance(ownership, str):
+                    stage_ownership[str(rt)] = ownership
+
+    develop_vars_path = root / "infra" / "gcp" / "develop" / "variables.tf"
+
+    # Check for workload_enabled boolean shortcut
+    if develop_vars_path.exists():
+        develop_vars_text = develop_vars_path.read_text(encoding="utf-8")
+        if 'variable "workload_enabled"' in develop_vars_text:
+            violations.append(
+                "infra/gcp/develop/variables.tf contains forbidden boolean "
+                "'workload_enabled' shortcut; use deployment_stage instead"
+            )
+
+    for path in sorted(terraform_config_paths):
+        relative_path = path.relative_to(root)
+        text = path.read_text(encoding="utf-8")
+
+        # Extract count expressions for all resources
+        resource_counts = _extract_resource_count_expressions(text)
+
+        for resource_type, resource_name, count_expr in resource_counts:
+            if resource_type not in STAGE_OWNERSHIP_RESOURCE_TYPES:
+                continue
+
+            # Check 1: stage_ownership must be declared in manifest
+            if resource_type not in stage_ownership:
+                violations.append(
+                    f"{relative_path} contains executable workload resource "
+                    f"{resource_type!r} without stage_ownership declared in manifest"
+                )
+                continue
+
+            expected_stage = stage_ownership[resource_type]
+
+            # Check 1b: stage_ownership must match the expected value for this resource type
+            expected_manifest_stage = EXPECTED_STAGE_OWNERSHIP.get(resource_type)
+            if expected_manifest_stage is not None and expected_stage != expected_manifest_stage:
+                violations.append(
+                    f"{relative_path} executable workload resource {resource_type!r} "
+                    f"stage_ownership is {expected_stage!r} but must be "
+                    f"{expected_manifest_stage!r}"
+                )
+
+            # Check 2: must be stage-gated (have count referencing deployment_stage)
+            if count_expr is None:
+                violations.append(
+                    f"{relative_path} contains unconditional executable workload resource "
+                    f"{resource_type} {resource_name!r}; must use count = var.deployment_stage ..."
+                )
+                continue
+
+            if "deployment_stage" not in count_expr:
+                # Check for boolean workload_enabled shortcut
+                if "workload_enabled" in count_expr:
+                    violations.append(
+                        f"{relative_path} contains forbidden boolean workload shortcut "
+                        f"for {resource_type} {resource_name!r}; use deployment_stage instead"
+                    )
+                else:
+                    violations.append(
+                        f"{relative_path} contains unconditional executable workload resource "
+                        f"{resource_type} {resource_name!r}; count must reference var.deployment_stage"
+                    )
+                continue
+
+            # Check 3: evaluate which stages the count expression includes
+            evaluated_stages = _evaluate_count_stages(count_expr)
+
+            if "foundation" in evaluated_stages:
+                violations.append(
+                    f"{relative_path} executable workload resource {resource_type} "
+                    f"{resource_name!r} count expression includes foundation stage; "
+                    f"foundation must not create any executable workload"
+                )
+
+            # Check 4: count must not include stages outside the resource's stage_ownership
+            # For service-owned resources, migration stage must not be included
+            # For migration-owned resources, service stage inclusion is allowed (migration+service)
+            if expected_stage == "service" and "migration" in evaluated_stages:
+                violations.append(
+                    f"{relative_path} executable workload resource {resource_type} "
+                    f"{resource_name!r} stage_ownership is 'service' but count expression "
+                    f"includes migration stage"
+                )
+
+    return violations
+
+
+def _collect_env_secret_violations(root: Path, terraform_config_paths: list[Path]) -> list[str]:
+    """Collect env/secret-reference violations in Cloud Run service/job containers.
+
+    Checks:
+    1. All env names must be in the approved allowlist.
+    2. Secret env names must use value_source/secret_ref, not literal value.
+    3. Secret reference names must be in the approved set.
+    4. Runtime service must use runtime-database-url, not migration-database-url.
+    5. Migration job must use migration-database-url, not runtime-database-url.
+    6. Migration-only env names must not appear in service containers.
+    7. Literal secret values are forbidden.
+    """
+    violations: list[str] = []
+
+    # Regex to extract env blocks from HCL resource containers
+    env_block_pattern = re.compile(
+        r'resource\s+"([^"]+)"\s+"([^"]+)"\s*\{(?P<body>.*?)^\}',
+        re.MULTILINE | re.DOTALL,
+    )
+
+    for path in sorted(terraform_config_paths):
+        relative_path = path.relative_to(root)
+        text = path.read_text(encoding="utf-8")
+
+        for match in env_block_pattern.finditer(text):
+            resource_type = match.group(1)
+            resource_name = match.group(2)
+            body = match.group("body")
+
+            if resource_type not in STAGE_OWNERSHIP_RESOURCE_TYPES:
+                continue
+
+            # Find all env blocks: env { name = "..." ... }
+            env_blocks = re.findall(
+                r"env\s*\{(.*?)(?=^\s*env\s*\{|^\s*\}\s*$|\Z)",
+                body,
+                re.MULTILINE | re.DOTALL,
+            )
+
+            for env_block in env_blocks:
+                name_match = re.search(r'name\s*=\s*"([^"]+)"', env_block)
+                if name_match is None:
+                    continue
+                env_name = name_match.group(1)
+
+                # Check 1: env name must be in the approved allowlist
+                if env_name not in APPROVED_ENV_NAMES:
+                    violations.append(
+                        f"{relative_path} contains unlisted env name {env_name!r} "
+                        f"in {resource_type} {resource_name!r}"
+                    )
+                    continue
+
+                # Check 6: migration-only env must not appear in service
+                if (
+                    resource_type == "google_cloud_run_v2_service"
+                    and env_name in MIGRATION_ONLY_ENV_NAMES
+                ):
+                    violations.append(
+                        f"{relative_path} contains migration-only env {env_name!r} "
+                        f"in service {resource_name!r}"
+                    )
+
+                # Check 2: secret env names must use value_source/secret_key_ref
+                has_value = re.search(r'value\s*=\s*"', env_block)
+                has_secret_ref = "secret_key_ref" in env_block or "value_source" in env_block
+
+                if env_name in SECRET_ENV_NAMES:
+                    if has_value and not has_secret_ref:
+                        violations.append(
+                            f"{relative_path} env {env_name!r} in {resource_type} "
+                            f"{resource_name!r} uses literal value instead of secret_key_ref; "
+                            f"literal secret values are forbidden"
+                        )
+                        continue
+
+                    if has_secret_ref:
+                        secret_name_match = re.search(
+                            r'secret_key_ref\s*\{\s*secret\s*=\s*"([^"]+)"', env_block
+                        )
+                        if secret_name_match is None:
+                            continue
+                        secret_name = secret_name_match.group(1)
+
+                        # Check 3: secret reference must be in approved set
+                        approved_refs = APPROVED_SECRET_REFS.get(env_name, set())
+                        if secret_name not in approved_refs:
+                            violations.append(
+                                f"{relative_path} env {env_name!r} references "
+                                f"unapproved secret {secret_name!r}"
+                            )
+
+                        # Check 4 & 5: cross-wiring check for DATABASE_URL
+                        if env_name == "GOLDEN_ROSE_DATABASE_URL":
+                            expected_secret = RESOURCE_DB_SECRET_MAP.get(resource_type)
+                            if expected_secret and secret_name != expected_secret:
+                                violations.append(
+                                    f"{relative_path} env {env_name!r} in "
+                                    f"{resource_type} {resource_name!r} is cross-wired "
+                                    f"to secret {secret_name!r}; expected "
+                                    f"{expected_secret!r}"
+                                )
+                else:
+                    # Non-secret env: value is allowed but check for literal
+                    # secret values in non-secret env names
+                    if has_value:
+                        value_match = re.search(r'value\s*=\s*"([^"]*)"', env_block)
+                        if value_match:
+                            value = value_match.group(1)
+                            if any(
+                                keyword in value.lower()
+                                for keyword in ["password", "secret", "token", "postgresql://"]
+                            ):
+                                violations.append(
+                                    f"{relative_path} env {env_name!r} in "
+                                    f"{resource_type} {resource_name!r} contains "
+                                    f"literal secret value"
+                                )
 
     return violations
 
@@ -2738,19 +3716,41 @@ def main() -> int:
             else None
         )
         if isinstance(resource_contracts, dict):
-            resource_occurrences, resource_counts = _collect_declared_terraform_resource_types(
-                terraform_config_paths
+            resource_occurrences, resource_counts, unresolved_expansions = (
+                _collect_declared_terraform_resource_expansions(terraform_config_paths)
             )
             for path, resource_type in resource_occurrences:
                 if resource_type not in resource_contracts:
                     violations.append(
                         f"{path.relative_to(root)} contains unlisted Terraform resource type {resource_type!r}"
                     )
+            for path, resource_type, expansion_kind, expansion_expr in unresolved_expansions:
+                if resource_type not in resource_contracts:
+                    continue
+                if expansion_kind == "count":
+                    violations.append(
+                        f"{path.relative_to(root)} contains unbounded or unreviewed count expression for allowed resource type {resource_type!r}: {expansion_expr}"
+                    )
+                elif expansion_kind == "for_each":
+                    violations.append(
+                        f"{path.relative_to(root)} contains unbounded or unreviewed for_each expression for allowed resource type {resource_type!r}: {expansion_expr}"
+                    )
+                else:
+                    violations.append(
+                        f"{path.relative_to(root)} contains invalid combined count/for_each expansion for allowed resource type {resource_type!r}"
+                    )
             for resource_type, count in sorted(resource_counts.items()):
                 if resource_type not in resource_contracts:
                     continue
                 contract = resource_contracts.get(resource_type)
                 max_count = contract.get("max_count") if isinstance(contract, dict) else None
+                max_count_by_stage = (
+                    contract.get("max_count_by_stage") if isinstance(contract, dict) else None
+                )
+                if isinstance(max_count_by_stage, dict) and max_count_by_stage:
+                    stage_max = max(max_count_by_stage.values())
+                    if isinstance(stage_max, int):
+                        max_count = stage_max
                 if isinstance(max_count, int) and count > max_count:
                     violations.append(
                         "predeployment authority manifest exceeded Terraform resource type "
@@ -2768,6 +3768,11 @@ def main() -> int:
     violations.extend(_collect_develop_iam_violations(root, terraform_config_paths))
     violations.extend(_collect_migration_job_violations(root, terraform_config_paths))
     violations.extend(_collect_budget_observability_violations(root, terraform_config_paths))
+    violations.extend(_collect_api_contract_violations(root))
+    violations.extend(_collect_cloud_run_contract_violations(root))
+    violations.extend(_collect_evidence_template_violations(root))
+    violations.extend(_collect_stage_contract_violations(root, terraform_config_paths, manifest))
+    violations.extend(_collect_env_secret_violations(root, terraform_config_paths))
 
     for path in sorted(terraform_config_paths):
         text = path.read_text(encoding="utf-8")

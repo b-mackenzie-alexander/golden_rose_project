@@ -5,9 +5,9 @@ module "develop" {
   control_plane_project_id = var.control_plane_project_id
   region                   = var.region
   container_image_digest   = var.container_image_digest
+  deployment_stage         = var.deployment_stage
   direct_vpc_subnet_cidr   = var.direct_vpc_subnet_cidr
 
-  deployer_principal                       = var.deployer_principal
   private_invoker_principal                = var.private_invoker_principal
   billing_account_id                       = var.billing_account_id
   alert_notification_email_address         = var.alert_notification_email_address
@@ -24,4 +24,5 @@ module "develop" {
   cloud_sql_migrator_role                  = var.cloud_sql_migrator_role
   cloud_sql_runtime_role                   = var.cloud_sql_runtime_role
   cloud_sql_recovery_policy_review_status  = var.cloud_sql_recovery_policy_review_status
+  golden_rose_public_environment_label     = var.golden_rose_public_environment_label
 }

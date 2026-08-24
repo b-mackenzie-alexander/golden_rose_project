@@ -3,9 +3,36 @@ name: deploy-develop
 on:
   workflow_dispatch:
     inputs:
-      publish_run_id:
-        description: Successful reviewed build-image publish run id
+      deployment_stage:
+        description: Separately approved deploy transition
         required: true
+        type: choice
+        options:
+        - migration
+        - service
+      stage_receipt_base64:
+        description: Operator-held signed stage receipt bytes, base64 encoded
+        required: true
+        type: string
+      stage_receipt_bundle_base64:
+        description: Detached Sigstore bundle for the operator-held stage receipt, base64 encoded
+        required: true
+        type: string
+      migration_receipt_base64:
+        description: Signed migration-stage receipt required only for service
+        required: false
+        type: string
+      migration_receipt_bundle_base64:
+        description: Detached Sigstore bundle for the signed migration-stage receipt required only for service
+        required: false
+        type: string
+      migration_success_receipt_base64:
+        description: Separately signed migration-success receipt required only for service
+        required: false
+        type: string
+      migration_success_receipt_bundle_base64:
+        description: Detached Sigstore bundle for migration-success receipt required only for service
+        required: false
         type: string
 
 permissions:
@@ -16,12 +43,12 @@ jobs:
     name: deploy
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: develop
     concurrency:
       group: deploy-develop
       cancel-in-progress: false
     permissions:
-      actions: read
       contents: read
       id-token: write
     steps:
@@ -48,6 +75,87 @@ jobs:
           set -euo pipefail
           test "$GITHUB_REF" = "refs/heads/develop"
 
+      - name: Install Cosign
+        # v3.0.6
+        uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22
+        with:
+          cosign-release: "v3.0.6"
+
+      - name: Verify signed stage receipt before cloud authentication
+        env:
+          STAGE_RECEIPT_BASE64: ${{ inputs.stage_receipt_base64 }}
+          STAGE_RECEIPT_BUNDLE_BASE64: ${{ inputs.stage_receipt_bundle_base64 }}
+          STAGE_RECEIPT_CERTIFICATE_IDENTITY: ${{ vars.STAGE_RECEIPT_CERTIFICATE_IDENTITY }}
+          MIGRATION_SUCCESS_RECEIPT_BASE64: ${{ inputs.migration_success_receipt_base64 }}
+          MIGRATION_SUCCESS_RECEIPT_BUNDLE_BASE64: ${{ inputs.migration_success_receipt_bundle_base64 }}
+          MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY: ${{ vars.MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY }}
+          MIGRATION_RECEIPT_BASE64: ${{ inputs.migration_receipt_base64 }}
+          MIGRATION_RECEIPT_BUNDLE_BASE64: ${{ inputs.migration_receipt_bundle_base64 }}
+          DEPLOYMENT_STAGE: ${{ inputs.deployment_stage }}
+        run: |
+          set -euo pipefail
+          mkdir -p build/transition-authority
+          printf '%s' "$STAGE_RECEIPT_BASE64" | base64 --decode > build/transition-authority/stage-receipt.json
+          printf '%s' "$STAGE_RECEIPT_BUNDLE_BASE64" | base64 --decode > build/transition-authority/stage-receipt.sigstore.json
+          cosign verify-blob build/transition-authority/stage-receipt.json --bundle build/transition-authority/stage-receipt.sigstore.json --certificate-identity "$STAGE_RECEIPT_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+          if [ "$DEPLOYMENT_STAGE" = "service" ]; then
+            test -n "$MIGRATION_SUCCESS_RECEIPT_BASE64"
+            test -n "$MIGRATION_SUCCESS_RECEIPT_BUNDLE_BASE64"
+            test -n "$MIGRATION_RECEIPT_BASE64"
+            test -n "$MIGRATION_RECEIPT_BUNDLE_BASE64"
+            printf '%s' "$MIGRATION_RECEIPT_BASE64" | base64 --decode > build/transition-authority/migration-receipt.json
+            printf '%s' "$MIGRATION_RECEIPT_BUNDLE_BASE64" | base64 --decode > build/transition-authority/migration-receipt.sigstore.json
+            cosign verify-blob build/transition-authority/migration-receipt.json --bundle build/transition-authority/migration-receipt.sigstore.json --certificate-identity "$STAGE_RECEIPT_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+            printf '%s' "$MIGRATION_SUCCESS_RECEIPT_BASE64" | base64 --decode > build/transition-authority/migration-success-receipt.json
+            printf '%s' "$MIGRATION_SUCCESS_RECEIPT_BUNDLE_BASE64" | base64 --decode > build/transition-authority/migration-success-receipt.sigstore.json
+            cosign verify-blob build/transition-authority/migration-success-receipt.json --bundle build/transition-authority/migration-success-receipt.sigstore.json --certificate-identity "$MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+          fi
+
+      - name: Initialize failed deploy result
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          Path("build/deploy-result.json").write_text(json.dumps({"result": "failed", "current_stage": "pre_deploy_validation", "qualification_executed": False, "recovery_disposition": "forward recovery or teardown/rebuild required"}, indent=2) + "\n", encoding="utf-8")
+          PY
+
+      - name: Verify direct OCI image authority
+        env:
+          MANAGED_REPOSITORY: us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer
+          BUILD_CERTIFICATE_IDENTITY: ${{ vars.BUILD_CERTIFICATE_IDENTITY }}
+        run: |
+          set -euo pipefail
+          IMAGE_TAG="$MANAGED_REPOSITORY:${GITHUB_SHA}"
+          mkdir -p build/oci-authority
+          cosign verify --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$IMAGE_TAG" > build/oci-authority/signature.json
+          IMAGE_DIGEST="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          records = json.loads(Path("build/oci-authority/signature.json").read_text(encoding="utf-8"))
+          print(records[0]["critical"]["image"]["docker-manifest-digest"])
+          PY
+          )"
+          MANAGED_IMAGE="${MANAGED_REPOSITORY}@${IMAGE_DIGEST}"
+          cosign verify-attestation --type slsaprovenance --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/oci-authority/provenance.json
+          cosign verify-attestation --type https://spdx.dev/Document --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/oci-authority/image-sbom.json
+          cosign verify-attestation --type https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1 --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/oci-authority/application-sbom.json
+          uv run python scripts/verify_deploy_image_authority.py --image "$MANAGED_IMAGE" --signature build/oci-authority/signature.json --provenance build/oci-authority/provenance.json --image-sbom build/oci-authority/image-sbom.json --application-sbom build/oci-authority/application-sbom.json --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --source-commit "$GITHUB_SHA"
+          printf 'MANAGED_IMAGE=%s\nIMAGE_DIGEST=%s\n' "$MANAGED_IMAGE" "$IMAGE_DIGEST" >> "$GITHUB_ENV"
+
+      - name: Validate signed stage receipt after image digest
+        env:
+          DEPLOYMENT_STAGE: ${{ inputs.deployment_stage }}
+        run: |
+          set -euo pipefail
+          args=(--receipt build/transition-authority/stage-receipt.json --stage "$DEPLOYMENT_STAGE" --source-sha "$GITHUB_SHA" --image-digest "$IMAGE_DIGEST")
+          if [ "$DEPLOYMENT_STAGE" = "service" ]; then
+            args+=(--migration-receipt build/transition-authority/migration-receipt.json)
+            args+=(--migration-success-receipt build/transition-authority/migration-success-receipt.json)
+          fi
+          uv run python scripts/verify_stage_receipt.py "${args[@]}" > build/transition-authority/stage-receipt.sha256
+
       - name: Authenticate to Google Cloud
         id: auth
         # v2.1.10
@@ -61,227 +169,92 @@ jobs:
         # v2.1.4
         uses: google-github-actions/setup-gcloud@77e7a554d41e2ee56fc945c52dfd3f33d12def9a
 
-      - name: Download reviewed publish artifacts
+      - name: Extract and validate selected live configuration projection
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-          PUBLISH_RUN_ID: ${{ inputs.publish_run_id }}
-          DEPLOY_COMMIT_SHA: ${{ github.sha }}
+          DEPLOYMENT_STAGE: ${{ inputs.deployment_stage }}
         run: |
           set -euo pipefail
-          mkdir -p build/reviewed-artifacts
+          if [ "$DEPLOYMENT_STAGE" = "migration" ]; then
+            gcloud run jobs describe run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --format=json > build/transition-authority/live-resource.json
+          else
+            gcloud run services describe staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --format=json > build/transition-authority/live-resource.json
+            gcloud run services get-iam-policy staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --format=json > build/transition-authority/live-service-iam-policy.json
+          fi
+          export DEPLOYMENT_STAGE
           python - <<'PY'
+          import importlib.util
           import json
           import os
-          import re
-          import urllib.request
-          import zipfile
-          from io import BytesIO
           from pathlib import Path
 
-          token = os.environ["GITHUB_TOKEN"]
-          run_id = os.environ["PUBLISH_RUN_ID"]
-          repository = os.environ["GITHUB_REPOSITORY"]
-          if not re.fullmatch(r"[1-9][0-9]{0,19}", run_id):
-              raise SystemExit("publish run id must be a decimal GitHub Actions run id")
-          api_base = f"https://api.github.com/repos/{repository}"
-          headers = {
-              "Authorization": f"Bearer {token}",
-              "Accept": "application/vnd.github+json",
-              "X-GitHub-Api-Version": "2022-11-28",
-          }
-          def get_json(url):
-              with urllib.request.urlopen(
-                  urllib.request.Request(url, headers=headers)
-              ) as response:
-                  return json.load(response)
-
-          run_payload = get_json(f"{api_base}/actions/runs/{run_id}")
-          expected_run = {
-              "status": "completed",
-              "conclusion": "success",
-              "event": "workflow_dispatch",
-              "head_branch": "develop",
-              "path": ".github/workflows/build-image.yml",
-          }
-          for key, expected_value in expected_run.items():
-              if run_payload.get(key) != expected_value:
-                  raise SystemExit(
-                      f"publish run {key} must be {expected_value!r}, got {run_payload.get(key)!r}"
+          module_path = Path("scripts/verify_stage_receipt.py")
+          spec = importlib.util.spec_from_file_location("verify_stage_receipt", module_path)
+          if spec is None or spec.loader is None:
+              raise SystemExit("could not load stage receipt verifier")
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          resource = json.loads(Path("build/transition-authority/live-resource.json").read_text(encoding="utf-8"))
+          iam_policy = None
+          if os.environ["DEPLOYMENT_STAGE"] == "service":
+              iam_policy = json.loads(
+                  Path("build/transition-authority/live-service-iam-policy.json").read_text(
+                      encoding="utf-8"
                   )
-          repository_payload = run_payload.get("repository", {})
-          if repository_payload.get("full_name") != repository:
-              raise SystemExit("publish run repository identity mismatch")
-          head_sha = run_payload.get("head_sha")
-          if not isinstance(head_sha, str) or not re.fullmatch(r"[0-9a-f]{40}", head_sha):
-              raise SystemExit("publish run head sha is malformed")
-          deploy_commit_sha = os.environ["DEPLOY_COMMIT_SHA"]
-          if not re.fullmatch(r"[0-9a-f]{40}", deploy_commit_sha):
-              raise SystemExit("deploy commit sha is malformed")
-          if head_sha != deploy_commit_sha:
-              raise SystemExit("publish run head sha must match the deploy commit sha")
-          jobs_payload = get_json(f"{api_base}/actions/runs/{run_id}/jobs")
-          publish_jobs = [
-              job
-              for job in jobs_payload.get("jobs", [])
-              if isinstance(job, dict) and job.get("name") == "publish-image"
-          ]
-          if len(publish_jobs) != 1:
-              raise SystemExit("publish run must contain exactly one publish-image job")
-          publish_job = publish_jobs[0]
-          if publish_job.get("status") != "completed" or publish_job.get("conclusion") != "success":
-              raise SystemExit("publish-image job did not complete successfully")
-          Path("build").mkdir(exist_ok=True)
-          Path("build/reviewed-publish-run.json").write_text(
-              json.dumps(
-                  {
-                      "publish_run_id": run_id,
-                      "workflow_path": run_payload["path"],
-                      "event": run_payload["event"],
-                      "head_branch": run_payload["head_branch"],
-                      "head_sha": head_sha,
-                      "deploy_commit_sha": deploy_commit_sha,
-                      "status": run_payload["status"],
-                      "conclusion": run_payload["conclusion"],
-                      "repository": repository,
-                      "publish_job_name": publish_job["name"],
-                  },
-                  indent=2,
               )
-              + "\n",
-              encoding="utf-8",
+          projection = module.extract_live_configuration_projection(
+              resource, stage=os.environ["DEPLOYMENT_STAGE"], iam_policy=iam_policy
           )
-          artifact_targets = {
-              "published-image": "published-image.txt",
-              "image-metadata": "image-metadata.json",
-              "backend-sbom-cdx": "backend-sbom.cdx.json",
-              "frontend-sbom-cdx": "frontend-sbom.cdx.json",
-          }
-          artifacts_payload = get_json(f"{api_base}/actions/runs/{run_id}/artifacts")
-          artifacts = {
-              artifact["name"]: artifact
-              for artifact in artifacts_payload.get("artifacts", [])
-              if isinstance(artifact, dict)
-          }
-          missing = sorted(set(artifact_targets) - set(artifacts))
-          if missing:
-              raise SystemExit(f"missing reviewed publish artifacts: {missing}")
-          output_root = Path("build/reviewed-artifacts")
-          for artifact_name, output_name in artifact_targets.items():
-              download_url = artifacts[artifact_name]["archive_download_url"]
-              with urllib.request.urlopen(
-                  urllib.request.Request(download_url, headers=headers)
-              ) as archive_response:
-                  archive_bytes = archive_response.read()
-              with zipfile.ZipFile(BytesIO(archive_bytes)) as archive:
-                  members = [member for member in archive.namelist() if not member.endswith("/")]
-                  if len(members) != 1:
-                      raise SystemExit(
-                          f"artifact {artifact_name} must contain exactly one file, got {members}"
-                      )
-                  (output_root / output_name).write_bytes(archive.read(members[0]))
-          PY
-
-      - name: Bind reviewed published image evidence
-        env:
-          MANAGED_REPOSITORY: us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer
-        run: |
-          set -euo pipefail
-          PUBLISHED_IMAGE_REF="$(tr -d '\r\n' < build/reviewed-artifacts/published-image.txt)"
-          VERIFIED_IMAGE_REF="$(uv run python scripts/verify_image_provenance.py --mode publish --dockerfile Dockerfile --metadata-path build/reviewed-artifacts/image-metadata.json --backend-sbom-path build/reviewed-artifacts/backend-sbom.cdx.json --frontend-sbom-path build/reviewed-artifacts/frontend-sbom.cdx.json --published-image-repository "$MANAGED_REPOSITORY")"
-          test "$VERIFIED_IMAGE_REF" = "$PUBLISHED_IMAGE_REF"
-          case "$VERIFIED_IMAGE_REF" in
-            "$MANAGED_REPOSITORY"@sha256:*) ;;
-            *)
-              echo "reviewed image reference is not bound to the managed repository" >&2
-              exit 1
-              ;;
-          esac
-          IMAGE_DIGEST="${VERIFIED_IMAGE_REF##*@}"
-          printf 'MANAGED_IMAGE=%s\n' "$VERIFIED_IMAGE_REF" >> "$GITHUB_ENV"
-          printf 'IMAGE_DIGEST=%s\n' "$IMAGE_DIGEST" >> "$GITHUB_ENV"
-
-      - name: Record schema compatibility posture
-        env:
-          PUBLISH_RUN_ID: ${{ inputs.publish_run_id }}
-        run: |
-          set -euo pipefail
-          mkdir -p build
-          python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          payload = {
-              "publish_run_id": os.environ["PUBLISH_RUN_ID"],
-              "publish_run_identity": json.loads(
-                  Path("build/reviewed-publish-run.json").read_text(encoding="utf-8")
-              ),
-              "image_digest": os.environ["IMAGE_DIGEST"],
-              "migration_precedes_rollout": True,
-              "rollback_without_proven_compatibility_window": False,
-              "recovery_posture": "forward recovery",
-              "qualification_executed": False,
-              "compatibility_evidence": "published-image artifact plus backend/frontend SBOM and metadata evidence from the reviewed publish run",
-          }
-          Path("build/deploy-compatibility.json").write_text(
-              json.dumps(payload, indent=2) + "\n", encoding="utf-8"
+          Path("build/transition-authority/live-configuration-projection.json").write_text(
+              json.dumps(projection, sort_keys=True, allow_nan=False) + "\n", encoding="utf-8"
           )
           PY
+          args=(--receipt build/transition-authority/stage-receipt.json --stage "$DEPLOYMENT_STAGE" --source-sha "$GITHUB_SHA" --image-digest "$IMAGE_DIGEST" --live-configuration-projection build/transition-authority/live-configuration-projection.json)
+          if [ "$DEPLOYMENT_STAGE" = "service" ]; then
+            args+=(--migration-receipt build/transition-authority/migration-receipt.json)
+            args+=(--migration-success-receipt build/transition-authority/migration-success-receipt.json)
+          fi
+          uv run python scripts/verify_stage_receipt.py "${args[@]}"
 
-      - name: Update migration job to reviewed image
-        run: |
-          set -euo pipefail
-          gcloud run jobs update run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --image "$MANAGED_IMAGE" >/dev/null
-
-      - name: Execute migration job
+      - name: Execute migration transition
+        if: inputs.deployment_stage == 'migration'
         run: |
           set -euo pipefail
           gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --wait >/dev/null
 
-      - name: Deploy reviewed service
+      - name: Verify service readiness transition
+        if: inputs.deployment_stage == 'service'
         run: |
           set -euo pipefail
-          gcloud run services update staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --image "$MANAGED_IMAGE" >/dev/null
-
-      - name: Verify readiness gate and record deploy result
-        env:
-          PUBLISH_RUN_ID: ${{ inputs.publish_run_id }}
-        run: |
-          set -euo pipefail
-          READY_STATUS=$(gcloud run services describe staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --format='value(status.conditions[0].status)')
-          test "$READY_STATUS" = "True"
-          mkdir -p build
+          SERVICE_JSON=$(gcloud run services describe staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --format=json)
+          export SERVICE_JSON
           python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          payload = {
-              "publish_run_id": os.environ["PUBLISH_RUN_ID"],
-              "publish_run_identity": json.loads(
-                  Path("build/reviewed-publish-run.json").read_text(encoding="utf-8")
-              ),
-              "image_digest": os.environ["IMAGE_DIGEST"],
-              "migration_executed": True,
-              "deploy_executed": True,
-              "readiness_checked": True,
-              "qualification_executed": False,
-              "result": "success",
-          }
-          Path("build/deploy-result.json").write_text(
-              json.dumps(payload, indent=2) + "\n", encoding="utf-8"
-          )
+          import json, os
+          service = json.loads(os.environ["SERVICE_JSON"])
+          ready = next((item for item in service.get("status", {}).get("conditions", []) if item.get("type") == "Ready"), None)
+          if not ready or ready.get("status") != "True":
+              raise SystemExit("cloud run ready condition must be True")
+          containers = service.get("template", {}).get("containers")
+          if not isinstance(containers, list) or len(containers) != 1 or not isinstance(containers[0], dict):
+              raise SystemExit("ready service must contain exactly one Cloud Run v2 container")
+          image = containers[0].get("image")
+          if image != os.environ["MANAGED_IMAGE"]:
+              raise SystemExit("ready service image must match the direct Cosign-verified image")
           PY
 
-      - name: Upload deploy compatibility evidence
+      - name: Record deploy result
         if: always()
-        # v4.6.2
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: deploy-compatibility
-          path: build/deploy-compatibility.json
-          if-no-files-found: error
-          retention-days: 14
+        env:
+          DEPLOYMENT_STAGE: ${{ inputs.deployment_stage }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          path = Path("build/deploy-result.json")
+          payload = json.loads(path.read_text(encoding="utf-8"))
+          payload.update({"current_stage": os.environ["DEPLOYMENT_STAGE"], "image_digest": os.environ.get("IMAGE_DIGEST"), "qualification_executed": False})
+          path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+          PY
 
       - name: Upload deploy result evidence
         if: always()

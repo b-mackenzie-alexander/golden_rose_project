@@ -85,7 +85,9 @@ def _normalize_cloud_run_url(base_url: str) -> str:
     if parsed.port not in (None, 443):
         raise QualificationError("base URL must use the approved https authority only")
     if parsed.hostname is None or not APPROVED_CLOUD_RUN_HOST_PATTERN.fullmatch(parsed.hostname):
-        raise QualificationError("base URL host must be an approved private Cloud Run authority")
+        raise QualificationError(
+            "base URL host must be an approved IAM-private Cloud Run authority"
+        )
     return f"https://{parsed.hostname}"
 
 
@@ -281,6 +283,44 @@ def render_qualification_evidence(result: dict[str, Any]) -> str:
         else:
             lines.append(f"{key}: {_redact_text(str(value))}")
     return "\n".join(lines) + "\n"
+
+
+def _failure_boundary(exc: QualificationError) -> str:
+    message = str(exc)
+    if "health" in message:
+        return "health"
+    if "readiness" in message:
+        return "readiness"
+    if "employer create" in message:
+        return "employer_create"
+    if "employer replay" in message:
+        return "employer_replay"
+    if "employer read" in message:
+        return "employer_read"
+    if "employer search" in message:
+        return "employer_search"
+    if "revision" in message:
+        return "employer_revision"
+    if "contact create" in message:
+        return "employer_contact_create"
+    if "contact query" in message:
+        return "employer_contact_query"
+    if "contact read" in message:
+        return "employer_contact_read"
+    if "token" in message or "authenticated access" in message:
+        return "authenticated_access"
+    if "base URL" in message or "service authority" in message:
+        return "network_reachability"
+    return "qualification_contract"
+
+
+def _failure_result(exc: QualificationError) -> dict[str, Any]:
+    return {
+        "qualification_status": "failed",
+        "failed_boundary": _failure_boundary(exc),
+        "qualification_executed": False,
+        "cleanup_disposition": "teardown/rebuild required before retry",
+    }
 
 
 def _expect_boundary(
@@ -532,8 +572,11 @@ def qualify_develop_deployment(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    args = _parse_args(argv)
+    destination: Path | None = None
+    if args.artifact_root:
+        destination = _validated_evidence_destination(args.artifact_root, args.evidence_name)
     try:
-        args = _parse_args(argv)
         access_token = _read_access_token(args)
         result = qualify_develop_deployment(
             base_url=args.base_url,
@@ -544,12 +587,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             allow_synthetic_writes=args.allow_synthetic_writes,
         )
     except QualificationError as exc:
-        print(str(exc))
+        if destination is not None:
+            _atomic_write_text(destination, render_qualification_evidence(_failure_result(exc)))
+        print("qualification failed")
         return 1
 
     rendered = render_qualification_evidence(result)
-    if args.artifact_root:
-        destination = _validated_evidence_destination(args.artifact_root, args.evidence_name)
+    if destination is not None:
         _atomic_write_text(destination, rendered)
     print(rendered, end="")
     return 0

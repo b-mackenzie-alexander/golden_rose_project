@@ -8,6 +8,7 @@
   - frontend SBOM: `npm sbom --sbom-format cyclonedx --sbom-type application` under Node `22.22.3` / npm `10.9.8`
   - backend SBOM: `uv run cyclonedx-py environment --pyproject pyproject.toml --output-reproducible --of JSON` from `cyclonedx-bom==7.3.1`
   - backend validation library: `cyclonedx-python-lib[json-validation]==11.11.0`
+  - reviewed publication attestation tooling contract: `cosign v3.0.6` via `sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22` in the protected publish workflow
 - **Observed advisory checks at review time:**
   - `npm --userconfig apps/web/.npmrc --prefix apps/web audit --audit-level=high --json` reported `0` vulnerabilities (`0` high / `0` critical)
   - `env -u PYTHONPATH uv run pip-audit --skip-editable --format=json` reported no known vulnerabilities

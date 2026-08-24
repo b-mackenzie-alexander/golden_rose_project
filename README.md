@@ -79,8 +79,12 @@ automated hiring, matching, ranking, eligibility, or referral system.
   configuration ownership; IAM-private internet-reachable named testers;
   exact viewer/job-executor and direct-workflow WIF authority; keyless
   digest-bound Cosign/SLSA/SBOM verification; and authenticated `/readiness`
-  availability monitoring. Its implementation is not authorized until the
-  documentation-only packet merges.
+  availability monitoring. PR #35 merged the amended planning packet at
+  `db1f293`, and the active local branch `fix/post-pr33-deployment-path-remediation`
+  now implements the no-cloud remediation through Tasks 1–11 plus the current
+  documentation/handoff reconciliation work. That review surface is still local
+  and uncommitted: no cloud action, plan/apply, publication, deployment, or
+  qualification has occurred, and merge remains pending committed-head review.
 - The current branch also carries a reviewed local clean-room qualification
   harness that exercises the approved pre-deployment bundle against a disposable
   repo copy plus Docker-backed synthetic PostgreSQL, including Terraform/static

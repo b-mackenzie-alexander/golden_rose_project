@@ -22,13 +22,24 @@ variable "region" {
 }
 
 variable "container_image_digest" {
-  description = "Immutable sha256 digest supplied out of band for the managed Artifact Registry staff-tracer image."
+  description = "Immutable sha256 digest supplied out of band for the managed Artifact Registry staff-tracer image. Nullable so the foundation stage may omit it; required for migration and service stages."
+  type        = string
+  nullable    = true
+
+  validation {
+    condition     = var.deployment_stage == "foundation" ? var.container_image_digest == null : can(regex("sha256:[0-9a-f]{64}$", var.container_image_digest))
+    error_message = "Foundation requires no image digest; migration and service require only an immutable sha256 digest."
+  }
+}
+
+variable "deployment_stage" {
+  description = "Staged deployment authority: foundation creates no executable workload, migration adds the configured migration job, and service adds the configured staff service."
   type        = string
   nullable    = false
 
   validation {
-    condition     = can(regex("sha256:[0-9a-f]{64}$", var.container_image_digest))
-    error_message = "The container image input must be only a sha256 digest for the managed Artifact Registry image authority."
+    condition     = contains(["foundation", "migration", "service"], var.deployment_stage)
+    error_message = "The deployment stage must be one of: foundation, migration, service."
   }
 }
 
@@ -47,17 +58,24 @@ variable "direct_vpc_subnet_cidr" {
 }
 
 
-variable "deployer_principal" {
-  description = "Operator-supplied principal string for the reviewed deployer identity that may impersonate only the required workload service accounts."
+variable "tester_authority_receipt_path" {
+  description = "Operator-held path to the signed tester-authority receipt; service plans derive the IAM principal from it rather than accepting a principal tfvar."
   type        = string
-  nullable    = false
+  nullable    = true
 }
 
-variable "private_invoker_principal" {
-  description = "Operator-supplied approved private invoker principal or group for the reviewed internal Cloud Run service."
+variable "tester_authority_bundle_path" {
+  description = "Operator-held path to the detached Sigstore bundle for the tester-authority receipt."
   type        = string
-  nullable    = false
+  nullable    = true
 }
+
+variable "tester_authority_certificate_identity" {
+  description = "Reviewed GitHub workflow certificate identity required to verify the tester-authority receipt."
+  type        = string
+  nullable    = true
+}
+
 
 variable "billing_account_id" {
   description = "Operator-supplied billing account identifier for reviewed develop budget routing."
@@ -89,16 +107,13 @@ variable "log_retention_days" {
 }
 
 variable "cloud_run_request_log_posture" {
-  description = "Value-safe marker for the reviewed Cloud Run request-log minimization and access decision pending live qualification."
+  description = "Value-safe marker for the reviewed Cloud Run request-log minimization posture enforced by exclusion plus restricted access/no export."
   type        = string
   nullable    = false
 
   validation {
-    condition = contains([
-      "restrict-access-no-export",
-      "exclude-uuid-bearing-paths-if-supported",
-    ], var.cloud_run_request_log_posture)
-    error_message = "The Cloud Run request-log posture must stay within the reviewed minimization markers."
+    condition     = var.cloud_run_request_log_posture == "exclude-uuid-bearing-staff-paths-and-restrict-access-no-export"
+    error_message = "The Cloud Run request-log posture must remain the reviewed exclusion-backed minimization posture."
   }
 }
 
@@ -131,8 +146,8 @@ variable "cloud_sql_transaction_log_retention_days" {
   nullable    = false
 
   validation {
-    condition     = floor(var.cloud_sql_transaction_log_retention_days) == var.cloud_sql_transaction_log_retention_days && var.cloud_sql_transaction_log_retention_days >= 1
-    error_message = "The Cloud SQL transaction log retention input must be a whole number of at least one day."
+    condition     = floor(var.cloud_sql_transaction_log_retention_days) == var.cloud_sql_transaction_log_retention_days && var.cloud_sql_transaction_log_retention_days >= 1 && var.cloud_sql_transaction_log_retention_days <= 7
+    error_message = "The Cloud SQL transaction log retention input must be a whole number between 1 and 7 days."
   }
 }
 
@@ -142,8 +157,8 @@ variable "cloud_sql_retained_backups" {
   nullable    = false
 
   validation {
-    condition     = floor(var.cloud_sql_retained_backups) == var.cloud_sql_retained_backups && var.cloud_sql_retained_backups >= 1
-    error_message = "The Cloud SQL retained backup count must be a whole number of at least one backup."
+    condition     = floor(var.cloud_sql_retained_backups) == var.cloud_sql_retained_backups && var.cloud_sql_retained_backups >= 1 && var.cloud_sql_retained_backups <= 365
+    error_message = "The Cloud SQL retained backup count must be a whole number between 1 and 365 backups."
   }
 }
 
@@ -199,5 +214,16 @@ variable "cloud_sql_recovery_policy_review_status" {
   validation {
     condition     = var.cloud_sql_recovery_policy_review_status == "gate-2-evidence-required"
     error_message = "The Cloud SQL recovery-policy marker must remain gate-2-evidence-required until later recovery evidence is accepted."
+  }
+}
+
+variable "golden_rose_public_environment_label" {
+  description = "Operator-held reviewed non-secret public environment label containing 'non-production' and 'synthetic'."
+  type        = string
+  nullable    = false
+
+  validation {
+    condition     = can(regex("non-production", var.golden_rose_public_environment_label)) && can(regex("synthetic", var.golden_rose_public_environment_label))
+    error_message = "The public environment label must contain 'non-production' and 'synthetic'."
   }
 }

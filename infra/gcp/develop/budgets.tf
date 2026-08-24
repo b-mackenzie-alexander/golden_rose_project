@@ -36,5 +36,8 @@ resource "google_billing_budget" "develop" {
     schema_version                   = "1.0"
   }
 
-  depends_on = [google_monitoring_notification_channel.alerts]
+  depends_on = [
+    google_project_service.approved["billingbudgets.googleapis.com"],
+    google_monitoring_notification_channel.alerts,
+  ]
 }

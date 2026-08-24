@@ -19,40 +19,16 @@ resource "google_service_account" "deployer" {
   description  = "Deployment identity kept separate from provisioning and image publication authority."
 }
 
-resource "google_service_account_iam_member" "provisioner_wif" {
-  service_account_id = google_service_account.provisioner.name
-  role               = "roles/iam.workloadIdentityUser"
-  member             = local.github_principal_set
-}
-
-resource "google_service_account_iam_member" "provisioner_token_creator" {
-  service_account_id = google_service_account.provisioner.name
-  role               = "roles/iam.serviceAccountTokenCreator"
-  member             = local.github_principal_set
-}
-
 resource "google_service_account_iam_member" "image_publisher_wif" {
   service_account_id = google_service_account.image_publisher.name
   role               = "roles/iam.workloadIdentityUser"
-  member             = local.github_principal_set
-}
-
-resource "google_service_account_iam_member" "image_publisher_token_creator" {
-  service_account_id = google_service_account.image_publisher.name
-  role               = "roles/iam.serviceAccountTokenCreator"
-  member             = local.github_principal_set
+  member             = local.build_image_workflow_principal_set
 }
 
 resource "google_service_account_iam_member" "deployer_wif" {
   service_account_id = google_service_account.deployer.name
   role               = "roles/iam.workloadIdentityUser"
-  member             = local.github_principal_set
-}
-
-resource "google_service_account_iam_member" "deployer_token_creator" {
-  service_account_id = google_service_account.deployer.name
-  role               = "roles/iam.serviceAccountTokenCreator"
-  member             = local.github_principal_set
+  member             = local.deploy_develop_workflow_principal_set
 }
 
 resource "google_storage_bucket_iam_member" "state_authority_object_admin" {

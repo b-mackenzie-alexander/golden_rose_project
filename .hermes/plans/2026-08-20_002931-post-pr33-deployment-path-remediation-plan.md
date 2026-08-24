@@ -677,6 +677,25 @@ terraform fmt -check -recursive infra/gcp
 
 ---
 
+## 2026-08-21 amendment A — review-confirmed transition authority repairs
+
+**Authority:** Beatrice accepted this amendment after the independent review of `6e11635` confirmed that the initial F1–F17 implementation left receipt production/transport, exact-resource deploy IAM, tester-authority anchoring, direct OCI evidence verification, stage separation, full drift checks, and uptime live-shape verification incomplete.
+
+**Scope:** This remains a no-cloud remediation. It authorizes only tracked source/docs/tests for the following exact contracts; receipt signing, protected environment configuration, all Terraform plan/apply work, publication, deployment, and live verification stay separate gates.
+
+1. Add a signed operator-held stage-plan receipt transport: manual deploy dispatch supplies receipt and detached Sigstore bundle; the workflow performs fresh `cosign verify-blob` against an operator-held protected certificate identity before parsing it. The publication workflow must not create or upload a plan-approval receipt.
+2. Split deploy selection into exactly `migration` and `service`. Migration validates only its own receipt and Terraform-owned job projection then executes the job. Service validates its own receipt plus a separately signed migration-success receipt bound to the migration receipt hash and image digest, then validates only the Terraform-owned service projection and readiness.
+3. Replace project-scoped deployer grants with Cloud Run v2 job/service IAM-member resources: executor on only `run-migrations`; viewer on that job and `staff-tracer`; reject project-level deployer `run` grants in the static validator and live verifier.
+4. Introduce the review-bound named-tester receipt interface. Terraform inputs require a derived exact user principal and immutable authority SHA-256; verifier inputs include the operator-held receipt/bundle and independently verify/derive the principal before accepting live IAM. Add substitute-principal negatives.
+5. Replace self-authored provenance/SBOM claim files with fresh Cosign signature and attestation verification against the digest. Preserve and parse raw verified output; obtain the final-image SBOM only from its OCI attestation and reject self-authored JSON or wrong signed subject/predicate.
+6. Add normalized Terraform configuration projections for migration job and service to signed stage receipts, and compare every reviewed execution-affecting field before job execution/readiness.
+7. Expand the foundation verifier snapshot from uptime display names to complete uptime configuration and exact project-number-derived Monitoring service agent. Reject wrong host/path/TLS/auth/project-agent fixtures.
+8. Correct committed living docs and replace stale exact-head claims with a new final-head handoff only after the remediation commit and final verification are complete.
+
+**Required regression evidence:** fixture-driven workflow producer/consumer interoperability; digest-free foundation variable admission and migration/service digest rejection; signed-receipt and tester-authority substitute negatives; deployer resource-IAM scope negatives; direct-Cosign output/self-authored-JSON negatives; migration/service separation and projection-drift negatives; authenticated uptime full-shape negatives; and a full no-cloud rerun on the new committed head.
+
+---
+
 ## Likely changed-path surface
 
 The implementation plan is intentionally bounded to these families:

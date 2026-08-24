@@ -219,7 +219,7 @@ def test_qualify_develop_deployment_accepts_reviewed_private_synthetic_flow() ->
         ("file:///tmp/not-allowed", "https"),
         ("ssh://staff-tracer-abc123.a.run.app", "https"),
         ("https://user:pass@staff-tracer-abc123.a.run.app", "userinfo"),
-        ("https://evil.example.com", "approved private Cloud Run authority"),
+        ("https://evil.example.com", "approved IAM-private Cloud Run authority"),
         ("https://staff-tracer-abc123.a.run.app?token=leak", "query string"),
         ("https://staff-tracer-abc123.a.run.app/#frag", "fragment"),
         ("https://staff-tracer-abc123.a.run.app/path", "must not include a path"),
@@ -258,6 +258,25 @@ def test_qualify_develop_deployment_fails_closed_on_non_private_auth_gap() -> No
             allow_synthetic_writes=True,
             requester=FakeRequester(),
         )
+
+
+def test_qualification_contract_requires_reviewed_authenticated_proxy_or_token_path() -> None:
+    module = load_module()
+    args = module._parse_args(
+        [
+            "--base-url",
+            "https://staff-tracer-abc123.a.run.app",
+            "--expected-service-url",
+            "https://staff-tracer-abc123.a.run.app",
+            "--expected-image-digest",
+            EXPECTED_IMAGE_DIGEST,
+            "--access-token-stdin",
+        ]
+    )
+
+    assert args.access_token_stdin is True
+    assert args.access_token_env is None
+    assert args.access_token_file is None
 
 
 def test_qualify_develop_deployment_requires_explicit_live_write_acknowledgement() -> None:
@@ -412,6 +431,62 @@ def test_main_reads_token_from_environment_and_writes_bounded_evidence(tmp_path:
     evidence_path = tmp_path / "qualification-evidence.md"
     assert evidence_path.exists()
     assert "top-secret-token" not in evidence_path.read_text(encoding="utf-8")
+
+
+def test_qualification_failure_writes_minimized_atomic_failure_evidence(tmp_path: Path) -> None:
+    module = load_module()
+    os.environ["QUAL_TOKEN"] = "top-secret-token"
+
+    def failing_requester(
+        method: str,
+        path: str,
+        headers: dict[str, str],
+        body: dict[str, Any] | None,
+    ) -> FakeResponse:
+        if path == "/health":
+            return FakeResponse(200, {"status": "ok"})
+        if path == "/readiness":
+            return FakeResponse(503, {"status": "not_ready"})
+        raise AssertionError("later requests must not run after readiness failure")
+
+    qualification_function_name = "qualify_develop_deployment"
+    original = getattr(module, qualification_function_name)
+    try:
+        setattr(
+            module,
+            qualification_function_name,
+            lambda **kwargs: original(requester=failing_requester, **kwargs),
+        )
+        exit_code = module.main(
+            [
+                "--base-url",
+                "https://staff-tracer-abc123.a.run.app",
+                "--expected-service-url",
+                "https://staff-tracer-abc123.a.run.app",
+                "--expected-image-digest",
+                EXPECTED_IMAGE_DIGEST,
+                "--access-token-env",
+                "QUAL_TOKEN",
+                "--allow-synthetic-writes",
+                "--artifact-root",
+                str(tmp_path),
+                "--evidence-name",
+                "qualification-failure.md",
+            ]
+        )
+    finally:
+        setattr(module, qualification_function_name, original)
+        os.environ.pop("QUAL_TOKEN", None)
+
+    assert exit_code == 1
+    evidence_path = tmp_path / "qualification-failure.md"
+    rendered = evidence_path.read_text(encoding="utf-8")
+    assert evidence_path.exists()
+    assert "qualification_status: failed" in rendered
+    assert "failed_boundary: readiness" in rendered
+    assert "cleanup_disposition: teardown/rebuild required before retry" in rendered
+    assert "top-secret-token" not in rendered
+    assert "request failed for" not in rendered
 
 
 def test_atomic_write_text_rejects_renamed_parent_replaced_with_symlink(tmp_path: Path) -> None:

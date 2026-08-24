@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -27,6 +28,15 @@ EXPECTED_BASE_MATERIALS = {
 }
 EXPECTED_PROVENANCE_PREDICATE = "https://slsa.dev/provenance/v1"
 EXPECTED_BUILDKIT_BUILD_TYPE = "https://mobyproject.org/buildkit@v1"
+EXPECTED_GITHUB_CERTIFICATE_IDENTITY = (
+    "https://github.com/b-mackenzie-alexander/golden_rose_project/"
+    ".github/workflows/build-image.yml@refs/heads/develop"
+)
+EXPECTED_GITHUB_OIDC_ISSUER = "https://token.actions.githubusercontent.com"
+EXPECTED_APPLICATION_SBOM_ATTESTATION_PREDICATE = (
+    "https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1"
+)
+EXPECTED_IMAGE_SBOM_PLATFORM = "linux/amd64"
 
 
 class VerificationResult:
@@ -80,6 +90,103 @@ def _validate_sbom(path: Path) -> None:
     metadata = payload.get("metadata")
     if not isinstance(metadata, dict):
         raise ValueError(f"SBOM evidence must include metadata: {path}")
+
+
+def _sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _validate_trust_identity(
+    payload: dict[str, Any], *, expected_digest: str, expected_subject: str
+) -> None:
+    if payload.get("subject") != expected_subject:
+        raise ValueError("verification evidence subject must match the canonical image reference")
+    if payload.get("digest") != expected_digest:
+        raise ValueError("verification evidence digest must match the canonical image digest")
+    if payload.get("certificate_identity") != EXPECTED_GITHUB_CERTIFICATE_IDENTITY:
+        raise ValueError(
+            "verification evidence certificate identity must match the reviewed build workflow"
+        )
+    if payload.get("certificate_oidc_issuer") != EXPECTED_GITHUB_OIDC_ISSUER:
+        raise ValueError("verification evidence certificate OIDC issuer must be GitHub Actions")
+    if payload.get("transparency_log_included") is not True:
+        raise ValueError("verification evidence must prove transparency log inclusion")
+
+
+def _validate_signature_verification(
+    path: Path, *, expected_digest: str, expected_subject: str
+) -> None:
+    payload = _load_json(path)
+    _validate_trust_identity(
+        payload, expected_digest=expected_digest, expected_subject=expected_subject
+    )
+
+
+def _validate_provenance_verification(
+    path: Path, *, expected_digest: str, expected_subject: str
+) -> None:
+    payload = _load_json(path)
+    _validate_trust_identity(
+        payload, expected_digest=expected_digest, expected_subject=expected_subject
+    )
+    if payload.get("predicate_type") != EXPECTED_PROVENANCE_PREDICATE:
+        raise ValueError("provenance verification must use the reviewed SLSA predicate type")
+    source_commit = payload.get("source_commit")
+    if not isinstance(source_commit, str) or not re.fullmatch(r"[0-9a-f]{40}", source_commit):
+        raise ValueError("provenance verification source_commit must be a full git SHA")
+    builder_id = payload.get("builder_id")
+    if not isinstance(builder_id, str) or not builder_id.strip():
+        raise ValueError("provenance verification builder_id must be non-empty")
+
+
+def _validate_image_sbom(path: Path, *, expected_digest: str) -> None:
+    payload = _load_json(path)
+    if payload.get("bomFormat") != "CycloneDX":
+        raise ValueError("image SBOM must declare CycloneDX bomFormat")
+    metadata = payload.get("metadata")
+    if not isinstance(metadata, dict):
+        raise ValueError("image SBOM must include metadata")
+    component = metadata.get("component")
+    if not isinstance(component, dict):
+        raise ValueError("image SBOM must include a metadata.component")
+    purl = component.get("purl")
+    if not isinstance(purl, str) or f"@{expected_digest}" not in purl:
+        raise ValueError("image SBOM root component must be bound to the reviewed digest")
+    properties = component.get("properties")
+    if not isinstance(properties, list) or not any(
+        isinstance(item, dict)
+        and item.get("name") == "syft:source:image:platform"
+        and item.get("value") == EXPECTED_IMAGE_SBOM_PLATFORM
+        for item in properties
+    ):
+        raise ValueError("image SBOM must prove linux/amd64 platform binding")
+    components = payload.get("components")
+    if not isinstance(components, list) or len(components) < 1:
+        raise ValueError("image SBOM must contain a non-empty component inventory")
+
+
+def _validate_application_sbom_attestation(
+    path: Path,
+    *,
+    expected_digest: str,
+    expected_subject: str,
+    backend_sbom_path: Path,
+    frontend_sbom_path: Path,
+) -> None:
+    payload = _load_json(path)
+    _validate_trust_identity(
+        payload, expected_digest=expected_digest, expected_subject=expected_subject
+    )
+    if payload.get("predicate_type") != EXPECTED_APPLICATION_SBOM_ATTESTATION_PREDICATE:
+        raise ValueError("application SBOM attestation predicate type must be reviewed")
+    if payload.get("backend_sbom_sha256") != _sha256_file(backend_sbom_path):
+        raise ValueError(
+            "application SBOM attestation backend checksum must match the reviewed backend SBOM"
+        )
+    if payload.get("frontend_sbom_sha256") != _sha256_file(frontend_sbom_path):
+        raise ValueError(
+            "application SBOM attestation frontend checksum must match the reviewed frontend SBOM"
+        )
 
 
 def _validate_dockerfile_bases(dockerfile_path: Path) -> None:
@@ -156,6 +263,10 @@ def verify_image_provenance(
     backend_sbom_path: Path,
     frontend_sbom_path: Path,
     published_image_repository: str | None,
+    signature_verification_path: Path | None = None,
+    provenance_verification_path: Path | None = None,
+    image_sbom_path: Path | None = None,
+    application_sbom_verification_path: Path | None = None,
 ) -> VerificationResult:
     _validate_dockerfile_bases(dockerfile_path)
     _validate_sbom(backend_sbom_path)
@@ -166,12 +277,55 @@ def verify_image_provenance(
     if mode == "pr":
         if published_image_repository is not None:
             raise ValueError("published image repository is not allowed in pr mode")
+        if any(
+            path is not None
+            for path in (
+                signature_verification_path,
+                provenance_verification_path,
+                image_sbom_path,
+                application_sbom_verification_path,
+            )
+        ):
+            raise ValueError("publish attestation evidence is not allowed in pr mode")
         return VerificationResult(digest=digest, canonical_image_ref=None)
 
     if published_image_repository is None:
         raise ValueError("published image repository is required in publish mode")
     repository = _validate_repository(published_image_repository)
-    return VerificationResult(digest=digest, canonical_image_ref=f"{repository}@{digest}")
+    canonical_image_ref = f"{repository}@{digest}"
+    if None in (
+        signature_verification_path,
+        provenance_verification_path,
+        image_sbom_path,
+        application_sbom_verification_path,
+    ):
+        raise ValueError(
+            "publish mode requires signature, provenance, image SBOM, and "
+            "application SBOM attestation evidence"
+        )
+    assert signature_verification_path is not None
+    assert provenance_verification_path is not None
+    assert image_sbom_path is not None
+    assert application_sbom_verification_path is not None
+    _validate_signature_verification(
+        signature_verification_path,
+        expected_digest=digest,
+        expected_subject=canonical_image_ref,
+    )
+    _validate_provenance_verification(
+        provenance_verification_path,
+        expected_digest=digest,
+        expected_subject=canonical_image_ref,
+    )
+    _validate_image_sbom(image_sbom_path, expected_digest=digest)
+    _validate_application_sbom_attestation(
+        application_sbom_verification_path,
+        expected_digest=digest,
+        expected_subject=canonical_image_ref,
+        backend_sbom_path=backend_sbom_path,
+        frontend_sbom_path=frontend_sbom_path,
+    )
+    return VerificationResult(digest=digest, canonical_image_ref=canonical_image_ref)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -184,6 +338,10 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--backend-sbom-path", type=Path, required=True)
     parser.add_argument("--frontend-sbom-path", type=Path, required=True)
     parser.add_argument("--published-image-repository")
+    parser.add_argument("--signature-verification-path", type=Path)
+    parser.add_argument("--provenance-verification-path", type=Path)
+    parser.add_argument("--image-sbom-path", type=Path)
+    parser.add_argument("--application-sbom-verification-path", type=Path)
     return parser.parse_args()
 
 
@@ -196,6 +354,10 @@ def main() -> int:
         backend_sbom_path=args.backend_sbom_path,
         frontend_sbom_path=args.frontend_sbom_path,
         published_image_repository=args.published_image_repository,
+        signature_verification_path=args.signature_verification_path,
+        provenance_verification_path=args.provenance_verification_path,
+        image_sbom_path=args.image_sbom_path,
+        application_sbom_verification_path=args.application_sbom_verification_path,
     )
     if result.canonical_image_ref is not None:
         print(result.canonical_image_ref)

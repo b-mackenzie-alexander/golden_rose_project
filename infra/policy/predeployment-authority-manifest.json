@@ -11,13 +11,28 @@
         "max_count": 1
       },
       "google_cloud_run_v2_service": {
-        "max_count": 1
+        "max_count": 1,
+        "max_count_by_stage": {
+          "foundation": 0,
+          "migration": 0,
+          "service": 1
+        },
+        "stage_ownership": "service"
       },
       "google_cloud_run_v2_service_iam_member": {
-        "max_count": 1
+        "max_count": 3
+      },
+      "google_cloud_run_v2_job_iam_member": {
+        "max_count": 2
       },
       "google_cloud_run_v2_job": {
-        "max_count": 1
+        "max_count": 1,
+        "max_count_by_stage": {
+          "foundation": 0,
+          "migration": 1,
+          "service": 1
+        },
+        "stage_ownership": "migration"
       },
       "google_compute_global_address": {
         "max_count": 1
@@ -35,16 +50,19 @@
         "max_count": 1
       },
       "google_logging_metric": {
-        "max_count": 3
+        "max_count": 2
+      },
+      "google_logging_project_exclusion": {
+        "max_count": 1
       },
       "google_logging_project_bucket_config": {
         "max_count": 1
       },
       "google_project_service": {
-        "max_count": 1
+        "max_count": 12
       },
       "google_project_iam_member": {
-        "max_count": 8
+        "max_count": 10
       },
       "google_monitoring_alert_policy": {
         "max_count": 3
@@ -52,17 +70,25 @@
       "google_monitoring_notification_channel": {
         "max_count": 1
       },
+      "google_monitoring_uptime_check_config": {
+        "max_count": 1,
+        "max_count_by_stage": {
+          "foundation": 0,
+          "migration": 0,
+          "service": 1
+        }
+      },
       "google_secret_manager_secret": {
-        "max_count": 1
+        "max_count": 4
       },
       "google_secret_manager_secret_iam_member": {
-        "max_count": 6
+        "max_count": 8
       },
       "google_service_account": {
         "max_count": 5
       },
       "google_service_account_iam_member": {
-        "max_count": 8
+        "max_count": 2
       },
       "google_service_networking_connection": {
         "max_count": 1
@@ -123,13 +149,19 @@
               "name:Set up uv",
               "name:Set up Node.js 22.22.3",
               "name:Set up Docker Buildx",
+              "name:Install Cosign",
               "name:Enforce protected develop source",
               "name:Authenticate to Google Cloud",
               "name:Log in to Artifact Registry",
               "name:Build publish image and evidence",
+              "name:Sign and verify published image attestation set",
               "name:Upload backend SBOM evidence",
               "name:Upload frontend SBOM evidence",
               "name:Upload image metadata evidence",
+              "name:Upload image SBOM evidence",
+              "name:Upload signature verification evidence",
+              "name:Upload provenance verification evidence",
+              "name:Upload application SBOM attestation evidence",
               "name:Upload published image reference"
             ]
           }
@@ -143,16 +175,17 @@
               "name:Set up Python 3.12",
               "name:Set up uv",
               "name:Enforce protected develop source",
+              "name:Install Cosign",
+              "name:Verify signed stage receipt before cloud authentication",
+              "name:Initialize failed deploy result",
+              "name:Verify direct OCI image authority",
+              "name:Validate signed stage receipt after image digest",
               "name:Authenticate to Google Cloud",
               "name:Set up gcloud",
-              "name:Download reviewed publish artifacts",
-              "name:Bind reviewed published image evidence",
-              "name:Record schema compatibility posture",
-              "name:Update migration job to reviewed image",
-              "name:Execute migration job",
-              "name:Deploy reviewed service",
-              "name:Verify readiness gate and record deploy result",
-              "name:Upload deploy compatibility evidence",
+              "name:Extract and validate selected live configuration projection",
+              "name:Execute migration transition",
+              "name:Verify service readiness transition",
+              "name:Record deploy result",
               "name:Upload deploy result evidence"
             ]
           }
@@ -202,8 +235,11 @@
       "scripts/qualify_develop_deployment.py",
       "scripts/verify_gcp_foundation.py",
       "scripts/verify_image_provenance.py",
+      "scripts/verify_stage_receipt.py",
+      "scripts/verify_tester_authority_receipt.py",
       "scripts/validate_sbom.py",
-      "scripts/validate_terraform_static.py"
+      "scripts/validate_terraform_static.py",
+      "scripts/verify_deploy_image_authority.py"
     ]
   },
   "protected_deployment_paths": [

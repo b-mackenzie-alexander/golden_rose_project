@@ -2,6 +2,8 @@
 
 This runbook defines how the first private fictional-synthetic `develop` deployment decides between rollback and forward recovery after a failed migration, failed rollout, or failed bounded qualification. It is executable guidance only after the separate deployment gate is approved; it does not authorize cloud actions from the source-controlled branch.
 
+Current source status: the deploy/readiness and provenance source contracts are implemented locally on `fix/post-pr33-deployment-path-remediation`, but this runbook remains future operator guidance only until committed-head review, merge, and the later deployment gate are explicitly approved.
+
 ## Scope
 
 - first private fictional-synthetic `develop` deployment and later reviewed repeats
@@ -14,6 +16,8 @@ This runbook defines how the first private fictional-synthetic `develop` deploym
 ## Core rule
 
 Choose rollback only when the reviewed schema/image compatibility matrix proves the prior digest can safely run against the post-migration database state. Otherwise use forward recovery or teardown/rebuild. Never improvise a rollback because it feels faster.
+
+Deployment-readiness success is not Gate 6 qualification success. Treat deploy-result evidence as deployment/readiness evidence only unless the separate bounded qualification workflow explicitly ran and recorded `qualification_executed=true`.
 
 ## Preconditions
 

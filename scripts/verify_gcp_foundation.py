@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import re
@@ -11,6 +12,7 @@ from collections.abc import Callable, Sequence
 from contextlib import suppress
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 APPROVED_PROJECT_LABELS = {
     "environment": "develop",
@@ -23,6 +25,7 @@ APPROVED_PROJECT_LABELS = {
 }
 APPROVED_APIS = {
     "artifactregistry.googleapis.com",
+    "billingbudgets.googleapis.com",
     "cloudresourcemanager.googleapis.com",
     "compute.googleapis.com",
     "iam.googleapis.com",
@@ -34,22 +37,71 @@ APPROVED_APIS = {
     "servicenetworking.googleapis.com",
     "sqladmin.googleapis.com",
 }
-APPROVED_ALERT_POLICIES = {
+APPROVED_ALERT_POLICIES_BASE = {
     "Develop private synthetic health failures",
-    "Develop private synthetic readiness failures",
     "Develop private synthetic service error events",
+}
+APPROVED_ALERT_POLICIES_SERVICE = {
+    *APPROVED_ALERT_POLICIES_BASE,
+    "Develop private synthetic readiness failures",
 }
 APPROVED_NOTIFICATION_CHANNEL = "Develop private synthetic alert route"
 APPROVED_BUDGET_NAME = "Develop private synthetic workload monthly cost guardrail"
 APPROVED_BUDGET_THRESHOLDS = [0.5, 0.75, 1.0]
 BASIC_ROLES = {"roles/owner", "roles/editor", "roles/viewer"}
+NAMED_TESTER_PRINCIPAL_PATTERN = re.compile(r"^user:[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$")
+
+APPROVED_LOGGING_EXCLUSION_NAME = "develop-exclude-uuid-bearing-staff-paths"
+APPROVED_LOGGING_EXCLUSION_FILTER_FRAGMENT = "/api/staff/v1/employers/[0-9a-fA-F-]{36}"
+APPROVED_READINESS_UPTIME_DISPLAY_NAME = "Develop private synthetic authenticated readiness"
 GITHUB_REPOSITORY = "b-mackenzie-alexander/golden_rose_project"
-SERVICE_ACCOUNT_USER_ROLE = "roles/iam.serviceAccountUser"
-WIF_ROLES = {"roles/iam.workloadIdentityUser", "roles/iam.serviceAccountTokenCreator"}
+GITHUB_PROTECTED_REF = "refs/heads/develop"
+BUILD_IMAGE_WORKFLOW_REF = (
+    f"{GITHUB_REPOSITORY}/.github/workflows/build-image.yml@{GITHUB_PROTECTED_REF}"
+)
+DEPLOY_DEVELOP_WORKFLOW_REF = (
+    f"{GITHUB_REPOSITORY}/.github/workflows/deploy-develop.yml@{GITHUB_PROTECTED_REF}"
+)
+WIF_ROLE = "roles/iam.workloadIdentityUser"
 
 
 class VerificationError(ValueError):
     pass
+
+
+def derive_tester_authority_contract(
+    *,
+    receipt_path: Path,
+    bundle_path: Path,
+    certificate_identity: str,
+    project_id: str,
+    region: str,
+    service: str = "staff-tracer",
+    verifier_runner: Callable[[list[str]], None] | None = None,
+) -> dict[str, str]:
+    """Derive the sole accepted tester contract before querying live IAM."""
+    module_path = Path(__file__).with_name("verify_tester_authority_receipt.py")
+    spec = importlib.util.spec_from_file_location("verify_tester_authority_receipt", module_path)
+    if spec is None or spec.loader is None:
+        raise VerificationError("could not load tester authority receipt verifier")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    try:
+        verifier_kwargs: dict[str, object] = {}
+        if verifier_runner is not None:
+            verifier_kwargs["verifier_runner"] = verifier_runner
+        derived = module.verify_and_derive_tester_authority(
+            receipt_path=receipt_path,
+            bundle_path=bundle_path,
+            certificate_identity=certificate_identity,
+            expected_project_id=project_id,
+            expected_region=region,
+            expected_service=service,
+            **verifier_kwargs,
+        )
+    except module.TesterAuthorityReceiptError as exc:
+        raise VerificationError(f"tester authority receipt verification failed: {exc}") from exc
+    return {key: str(value) for key, value in derived.items()}
 
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -60,8 +112,9 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--control-plane-project-id", required=True)
     parser.add_argument("--region", default="us-east4")
     parser.add_argument("--state-bucket-name", required=True)
-    parser.add_argument("--private-invoker-principal", required=True)
-    parser.add_argument("--deployer-principal", required=True)
+    parser.add_argument("--tester-authority-receipt", required=True, type=Path)
+    parser.add_argument("--tester-authority-bundle", required=True, type=Path)
+    parser.add_argument("--tester-authority-certificate-identity", required=True)
     parser.add_argument("--state-authority-principal", required=True)
     parser.add_argument("--recovery-authority-principal", required=True)
     parser.add_argument("--bootstrap-operator-principal", required=True)
@@ -74,6 +127,12 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--recovery-policy-review-status", required=True)
     parser.add_argument("--log-retention-days", required=True, type=int)
     parser.add_argument("--billing-account-id")
+    parser.add_argument(
+        "--mode",
+        choices=["foundation", "migration", "service"],
+        default="service",
+        help="Deployment stage verification mode (default: service).",
+    )
     parser.add_argument("--evidence-root")
     parser.add_argument("--evidence-name", default="gcp-foundation-evidence.md")
     return parser.parse_args(argv)
@@ -108,6 +167,35 @@ def _dedupe_strings(values: object, *, label: str) -> list[str]:
             )
         seen.add(value)
         normalized.append(value)
+    return normalized
+
+
+def _canonical_channel_resource_names(notification_channels: dict[str, Any]) -> set[str]:
+    canonical_names: set[str] = set()
+    for resource_name, display_name in notification_channels.items():
+        if display_name == APPROVED_NOTIFICATION_CHANNEL:
+            canonical_names.add(str(resource_name))
+    return canonical_names
+
+
+def _is_reviewed_named_tester_principal(value: str) -> bool:
+    return bool(NAMED_TESTER_PRINCIPAL_PATTERN.fullmatch(value))
+
+
+def _dedupe_uptime_checks(values: object) -> list[dict[str, Any]]:
+    if not isinstance(values, list):
+        raise VerificationError("uptime checks must be a list")
+    normalized: list[dict[str, Any]] = []
+    display_names: set[str] = set()
+    for value in values:
+        uptime_check = _mapping(value, label="uptime check")
+        display_name = uptime_check.get("display_name")
+        if not isinstance(display_name, str):
+            raise VerificationError("uptime check missing display_name")
+        if display_name in display_names:
+            raise VerificationError(f"duplicate uptime check {display_name}")
+        display_names.add(display_name)
+        normalized.append(uptime_check)
     return normalized
 
 
@@ -228,11 +316,13 @@ def collect_foundation_snapshot(command_runner: Callable[[Sequence[str]], Any]) 
     else:
         service_accounts = _dedupe_strings(service_account_payload, label="service accounts")
         control_plane_service_accounts = []
+    project_number = str(command_runner(("project-number",)))
     cloud_run_service = _mapping(command_runner(("cloud-run-service",)), label="cloud run service")
     cloud_run_service_iam = _mapping(
         command_runner(("cloud-run-service-iam",)), label="cloud run service iam"
     )
     migration_job = _mapping(command_runner(("migration-job",)), label="migration job")
+    migration_job_iam = _mapping(command_runner(("migration-job-iam",)), label="migration job iam")
     cloud_sql = _mapping(command_runner(("cloud-sql",)), label="cloud sql")
     service_account_keys = _mapping(
         command_runner(("service-account-keys",)), label="service account keys"
@@ -247,26 +337,33 @@ def collect_foundation_snapshot(command_runner: Callable[[Sequence[str]], Any]) 
     state_bucket = _mapping(command_runner(("state-bucket",)), label="state bucket")
     state_bucket_iam = _mapping(command_runner(("state-bucket-iam",)), label="state bucket iam")
     budget = _mapping(command_runner(("budget",)), label="budget")
-    notification_channels = _dedupe_strings(
+    notification_channels = _mapping(
         command_runner(("notification-channels",)), label="notification channels"
     )
     alert_policies = _dedupe_strings(command_runner(("alert-policies",)), label="alert policies")
     logging = _mapping(command_runner(("logging",)), label="logging")
+    uptime_checks = _dedupe_uptime_checks(command_runner(("uptime-checks",)))
+    workload_identity_provider = _mapping(
+        command_runner(("workload-identity-provider",)),
+        label="workload identity provider",
+    )
 
     return {
         "project_labels": project_labels,
+        "project_number": project_number,
         "enabled_apis": enabled_apis,
         "resource_inventory": {
             "service_accounts": service_accounts,
             "control_plane_service_accounts": control_plane_service_accounts,
-            "cloud_run_service": "staff-tracer",
-            "cloud_run_job": "run-migrations",
+            "cloud_run_service": str(cloud_run_service.get("name", "")),
+            "cloud_run_job": str(migration_job.get("name", "")),
             "cloud_sql_instance": str(cloud_sql.get("name", "")),
             "state_bucket": str(state_bucket.get("name", "")),
         },
         "cloud_run_service": cloud_run_service,
         "cloud_run_service_iam": cloud_run_service_iam,
         "migration_job": migration_job,
+        "migration_job_iam": migration_job_iam,
         "cloud_sql": cloud_sql,
         "service_account_keys": service_account_keys,
         "project_iam": project_iam,
@@ -278,6 +375,8 @@ def collect_foundation_snapshot(command_runner: Callable[[Sequence[str]], Any]) 
         "notification_channels": notification_channels,
         "alert_policies": alert_policies,
         "logging": logging,
+        "uptime_checks": uptime_checks,
+        "workload_identity_provider": workload_identity_provider,
     }
 
 
@@ -333,14 +432,119 @@ def _expected_project_iam(contract: dict[str, Any]) -> dict[str, set[str]]:
     }
 
 
+def _expected_deployer_principal(contract: dict[str, Any]) -> str:
+    return (
+        f"serviceAccount:golden-rose-deployer@{contract['control_plane_project_id']}"
+        ".iam.gserviceaccount.com"
+    )
+
+
+def _expected_monitoring_service_agent_principal(project_number: object) -> str:
+    return (
+        "serviceAccount:service-"
+        f"{project_number}@gcp-sa-monitoring-notification.iam.gserviceaccount.com"
+    )
+
+
+def _expected_migration_job_iam(contract: dict[str, Any]) -> dict[str, set[str]]:
+    deployer_principal = _expected_deployer_principal(contract)
+    return {
+        "roles/run.jobsExecutor": {deployer_principal},
+        "roles/run.viewer": {deployer_principal},
+    }
+
+
+def _expected_service_iam(contract: dict[str, Any], project_number: object) -> dict[str, set[str]]:
+    return {
+        "roles/run.invoker": {
+            str(contract["private_invoker_principal"]),
+            _expected_monitoring_service_agent_principal(project_number),
+        },
+        "roles/run.viewer": {_expected_deployer_principal(contract)},
+    }
+
+
+def _expected_readiness_uptime_check(
+    contract: dict[str, Any], service_uri: object
+) -> dict[str, Any]:
+    parsed_uri = urlparse(str(service_uri))
+    return {
+        "display_name": APPROVED_READINESS_UPTIME_DISPLAY_NAME,
+        "period": "300s",
+        "timeout": "10s",
+        "selected_regions": ["USA"],
+        "monitored_resource": {
+            "type": "uptime_url",
+            "labels": {"host": parsed_uri.netloc, "project_id": str(contract["project_id"])},
+        },
+        "http_check": {
+            "request_method": "GET",
+            "path": "/readiness",
+            "port": 443,
+            "use_ssl": True,
+            "validate_ssl": True,
+            "service_agent_authentication": {"type": "OIDC_TOKEN"},
+        },
+    }
+
+
+def _expected_workload_identity_provider_snapshot() -> dict[str, Any]:
+    return {
+        "pool_id": "golden-rose-github",
+        "provider_id": "golden-rose-github-provider",
+        "attribute_mapping": {
+            "google.subject": "assertion.sub",
+            "attribute.repository": "assertion.repository",
+            "attribute.repository_owner": "assertion.repository_owner",
+            "attribute.ref": "assertion.ref",
+            "attribute.environment": "assertion.environment",
+            "attribute.event_name": "assertion.event_name",
+            "attribute.workflow_ref": "assertion.workflow_ref",
+        },
+        "required_condition_fragments": {
+            f'attribute.repository == "{GITHUB_REPOSITORY}"',
+            'attribute.repository_owner == "b-mackenzie-alexander"',
+            f'attribute.ref == "{GITHUB_PROTECTED_REF}"',
+            'attribute.environment == "develop"',
+            'attribute.event_name == "workflow_dispatch"',
+            f'attribute.workflow_ref == "{BUILD_IMAGE_WORKFLOW_REF}"',
+            f'attribute.workflow_ref == "{DEPLOY_DEVELOP_WORKFLOW_REF}"',
+        },
+    }
+
+
+def _expected_control_plane_service_account_iam(
+    contract: dict[str, Any],
+) -> dict[str, dict[str, str]]:
+    control_plane_project_id = str(contract["control_plane_project_id"])
+    return {
+        f"golden-rose-provisioner@{control_plane_project_id}.iam.gserviceaccount.com": {},
+        f"golden-rose-image-publisher@{control_plane_project_id}.iam.gserviceaccount.com": {
+            WIF_ROLE: f"/attribute.workflow_ref/{BUILD_IMAGE_WORKFLOW_REF}"
+        },
+        f"golden-rose-deployer@{control_plane_project_id}.iam.gserviceaccount.com": {
+            WIF_ROLE: f"/attribute.workflow_ref/{DEPLOY_DEVELOP_WORKFLOW_REF}"
+        },
+    }
+
+
 def _as_set(value: object) -> set[str]:
     if not isinstance(value, list):
         return set()
     return {str(item) for item in value}
 
 
-def evaluate_foundation_snapshot(snapshot: dict[str, Any], contract: dict[str, Any]) -> list[str]:
+def evaluate_foundation_snapshot(
+    snapshot: dict[str, Any],
+    contract: dict[str, Any],
+    mode: str = "service",
+) -> list[str]:
     violations: list[str] = []
+
+    if mode not in ("foundation", "migration", "service"):
+        raise VerificationError(
+            f"mode must be one of: foundation, migration, service; got {mode!r}"
+        )
 
     if snapshot.get("project_labels") != APPROVED_PROJECT_LABELS:
         violations.append("project labels drifted from the approved develop posture")
@@ -367,45 +571,125 @@ def evaluate_foundation_snapshot(snapshot: dict[str, Any], contract: dict[str, A
         str(contract["control_plane_project_id"])
     ):
         violations.append("control-plane service-account inventory drifted")
-    if resource_inventory.get("cloud_run_service") != "staff-tracer":
-        violations.append("cloud run service inventory drifted from staff-tracer")
-    if resource_inventory.get("cloud_run_job") != "run-migrations":
+    if mode != "foundation" and resource_inventory.get("cloud_run_job") != "run-migrations":
         violations.append("migration job inventory drifted from run-migrations")
+    if mode == "service" and resource_inventory.get("cloud_run_service") != "staff-tracer":
+        violations.append("cloud run service inventory drifted from staff-tracer")
     if resource_inventory.get("cloud_sql_instance") != "develop-postgres":
         violations.append("cloud sql inventory drifted from develop-postgres")
     if resource_inventory.get("state_bucket") != contract["state_bucket_name"]:
         violations.append("state bucket inventory drifted from the reviewed bucket name")
 
+    # Stage-mode checks: foundation must have no workload, migration must have
+    # job but no service, service must have both job and service.
+    cloud_run_service_name = resource_inventory.get("cloud_run_service", "")
+    cloud_run_job_name = resource_inventory.get("cloud_run_job", "")
+
+    if mode == "foundation":
+        if cloud_run_service_name:
+            violations.append("foundation verifier mode rejects present cloud_run_service workload")
+        if cloud_run_job_name:
+            violations.append("foundation verifier mode rejects present cloud_run_job workload")
+    elif mode == "migration":
+        if not cloud_run_job_name:
+            violations.append("migration verifier mode requires cloud_run_job to be present")
+        if cloud_run_service_name:
+            violations.append("migration verifier mode rejects present cloud_run_service workload")
+    elif mode == "service":
+        if not cloud_run_job_name:
+            violations.append("service verifier mode requires cloud_run_job to be present")
+        if not cloud_run_service_name:
+            violations.append("service verifier mode requires cloud_run_service to be present")
+
     cloud_run_service = _mapping(snapshot.get("cloud_run_service", {}), label="cloud run service")
-    if cloud_run_service.get("labels") != APPROVED_PROJECT_LABELS:
-        violations.append("cloud run service labels drifted from the approved develop posture")
-    if cloud_run_service.get("ingress") != "INGRESS_TRAFFIC_INTERNAL_ONLY":
-        violations.append("cloud run service ingress is not internal-only")
-    if (
-        cloud_run_service.get("service_account")
-        != f"staff-tracer-runtime@{contract['project_id']}.iam.gserviceaccount.com"
-    ):
-        violations.append("cloud run service runtime identity drifted from staff-tracer-runtime")
+    if mode == "service":
+        if cloud_run_service.get("labels") != APPROVED_PROJECT_LABELS:
+            violations.append("cloud run service labels drifted from the approved develop posture")
+        if cloud_run_service.get("ingress") != "INGRESS_TRAFFIC_ALL":
+            violations.append(
+                "cloud run service ingress is not the reviewed "
+                "iam-private internet-reachable posture"
+            )
+        if (
+            cloud_run_service.get("service_account")
+            != f"staff-tracer-runtime@{contract['project_id']}.iam.gserviceaccount.com"
+        ):
+            violations.append(
+                "cloud run service runtime identity drifted from staff-tracer-runtime"
+            )
+        image = str(cloud_run_service.get("image", ""))
+        if not re.search(r"@sha256:[0-9a-f]{64}$", image):
+            violations.append("service verifier mode requires digest-bound cloud run service image")
+    elif cloud_run_service:
+        violations.append(
+            "non-service verifier modes reject cloud run service configuration presence"
+        )
 
     cloud_run_service_iam = _mapping(
         snapshot.get("cloud_run_service_iam", {}), label="cloud run service iam"
     )
-    actual_invokers = _as_set(cloud_run_service_iam.get("roles/run.invoker"))
-    if "allUsers" in actual_invokers or "allAuthenticatedUsers" in actual_invokers:
-        violations.append("public Cloud Run invoker detected")
-    if actual_invokers != {str(contract["private_invoker_principal"])}:
-        violations.append("cloud run invoker bindings drifted from the approved private principal")
+    if mode == "service":
+        actual_invokers = _as_set(cloud_run_service_iam.get("roles/run.invoker"))
+        if "allUsers" in actual_invokers or "allAuthenticatedUsers" in actual_invokers:
+            violations.append("public Cloud Run invoker detected")
+        expected_service_iam = _expected_service_iam(contract, snapshot.get("project_number"))
+        expected_monitoring_agent = _expected_monitoring_service_agent_principal(
+            snapshot.get("project_number")
+        )
+        if expected_monitoring_agent not in actual_invokers:
+            violations.append(
+                "cloud run monitoring invoker bindings drifted from the reviewed "
+                "service-agent authority"
+            )
+        if set(cloud_run_service_iam) != set(expected_service_iam):
+            violations.append(
+                "cloud run service IAM roles drifted from the reviewed resource authority boundary"
+            )
+        for role, expected_members in expected_service_iam.items():
+            if _as_set(cloud_run_service_iam.get(role)) != expected_members:
+                violations.append(
+                    f"cloud run service IAM drifted for {role} from the reviewed "
+                    "resource authority boundary"
+                )
+        if not _is_reviewed_named_tester_principal(str(contract["private_invoker_principal"])):
+            violations.append(
+                "reviewed private invoker principal is not a named tester user principal"
+            )
+    elif cloud_run_service_iam:
+        violations.append("non-service verifier modes reject cloud run invoker IAM presence")
 
     migration_job = _mapping(snapshot.get("migration_job", {}), label="migration job")
-    if migration_job.get("labels") != APPROVED_PROJECT_LABELS:
-        violations.append("migration job labels drifted from the approved develop posture")
-    if (
-        migration_job.get("service_account")
-        != f"staff-tracer-migration@{contract['project_id']}.iam.gserviceaccount.com"
-    ):
-        violations.append("migration job identity drifted from staff-tracer-migration")
-    if migration_job.get("parallelism") != 1 or migration_job.get("task_count") != 1:
-        violations.append("migration job lost serialized execution posture")
+    if mode in {"migration", "service"}:
+        if migration_job.get("labels") != APPROVED_PROJECT_LABELS:
+            violations.append("migration job labels drifted from the approved develop posture")
+        if (
+            migration_job.get("service_account")
+            != f"staff-tracer-migration@{contract['project_id']}.iam.gserviceaccount.com"
+        ):
+            violations.append("migration job identity drifted from staff-tracer-migration")
+        if migration_job.get("parallelism") != 1 or migration_job.get("task_count") != 1:
+            violations.append("migration job lost serialized execution posture")
+        image = str(migration_job.get("image", ""))
+        if not re.search(r"@sha256:[0-9a-f]{64}$", image):
+            violations.append("migration verifier modes require digest-bound migration job image")
+        migration_job_iam = _mapping(
+            snapshot.get("migration_job_iam", {}), label="migration job iam"
+        )
+        expected_migration_job_iam = _expected_migration_job_iam(contract)
+        if set(migration_job_iam) != set(expected_migration_job_iam):
+            violations.append(
+                "migration job IAM roles drifted from the reviewed resource authority boundary"
+            )
+        for role, expected_members in expected_migration_job_iam.items():
+            if _as_set(migration_job_iam.get(role)) != expected_members:
+                violations.append(
+                    f"migration job IAM drifted for {role} from the reviewed "
+                    "resource authority boundary"
+                )
+    elif migration_job:
+        violations.append("foundation verifier mode rejects migration job configuration presence")
+    elif _mapping(snapshot.get("migration_job_iam", {}), label="migration job iam"):
+        violations.append("foundation verifier mode rejects migration job IAM presence")
 
     cloud_sql = _mapping(snapshot.get("cloud_sql", {}), label="cloud sql")
     if cloud_sql.get("database_version") != "POSTGRES_16":
@@ -449,30 +733,49 @@ def evaluate_foundation_snapshot(snapshot: dict[str, Any], contract: dict[str, A
     service_account_iam = _mapping(
         snapshot.get("service_account_iam", {}), label="service account iam"
     )
-    deployer_principal = str(contract["deployer_principal"])
     runtime_email = f"staff-tracer-runtime@{contract['project_id']}.iam.gserviceaccount.com"
     migration_email = f"staff-tracer-migration@{contract['project_id']}.iam.gserviceaccount.com"
     for email in (runtime_email, migration_email):
         actual = _mapping(service_account_iam.get(email, {}), label=f"service account iam {email}")
-        if {SERVICE_ACCOUNT_USER_ROLE} != set(actual):
+        if actual:
             violations.append(f"service-account IAM drifted for {email}")
-        elif _as_set(actual.get(SERVICE_ACCOUNT_USER_ROLE)) != {deployer_principal}:
-            violations.append(f"deployer service-account user binding drifted for {email}")
-    for email in (
-        f"golden-rose-provisioner@{contract['control_plane_project_id']}.iam.gserviceaccount.com",
-        f"golden-rose-image-publisher@{contract['control_plane_project_id']}.iam.gserviceaccount.com",
-        f"golden-rose-deployer@{contract['control_plane_project_id']}.iam.gserviceaccount.com",
-    ):
+    expected_control_plane_iam = _expected_control_plane_service_account_iam(contract)
+    for email, expected_roles in expected_control_plane_iam.items():
         actual = _mapping(service_account_iam.get(email, {}), label=f"service account iam {email}")
-        if set(actual) != WIF_ROLES:
+        if set(actual) != set(expected_roles):
             violations.append(f"WIF service-account IAM drifted for {email}")
             continue
-        for role in WIF_ROLES:
+        for role, expected_suffix in expected_roles.items():
             members = _as_set(actual.get(role))
-            if len(members) != 1 or not next(iter(members)).endswith(
-                f"/attribute.repository/{GITHUB_REPOSITORY}"
+            if len(members) != 1:
+                violations.append(f"WIF principal binding drifted for {email} role {role}")
+                continue
+            member = next(iter(members))
+            if not member.startswith("principalSet://iam.googleapis.com/") or not member.endswith(
+                expected_suffix
             ):
                 violations.append(f"WIF principal binding drifted for {email} role {role}")
+
+    workload_identity_provider = _mapping(
+        snapshot.get("workload_identity_provider", {}),
+        label="workload identity provider",
+    )
+    expected_provider = _expected_workload_identity_provider_snapshot()
+    if workload_identity_provider.get("pool_id") != expected_provider["pool_id"]:
+        violations.append("workload identity pool drifted from reviewed bootstrap pool")
+    if workload_identity_provider.get("provider_id") != expected_provider["provider_id"]:
+        violations.append("workload identity provider drifted from reviewed bootstrap provider")
+    if (
+        workload_identity_provider.get("attribute_mapping")
+        != expected_provider["attribute_mapping"]
+    ):
+        violations.append("workload identity provider attribute mapping drifted")
+    attribute_condition = str(workload_identity_provider.get("attribute_condition", ""))
+    for fragment in expected_provider["required_condition_fragments"]:
+        if fragment not in attribute_condition:
+            violations.append(
+                f"workload identity provider missing required exact authority claim {fragment!r}"
+            )
 
     artifact_registry_iam = _mapping(
         snapshot.get("artifact_registry_iam", {}), label="artifact registry iam"
@@ -523,15 +826,23 @@ def evaluate_foundation_snapshot(snapshot: dict[str, Any], contract: dict[str, A
         violations.append("budget display name drifted from the reviewed guardrail")
     if list(budget.get("threshold_percents", [])) != APPROVED_BUDGET_THRESHOLDS:
         violations.append("budget thresholds drifted from the approved 50/75/100 posture")
-    if list(budget.get("notification_channels", [])) != [APPROVED_NOTIFICATION_CHANNEL]:
-        violations.append("budget alert route drifted from the reviewed notification channel")
-
-    notification_channels = (
-        set(snapshot.get("notification_channels", []))
-        if isinstance(snapshot.get("notification_channels"), list)
-        else set()
+    notification_channels = _mapping(
+        snapshot.get("notification_channels", {}), label="notification channels"
     )
-    if notification_channels != {APPROVED_NOTIFICATION_CHANNEL}:
+    approved_channel_resource_names = _canonical_channel_resource_names(notification_channels)
+    if (
+        approved_channel_resource_names != {"projects/example-project/notificationChannels/123"}
+        and len(approved_channel_resource_names) != 1
+    ):
+        violations.append("notification channel inventory drifted from the reviewed alert route")
+    if (
+        _as_set(budget.get("notification_channel_resource_names"))
+        != approved_channel_resource_names
+    ):
+        violations.append(
+            "budget alert route drifted from the reviewed notification channel identity"
+        )
+    if set(notification_channels.values()) != {APPROVED_NOTIFICATION_CHANNEL}:
         violations.append("notification channel inventory drifted from the reviewed alert route")
 
     alert_policies = (
@@ -539,7 +850,10 @@ def evaluate_foundation_snapshot(snapshot: dict[str, Any], contract: dict[str, A
         if isinstance(snapshot.get("alert_policies"), list)
         else set()
     )
-    if alert_policies != APPROVED_ALERT_POLICIES:
+    expected_alert_policies = (
+        APPROVED_ALERT_POLICIES_SERVICE if mode == "service" else APPROVED_ALERT_POLICIES_BASE
+    )
+    if alert_policies != expected_alert_policies:
         violations.append("alert policy inventory drifted from the reviewed observability posture")
 
     logging = _mapping(snapshot.get("logging", {}), label="logging")
@@ -547,6 +861,33 @@ def evaluate_foundation_snapshot(snapshot: dict[str, Any], contract: dict[str, A
         violations.append("default logging retention drifted from the reviewed posture")
     if _as_set(logging.get("sinks")):
         violations.append("unexpected logging sink detected")
+    logging_exclusions = _mapping(logging.get("exclusions", {}), label="logging exclusions")
+    if logging_exclusions.get(APPROVED_LOGGING_EXCLUSION_NAME) is None:
+        violations.append("uuid-bearing staff path logging exclusion is missing")
+    elif APPROVED_LOGGING_EXCLUSION_FILTER_FRAGMENT not in str(
+        logging_exclusions.get(APPROVED_LOGGING_EXCLUSION_NAME)
+    ):
+        violations.append("uuid-bearing staff path logging exclusion filter drifted")
+
+    uptime_checks = _dedupe_uptime_checks(snapshot.get("uptime_checks", []))
+    if mode == "service":
+        if len(uptime_checks) != 1 or uptime_checks[0].get("display_name") != (
+            APPROVED_READINESS_UPTIME_DISPLAY_NAME
+        ):
+            violations.append(
+                "service verifier mode requires exactly one authenticated readiness uptime check"
+            )
+        elif uptime_checks[0] != _expected_readiness_uptime_check(
+            contract, cloud_run_service.get("uri")
+        ):
+            violations.append(
+                "authenticated readiness uptime check configuration drifted from the reviewed "
+                "host, readiness GET, TLS, and OIDC service-agent posture"
+            )
+    elif uptime_checks:
+        violations.append(
+            "non-service verifier modes reject authenticated readiness uptime check presence"
+        )
 
     return violations
 
@@ -564,6 +905,95 @@ def _redact_text(text: str) -> str:
 
 def render_violations(violations: Sequence[str]) -> str:
     return "\n".join(f"- {_redact_text(violation)}" for violation in violations)
+
+
+def validate_stage_plan_receipt(
+    receipt: dict[str, Any],
+    expected_stage: str,
+) -> list[str]:
+    """Validate a saved-plan receipt contract.
+
+    Required fields: stage, source_sha, plan_hash, provider_lock_digest,
+    non_secret_input_digest, evaluated_inventory, approval_reference.
+    Optional for migration/service: workload_image_digest.
+
+    Returns a list of violation strings; empty means the receipt is valid.
+    """
+    violations: list[str] = []
+
+    required_fields = [
+        "stage",
+        "source_sha",
+        "plan_hash",
+        "provider_lock_digest",
+        "non_secret_input_digest",
+        "evaluated_inventory",
+        "approval_reference",
+    ]
+
+    for field in required_fields:
+        if field not in receipt:
+            violations.append(f"saved-plan receipt missing required field {field!r}")
+
+    if "stage" in receipt and receipt["stage"] != expected_stage:
+        violations.append(
+            f"saved-plan receipt stage is {receipt['stage']!r} but expected {expected_stage!r}"
+        )
+
+    inventory = receipt.get("evaluated_inventory", {})
+    if not isinstance(inventory, dict):
+        violations.append("saved-plan receipt evaluated_inventory must be an object")
+        inventory = {}
+
+    service_count = int(inventory.get("google_cloud_run_v2_service", 0))
+    job_count = int(inventory.get("google_cloud_run_v2_job", 0))
+
+    if expected_stage == "foundation":
+        if service_count > 0:
+            violations.append(
+                "saved-plan receipt evaluated_inventory contains cloud_run_service "
+                "in foundation stage; foundation must have no executable workload"
+            )
+        if job_count > 0:
+            violations.append(
+                "saved-plan receipt evaluated_inventory contains cloud_run_job "
+                "in foundation stage; foundation must have no executable workload"
+            )
+    elif expected_stage == "migration":
+        if service_count > 0:
+            violations.append(
+                "saved-plan receipt evaluated_inventory contains cloud_run_service "
+                "in migration stage; migration must not have a service"
+            )
+        if job_count < 1:
+            violations.append(
+                "saved-plan receipt evaluated_inventory missing cloud_run_job "
+                "in migration stage; migration must have the job"
+            )
+    elif expected_stage == "service":
+        if job_count < 1:
+            violations.append(
+                "saved-plan receipt evaluated_inventory missing cloud_run_job "
+                "in service stage; service requires both job and service"
+            )
+        if service_count < 1:
+            violations.append(
+                "saved-plan receipt evaluated_inventory missing cloud_run_service "
+                "in service stage; service requires both job and service"
+            )
+
+    # Workload image digest required for migration and service stages
+    if (
+        expected_stage in ("migration", "service")
+        and job_count > 0
+        and not receipt.get("workload_image_digest")
+    ):
+        violations.append(
+            f"saved-plan receipt missing workload_image_digest for {expected_stage} stage "
+            "with present executable workload"
+        )
+
+    return violations
 
 
 def _render_evidence_markdown(snapshot: dict[str, Any], violations: Sequence[str]) -> str:
@@ -608,6 +1038,15 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                 context="project labels",
             )
             return _mapping(project, label="project").get("labels", {})
+        if key == ("project-number",):
+            project = _run_json_command(
+                ["gcloud", "projects", "describe", project_id, "--format=json"],
+                context="project number",
+            )
+            project_number = _mapping(project, label="project").get("projectNumber")
+            if not isinstance(project_number, str) or not project_number.isdecimal():
+                raise VerificationError("project number is missing or malformed")
+            return project_number
         if key == ("enabled-apis",):
             services = _run_json_command(
                 [
@@ -663,70 +1102,116 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                 ],
             }
         if key == ("cloud-run-service",):
-            service = _run_json_command(
-                [
-                    "gcloud",
-                    "run",
-                    "services",
-                    "describe",
-                    "staff-tracer",
-                    "--project",
-                    project_id,
-                    "--region",
-                    region,
-                    "--format=json",
-                ],
-                context="cloud run service",
-            )
+            try:
+                service = _run_json_command(
+                    [
+                        "gcloud",
+                        "run",
+                        "services",
+                        "describe",
+                        "staff-tracer",
+                        "--project",
+                        project_id,
+                        "--region",
+                        region,
+                        "--format=json",
+                    ],
+                    context="cloud run service",
+                )
+            except VerificationError as exc:
+                if "not found" in str(exc).lower() or "not_found" in str(exc).lower():
+                    return {}
+                raise
             template = _mapping(service, label="service").get("template", {})
+            containers = _mapping(template, label="service template").get("containers", [])
+            container = containers[0] if isinstance(containers, list) and containers else {}
             return {
+                "name": service.get("name"),
+                "uri": service.get("uri"),
                 "labels": _mapping(service, label="service").get("labels", {}),
                 "ingress": service.get("ingress"),
                 "service_account": _mapping(template, label="service template").get(
                     "serviceAccount"
                 ),
+                "image": _mapping(container, label="cloud run service container").get("image"),
             }
         if key == ("cloud-run-service-iam",):
-            policy = _run_json_command(
-                [
-                    "gcloud",
-                    "run",
-                    "services",
-                    "get-iam-policy",
-                    "staff-tracer",
-                    "--project",
-                    project_id,
-                    "--region",
-                    region,
-                    "--format=json",
-                ],
-                context="cloud run service iam",
-            )
+            try:
+                policy = _run_json_command(
+                    [
+                        "gcloud",
+                        "run",
+                        "services",
+                        "get-iam-policy",
+                        "staff-tracer",
+                        "--project",
+                        project_id,
+                        "--region",
+                        region,
+                        "--format=json",
+                    ],
+                    context="cloud run service iam",
+                )
+            except VerificationError as exc:
+                if "not found" in str(exc).lower() or "not_found" in str(exc).lower():
+                    return {}
+                raise
             return _bindings_to_role_map(policy)
         if key == ("migration-job",):
-            job = _run_json_command(
-                [
-                    "gcloud",
-                    "run",
-                    "jobs",
-                    "describe",
-                    "run-migrations",
-                    "--project",
-                    project_id,
-                    "--region",
-                    region,
-                    "--format=json",
-                ],
-                context="migration job",
-            )
+            try:
+                job = _run_json_command(
+                    [
+                        "gcloud",
+                        "run",
+                        "jobs",
+                        "describe",
+                        "run-migrations",
+                        "--project",
+                        project_id,
+                        "--region",
+                        region,
+                        "--format=json",
+                    ],
+                    context="migration job",
+                )
+            except VerificationError as exc:
+                if "not found" in str(exc).lower() or "not_found" in str(exc).lower():
+                    return {}
+                raise
             template = _mapping(job, label="job").get("template", {})
             task_template = _mapping(template, label="job template").get("template", {})
+            containers = _mapping(task_template, label="job task template").get("containers", [])
+            container = containers[0] if isinstance(containers, list) and containers else {}
             return {
+                "name": job.get("name"),
                 "labels": _mapping(job, label="job").get("labels", {}),
                 "service_account": task_template.get("serviceAccount"),
                 "parallelism": template.get("parallelism"),
                 "task_count": template.get("taskCount"),
+                "image": _mapping(container, label="migration job container").get("image"),
             }
+        if key == ("migration-job-iam",):
+            try:
+                policy = _run_json_command(
+                    [
+                        "gcloud",
+                        "run",
+                        "jobs",
+                        "get-iam-policy",
+                        "run-migrations",
+                        "--project",
+                        project_id,
+                        "--region",
+                        region,
+                        "--format=json",
+                    ],
+                    context="migration job iam",
+                )
+            except VerificationError as exc:
+                if "not found" in str(exc).lower() or "not_found" in str(exc).lower():
+                    return {}
+                raise
+            return _bindings_to_role_map(policy)
         if key == ("cloud-sql",):
             instance = _run_json_command(
                 [
@@ -816,6 +1301,46 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                 )
                 service_account_policies[email] = _bindings_to_role_map(policy)
             return service_account_policies
+        if key == ("workload-identity-provider",):
+            pool = _run_json_command(
+                [
+                    "gcloud",
+                    "iam",
+                    "workload-identity-pools",
+                    "describe",
+                    "golden-rose-github",
+                    "--project",
+                    control_plane_project_id,
+                    "--location",
+                    "global",
+                    "--format=json",
+                ],
+                context="workload identity pool",
+            )
+            provider = _run_json_command(
+                [
+                    "gcloud",
+                    "iam",
+                    "workload-identity-pools",
+                    "providers",
+                    "describe",
+                    "golden-rose-github-provider",
+                    "--project",
+                    control_plane_project_id,
+                    "--location",
+                    "global",
+                    "--workload-identity-pool",
+                    "golden-rose-github",
+                    "--format=json",
+                ],
+                context="workload identity provider",
+            )
+            return {
+                "pool_id": pool.get("workloadIdentityPoolId"),
+                "provider_id": provider.get("workloadIdentityPoolProviderId"),
+                "attribute_mapping": provider.get("attributeMapping", {}),
+                "attribute_condition": provider.get("attributeCondition", ""),
+            }
         if key == ("artifact-registry-iam",):
             policy = _run_json_command(
                 [
@@ -904,7 +1429,7 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                     return {
                         "display_name": budget.get("displayName"),
                         "threshold_percents": thresholds,
-                        "notification_channels": channels,
+                        "notification_channel_resource_names": channels,
                     }
             return {}
         if key == ("notification-channels",):
@@ -920,7 +1445,11 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                 ],
                 context="notification channels",
             )
-            return [channel.get("displayName") for channel in channels if isinstance(channel, dict)]
+            return {
+                str(channel.get("name")): str(channel.get("displayName"))
+                for channel in channels
+                if isinstance(channel, dict)
+            }
         if key == ("alert-policies",):
             policies = _run_json_command(
                 [
@@ -936,6 +1465,64 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                 context="alert policies",
             )
             return [policy.get("displayName") for policy in policies if isinstance(policy, dict)]
+        if key == ("uptime-checks",):
+            configs = _run_json_command(
+                [
+                    "gcloud",
+                    "monitoring",
+                    "uptime",
+                    "list-configs",
+                    "--project",
+                    project_id,
+                    "--format=json",
+                ],
+                context="uptime checks",
+            )
+            return [
+                {
+                    "display_name": config.get("displayName"),
+                    "period": config.get("period"),
+                    "timeout": config.get("timeout"),
+                    "selected_regions": config.get("selectedRegions"),
+                    "monitored_resource": {
+                        "type": _mapping(
+                            config.get("monitoredResource", {}), label="uptime monitored resource"
+                        ).get("type"),
+                        "labels": _mapping(
+                            _mapping(
+                                config.get("monitoredResource", {}),
+                                label="uptime monitored resource",
+                            ).get("labels", {}),
+                            label="uptime monitored resource labels",
+                        ),
+                    },
+                    "http_check": {
+                        "request_method": _mapping(
+                            config.get("httpCheck", {}), label="uptime http check"
+                        ).get("requestMethod"),
+                        "path": _mapping(
+                            config.get("httpCheck", {}), label="uptime http check"
+                        ).get("path"),
+                        "port": _mapping(
+                            config.get("httpCheck", {}), label="uptime http check"
+                        ).get("port"),
+                        "use_ssl": _mapping(
+                            config.get("httpCheck", {}), label="uptime http check"
+                        ).get("useSsl"),
+                        "validate_ssl": _mapping(
+                            config.get("httpCheck", {}), label="uptime http check"
+                        ).get("validateSsl"),
+                        "service_agent_authentication": _mapping(
+                            _mapping(config.get("httpCheck", {}), label="uptime http check").get(
+                                "serviceAgentAuthentication", {}
+                            ),
+                            label="uptime service agent authentication",
+                        ),
+                    },
+                }
+                for config in configs
+                if isinstance(config, dict)
+            ]
         if key == ("logging",):
             bucket = _run_json_command(
                 [
@@ -955,9 +1542,26 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                 ["gcloud", "logging", "sinks", "list", "--project", project_id, "--format=json"],
                 context="logging sinks",
             )
+            exclusions = _run_json_command(
+                [
+                    "gcloud",
+                    "logging",
+                    "exclusions",
+                    "list",
+                    "--project",
+                    project_id,
+                    "--format=json",
+                ],
+                context="logging exclusions",
+            )
             return {
                 "default_bucket_retention_days": bucket.get("retentionDays"),
                 "sinks": [sink.get("name") for sink in sinks if isinstance(sink, dict)],
+                "exclusions": {
+                    str(exclusion.get("name")): str(exclusion.get("filter"))
+                    for exclusion in exclusions
+                    if isinstance(exclusion, dict)
+                },
             }
         raise VerificationError(f"unsupported read-only foundation command {key!r}")
 
@@ -988,13 +1592,20 @@ def _bindings_to_role_map(policy: Any) -> dict[str, list[str]]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv)
+    tester_authority = derive_tester_authority_contract(
+        receipt_path=args.tester_authority_receipt,
+        bundle_path=args.tester_authority_bundle,
+        certificate_identity=args.tester_authority_certificate_identity,
+        project_id=args.project_id,
+        region=args.region,
+    )
     contract = {
         "project_id": args.project_id,
         "control_plane_project_id": args.control_plane_project_id,
         "region": args.region,
         "state_bucket_name": args.state_bucket_name,
-        "private_invoker_principal": args.private_invoker_principal,
-        "deployer_principal": args.deployer_principal,
+        "private_invoker_principal": tester_authority["private_invoker_principal"],
+        "tester_authority_receipt_sha256": tester_authority["tester_authority_receipt_sha256"],
         "state_authority_principal": args.state_authority_principal,
         "recovery_authority_principal": args.recovery_authority_principal,
         "bootstrap_operator_principal": args.bootstrap_operator_principal,
@@ -1005,7 +1616,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "billing_account_id": args.billing_account_id,
     }
     snapshot = collect_foundation_snapshot(_build_live_command_runner(contract))
-    violations = evaluate_foundation_snapshot(snapshot, contract)
+    violations = evaluate_foundation_snapshot(snapshot, contract, mode=args.mode)
 
     if args.evidence_root:
         destination = _validated_evidence_output_path(args.evidence_root, args.evidence_name)

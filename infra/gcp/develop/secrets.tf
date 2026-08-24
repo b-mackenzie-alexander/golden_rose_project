@@ -1,6 +1,7 @@
 locals {
   metadata_only_secret_ids = toset([
-    "database-url",
+    "runtime-database-url",
+    "migration-database-url",
     "synthetic-staff-id",
     "deployment-posture",
   ])

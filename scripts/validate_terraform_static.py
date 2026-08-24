@@ -321,6 +321,8 @@ ALLOWED_WORKFLOW_STEP_IDENTIFIERS = {
         "name:Set up Python 3.12",
         "name:Set up uv",
         "name:Enforce protected develop source",
+        "name:Install Cosign",
+        "name:Verify signed stage receipt before cloud authentication",
         "name:Authenticate to Google Cloud",
         "name:Set up gcloud",
         "name:Initialize failed deploy result",
@@ -404,6 +406,8 @@ REQUIRED_WORKFLOW_STEP_ORDER = {
         "name:Set up Python 3.12",
         "name:Set up uv",
         "name:Enforce protected develop source",
+        "name:Install Cosign",
+        "name:Verify signed stage receipt before cloud authentication",
         "name:Authenticate to Google Cloud",
         "name:Set up gcloud",
         "name:Initialize failed deploy result",
@@ -550,6 +554,11 @@ ALLOWED_WORKFLOW_STEP_IF = {
 }
 
 ALLOWED_WORKFLOW_STEP_WITH = {
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Install Cosign",
+    ): {"cosign-release": "v3.0.6"},
     (
         "application-quality.yml",
         "application",
@@ -1064,6 +1073,11 @@ ALLOWED_WORKFLOW_STEP_USES = {
         "uses:actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
     ): "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
     (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Install Cosign",
+    ): "sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22",
+    (
         "repository-hygiene.yml",
         "check",
         "name:Scan for secrets",
@@ -1071,6 +1085,19 @@ ALLOWED_WORKFLOW_STEP_USES = {
 }
 
 ALLOWED_WORKFLOW_STEP_RUN = {
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Verify signed stage receipt before cloud authentication",
+    ): _strip_block_scalar(
+        """
+set -euo pipefail
+mkdir -p build/transition-authority
+printf '%s' "$STAGE_RECEIPT_BASE64" | base64 --decode > build/transition-authority/stage-receipt.json
+printf '%s' "$STAGE_RECEIPT_BUNDLE_BASE64" | base64 --decode > build/transition-authority/stage-receipt.sigstore.json
+cosign verify-blob build/transition-authority/stage-receipt.json --bundle build/transition-authority/stage-receipt.sigstore.json --certificate-identity "$STAGE_RECEIPT_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+"""
+    ),
     (
         "application-quality.yml",
         "application",
@@ -1682,6 +1709,15 @@ ALLOWED_WORKFLOW_STEP_ID = {
 
 ALLOWED_WORKFLOW_STEP_ENV = {
     (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Verify signed stage receipt before cloud authentication",
+    ): {
+        "STAGE_RECEIPT_BASE64": "${{ inputs.stage_receipt_base64 }}",
+        "STAGE_RECEIPT_BUNDLE_BASE64": "${{ inputs.stage_receipt_bundle_base64 }}",
+        "STAGE_RECEIPT_CERTIFICATE_IDENTITY": "${{ vars.STAGE_RECEIPT_CERTIFICATE_IDENTITY }}",
+    },
+    (
         "branch-policy.yml",
         "enforce",
         "name:Validate source-to-target flow",
@@ -1747,6 +1783,134 @@ ALLOWED_WORKFLOW_STEP_ENV = {
         "name:Verify readiness gate and record deploy result",
     ): {"PUBLISH_RUN_ID": "${{ inputs.publish_run_id }}"},
 }
+
+
+DEPLOY_WORKFLOW_STEPS = [
+    "name:Check out repository",
+    "name:Set up Python 3.12",
+    "name:Set up uv",
+    "name:Enforce protected develop source",
+    "name:Install Cosign",
+    "name:Verify signed stage receipt before cloud authentication",
+    "name:Initialize failed deploy result",
+    "name:Verify direct OCI image authority",
+    "name:Validate signed stage receipt after image digest",
+    "name:Authenticate to Google Cloud",
+    "name:Set up gcloud",
+    "name:Extract and validate selected live configuration projection",
+    "name:Execute migration transition",
+    "name:Verify service readiness transition",
+    "name:Record deploy result",
+    "name:Upload deploy result evidence",
+]
+_DEPLOY_KEY = ("deploy-develop.yml", "deploy")
+ALLOWED_WORKFLOW_STEP_IDENTIFIERS[_DEPLOY_KEY] = set(DEPLOY_WORKFLOW_STEPS)
+REQUIRED_WORKFLOW_STEP_ORDER[_DEPLOY_KEY] = DEPLOY_WORKFLOW_STEPS
+ALLOWED_WORKFLOW_JOB_PERMISSIONS[_DEPLOY_KEY] = {"contents": "read", "id-token": "write"}
+for _identifier in DEPLOY_WORKFLOW_STEPS:
+    ALLOWED_WORKFLOW_STEP_RUN.pop(("deploy-develop.yml", "deploy", _identifier), None)
+    EXACT_WORKFLOW_RUN_SHA256.pop(("deploy-develop.yml", "deploy", _identifier), None)
+    ALLOWED_WORKFLOW_STEP_RUN_SUBSTRINGS.pop(("deploy-develop.yml", "deploy", _identifier), None)
+ALLOWED_WORKFLOW_STEP_IF[("deploy-develop.yml", "deploy", "name:Execute migration transition")] = (
+    "inputs.deployment_stage == 'migration'"
+)
+ALLOWED_WORKFLOW_STEP_IF[
+    ("deploy-develop.yml", "deploy", "name:Verify service readiness transition")
+] = "inputs.deployment_stage == 'service'"
+ALLOWED_WORKFLOW_STEP_IF[("deploy-develop.yml", "deploy", "name:Record deploy result")] = "always()"
+ALLOWED_WORKFLOW_STEP_ENV[
+    ("deploy-develop.yml", "deploy", "name:Verify signed stage receipt before cloud authentication")
+] = {
+    "STAGE_RECEIPT_BASE64": "${{ inputs.stage_receipt_base64 }}",
+    "STAGE_RECEIPT_BUNDLE_BASE64": "${{ inputs.stage_receipt_bundle_base64 }}",
+    "STAGE_RECEIPT_CERTIFICATE_IDENTITY": "${{ vars.STAGE_RECEIPT_CERTIFICATE_IDENTITY }}",
+    "MIGRATION_SUCCESS_RECEIPT_BASE64": "${{ inputs.migration_success_receipt_base64 }}",
+    "MIGRATION_SUCCESS_RECEIPT_BUNDLE_BASE64": "${{ inputs.migration_success_receipt_bundle_base64 }}",
+    "MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY": "${{ vars.MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY }}",
+    "MIGRATION_RECEIPT_BASE64": "${{ inputs.migration_receipt_base64 }}",
+    "MIGRATION_RECEIPT_BUNDLE_BASE64": "${{ inputs.migration_receipt_bundle_base64 }}",
+    "DEPLOYMENT_STAGE": "${{ inputs.deployment_stage }}",
+}
+ALLOWED_WORKFLOW_STEP_ENV.pop(
+    ("deploy-develop.yml", "deploy", "name:Initialize failed deploy result"), None
+)
+ALLOWED_WORKFLOW_STEP_ENV[
+    ("deploy-develop.yml", "deploy", "name:Verify direct OCI image authority")
+] = {
+    "MANAGED_REPOSITORY": "us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer",
+    "BUILD_CERTIFICATE_IDENTITY": "${{ vars.BUILD_CERTIFICATE_IDENTITY }}",
+}
+ALLOWED_WORKFLOW_STEP_ENV[
+    ("deploy-develop.yml", "deploy", "name:Validate signed stage receipt after image digest")
+] = {
+    "DEPLOYMENT_STAGE": "${{ inputs.deployment_stage }}",
+}
+ALLOWED_WORKFLOW_STEP_ENV[
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Extract and validate selected live configuration projection",
+    )
+] = {
+    "DEPLOYMENT_STAGE": "${{ inputs.deployment_stage }}",
+}
+ALLOWED_WORKFLOW_STEP_ENV[("deploy-develop.yml", "deploy", "name:Record deploy result")] = {
+    "DEPLOYMENT_STAGE": "${{ inputs.deployment_stage }}",
+}
+
+# Deploy is the only workflow that can obtain the deployer identity. Every
+# executable body is pinned, rather than merely checked for a few dangerous
+# substrings. This rejects both known authority expansions and syntactically
+# valid but unreviewed commands (including new gcloud groups).
+EXACT_WORKFLOW_RUN_SHA256.update(
+    {
+        (
+            "deploy-develop.yml",
+            "deploy",
+            "name:Enforce protected develop source",
+        ): "4cc323975c42ce2d900b90afc6ce6efc272462d00b51a490915b8c23093ad963",
+        (
+            "deploy-develop.yml",
+            "deploy",
+            "name:Verify signed stage receipt before cloud authentication",
+        ): "4c6808f0dadffdd9928015544da4a5f01ee29276a86d3ccb561ff04997f79b2e",
+        (
+            "deploy-develop.yml",
+            "deploy",
+            "name:Initialize failed deploy result",
+        ): "81dbf3a69fd1821aee92b7b44894027865d07dd73fe7dc501e8e955b8ce1792f",
+        (
+            "deploy-develop.yml",
+            "deploy",
+            "name:Verify direct OCI image authority",
+        ): "24555e0c0dca73edfd117741cd9be7a92d6a463406b57751e6209ea806629799",
+        (
+            "deploy-develop.yml",
+            "deploy",
+            "name:Validate signed stage receipt after image digest",
+        ): "2a15ed6518a39525d3d35862441af994a168958ef2f6acc7039fc3b010c05594",
+        (
+            "deploy-develop.yml",
+            "deploy",
+            "name:Extract and validate selected live configuration projection",
+        ): "8698695ce9400ffa409aeba425d4566a396fc3f8fe27955982272563c78506fc",
+        (
+            "deploy-develop.yml",
+            "deploy",
+            "name:Execute migration transition",
+        ): "a3dcc21f6e4fdcd0fe7552e1c0a402a34c4c538a916e914872e5998d314ba336",
+        (
+            "deploy-develop.yml",
+            "deploy",
+            "name:Verify service readiness transition",
+        ): "6911e08b248ee22bea937040a0976407ac38bbe6cc407e1d8bff0f1fab992b92",
+        (
+            "deploy-develop.yml",
+            "deploy",
+            "name:Record deploy result",
+        ): "491e2d8b8fb26c206faeeec288d25f5340bc9528fc0dc1147ce4129aab3b82c9",
+    }
+)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -2163,6 +2327,31 @@ def _collect_workflow_run_mutations(path: Path, node: object) -> list[str]:
                 continue
             actual_run = step.get("run")
             workflow_step_key = (path.name, str(job_name), identifier)
+            if workflow_step_key[:2] == ("deploy-develop.yml", "deploy"):
+                if isinstance(actual_run, str):
+                    for forbidden in (
+                        "gcloud run services update",
+                        "gcloud run jobs update",
+                        "--update-env-vars",
+                        "--set-env-vars",
+                        "--set-secrets",
+                        "--update-secrets",
+                        "--add-cloudsql-instances",
+                    ):
+                        if forbidden in actual_run:
+                            violations.append(
+                                f"{identifier} contains forbidden imperative deployment mutation {forbidden!r}"
+                            )
+                if actual_run is None:
+                    continue
+                expected_digest = EXACT_WORKFLOW_RUN_SHA256.get(workflow_step_key)
+                if (
+                    not isinstance(actual_run, str)
+                    or expected_digest is None
+                    or hashlib.sha256(actual_run.strip().encode()).hexdigest() != expected_digest
+                ):
+                    violations.append(f"{identifier} must match reviewed executable script exactly")
+                continue
             expected_run = ALLOWED_WORKFLOW_STEP_RUN.get(workflow_step_key)
             if expected_run is None:
                 if actual_run is not None:
@@ -3053,8 +3242,9 @@ def _collect_develop_iam_violations(root: Path, terraform_config_paths: list[Pat
             'resource "google_project_iam_member" "migration_cloudsql_client"',
             'resource "google_project_iam_member" "migration_log_writer"',
             'resource "google_project_iam_member" "migration_metric_writer"',
-            'resource "google_project_iam_member" "deployer_jobs_executor"',
-            'resource "google_project_iam_member" "deployer_run_viewer"',
+            'resource "google_cloud_run_v2_job_iam_member" "deployer_jobs_executor"',
+            'resource "google_cloud_run_v2_job_iam_member" "deployer_migration_job_viewer"',
+            'resource "google_cloud_run_v2_service_iam_member" "deployer_staff_service_viewer"',
             'resource "google_secret_manager_secret_iam_member" "runtime_database_secret_access"',
             'resource "google_secret_manager_secret_iam_member" "migration_database_secret_access"',
             'resource "google_secret_manager_secret_iam_member" "runtime_synthetic_staff_secret_access"',
@@ -3064,21 +3254,42 @@ def _collect_develop_iam_violations(root: Path, terraform_config_paths: list[Pat
             'role    = "roles/cloudsql.client"',
             'role    = "roles/logging.logWriter"',
             'role    = "roles/monitoring.metricWriter"',
-            'role    = "roles/run.jobsExecutor"',
-            'role    = "roles/run.viewer"',
+            'role     = "roles/run.jobsExecutor"',
+            'role     = "roles/run.viewer"',
             'role      = "roles/secretmanager.secretAccessor"',
             'role       = "roles/artifactregistry.writer"',
             'role     = "roles/run.invoker"',
             'member  = "serviceAccount:${google_service_account.runtime.email}"',
             'member  = "serviceAccount:${google_service_account.migration.email}"',
             'member     = "serviceAccount:golden-rose-image-publisher@${var.control_plane_project_id}.iam.gserviceaccount.com"',
-            'member  = "serviceAccount:golden-rose-deployer@${var.control_plane_project_id}.iam.gserviceaccount.com"',
-            "member   = var.private_invoker_principal",
+            'member   = "serviceAccount:golden-rose-deployer@${var.control_plane_project_id}.iam.gserviceaccount.com"',
+            'data "external" "tester_authority"',
+            "verify_tester_authority_receipt.py",
+            "data.external.tester_authority[0].result.private_invoker_principal",
+            "data.external.tester_authority[0].result.tester_authority_receipt_sha256",
         ]
         for fragment in required_fragments:
             if fragment not in text:
                 violations.append(
                     f"{relative_path} missing required least-privilege IAM fragment {fragment!r}"
+                )
+
+        migration_job_iam_count = 'count    = var.deployment_stage == "migration" || var.deployment_stage == "service" ? 1 : 0'
+        for resource_name in ["deployer_jobs_executor", "deployer_migration_job_viewer"]:
+            resource_marker = f'resource "google_cloud_run_v2_job_iam_member" "{resource_name}"'
+            if resource_marker not in text:
+                violations.append(
+                    f"{relative_path} missing required migration job IAM member {resource_name!r}"
+                )
+                continue
+            resource_text = text.split(resource_marker, 1)[1].split("\n}\n", 1)[0]
+            if not _contains_normalized_fragment(resource_text, migration_job_iam_count):
+                violations.append(
+                    f"{relative_path} missing migration/service count on job IAM member {resource_name!r}"
+                )
+            if "google_cloud_run_v2_job.migration[0].name" not in resource_text:
+                violations.append(
+                    f"{relative_path} missing migration job target on IAM member {resource_name!r}"
                 )
 
         forbidden_fragments = [
@@ -3092,6 +3303,8 @@ def _collect_develop_iam_violations(root: Path, terraform_config_paths: list[Pat
             "roles/iam.serviceAccountTokenCreator",
             'resource "google_service_account_iam_member" "deployer_runtime_user"',
             'resource "google_service_account_iam_member" "deployer_migration_user"',
+            'resource "google_project_iam_member" "deployer_jobs_executor"',
+            'resource "google_project_iam_member" "deployer_run_viewer"',
             "var.deployer_principal",
         ]
         for fragment in forbidden_fragments:

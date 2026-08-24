@@ -20,6 +20,9 @@
         "stage_ownership": "service"
       },
       "google_cloud_run_v2_service_iam_member": {
+        "max_count": 3
+      },
+      "google_cloud_run_v2_job_iam_member": {
         "max_count": 2
       },
       "google_cloud_run_v2_job": {
@@ -172,18 +175,17 @@
               "name:Set up Python 3.12",
               "name:Set up uv",
               "name:Enforce protected develop source",
+              "name:Install Cosign",
+              "name:Verify signed stage receipt before cloud authentication",
+              "name:Initialize failed deploy result",
+              "name:Verify direct OCI image authority",
+              "name:Validate signed stage receipt after image digest",
               "name:Authenticate to Google Cloud",
               "name:Set up gcloud",
-              "name:Initialize failed deploy result",
-              "name:Download reviewed publish artifacts",
-              "name:Bind reviewed published image evidence",
-              "name:Record schema compatibility posture",
-              "name:Validate reviewed stage plan receipt",
-              "name:Verify migration job already matches reviewed image",
-              "name:Execute migration job",
-              "name:Verify service already matches reviewed image",
-              "name:Verify readiness gate and record deploy result",
-              "name:Upload deploy compatibility evidence",
+              "name:Extract and validate selected live configuration projection",
+              "name:Execute migration transition",
+              "name:Verify service readiness transition",
+              "name:Record deploy result",
               "name:Upload deploy result evidence"
             ]
           }
@@ -233,8 +235,11 @@
       "scripts/qualify_develop_deployment.py",
       "scripts/verify_gcp_foundation.py",
       "scripts/verify_image_provenance.py",
+      "scripts/verify_stage_receipt.py",
+      "scripts/verify_tester_authority_receipt.py",
       "scripts/validate_sbom.py",
-      "scripts/validate_terraform_static.py"
+      "scripts/validate_terraform_static.py",
+      "scripts/verify_deploy_image_authority.py"
     ]
   },
   "protected_deployment_paths": [

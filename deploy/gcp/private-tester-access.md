@@ -38,12 +38,13 @@ Do not place tester identities or emails into repo docs, Terraform vars, or PR c
 ## Grant procedure
 
 1. Confirm the target deployment is still private, synthetic-only, and qualified for a named tester window.
-2. Confirm each tester has explicit owner approval and appears in the operator-held record.
-3. Confirm the reviewed private access path is available for those identities.
-4. Grant only the reviewed service-level Cloud Run invoker access to the exact named tester user principal.
-5. Verify no project-wide convenience role, no `allUsers`, and no `allAuthenticatedUsers` binding was introduced.
-6. Deliver the private access instructions out of band. Do not paste private endpoints or identity details into chat or repo artifacts.
-7. Run the bounded qualification checks needed to prove access works without widening the service boundary.
+2. Verify the detached Sigstore bundle for the operator-held tester-authority receipt before reading it. Derive exactly one `user:` principal and retain only the receipt SHA-256 for Terraform input; a typed principal or caller-supplied digest is not authority.
+3. Confirm the derived tester has explicit owner approval and appears in the operator-held record.
+4. Confirm the reviewed private access path is available for that identity.
+5. Grant only the reviewed service-level Cloud Run invoker access to the exact receipt-derived named tester user principal, with its immutable tester-authority receipt SHA-256.
+6. Verify no project-wide convenience role, no `allUsers`, and no `allAuthenticatedUsers` binding was introduced.
+7. Deliver the private access instructions out of band. Do not paste private endpoints, receipt contents, or identity details into chat or repo artifacts.
+8. Run the bounded qualification checks needed to prove access works without widening the service boundary.
 
 ## Qualification invocation boundary
 

@@ -78,10 +78,11 @@ resource "google_monitoring_uptime_check_config" "readiness" {
   }
 
   http_check {
-    path         = "/readiness"
-    port         = 443
-    use_ssl      = true
-    validate_ssl = true
+    request_method = "GET"
+    path           = "/readiness"
+    port           = 443
+    use_ssl        = true
+    validate_ssl   = true
 
     service_agent_authentication {
       type = "OIDC_TOKEN"

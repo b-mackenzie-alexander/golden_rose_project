@@ -27,8 +27,8 @@ variable "container_image_digest" {
   nullable    = true
 
   validation {
-    condition     = can(regex("sha256:[0-9a-f]{64}$", var.container_image_digest))
-    error_message = "The container image input must be only a sha256 digest for the managed Artifact Registry image authority."
+    condition     = var.deployment_stage == "foundation" ? var.container_image_digest == null : can(regex("sha256:[0-9a-f]{64}$", var.container_image_digest))
+    error_message = "Foundation requires no image digest; migration and service require only an immutable sha256 digest."
   }
 }
 
@@ -58,16 +58,39 @@ variable "direct_vpc_subnet_cidr" {
 }
 
 
-variable "private_invoker_principal" {
-  description = "Operator-supplied reviewed exact named tester user principal for IAM-authenticated Cloud Run access."
+variable "tester_authority_receipt_path" {
+  description = "Operator-held path to the signed tester-authority receipt; service plans derive the IAM principal from it rather than accepting a principal tfvar."
   type        = string
-  nullable    = false
+  nullable    = true
 
   validation {
-    condition     = can(regex("^user:[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$", var.private_invoker_principal))
-    error_message = "The private invoker principal must be an exact reviewed named tester user principal in user:email form."
+    condition     = var.deployment_stage != "service" || var.tester_authority_receipt_path != null
+    error_message = "Service stage requires an operator-held tester-authority receipt path."
   }
 }
+
+variable "tester_authority_bundle_path" {
+  description = "Operator-held path to the detached Sigstore bundle for the tester-authority receipt."
+  type        = string
+  nullable    = true
+
+  validation {
+    condition     = var.deployment_stage != "service" || var.tester_authority_bundle_path != null
+    error_message = "Service stage requires the tester-authority detached Sigstore bundle path."
+  }
+}
+
+variable "tester_authority_certificate_identity" {
+  description = "Reviewed GitHub workflow certificate identity required to verify the tester-authority receipt."
+  type        = string
+  nullable    = true
+
+  validation {
+    condition     = var.deployment_stage != "service" || var.tester_authority_certificate_identity != null
+    error_message = "Service stage requires the reviewed tester-authority certificate identity."
+  }
+}
+
 
 variable "billing_account_id" {
   description = "Operator-supplied billing account identifier for reviewed develop budget routing."

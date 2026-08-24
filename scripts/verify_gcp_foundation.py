@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import re
@@ -11,6 +12,7 @@ from collections.abc import Callable, Sequence
 from contextlib import suppress
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 APPROVED_PROJECT_LABELS = {
     "environment": "develop",
@@ -48,9 +50,7 @@ APPROVED_BUDGET_NAME = "Develop private synthetic workload monthly cost guardrai
 APPROVED_BUDGET_THRESHOLDS = [0.5, 0.75, 1.0]
 BASIC_ROLES = {"roles/owner", "roles/editor", "roles/viewer"}
 NAMED_TESTER_PRINCIPAL_PATTERN = re.compile(r"^user:[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$")
-MONITORING_SERVICE_AGENT_PRINCIPAL_PATTERN = re.compile(
-    r"^serviceAccount:service-[0-9]+@gcp-sa-monitoring-notification\.iam\.gserviceaccount\.com$"
-)
+
 APPROVED_LOGGING_EXCLUSION_NAME = "develop-exclude-uuid-bearing-staff-paths"
 APPROVED_LOGGING_EXCLUSION_FILTER_FRAGMENT = "/api/staff/v1/employers/[0-9a-fA-F-]{36}"
 APPROVED_READINESS_UPTIME_DISPLAY_NAME = "Develop private synthetic authenticated readiness"
@@ -69,6 +69,41 @@ class VerificationError(ValueError):
     pass
 
 
+def derive_tester_authority_contract(
+    *,
+    receipt_path: Path,
+    bundle_path: Path,
+    certificate_identity: str,
+    project_id: str,
+    region: str,
+    service: str = "staff-tracer",
+    verifier_runner: Callable[[list[str]], None] | None = None,
+) -> dict[str, str]:
+    """Derive the sole accepted tester contract before querying live IAM."""
+    module_path = Path(__file__).with_name("verify_tester_authority_receipt.py")
+    spec = importlib.util.spec_from_file_location("verify_tester_authority_receipt", module_path)
+    if spec is None or spec.loader is None:
+        raise VerificationError("could not load tester authority receipt verifier")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    try:
+        verifier_kwargs: dict[str, object] = {}
+        if verifier_runner is not None:
+            verifier_kwargs["verifier_runner"] = verifier_runner
+        derived = module.verify_and_derive_tester_authority(
+            receipt_path=receipt_path,
+            bundle_path=bundle_path,
+            certificate_identity=certificate_identity,
+            expected_project_id=project_id,
+            expected_region=region,
+            expected_service=service,
+            **verifier_kwargs,
+        )
+    except module.TesterAuthorityReceiptError as exc:
+        raise VerificationError(f"tester authority receipt verification failed: {exc}") from exc
+    return {key: str(value) for key, value in derived.items()}
+
+
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Verify the live Golden Rose GCP foundation posture in read-only mode."
@@ -77,7 +112,9 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--control-plane-project-id", required=True)
     parser.add_argument("--region", default="us-east4")
     parser.add_argument("--state-bucket-name", required=True)
-    parser.add_argument("--private-invoker-principal", required=True)
+    parser.add_argument("--tester-authority-receipt", required=True, type=Path)
+    parser.add_argument("--tester-authority-bundle", required=True, type=Path)
+    parser.add_argument("--tester-authority-certificate-identity", required=True)
     parser.add_argument("--state-authority-principal", required=True)
     parser.add_argument("--recovery-authority-principal", required=True)
     parser.add_argument("--bootstrap-operator-principal", required=True)
@@ -145,8 +182,21 @@ def _is_reviewed_named_tester_principal(value: str) -> bool:
     return bool(NAMED_TESTER_PRINCIPAL_PATTERN.fullmatch(value))
 
 
-def _is_monitoring_service_agent_principal(value: str) -> bool:
-    return bool(MONITORING_SERVICE_AGENT_PRINCIPAL_PATTERN.fullmatch(value))
+def _dedupe_uptime_checks(values: object) -> list[dict[str, Any]]:
+    if not isinstance(values, list):
+        raise VerificationError("uptime checks must be a list")
+    normalized: list[dict[str, Any]] = []
+    display_names: set[str] = set()
+    for value in values:
+        uptime_check = _mapping(value, label="uptime check")
+        display_name = uptime_check.get("display_name")
+        if not isinstance(display_name, str):
+            raise VerificationError("uptime check missing display_name")
+        if display_name in display_names:
+            raise VerificationError(f"duplicate uptime check {display_name}")
+        display_names.add(display_name)
+        normalized.append(uptime_check)
+    return normalized
 
 
 def _mapping(value: object, *, label: str) -> dict[str, Any]:
@@ -266,11 +316,13 @@ def collect_foundation_snapshot(command_runner: Callable[[Sequence[str]], Any]) 
     else:
         service_accounts = _dedupe_strings(service_account_payload, label="service accounts")
         control_plane_service_accounts = []
+    project_number = str(command_runner(("project-number",)))
     cloud_run_service = _mapping(command_runner(("cloud-run-service",)), label="cloud run service")
     cloud_run_service_iam = _mapping(
         command_runner(("cloud-run-service-iam",)), label="cloud run service iam"
     )
     migration_job = _mapping(command_runner(("migration-job",)), label="migration job")
+    migration_job_iam = _mapping(command_runner(("migration-job-iam",)), label="migration job iam")
     cloud_sql = _mapping(command_runner(("cloud-sql",)), label="cloud sql")
     service_account_keys = _mapping(
         command_runner(("service-account-keys",)), label="service account keys"
@@ -290,7 +342,7 @@ def collect_foundation_snapshot(command_runner: Callable[[Sequence[str]], Any]) 
     )
     alert_policies = _dedupe_strings(command_runner(("alert-policies",)), label="alert policies")
     logging = _mapping(command_runner(("logging",)), label="logging")
-    uptime_checks = _dedupe_strings(command_runner(("uptime-checks",)), label="uptime checks")
+    uptime_checks = _dedupe_uptime_checks(command_runner(("uptime-checks",)))
     workload_identity_provider = _mapping(
         command_runner(("workload-identity-provider",)),
         label="workload identity provider",
@@ -298,6 +350,7 @@ def collect_foundation_snapshot(command_runner: Callable[[Sequence[str]], Any]) 
 
     return {
         "project_labels": project_labels,
+        "project_number": project_number,
         "enabled_apis": enabled_apis,
         "resource_inventory": {
             "service_accounts": service_accounts,
@@ -310,6 +363,7 @@ def collect_foundation_snapshot(command_runner: Callable[[Sequence[str]], Any]) 
         "cloud_run_service": cloud_run_service,
         "cloud_run_service_iam": cloud_run_service_iam,
         "migration_job": migration_job,
+        "migration_job_iam": migration_job_iam,
         "cloud_sql": cloud_sql,
         "service_account_keys": service_account_keys,
         "project_iam": project_iam,
@@ -360,10 +414,6 @@ def _expected_state_bucket_iam(contract: dict[str, Any]) -> dict[str, set[str]]:
 def _expected_project_iam(contract: dict[str, Any]) -> dict[str, set[str]]:
     project_id = str(contract["project_id"])
     observability_principal = str(contract["observability_viewer_principal"])
-    deployer_principal = (
-        f"serviceAccount:golden-rose-deployer@{contract['control_plane_project_id']}"
-        ".iam.gserviceaccount.com"
-    )
     return {
         "roles/cloudsql.client": {
             f"serviceAccount:staff-tracer-runtime@{project_id}.iam.gserviceaccount.com",
@@ -379,8 +429,62 @@ def _expected_project_iam(contract: dict[str, Any]) -> dict[str, set[str]]:
         },
         "roles/logging.viewer": {observability_principal},
         "roles/monitoring.viewer": {observability_principal},
+    }
+
+
+def _expected_deployer_principal(contract: dict[str, Any]) -> str:
+    return (
+        f"serviceAccount:golden-rose-deployer@{contract['control_plane_project_id']}"
+        ".iam.gserviceaccount.com"
+    )
+
+
+def _expected_monitoring_service_agent_principal(project_number: object) -> str:
+    return (
+        "serviceAccount:service-"
+        f"{project_number}@gcp-sa-monitoring-notification.iam.gserviceaccount.com"
+    )
+
+
+def _expected_migration_job_iam(contract: dict[str, Any]) -> dict[str, set[str]]:
+    deployer_principal = _expected_deployer_principal(contract)
+    return {
         "roles/run.jobsExecutor": {deployer_principal},
         "roles/run.viewer": {deployer_principal},
+    }
+
+
+def _expected_service_iam(contract: dict[str, Any], project_number: object) -> dict[str, set[str]]:
+    return {
+        "roles/run.invoker": {
+            str(contract["private_invoker_principal"]),
+            _expected_monitoring_service_agent_principal(project_number),
+        },
+        "roles/run.viewer": {_expected_deployer_principal(contract)},
+    }
+
+
+def _expected_readiness_uptime_check(
+    contract: dict[str, Any], service_uri: object
+) -> dict[str, Any]:
+    parsed_uri = urlparse(str(service_uri))
+    return {
+        "display_name": APPROVED_READINESS_UPTIME_DISPLAY_NAME,
+        "period": "300s",
+        "timeout": "10s",
+        "selected_regions": ["USA"],
+        "monitored_resource": {
+            "type": "uptime_url",
+            "labels": {"host": parsed_uri.netloc, "project_id": str(contract["project_id"])},
+        },
+        "http_check": {
+            "request_method": "GET",
+            "path": "/readiness",
+            "port": 443,
+            "use_ssl": True,
+            "validate_ssl": True,
+            "service_agent_authentication": {"type": "OIDC_TOKEN"},
+        },
     }
 
 
@@ -524,29 +628,32 @@ def evaluate_foundation_snapshot(
     cloud_run_service_iam = _mapping(
         snapshot.get("cloud_run_service_iam", {}), label="cloud run service iam"
     )
-    actual_invokers = _as_set(cloud_run_service_iam.get("roles/run.invoker"))
-    monitoring_invokers = {
-        member for member in actual_invokers if _is_monitoring_service_agent_principal(member)
-    }
-    named_tester_invokers = {
-        member for member in actual_invokers if _is_reviewed_named_tester_principal(member)
-    }
     if mode == "service":
+        actual_invokers = _as_set(cloud_run_service_iam.get("roles/run.invoker"))
         if "allUsers" in actual_invokers or "allAuthenticatedUsers" in actual_invokers:
             violations.append("public Cloud Run invoker detected")
-        if named_tester_invokers != {str(contract["private_invoker_principal"])}:
-            violations.append(
-                "cloud run invoker bindings drifted from the approved private principal"
-            )
-        if len(monitoring_invokers) != 1:
+        expected_service_iam = _expected_service_iam(contract, snapshot.get("project_number"))
+        expected_monitoring_agent = _expected_monitoring_service_agent_principal(
+            snapshot.get("project_number")
+        )
+        if expected_monitoring_agent not in actual_invokers:
             violations.append(
                 "cloud run monitoring invoker bindings drifted from the reviewed "
                 "service-agent authority"
             )
-        if actual_invokers != named_tester_invokers | monitoring_invokers:
+        if set(cloud_run_service_iam) != set(expected_service_iam):
             violations.append(
-                "cloud run invoker bindings drifted from the reviewed named tester "
-                "plus monitoring service-agent authority"
+                "cloud run service IAM roles drifted from the reviewed resource authority boundary"
+            )
+        for role, expected_members in expected_service_iam.items():
+            if _as_set(cloud_run_service_iam.get(role)) != expected_members:
+                violations.append(
+                    f"cloud run service IAM drifted for {role} from the reviewed "
+                    "resource authority boundary"
+                )
+        if not _is_reviewed_named_tester_principal(str(contract["private_invoker_principal"])):
+            violations.append(
+                "reviewed private invoker principal is not a named tester user principal"
             )
     elif cloud_run_service_iam:
         violations.append("non-service verifier modes reject cloud run invoker IAM presence")
@@ -565,8 +672,24 @@ def evaluate_foundation_snapshot(
         image = str(migration_job.get("image", ""))
         if not re.search(r"@sha256:[0-9a-f]{64}$", image):
             violations.append("migration verifier modes require digest-bound migration job image")
+        migration_job_iam = _mapping(
+            snapshot.get("migration_job_iam", {}), label="migration job iam"
+        )
+        expected_migration_job_iam = _expected_migration_job_iam(contract)
+        if set(migration_job_iam) != set(expected_migration_job_iam):
+            violations.append(
+                "migration job IAM roles drifted from the reviewed resource authority boundary"
+            )
+        for role, expected_members in expected_migration_job_iam.items():
+            if _as_set(migration_job_iam.get(role)) != expected_members:
+                violations.append(
+                    f"migration job IAM drifted for {role} from the reviewed "
+                    "resource authority boundary"
+                )
     elif migration_job:
         violations.append("foundation verifier mode rejects migration job configuration presence")
+    elif _mapping(snapshot.get("migration_job_iam", {}), label="migration job iam"):
+        violations.append("foundation verifier mode rejects migration job IAM presence")
 
     cloud_sql = _mapping(snapshot.get("cloud_sql", {}), label="cloud sql")
     if cloud_sql.get("database_version") != "POSTGRES_16":
@@ -746,15 +869,20 @@ def evaluate_foundation_snapshot(
     ):
         violations.append("uuid-bearing staff path logging exclusion filter drifted")
 
-    uptime_checks = (
-        set(snapshot.get("uptime_checks", []))
-        if isinstance(snapshot.get("uptime_checks"), list)
-        else set()
-    )
+    uptime_checks = _dedupe_uptime_checks(snapshot.get("uptime_checks", []))
     if mode == "service":
-        if uptime_checks != {APPROVED_READINESS_UPTIME_DISPLAY_NAME}:
+        if len(uptime_checks) != 1 or uptime_checks[0].get("display_name") != (
+            APPROVED_READINESS_UPTIME_DISPLAY_NAME
+        ):
             violations.append(
                 "service verifier mode requires exactly one authenticated readiness uptime check"
+            )
+        elif uptime_checks[0] != _expected_readiness_uptime_check(
+            contract, cloud_run_service.get("uri")
+        ):
+            violations.append(
+                "authenticated readiness uptime check configuration drifted from the reviewed "
+                "host, readiness GET, TLS, and OIDC service-agent posture"
             )
     elif uptime_checks:
         violations.append(
@@ -910,6 +1038,15 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                 context="project labels",
             )
             return _mapping(project, label="project").get("labels", {})
+        if key == ("project-number",):
+            project = _run_json_command(
+                ["gcloud", "projects", "describe", project_id, "--format=json"],
+                context="project number",
+            )
+            project_number = _mapping(project, label="project").get("projectNumber")
+            if not isinstance(project_number, str) or not project_number.isdecimal():
+                raise VerificationError("project number is missing or malformed")
+            return project_number
         if key == ("enabled-apis",):
             services = _run_json_command(
                 [
@@ -990,6 +1127,7 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
             container = containers[0] if isinstance(containers, list) and containers else {}
             return {
                 "name": service.get("name"),
+                "uri": service.get("uri"),
                 "labels": _mapping(service, label="service").get("labels", {}),
                 "ingress": service.get("ingress"),
                 "service_account": _mapping(template, label="service template").get(
@@ -1052,6 +1190,28 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                 "task_count": template.get("taskCount"),
                 "image": _mapping(container, label="migration job container").get("image"),
             }
+        if key == ("migration-job-iam",):
+            try:
+                policy = _run_json_command(
+                    [
+                        "gcloud",
+                        "run",
+                        "jobs",
+                        "get-iam-policy",
+                        "run-migrations",
+                        "--project",
+                        project_id,
+                        "--region",
+                        region,
+                        "--format=json",
+                    ],
+                    context="migration job iam",
+                )
+            except VerificationError as exc:
+                if "not found" in str(exc).lower() or "not_found" in str(exc).lower():
+                    return {}
+                raise
+            return _bindings_to_role_map(policy)
         if key == ("cloud-sql",):
             instance = _run_json_command(
                 [
@@ -1318,7 +1478,51 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                 ],
                 context="uptime checks",
             )
-            return [config.get("displayName") for config in configs if isinstance(config, dict)]
+            return [
+                {
+                    "display_name": config.get("displayName"),
+                    "period": config.get("period"),
+                    "timeout": config.get("timeout"),
+                    "selected_regions": config.get("selectedRegions"),
+                    "monitored_resource": {
+                        "type": _mapping(
+                            config.get("monitoredResource", {}), label="uptime monitored resource"
+                        ).get("type"),
+                        "labels": _mapping(
+                            _mapping(
+                                config.get("monitoredResource", {}),
+                                label="uptime monitored resource",
+                            ).get("labels", {}),
+                            label="uptime monitored resource labels",
+                        ),
+                    },
+                    "http_check": {
+                        "request_method": _mapping(
+                            config.get("httpCheck", {}), label="uptime http check"
+                        ).get("requestMethod"),
+                        "path": _mapping(
+                            config.get("httpCheck", {}), label="uptime http check"
+                        ).get("path"),
+                        "port": _mapping(
+                            config.get("httpCheck", {}), label="uptime http check"
+                        ).get("port"),
+                        "use_ssl": _mapping(
+                            config.get("httpCheck", {}), label="uptime http check"
+                        ).get("useSsl"),
+                        "validate_ssl": _mapping(
+                            config.get("httpCheck", {}), label="uptime http check"
+                        ).get("validateSsl"),
+                        "service_agent_authentication": _mapping(
+                            _mapping(config.get("httpCheck", {}), label="uptime http check").get(
+                                "serviceAgentAuthentication", {}
+                            ),
+                            label="uptime service agent authentication",
+                        ),
+                    },
+                }
+                for config in configs
+                if isinstance(config, dict)
+            ]
         if key == ("logging",):
             bucket = _run_json_command(
                 [
@@ -1388,12 +1592,20 @@ def _bindings_to_role_map(policy: Any) -> dict[str, list[str]]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv)
+    tester_authority = derive_tester_authority_contract(
+        receipt_path=args.tester_authority_receipt,
+        bundle_path=args.tester_authority_bundle,
+        certificate_identity=args.tester_authority_certificate_identity,
+        project_id=args.project_id,
+        region=args.region,
+    )
     contract = {
         "project_id": args.project_id,
         "control_plane_project_id": args.control_plane_project_id,
         "region": args.region,
         "state_bucket_name": args.state_bucket_name,
-        "private_invoker_principal": args.private_invoker_principal,
+        "private_invoker_principal": tester_authority["private_invoker_principal"],
+        "tester_authority_receipt_sha256": tester_authority["tester_authority_receipt_sha256"],
         "state_authority_principal": args.state_authority_principal,
         "recovery_authority_principal": args.recovery_authority_principal,
         "bootstrap_operator_principal": args.bootstrap_operator_principal,

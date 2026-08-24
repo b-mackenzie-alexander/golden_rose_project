@@ -8,7 +8,9 @@ module "develop" {
   deployment_stage         = var.deployment_stage
   direct_vpc_subnet_cidr   = var.direct_vpc_subnet_cidr
 
-  private_invoker_principal                = var.private_invoker_principal
+  tester_authority_receipt_path            = var.tester_authority_receipt_path
+  tester_authority_bundle_path             = var.tester_authority_bundle_path
+  tester_authority_certificate_identity    = var.tester_authority_certificate_identity
   billing_account_id                       = var.billing_account_id
   alert_notification_email_address         = var.alert_notification_email_address
   observability_viewer_principal           = var.observability_viewer_principal

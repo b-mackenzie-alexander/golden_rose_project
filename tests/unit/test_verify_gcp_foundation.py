@@ -24,6 +24,7 @@ def load_module() -> ModuleType:
 def expected_contract() -> dict[str, Any]:
     return {
         "project_id": "example-project",
+        "project_number": "123456789",
         "control_plane_project_id": "state-project",
         "region": "us-east4",
         "state_bucket_name": "example-terraform-state",
@@ -41,6 +42,7 @@ def expected_contract() -> dict[str, Any]:
 def valid_snapshot() -> dict[str, Any]:
     contract = expected_contract()
     return {
+        "project_number": "123456789",
         "project_labels": {
             "environment": "develop",
             "data_boundary": "fictional-synthetic-only",
@@ -81,6 +83,7 @@ def valid_snapshot() -> dict[str, Any]:
         },
         "cloud_run_service": {
             "name": "staff-tracer",
+            "uri": "https://staff-tracer-example-uc.a.run.app",
             "labels": {
                 "environment": "develop",
                 "data_boundary": "fictional-synthetic-only",
@@ -98,6 +101,17 @@ def valid_snapshot() -> dict[str, Any]:
             "roles/run.invoker": [
                 contract["private_invoker_principal"],
                 "serviceAccount:service-123456789@gcp-sa-monitoring-notification.iam.gserviceaccount.com",
+            ],
+            "roles/run.viewer": [
+                "serviceAccount:golden-rose-deployer@state-project.iam.gserviceaccount.com"
+            ],
+        },
+        "migration_job_iam": {
+            "roles/run.jobsExecutor": [
+                "serviceAccount:golden-rose-deployer@state-project.iam.gserviceaccount.com"
+            ],
+            "roles/run.viewer": [
+                "serviceAccount:golden-rose-deployer@state-project.iam.gserviceaccount.com"
             ],
         },
         "migration_job": {
@@ -155,12 +169,6 @@ def valid_snapshot() -> dict[str, Any]:
             ],
             "roles/logging.viewer": [contract["observability_viewer_principal"]],
             "roles/monitoring.viewer": [contract["observability_viewer_principal"]],
-            "roles/run.jobsExecutor": [
-                "serviceAccount:golden-rose-deployer@state-project.iam.gserviceaccount.com"
-            ],
-            "roles/run.viewer": [
-                "serviceAccount:golden-rose-deployer@state-project.iam.gserviceaccount.com"
-            ],
         },
         "service_account_iam": {
             "staff-tracer-runtime@example-project.iam.gserviceaccount.com": {},
@@ -217,7 +225,29 @@ def valid_snapshot() -> dict[str, Any]:
                 "develop-exclude-uuid-bearing-staff-paths": 'resource.type="cloud_run_revision" AND httpRequest.requestUrl=~"/api/staff/v1/employers/[0-9a-fA-F-]{36}(/contacts(/[0-9a-fA-F-]{36})?)?$"'
             },
         },
-        "uptime_checks": ["Develop private synthetic authenticated readiness"],
+        "uptime_checks": [
+            {
+                "display_name": "Develop private synthetic authenticated readiness",
+                "period": "300s",
+                "timeout": "10s",
+                "selected_regions": ["USA"],
+                "monitored_resource": {
+                    "type": "uptime_url",
+                    "labels": {
+                        "host": "staff-tracer-example-uc.a.run.app",
+                        "project_id": "example-project",
+                    },
+                },
+                "http_check": {
+                    "request_method": "GET",
+                    "path": "/readiness",
+                    "port": 443,
+                    "use_ssl": True,
+                    "validate_ssl": True,
+                    "service_agent_authentication": {"type": "OIDC_TOKEN"},
+                },
+            }
+        ],
         "workload_identity_provider": {
             "pool_id": "golden-rose-github",
             "provider_id": "golden-rose-github-provider",
@@ -247,6 +277,87 @@ def test_manifest_lists_verify_gcp_foundation_script_entrypoint() -> None:
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
     assert "scripts/verify_gcp_foundation.py" in manifest["scripts"]["entrypoints"]
+
+
+def test_live_foundation_verifier_derives_private_invoker_from_a_signed_receipt() -> None:
+    module = load_module()
+    common_args = [
+        "--project-id",
+        "example-project",
+        "--control-plane-project-id",
+        "state-project",
+        "--state-bucket-name",
+        "example-terraform-state",
+        "--state-authority-principal",
+        "serviceAccount:golden-rose-provisioner@state-project.iam.gserviceaccount.com",
+        "--recovery-authority-principal",
+        "group:recovery@example.com",
+        "--bootstrap-operator-principal",
+        "user:bootstrap@example.com",
+        "--bootstrap-operator-status",
+        "bootstrap-retired",
+        "--observability-viewer-principal",
+        "group:observability@example.com",
+        "--recovery-policy-review-status",
+        "gate-2-evidence-required",
+        "--log-retention-days",
+        "30",
+    ]
+
+    parsed = module._parse_args(
+        [
+            *common_args,
+            "--tester-authority-receipt",
+            "private/tester-receipt.json",
+            "--tester-authority-bundle",
+            "private/tester-receipt.sigstore.json",
+            "--tester-authority-certificate-identity",
+            "https://github.com/example/authority/.github/workflows/tester-authority.yml@refs/heads/main",
+        ]
+    )
+
+    assert parsed.tester_authority_receipt.name == "tester-receipt.json"
+    assert parsed.tester_authority_bundle.name == "tester-receipt.sigstore.json"
+    with pytest.raises(SystemExit):
+        module._parse_args(
+            [*common_args, "--private-invoker-principal", "user:attacker@example.com"]
+        )
+
+
+def test_live_foundation_verifier_uses_receipt_derived_principal_and_digest(tmp_path: Path) -> None:
+    module = load_module()
+    receipt = tmp_path / "tester-receipt.json"
+    bundle = tmp_path / "tester-receipt.sigstore.json"
+    receipt.write_text(
+        json.dumps(
+            {
+                "schema": "golden-rose.tester-authority/v1",
+                "principal": "user:private.tester@example.com",
+                "scope": {
+                    "project_id": "example-project",
+                    "region": "us-east4",
+                    "service": "staff-tracer",
+                    "role": "roles/run.invoker",
+                },
+                "approval_reference": "operator-held",
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    bundle.write_text("{}", encoding="utf-8")
+
+    derived = module.derive_tester_authority_contract(
+        receipt_path=receipt,
+        bundle_path=bundle,
+        certificate_identity="https://github.com/example/authority/.github/workflows/tester-authority.yml@refs/heads/main",
+        project_id="example-project",
+        region="us-east4",
+        verifier_runner=lambda command: None,
+    )
+
+    assert derived["private_invoker_principal"] == "user:private.tester@example.com"
+    assert len(derived["tester_authority_receipt_sha256"]) == 64
 
 
 def test_collect_foundation_snapshot_accepts_reviewed_fixture() -> None:
@@ -281,9 +392,11 @@ def test_collect_foundation_snapshot_accepts_reviewed_fixture() -> None:
                 "control_plane_service_accounts"
             ],
         },
+        ("project-number",): expected_contract()["project_number"],
         ("cloud-run-service",): valid_snapshot()["cloud_run_service"],
         ("cloud-run-service-iam",): valid_snapshot()["cloud_run_service_iam"],
         ("migration-job",): valid_snapshot()["migration_job"],
+        ("migration-job-iam",): valid_snapshot()["migration_job_iam"],
         ("cloud-sql",): valid_snapshot()["cloud_sql"],
         ("service-account-keys",): valid_snapshot()["service_account_keys"],
         ("project-iam",): valid_snapshot()["project_iam"],
@@ -303,6 +416,9 @@ def test_collect_foundation_snapshot_accepts_reviewed_fixture() -> None:
 
     assert snapshot["resource_inventory"]["cloud_run_service"] == "staff-tracer"
     assert snapshot["cloud_run_service"]["ingress"] == "INGRESS_TRAFFIC_ALL"
+    assert snapshot["project_number"] == "123456789"
+    assert snapshot["migration_job_iam"]["roles/run.jobsExecutor"]
+    assert snapshot["uptime_checks"][0]["http_check"]["path"] == "/readiness"
     assert snapshot["state_bucket"]["versioning_enabled"] is True
 
 
@@ -312,9 +428,11 @@ def test_collect_foundation_snapshot_rejects_duplicate_enabled_apis() -> None:
         ("project-labels",): {"environment": "develop"},
         ("enabled-apis",): ["run.googleapis.com", "run.googleapis.com"],
         ("service-accounts",): [],
+        ("project-number",): "123456789",
         ("cloud-run-service",): {},
         ("cloud-run-service-iam",): {},
         ("migration-job",): {},
+        ("migration-job-iam",): {},
         ("cloud-sql",): {},
         ("service-account-keys",): {},
         ("project-iam",): {},
@@ -556,16 +674,45 @@ def test_uptime_check_and_monitoring_invoker_are_absent_before_service_stage() -
 def test_service_stage_has_exactly_one_uptime_check_and_monitoring_invoker() -> None:
     module = load_module()
     snapshot = valid_snapshot()
-    snapshot["uptime_checks"] = [
-        "Develop private synthetic authenticated readiness",
-        "unexpected-second-check",
-    ]
+    snapshot["uptime_checks"].append({"display_name": "unexpected-second-check"})
 
     violations = module.evaluate_foundation_snapshot(snapshot, expected_contract(), mode="service")
 
     assert any(
         "exactly one authenticated readiness uptime check" in violation for violation in violations
     )
+
+
+def test_service_stage_requires_exact_resource_iam_and_project_number_monitoring_agent() -> None:
+    module = load_module()
+    snapshot = valid_snapshot()
+    snapshot["cloud_run_service_iam"]["roles/run.invoker"][1] = (
+        "serviceAccount:service-999999999@gcp-sa-monitoring-notification.iam.gserviceaccount.com"
+    )
+    snapshot["migration_job_iam"]["roles/run.jobsExecutor"] = []
+
+    violations = module.evaluate_foundation_snapshot(snapshot, expected_contract(), mode="service")
+
+    assert any("service-agent authority" in violation for violation in violations)
+    assert any("migration job IAM" in violation for violation in violations)
+
+
+def test_service_stage_requires_full_authenticated_readiness_uptime_configuration() -> None:
+    module = load_module()
+    snapshot = valid_snapshot()
+    snapshot["uptime_checks"][0]["monitored_resource"]["labels"]["host"] = "wrong.example"
+    snapshot["uptime_checks"][0]["http_check"] = {
+        "request_method": "POST",
+        "path": "/health",
+        "port": 80,
+        "use_ssl": False,
+        "validate_ssl": False,
+        "service_agent_authentication": {"type": "NONE"},
+    }
+
+    violations = module.evaluate_foundation_snapshot(snapshot, expected_contract(), mode="service")
+
+    assert any("uptime check configuration drifted" in violation for violation in violations)
 
 
 def test_tester_authority_rejects_substituted_extra_empty_group_domain_principal_set_and_public_invokers() -> (
@@ -611,14 +758,15 @@ def test_verifier_rejects_arbitrary_deployer_principal_not_derived_from_control_
 ):
     module = load_module()
     snapshot = valid_snapshot()
-    snapshot["project_iam"]["roles/run.jobsExecutor"] = [
+    snapshot["migration_job_iam"]["roles/run.jobsExecutor"] = [
         "serviceAccount:arbitrary-deployer@other-project.iam.gserviceaccount.com"
     ]
 
     violations = module.evaluate_foundation_snapshot(snapshot, expected_contract(), mode="service")
 
     assert any(
-        "project IAM drifted for roles/run.jobsExecutor" in violation for violation in violations
+        "migration job IAM drifted for roles/run.jobsExecutor" in violation
+        for violation in violations
     )
 
 

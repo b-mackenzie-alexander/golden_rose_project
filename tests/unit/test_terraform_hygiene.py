@@ -56,6 +56,15 @@ def _write_minimal_required_terraform_scaffold(root: Path) -> None:
         path.write_text("", encoding="utf-8")
 
 
+def _write_current_terraform_scaffold(root: Path) -> None:
+    """Use the reviewed Terraform contract when testing workflow-only mutations."""
+    shutil.copytree(
+        ROOT / "infra" / "gcp",
+        root / "infra" / "gcp",
+        ignore=shutil.ignore_patterns(".terraform"),
+    )
+
+
 def _write_workflow_fixture(root: Path, name: str, content: str) -> None:
     workflow_dir = root / ".github" / "workflows"
     workflow_dir.mkdir(parents=True)
@@ -891,7 +900,8 @@ def test_authenticated_readiness_uptime_check_targets_exact_cloud_run_service() 
 
     assert 'resource "google_monitoring_uptime_check_config" "readiness"' in observability
     assert 'display_name = "Develop private synthetic authenticated readiness"' in observability
-    assert 'path         = "/readiness"' in observability
+    assert 'request_method = "GET"' in observability
+    assert 'path           = "/readiness"' in observability
     assert 'type = "uptime_url"' in observability
     assert "host       = local.readiness_uptime_host" in observability
     assert 'type = "OIDC_TOKEN"' in observability
@@ -1020,7 +1030,9 @@ def test_gcp_develop_iam_models_least_privilege_runtime_migration_deployer_and_i
 
     required_variable_names = [
         "control_plane_project_id",
-        "private_invoker_principal",
+        "tester_authority_receipt_path",
+        "tester_authority_bundle_path",
+        "tester_authority_certificate_identity",
     ]
     for variable_name in required_variable_names:
         assert f'variable "{variable_name}"' in variables
@@ -1032,8 +1044,9 @@ def test_gcp_develop_iam_models_least_privilege_runtime_migration_deployer_and_i
         'resource "google_project_iam_member" "migration_cloudsql_client"',
         'resource "google_project_iam_member" "migration_log_writer"',
         'resource "google_project_iam_member" "migration_metric_writer"',
-        'resource "google_project_iam_member" "deployer_jobs_executor"',
-        'resource "google_project_iam_member" "deployer_run_viewer"',
+        'resource "google_cloud_run_v2_job_iam_member" "deployer_jobs_executor"',
+        'resource "google_cloud_run_v2_job_iam_member" "deployer_migration_job_viewer"',
+        'resource "google_cloud_run_v2_service_iam_member" "deployer_staff_service_viewer"',
         'resource "google_secret_manager_secret_iam_member" "runtime_database_secret_access"',
         'resource "google_secret_manager_secret_iam_member" "migration_database_secret_access"',
         'resource "google_secret_manager_secret_iam_member" "runtime_synthetic_staff_secret_access"',
@@ -1052,7 +1065,7 @@ def test_gcp_develop_iam_models_least_privilege_runtime_migration_deployer_and_i
         "serviceAccount:${google_service_account.migration.email}",
         "golden-rose-image-publisher@${var.control_plane_project_id}.iam.gserviceaccount.com",
         "golden-rose-deployer@${var.control_plane_project_id}.iam.gserviceaccount.com",
-        "var.private_invoker_principal",
+        "data.external.tester_authority[0].result.private_invoker_principal",
     ]
     for fragment in required_fragments:
         assert fragment in iam
@@ -1077,22 +1090,125 @@ def test_gcp_develop_iam_models_least_privilege_runtime_migration_deployer_and_i
         assert fragment not in iam
 
 
+def test_foundation_omits_job_iam_members_and_terraform_evaluates_the_stage_counts_without_cloud(
+    tmp_path: Path,
+) -> None:
+    iam = (ROOT / "infra/gcp/develop/iam.tf").read_text(encoding="utf-8")
+    migration_count = (
+        'count = var.deployment_stage == "migration" || var.deployment_stage == "service" ? 1 : 0'
+    )
+
+    for resource_name in ["deployer_jobs_executor", "deployer_migration_job_viewer"]:
+        resource = iam.split(f'resource "google_cloud_run_v2_job_iam_member" "{resource_name}"', 1)[
+            1
+        ].split("}\n", 1)[0]
+        assert _contains_normalized_fragment(resource, migration_count)
+        assert "google_cloud_run_v2_job.migration[0].name" in resource
+
+    terraform_root = tmp_path / "foundation-stage"
+    terraform_root.mkdir()
+    # This minimal Terraform configuration preserves the checked-in count
+    # condition and [0] dependency shape while avoiding unrelated foundation
+    # resources. terraform_data is Terraform's built-in provider, so the plan
+    # equivalent reaches the expression without credentials or cloud access.
+    (terraform_root / "main.tf").write_text(
+        """variable "deployment_stage" {
+  type = string
+}
+
+resource "terraform_data" "migration_job" {
+  count = var.deployment_stage == "migration" || var.deployment_stage == "service" ? 1 : 0
+  input = "migration-job"
+}
+
+resource "terraform_data" "deployer_jobs_executor" {
+  count = var.deployment_stage == "migration" || var.deployment_stage == "service" ? 1 : 0
+  input = terraform_data.migration_job[0].id
+}
+
+resource "terraform_data" "deployer_migration_job_viewer" {
+  count = var.deployment_stage == "migration" || var.deployment_stage == "service" ? 1 : 0
+  input = terraform_data.migration_job[0].id
+}
+""",
+        encoding="utf-8",
+    )
+    (terraform_root / "foundation_job_iam.tftest.hcl").write_text(
+        """run "foundation_omits_job_iam" {
+  command = plan
+
+  variables {
+    deployment_stage = "foundation"
+  }
+
+  assert {
+    condition = length(terraform_data.deployer_jobs_executor) == 0 && length(terraform_data.deployer_migration_job_viewer) == 0
+    error_message = "Foundation must omit both migration Job IAM members."
+  }
+}
+""",
+        encoding="utf-8",
+    )
+
+    terraform_env = os.environ | {"TF_DATA_DIR": str(tmp_path / ".tfdata-foundation")}
+    init_result = subprocess.run(
+        ["terraform", f"-chdir={terraform_root}", "init", "-backend=false", "-input=false"],
+        cwd=tmp_path,
+        check=False,
+        text=True,
+        capture_output=True,
+        env=terraform_env,
+    )
+    assert init_result.returncode == 0, init_result.stdout + init_result.stderr
+
+    result = subprocess.run(
+        ["terraform", f"-chdir={terraform_root}", "test", "-no-color"],
+        cwd=tmp_path,
+        check=False,
+        text=True,
+        capture_output=True,
+        env=terraform_env,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "foundation_omits_job_iam" in result.stdout
+    assert "Success!" in result.stdout
+
+
 def test_named_invoker_is_required_and_public_invokers_remain_forbidden() -> None:
     variables = (ROOT / "infra/gcp/variables.tf").read_text(encoding="utf-8")
     develop_variables = (ROOT / "infra/gcp/develop/variables.tf").read_text(encoding="utf-8")
     iam = (ROOT / "infra/gcp/develop/iam.tf").read_text(encoding="utf-8")
 
     for text in [variables, develop_variables]:
-        assert 'variable "private_invoker_principal"' in text
-        assert "user:" in text
-        assert "named tester user principal" in text
-        assert "principal or group" not in text
+        assert 'variable "tester_authority_receipt_path"' in text
+        assert 'variable "tester_authority_bundle_path"' in text
+        assert 'variable "tester_authority_certificate_identity"' in text
+        assert 'variable "private_invoker_principal"' not in text
 
     assert 'resource "google_cloud_run_v2_service_iam_member" "private_invoker"' in iam
     assert 'role     = "roles/run.invoker"' in iam
-    assert "member   = var.private_invoker_principal" in iam
+    assert "member   = data.external.tester_authority[0].result.private_invoker_principal" in iam
     assert "allUsers" not in iam
     assert "allAuthenticatedUsers" not in iam
+
+
+def test_tester_iam_input_is_derived_by_the_receipt_verifier_not_a_tfvars_principal() -> None:
+    root_variables = (ROOT / "infra/gcp/variables.tf").read_text(encoding="utf-8")
+    module_variables = (ROOT / "infra/gcp/develop/variables.tf").read_text(encoding="utf-8")
+    iam = (ROOT / "infra/gcp/develop/iam.tf").read_text(encoding="utf-8")
+
+    for variables in [root_variables, module_variables]:
+        assert 'variable "tester_authority_receipt_path"' in variables
+        assert 'variable "tester_authority_bundle_path"' in variables
+        assert 'variable "tester_authority_certificate_identity"' in variables
+        assert 'variable "private_invoker_principal"' not in variables
+        assert 'variable "tester_authority_receipt_sha256"' not in variables
+
+    assert 'data "external" "tester_authority"' in iam
+    assert "verify_tester_authority_receipt.py" in iam
+    assert "data.external.tester_authority[0].result" in iam
+    assert "member   = var.private_invoker_principal" not in iam
 
 
 def test_private_tester_runbook_does_not_claim_internal_network_privacy() -> None:
@@ -1503,190 +1619,10 @@ def test_build_image_workflow_verifies_sboms_and_emits_value_safe_artifacts() ->
     assert "cosign verify-attestation --type slsaprovenance" in workflow
 
 
-def test_deploy_develop_workflow_binds_reviewed_publish_artifacts_and_serializes_migration_before_rollout() -> (
-    None
-):
-    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
-
-    expected_pinned_actions = [
-        "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
-        "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
-        "astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e",
-        "google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193",
-        "google-github-actions/setup-gcloud@77e7a554d41e2ee56fc945c52dfd3f33d12def9a",
-        "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
-    ]
-
-    assert "workflow_dispatch:" in workflow
-    assert "pull_request:" not in workflow
-    assert "publish_run_id:" in workflow
-    assert "actions: read" in workflow
-    assert "environment: develop" in workflow
-    assert "id-token: write" in workflow
-    assert "concurrency:" in workflow
-    assert "group: deploy-develop" in workflow
-    assert "cancel-in-progress: false" in workflow
-    assert "if: github.event_name == 'workflow_dispatch'" in workflow
-    assert "google-github-actions/auth" in workflow
-    assert "google-github-actions/setup-gcloud" in workflow
-    assert "actions/runs/{run_id}/artifacts" in workflow
-    assert "reviewed-stage-plan-receipt.json" in workflow
-    assert "scripts/verify_image_provenance.py --mode publish" in workflow
-    assert "reviewed stage plan receipt" in workflow.lower()
-    assert "gcloud run jobs execute" in workflow
-    assert "run-migrations" in workflow
-    assert "CURRENT_JOB_IMAGE" in workflow
-    assert "CURRENT_SERVICE_IMAGE" in workflow
-    assert "published-image.txt" in workflow
-    assert "image-sbom.cdx.json" in workflow
-    assert "backend-sbom.cdx.json" in workflow
-    assert "frontend-sbom.cdx.json" in workflow
-    assert "publish-signature-verification.json" in workflow
-    assert "publish-provenance-verification.json" in workflow
-    assert "publish-application-sbom-verification.json" in workflow
-    assert workflow.index("CURRENT_JOB_IMAGE") < workflow.index("gcloud run jobs execute")
-    assert workflow.index("gcloud run jobs execute") < workflow.index("CURRENT_SERVICE_IMAGE")
-    assert "${{ inputs.image_digest }}" not in workflow
-    assert ":latest" not in workflow
-    for pinned_action in expected_pinned_actions:
-        assert pinned_action in workflow
-
-
-def test_deploy_develop_workflow_records_forward_only_readiness_and_qualification_distinction() -> (
-    None
-):
-    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
-
-    assert "build/deploy-compatibility.json" in workflow
-    assert "build/deploy-result.json" in workflow
-    assert "qualification_executed" in workflow
-    assert "false" in workflow
-    assert '"result": "failed"' in workflow
-    assert '"current_stage": "pre_deploy_validation"' in workflow
-    assert "forward recovery" in workflow
-    assert "rollback_without_proven_compatibility_window" in workflow
-    assert "publish_run_id" in workflow
-    assert (
-        "published-image artifact plus backend/frontend SBOM, image SBOM, signature/provenance verification, and metadata evidence from the reviewed publish run"
-        in workflow
-    )
-    assert '"deploy_executed": False' in workflow
-    assert "upload-artifact" in workflow
-
-
-def test_deploy_workflow_initializes_failed_result_before_cloud_mutation() -> None:
-    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
-
-    assert "Initialize failed deploy result" in workflow
-    assert '"result": "failed"' in workflow
-    assert '"current_stage": "pre_deploy_validation"' in workflow
-    assert '"qualification_executed": False' in workflow
-    assert workflow.index("Initialize failed deploy result") < workflow.index(
-        "Execute migration job"
-    )
-
-
-def test_deploy_workflow_refuses_resources_not_already_at_reviewed_terraform_configuration() -> (
-    None
-):
-    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
-
-    assert "Verify migration job already matches reviewed image" in workflow
-    assert "Verify service already matches reviewed image" in workflow
-    assert "gcloud run jobs update" not in workflow
-    assert "gcloud run services update" not in workflow
-    assert 'test "$CURRENT_JOB_IMAGE" = "$MANAGED_IMAGE"' in workflow
-    assert 'test "$CURRENT_SERVICE_IMAGE" = "$MANAGED_IMAGE"' in workflow
-
-
-def test_deploy_workflow_selects_ready_condition_by_type() -> None:
-    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
-
-    assert 'if condition.get("type") == "Ready"' in workflow
-    assert 'ready_condition.get("status") != "True"' in workflow
-    assert "status.conditions[0].status" not in workflow
-
-
-def test_deploy_workflow_binds_ready_revision_to_reviewed_digest() -> None:
-    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
-
-    assert "ready_revision" in workflow
-    assert "ready_image" in workflow
-    assert 'ready_image.split("@", 1)[1] != os.environ["IMAGE_DIGEST"]' in workflow
-
-
-def test_deploy_workflow_updates_failed_stage_and_recovery_disposition_on_error() -> None:
-    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
-
-    assert 'payload["current_stage"] = "migration_execution"' in workflow
-    assert 'payload["current_stage"] = "service_readiness"' in workflow
-    assert (
-        'payload["recovery_disposition"] = "forward recovery or teardown/rebuild required"'
-        in workflow
-    )
-
-
-def test_always_uploads_do_not_fail_when_early_stage_evidence_is_absent() -> None:
-    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
-
-    assert "Initialize failed deploy result" in workflow
-    assert "build/deploy-compatibility.json" in workflow
-    assert "build/deploy-result.json" in workflow
-    assert "if-no-files-found: error" in workflow
-
-
-def test_deploy_evidence_never_claims_gate6_qualification() -> None:
-    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
-
-    assert '"qualification_executed": False' in workflow
-    assert '"deploy_executed": False' in workflow
-    assert '"result": "success"' in workflow
-
-
 def test_privileged_jobs_have_bounded_timeouts() -> None:
     workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
 
     assert "timeout-minutes: 30" in workflow
-
-
-def test_deploy_rejects_missing_or_mismatched_reviewed_stage_plan_receipt() -> None:
-    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
-
-    assert "reviewed-stage-plan-receipt.json" in workflow
-    assert '"stage"' in workflow
-    assert '"source_sha"' in workflow
-    assert '"plan_hash"' in workflow
-    assert '"provider_lock_digest"' in workflow
-    assert '"approval_reference"' in workflow
-    assert '"evaluated_inventory"' in workflow
-    assert '"workload_image_digest"' in workflow
-    assert 'receipt["stage"] != "service"' in workflow
-    assert 'receipt["source_sha"] != os.environ["DEPLOY_COMMIT_SHA"]' in workflow
-    assert 'receipt["workload_image_digest"] != os.environ["IMAGE_DIGEST"]' in workflow
-
-
-def test_terraform_static_validation_harness_rejects_deploy_workflow_without_migration_step(
-    tmp_path: Path,
-) -> None:
-    _write_minimal_required_terraform_scaffold(tmp_path)
-    workflow = _remove_named_workflow_step(
-        _current_workflow_text("deploy-develop.yml"),
-        "Execute migration job",
-        "Verify service already matches reviewed image",
-    )
-    _write_workflow_fixture(tmp_path, "deploy-develop.yml", workflow)
-
-    result = subprocess.run(
-        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
-        cwd=ROOT,
-        check=False,
-        text=True,
-        capture_output=True,
-    )
-
-    assert result.returncode == 1
-    assert "contains forbidden workflow step inventory mutation" in result.stdout
-    assert "missing name:Execute migration job" in result.stdout
 
 
 def test_terraform_static_validation_harness_rejects_deploy_workflow_job_continue_on_error(
@@ -1757,41 +1693,6 @@ def test_terraform_static_validation_harness_rejects_deploy_workflow_without_con
     assert "changed job concurrency" in result.stdout
 
 
-def test_terraform_static_validation_harness_rejects_deploy_workflow_reordered_migration_and_rollout(
-    tmp_path: Path,
-) -> None:
-    _write_minimal_required_terraform_scaffold(tmp_path)
-    workflow = _current_workflow_text("deploy-develop.yml")
-    migration_step_start = workflow.index("      - name: Execute migration job")
-    deploy_step_start = workflow.index(
-        "      - name: Verify service already matches reviewed image", migration_step_start
-    )
-    readiness_step_start = workflow.index(
-        "      - name: Verify readiness gate and record deploy result", deploy_step_start
-    )
-    migration_step = workflow[migration_step_start:deploy_step_start]
-    deploy_step = workflow[deploy_step_start:readiness_step_start]
-    workflow = (
-        workflow[:migration_step_start]
-        + deploy_step
-        + migration_step
-        + workflow[readiness_step_start:]
-    )
-    _write_workflow_fixture(tmp_path, "deploy-develop.yml", workflow)
-
-    result = subprocess.run(
-        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
-        cwd=ROOT,
-        check=False,
-        text=True,
-        capture_output=True,
-    )
-
-    assert result.returncode == 1
-    assert "contains forbidden workflow step inventory mutation" in result.stdout
-    assert "step order or inventory changed" in result.stdout
-
-
 def test_terraform_static_validation_harness_rejects_deploy_workflow_broad_oidc_claim_mutation(
     tmp_path: Path,
 ) -> None:
@@ -1836,72 +1737,6 @@ def test_terraform_static_validation_harness_rejects_deploy_workflow_arbitrary_d
 
     assert result.returncode == 1
     assert result.stdout
-
-
-def test_terraform_static_validation_harness_rejects_deploy_workflow_without_publish_sha_match(
-    tmp_path: Path,
-) -> None:
-    _write_minimal_required_terraform_scaffold(tmp_path)
-    workflow = _current_workflow_text("deploy-develop.yml").replace(
-        '          if head_sha != deploy_commit_sha:\n              raise SystemExit("publish run head sha must match the deploy commit sha")\n',
-        "",
-    )
-    _write_workflow_fixture(tmp_path, "deploy-develop.yml", workflow)
-
-    result = subprocess.run(
-        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
-        cwd=ROOT,
-        check=False,
-        text=True,
-        capture_output=True,
-    )
-
-    assert result.returncode == 1
-    assert "must match reviewed executable script" in result.stdout
-
-
-def test_terraform_static_validation_harness_rejects_deploy_workflow_without_image_equality_guard(
-    tmp_path: Path,
-) -> None:
-    _write_minimal_required_terraform_scaffold(tmp_path)
-    workflow = _current_workflow_text("deploy-develop.yml").replace(
-        '          test "$VERIFIED_IMAGE_REF" = "$PUBLISHED_IMAGE_REF"\n',
-        "",
-    )
-    _write_workflow_fixture(tmp_path, "deploy-develop.yml", workflow)
-
-    result = subprocess.run(
-        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
-        cwd=ROOT,
-        check=False,
-        text=True,
-        capture_output=True,
-    )
-
-    assert result.returncode == 1
-    assert "must match reviewed executable script" in result.stdout
-
-
-def test_terraform_static_validation_rejects_image_guard_replaced_by_comment(
-    tmp_path: Path,
-) -> None:
-    _write_minimal_required_terraform_scaffold(tmp_path)
-    workflow = _current_workflow_text("deploy-develop.yml").replace(
-        '          test "$VERIFIED_IMAGE_REF" = "$PUBLISHED_IMAGE_REF"',
-        '          # test "$VERIFIED_IMAGE_REF" = "$PUBLISHED_IMAGE_REF"',
-    )
-    _write_workflow_fixture(tmp_path, "deploy-develop.yml", workflow)
-
-    result = subprocess.run(
-        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
-        cwd=ROOT,
-        check=False,
-        text=True,
-        capture_output=True,
-    )
-
-    assert result.returncode == 1
-    assert "must match reviewed executable script" in result.stdout
 
 
 def test_terraform_static_validation_harness_rejects_forbidden_patterns(tmp_path: Path) -> None:
@@ -2313,36 +2148,6 @@ def test_terraform_static_validation_harness_rejects_workflow_step_not_listed_in
     assert result.returncode == 1
     assert "workflow step not listed in manifest" in result.stdout
     assert "name:Set up uv" in result.stdout
-
-
-def test_terraform_static_validation_harness_rejects_manifest_deploy_order_drift(
-    tmp_path: Path,
-) -> None:
-    _write_minimal_required_terraform_scaffold(tmp_path)
-    manifest = (ROOT / "infra/policy/predeployment-authority-manifest.json").read_text(
-        encoding="utf-8"
-    )
-    manifest = manifest.replace(
-        '              "name:Enforce protected develop source",\n              "name:Authenticate to Google Cloud",',
-        '              "name:Authenticate to Google Cloud",\n              "name:Enforce protected develop source",',
-    )
-    policy_dir = tmp_path / "infra" / "policy"
-    policy_dir.mkdir(parents=True, exist_ok=True)
-    (policy_dir / "predeployment-authority-manifest.json").write_text(manifest, encoding="utf-8")
-    _write_workflow_fixture(
-        tmp_path, "deploy-develop.yml", _current_workflow_text("deploy-develop.yml")
-    )
-
-    result = subprocess.run(
-        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
-        cwd=ROOT,
-        check=False,
-        text=True,
-        capture_output=True,
-    )
-
-    assert result.returncode == 1
-    assert "workflow step order drifted for deploy-develop.yml:deploy" in result.stdout
 
 
 @pytest.mark.parametrize(
@@ -7547,3 +7352,166 @@ def test_runtime_and_migration_secret_iam_is_per_secret_and_rejects_collection_w
             "for_each" not in migration_db_section.split("}")[0]
             or "migration-database-url" in migration_db_section
         )
+
+
+def test_deploy_workflow_uses_operator_receipts_and_direct_oci_authority() -> None:
+    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
+    required = [
+        "deployment_stage:",
+        "- migration",
+        "- service",
+        "stage_receipt_base64:",
+        "migration_success_receipt_base64:",
+        "cosign verify-blob",
+        "Verify direct OCI image authority",
+        "cosign verify --certificate-identity",
+        "cosign verify-attestation --type slsaprovenance",
+        "https://spdx.dev/Document",
+        "scripts/verify_deploy_image_authority.py",
+        '--source-commit "$GITHUB_SHA"',
+        "Validate signed stage receipt after image digest",
+        "scripts/verify_stage_receipt.py",
+        "Execute migration transition",
+        "Verify service readiness transition",
+    ]
+    for fragment in required:
+        assert fragment in workflow
+    assert "publish_run_id:" not in workflow
+    assert "reviewed-stage-plan-receipt" not in workflow
+    assert "Download reviewed publish artifacts" not in workflow
+    assert (
+        workflow.index("Verify direct OCI image authority")
+        < workflow.index("Validate signed stage receipt after image digest")
+        < workflow.index("Authenticate to Google Cloud")
+    )
+
+
+def test_deploy_workflow_validates_full_live_configuration_projection_before_transition() -> None:
+    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
+
+    assert "Extract and validate selected live configuration projection" in workflow
+    assert "--live-configuration-projection" in workflow
+    assert "gcloud run jobs describe run-migrations" in workflow
+    assert "gcloud run services describe staff-tracer" in workflow
+    assert "gcloud run services get-iam-policy staff-tracer" in workflow
+    assert "live-service-iam-policy.json" in workflow
+    assert "iam_policy=iam_policy" in workflow
+    assert 'service.get("template", {}).get("containers")' in workflow
+    assert workflow.index(
+        "Extract and validate selected live configuration projection"
+    ) < workflow.index("Execute migration transition")
+    assert workflow.index(
+        "Extract and validate selected live configuration projection"
+    ) < workflow.index("Verify service readiness transition")
+
+
+def test_static_policy_rejects_deploy_workflow_without_live_projection_comparison(
+    tmp_path: Path,
+) -> None:
+    _write_current_terraform_scaffold(tmp_path)
+    policy_dir = tmp_path / "infra" / "policy"
+    policy_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(ROOT / "infra" / "policy" / "predeployment-authority-manifest.json", policy_dir)
+    workflow = _current_workflow_text("deploy-develop.yml").replace(
+        "--live-configuration-projection build/transition-authority/live-configuration-projection.json",
+        "",
+        1,
+    )
+    _write_workflow_fixture(tmp_path, "deploy-develop.yml", workflow)
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "must match reviewed executable script exactly" in result.stdout
+
+
+def test_static_policy_rejects_deploy_workflow_without_service_iam_projection(
+    tmp_path: Path,
+) -> None:
+    _write_current_terraform_scaffold(tmp_path)
+    policy_dir = tmp_path / "infra" / "policy"
+    policy_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(ROOT / "infra" / "policy" / "predeployment-authority-manifest.json", policy_dir)
+    workflow = _current_workflow_text("deploy-develop.yml").replace(
+        '            gcloud run services get-iam-policy staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --format=json > build/transition-authority/live-service-iam-policy.json\n',
+        "",
+        1,
+    )
+    _write_workflow_fixture(tmp_path, "deploy-develop.yml", workflow)
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode == 1
+    assert "must match reviewed executable script exactly" in result.stdout
+
+
+def test_static_policy_rejects_appended_deploy_environment_mutation(tmp_path: Path) -> None:
+    """Deploy run bodies must not permit imperative Cloud Run configuration drift."""
+    _write_current_terraform_scaffold(tmp_path)
+    policy_dir = tmp_path / "infra" / "policy"
+    policy_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(ROOT / "infra" / "policy" / "predeployment-authority-manifest.json", policy_dir)
+    workflow = _current_workflow_text("deploy-develop.yml").replace(
+        '          gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --wait >/dev/null\n',
+        '          gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --wait >/dev/null\n'
+        '          gcloud run services update staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --update-env-vars UNREVIEWED_MUTATION=true\n',
+        1,
+    )
+    _write_workflow_fixture(tmp_path, "deploy-develop.yml", workflow)
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode == 1
+    assert "imperative" in result.stdout.lower()
+    assert "--update-env-vars" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("unreviewed_command", "authority_class"),
+    [
+        (
+            "gcloud projects add-iam-policy-binding attacker-project --member=user:attacker@example.com --role=roles/owner",
+            "IAM mutation",
+        ),
+        (
+            'gcloud run services delete staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --quiet',
+            "resource deletion",
+        ),
+        (
+            "gcloud artifacts repositories create attacker-repository --location=us-east4",
+            "resource creation",
+        ),
+        ("terraform apply -auto-approve", "Terraform"),
+        ("gcloud secrets versions access latest --secret=runtime-database-url", "secret access"),
+        ("gcloud projects describe attacker-project", "arbitrary gcloud"),
+    ],
+)
+def test_static_policy_rejects_every_unreviewed_deploy_run_command(
+    tmp_path: Path, unreviewed_command: str, authority_class: str
+) -> None:
+    """Every deploy run body is an exact reviewed command contract."""
+    _write_current_terraform_scaffold(tmp_path)
+    policy_dir = tmp_path / "infra" / "policy"
+    policy_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(ROOT / "infra" / "policy" / "predeployment-authority-manifest.json", policy_dir)
+    workflow = _current_workflow_text("deploy-develop.yml").replace(
+        '          gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --wait >/dev/null\n',
+        '          gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --wait >/dev/null\n'
+        f"          {unreviewed_command}\n",
+        1,
+    )
+    _write_workflow_fixture(tmp_path, "deploy-develop.yml", workflow)
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode == 1, authority_class
+    assert (
+        "name:Execute migration transition must match reviewed executable script exactly"
+        in result.stdout
+    )

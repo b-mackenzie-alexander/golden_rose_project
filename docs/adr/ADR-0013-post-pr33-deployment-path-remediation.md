@@ -124,6 +124,18 @@ The deployment path remains owner-controlled and sequential:
 
 Passing one gate never grants the next.
 
+### 9. Amendment A — independently verifiable transition and tester authorities
+
+This amendment was accepted by Beatrice on 2026-08-21 after independent review of the first remediation implementation found that the stage-receipt and named-tester contracts were described but not executable.
+
+1. A reviewed stage-plan receipt is an **operator-held signed blob**, never an artifact authored by the image-publication workflow. Its detached Sigstore bundle, the receipt bytes, and its declared SHA-256 are supplied only at manual dispatch from the protected `develop` environment. The deploy workflow must independently run `cosign verify-blob` against the configured, operator-held receipt certificate identity and GitHub OIDC issuer before parsing any receipt field. The receipt itself binds the stage, source SHA, plan/lock/non-secret-input digests, reviewed inventory, approval reference, and required workload digest. It is not uploaded by `build-image.yml` and must not be substituted by publication success or an unsigned GitHub artifact.
+2. Deploy dispatch must select exactly one transition: `migration` or `service`. A migration transition verifies only its migration receipt and exact Terraform-owned migration-job projection, then executes the existing job without overrides. A service transition verifies a distinct service receipt, a separately signed successful migration-execution receipt bound to the migration receipt SHA-256 and image digest, and the exact Terraform-owned service projection before readiness inspection. Neither transition creates or mutates Cloud Run configuration.
+3. The operator-held tester-authority receipt is also a signed blob. Before a Terraform plan/apply, the approved local ceremony verifies its detached Sigstore bundle and derives one exact `user:` principal plus a receipt SHA-256. Terraform receives only that derived principal and its immutable authority digest; the root and module reject missing/non-hex authority digests and the verifier independently repeats receipt verification before comparing live service IAM. A caller-supplied principal, digest, or syntactically valid substitute is never sufficient.
+4. The deploy environment holds the non-secret expected certificate identities for stage and tester receipts as protected configuration, not tracked Terraform values. Receipt content, bundles, named identities, endpoints, plans, and approval records remain operator-held and must not enter logs, source, state, or ordinary evidence.
+5. Deploy-time image authority must be established by fresh Cosign verification directly against the immutable OCI image. The workflow preserves raw `cosign verify` and `cosign verify-attestation` output only as bounded ephemeral execution input, verifies the signature, SLSA provenance, image-SBOM attestation, and application-SBOM-checksum attestation with the reviewed certificate identity/issuer, and parses their actual signed subjects/predicates. Workflow-authored JSON assertions and hand-constructed image SBOMs are prohibited. Before selecting the final-image SBOM generator, predicate, or Cosign v3 command shape, a separately approved isolated-registry compatibility spike must demonstrate the exact `linux/amd64` final-image SBOM subject, signed-attestation retrieval, and parser schema; no inferred attachment contract is authorized.
+
+This amendment authorizes only the corresponding no-cloud source, test, and documentation remediation. It does not authorize receipt signing, cloud authentication, Terraform planning/apply, publication, deployment, tester access, or live verification.
+
 ## Consequences and constraints
 
 ### Positive

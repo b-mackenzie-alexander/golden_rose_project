@@ -132,4 +132,4 @@ Stop immediately if any of the following is true:
 
 ## Current status
 
-This procedure is source-controlled guidance only. As of the active `fix/post-pr33-deployment-path-remediation` review surface, no saved Terraform plan, apply, migration execution, service activation, or qualification has been performed.
+This procedure is source-controlled guidance only. PR #37 merged the no-cloud remediation into protected `develop` at `caf96a7`; no saved Terraform plan, apply, migration execution, service activation, or qualification has been performed.

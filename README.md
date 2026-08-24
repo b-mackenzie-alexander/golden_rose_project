@@ -80,11 +80,11 @@ automated hiring, matching, ranking, eligibility, or referral system.
   exact viewer/job-executor and direct-workflow WIF authority; keyless
   digest-bound Cosign/SLSA/SBOM verification; and authenticated `/readiness`
   availability monitoring. PR #35 merged the amended planning packet at
-  `db1f293`, and the active local branch `fix/post-pr33-deployment-path-remediation`
-  now implements the no-cloud remediation through Tasks 1–11 plus the current
-  documentation/handoff reconciliation work. That review surface is still local
-  and uncommitted: no cloud action, plan/apply, publication, deployment, or
-  qualification has occurred, and merge remains pending committed-head review.
+  `db1f293`; PR #37 then merged the no-cloud remediation into protected
+  `develop` at `caf96a7`. The next documentation-only planning lane operationalizes
+  ADR-0013's separate Gate 2 read-only qualification and Gate 3/4 foundation
+  sequence. No cloud action, plan/apply, publication, deployment, or
+  qualification has occurred.
 - The current branch also carries a reviewed local clean-room qualification
   harness that exercises the approved pre-deployment bundle against a disposable
   repo copy plus Docker-backed synthetic PostgreSQL, including Terraform/static

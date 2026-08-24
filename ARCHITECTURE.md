@@ -1,6 +1,6 @@
 # Architecture — Golden Rose Operations Platform
 
-**Status:** Accepted Phase 1 structural/security baseline with ADR-0009's private GCP `develop` boundary, PR #33's merged source-controlled pre-deployment implementation at `3c0118a`, and accepted ADR-0013's post-merge remediation boundary. The active local branch `fix/post-pr33-deployment-path-remediation` now implements the no-cloud remediation through Tasks 1–11 plus current Task 12 documentation/handoff reconciliation as an uncommitted review surface. F1-F17 still require independent rereview, committed-head qualification, push/PR, and merge before read-only qualification or any Terraform/cloud progression; no running shared system exists.
+**Status:** Accepted Phase 1 structural/security baseline with ADR-0009's private GCP `develop` boundary, PR #33's merged source-controlled pre-deployment implementation at `3c0118a`, and accepted ADR-0013's post-merge remediation boundary. PR #37 merged the F1–F17 no-cloud remediation into protected `develop` at `caf96a7`. Gate 2 read-only qualification and every later Terraform/cloud transition remain separately approved; no running shared system exists.
 
 ## Architectural posture
 Start with one modular product and a relational operational core. Preserve explicit trust boundaries and auditability without prematurely splitting into microservices.

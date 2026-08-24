@@ -2,7 +2,7 @@
 
 This runbook defines the human/operator ceremony for the first private fictional-synthetic `develop` deployment after the separate cloud-read, Terraform-plan, and foundation-apply gates are complete. It is intentionally value-safe: project IDs, domains, tester identities, secret payloads, passwords, tokens, and exact private endpoints stay in operator-held records rather than tracked source.
 
-Current source status: the no-cloud deployment-path remediation is implemented locally on `fix/post-pr33-deployment-path-remediation` through Task 11, but this runbook remains future operator guidance only until committed-head review, merge, and the later cloud gates are explicitly approved.
+Current source status: PR #37 merged the no-cloud deployment-path remediation into protected `develop` at `caf96a7`. This runbook remains future operator guidance until Gate 2 qualification and the later explicitly approved cloud gates occur.
 
 ## Scope
 

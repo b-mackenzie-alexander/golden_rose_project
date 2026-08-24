@@ -67,7 +67,7 @@ The actual policy remains zero required approvals, no CODEOWNER review, and no l
 
 `Terraform static validation` is required quality evidence after PR #29's qualified producer merged. It must never be described as immutable or independent. Under accepted ADR-0012 and ADR-0013, the open High remains accepted residual risk while Beatrice separately authorizes remediation implementation, read-only cloud qualification, each Terraform plan/apply, publication, migration, service activation, and qualification. No unavailable second-human approval is required, and no gate silently authorizes the next.
 
-The active `fix/post-pr33-deployment-path-remediation` review surface is still an uncommitted local working tree. Even after its future remediation PR merges, that merge must be described only as clearing the source-controlled no-cloud remediation and opening the separate request for Gate 2 read-only qualification; it does not itself authorize cloud execution, plan/apply, publication, migration, activation, or qualification.
+PR #37 merged the `fix/post-pr33-deployment-path-remediation` source-controlled no-cloud remediation into protected `develop` at `caf96a72df87cd98114025627ad9f467f846f3a9`; its feature branch is retired. That merge cleared only the source-controlled remediation and opened the separate request for Gate 2 read-only qualification. It did not authorize cloud execution, plan/apply, publication, migration, activation, or qualification.
 
 ## Required checks (target state)
 - Branch policy.

@@ -2,7 +2,7 @@
 
 This procedure governs named tester access to the first private fictional-synthetic GCP `develop` deployment while application authentication remains synthetic. It exists because Terraform and CI must not infer human access rosters or create broad convenience access.
 
-Current source status: the exact named-tester contract is implemented locally on `fix/post-pr33-deployment-path-remediation`, but this procedure remains future operator guidance only until the remediation branch is reviewed, merged, and the later tester-access gate is explicitly approved.
+Current source status: PR #37 merged the exact named-tester contract into protected `develop` at `caf96a7`. This procedure remains future operator guidance until the later explicitly approved tester-access gate.
 
 ## Scope
 

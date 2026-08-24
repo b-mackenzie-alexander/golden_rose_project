@@ -1,6 +1,6 @@
 # Security — Golden Rose Operations Platform
 
-**Status:** Planning baseline with active no-cloud remediation implementation on `fix/post-pr33-deployment-path-remediation`. This document records security posture and open controls; it does not claim production compliance, merged remediation closeout, or completed cloud qualification.
+**Status:** Planning baseline with PR #37's merged no-cloud remediation at `develop@caf96a7`. This document records security posture and open controls; it does not claim production compliance or completed cloud qualification.
 
 ## Security objectives
 - Protect worker, employer, household/worksite, document, and operational data using least privilege and data minimization.

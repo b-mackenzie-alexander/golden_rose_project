@@ -2,7 +2,7 @@
 
 This runbook covers the one-time local bootstrap of the durable Terraform state bucket and the later migration to remote state. It is intentionally value-safe: operator-held project, bucket, location, and principal inputs stay out of tracked source.
 
-Current source status: the no-cloud deployment-path remediation is implemented locally on `fix/post-pr33-deployment-path-remediation` through Task 11, but this runbook remains future operator guidance only until the remediation review surface is committed, reviewed, merged, and the later cloud gates are explicitly approved.
+Current source status: PR #37 merged the no-cloud deployment-path remediation into protected `develop` at `caf96a7`. This runbook remains future operator guidance until Gate 2 qualification and the later explicitly approved cloud gates occur.
 
 ## Scope
 

@@ -846,6 +846,15 @@ def test_gcp_develop_observability_models_private_alerting_bounded_retention_and
     for fragment in required_fragments:
         assert _contains_normalized_fragment(observability, fragment)
 
+    assert _contains_normalized_fragment(
+        observability,
+        'resource.type=\\"cloud_run_revision\\" AND metric.type=\\"logging.googleapis.com/user/develop-health-failure-count\\"',
+    )
+    assert _contains_normalized_fragment(
+        observability,
+        'resource.type=\\"cloud_run_revision\\" AND metric.type=\\"logging.googleapis.com/user/develop-service-error-count\\"',
+    )
+
     forbidden_fragments = [
         'resource "google_logging_project_sink"',
         "request.body",

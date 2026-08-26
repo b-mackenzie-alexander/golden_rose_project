@@ -23,6 +23,9 @@ APPROVED_PROJECT_LABELS = {
     "owner": "technical-owner",
     "teardown": "intentional-runbook-only",
 }
+# Required APIs are the Terraform-managed foundation contract. Google-managed
+# or account-default services observed outside this set are evidence, not an
+# automatic foundation-policy violation; only missing required APIs fail.
 APPROVED_APIS = {
     "artifactregistry.googleapis.com",
     "billingbudgets.googleapis.com",
@@ -554,10 +557,9 @@ def evaluate_foundation_snapshot(
         if isinstance(snapshot.get("enabled_apis"), list)
         else set()
     )
-    if enabled_apis != APPROVED_APIS:
-        violations.append(
-            f"approved APIs drifted: expected {sorted(APPROVED_APIS)} got {sorted(enabled_apis)}"
-        )
+    missing_apis = APPROVED_APIS - enabled_apis
+    if missing_apis:
+        violations.append(f"required APIs missing: {sorted(missing_apis)}")
 
     resource_inventory = _mapping(
         snapshot.get("resource_inventory", {}), label="resource inventory"

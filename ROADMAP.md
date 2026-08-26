@@ -208,7 +208,7 @@
 ### Monday, August 24 — bootstrap, plan, and apply foundation only
 
 - [x] Complete separately approved partial control-plane/bootstrap and non-executable foundation work; its identifiers, commands, and raw evidence remain private, and it does not constitute a Terraform apply or a completed foundation gate.
-- [ ] Prepare, review, and accept the source/live adoption/reconciliation plan that will make Terraform the future sole desired-state authority for the partial foundation. It must prohibit import, Terraform plan/apply, and cloud mutation until its own later approval gate.
+- [ ] Prepare, review, accept, and merge the source/live adoption/reconciliation plan that will make Terraform the future sole desired-state authority for the partial foundation. It prohibits import, backend/state actions, Terraform plan/apply, and cloud mutation until later separate approval; it also blocks every foundation saved plan until a separately accepted source amendment stage-gates/removes the currently unconditional network, private-service-access, Cloud SQL, and application-database actions from the evaluated foundation root.
 - [ ] Produce the exact `foundation` Terraform plan and confirm it contains no Cloud Run job or service.
 - [ ] Review resource inventory, IAM, APIs, budgets, networking, private SQL, secret metadata, logs, recovery controls, costs, and destruction/replacement actions.
 - [ ] Obtain explicit Gate 4 approval for the exact saved foundation plan.

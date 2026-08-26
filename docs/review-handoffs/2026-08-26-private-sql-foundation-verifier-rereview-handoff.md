@@ -1,13 +1,13 @@
 # Focused rereview handoff — private-SQL foundation verifier reconciliation
 
 **Date:** 2026-08-26
-**Branch:** `fix/foundation-verifier-stage-authority`
-**Intended PR base:** `develop`
+**Historical branch:** `fix/foundation-verifier-stage-authority` (retired after merge)
+**PR outcome:** PR #42 merged to protected `develop` at `b2d79b54d38dd24819509271646d0c71b593d92e` on 2026-08-26.
 **Planning authority merge:** `origin/develop@1c1a7b6782c263b9fdb3ea67fd524328bc537f38` (PR #39 plan publication)
-**Current exact integration base:** `origin/develop@6ef2452d7db812a9c644f328005d5230c8611c39` (PR #41 merge tip)
-**Current HEAD:** `6ef2452d7db812a9c644f328005d5230c8611c39`
-**Review surface:** local uncommitted working tree above `develop@6ef2452`; not committed, pushed, or opened as a PR
-**Ahead/behind vs `origin/develop`:** `0/0`
+**Historical review base:** `origin/develop@6ef2452d7db812a9c644f328005d5230c8611c39` (PR #41 merge tip)
+**Merged implementation tip:** `develop@b2d79b54d38dd24819509271646d0c71b593d92e`
+**Review surface:** historical pre-commit working-tree handoff; its evidence was subsequently committed, reviewed, and merged as PR #42
+**Post-merge status:** the implementation branch and stale worktree records were retired; initial Gate 2 and partial foundation work are privately recorded, while remaining decision freezes stay separately unapproved
 **Cloud status:** no GCP authentication/inspection, Terraform plan/apply, private-network or Cloud SQL provisioning, secret/database action, service start, deployment, tester access, or qualification
 
 ## Purpose

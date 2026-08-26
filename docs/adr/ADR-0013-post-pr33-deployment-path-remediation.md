@@ -6,7 +6,7 @@
 - **Amends:** ADR-0009 and ADR-0012 for post-PR33 deployment staging, automation authority, tester ingress, WIF identity, provenance, and availability evidence
 - **Related:** `.hermes/plans/2026-08-20_002931-post-pr33-deployment-path-remediation-plan.md`, PR #33 merge `3c0118abb8b84472141992d2238033b1312d5af2`
 
-> **Publication status:** The initial accepted ADR-0013 packet merged as PR #34 at `develop@63caa4088da44d5f98663bfc2578a0f93444a0fc`. The proof-node clarifications below are a separate, currently unmerged documentation-only amendment on `docs/post-pr34-planning-review-remediation`. They authorize no remediation implementation, cloud action, or later gate until they pass independent review and merge through protected `develop`.
+> **Publication status:** The initial accepted ADR-0013 packet merged as PR #34 at `develop@63caa4088da44d5f98663bfc2578a0f93444a0fc`; its amendment merged as PR #35 at `develop@db1f293`. PR #37 subsequently merged the bounded F1–F17 no-cloud remediation, and PR #42 merged the stage-aware verifier reconciliation. Those source-only merges did not themselves authorize operations; initial Gate 2 and partial foundation actions proceeded only under separate owner approvals recorded privately.
 
 ## Context and evidence posture
 

@@ -115,9 +115,9 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--control-plane-project-id", required=True)
     parser.add_argument("--region", default="us-east4")
     parser.add_argument("--state-bucket-name", required=True)
-    parser.add_argument("--tester-authority-receipt", required=True, type=Path)
-    parser.add_argument("--tester-authority-bundle", required=True, type=Path)
-    parser.add_argument("--tester-authority-certificate-identity", required=True)
+    parser.add_argument("--tester-authority-receipt", type=Path)
+    parser.add_argument("--tester-authority-bundle", type=Path)
+    parser.add_argument("--tester-authority-certificate-identity")
     parser.add_argument("--state-authority-principal", required=True)
     parser.add_argument("--recovery-authority-principal", required=True)
     parser.add_argument("--bootstrap-operator-principal", required=True)
@@ -139,6 +139,33 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--evidence-root")
     parser.add_argument("--evidence-name", default="gcp-foundation-evidence.md")
     return parser.parse_args(argv)
+
+
+def _derive_service_tester_authority(args: argparse.Namespace) -> dict[str, str]:
+    missing_flags: list[str] = []
+    receipt_path = args.tester_authority_receipt
+    bundle_path = args.tester_authority_bundle
+    certificate_identity = args.tester_authority_certificate_identity
+    if receipt_path is None:
+        missing_flags.append("--tester-authority-receipt")
+    if bundle_path is None:
+        missing_flags.append("--tester-authority-bundle")
+    if certificate_identity is None:
+        missing_flags.append("--tester-authority-certificate-identity")
+    if missing_flags:
+        missing = ", ".join(missing_flags)
+        raise VerificationError(f"service mode requires tester authority inputs: {missing}")
+    assert receipt_path is not None
+    assert bundle_path is not None
+    assert certificate_identity is not None
+
+    return derive_tester_authority_contract(
+        receipt_path=receipt_path,
+        bundle_path=bundle_path,
+        certificate_identity=certificate_identity,
+        project_id=args.project_id,
+        region=args.region,
+    )
 
 
 def _load_json(stdout: str, *, context: str) -> Any:
@@ -1594,20 +1621,11 @@ def _bindings_to_role_map(policy: Any) -> dict[str, list[str]]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv)
-    tester_authority = derive_tester_authority_contract(
-        receipt_path=args.tester_authority_receipt,
-        bundle_path=args.tester_authority_bundle,
-        certificate_identity=args.tester_authority_certificate_identity,
-        project_id=args.project_id,
-        region=args.region,
-    )
     contract = {
         "project_id": args.project_id,
         "control_plane_project_id": args.control_plane_project_id,
         "region": args.region,
         "state_bucket_name": args.state_bucket_name,
-        "private_invoker_principal": tester_authority["private_invoker_principal"],
-        "tester_authority_receipt_sha256": tester_authority["tester_authority_receipt_sha256"],
         "state_authority_principal": args.state_authority_principal,
         "recovery_authority_principal": args.recovery_authority_principal,
         "bootstrap_operator_principal": args.bootstrap_operator_principal,
@@ -1617,6 +1635,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         "log_retention_days": args.log_retention_days,
         "billing_account_id": args.billing_account_id,
     }
+    if args.mode == "service":
+        tester_authority = _derive_service_tester_authority(args)
+        contract["private_invoker_principal"] = tester_authority["private_invoker_principal"]
+        contract["tester_authority_receipt_sha256"] = tester_authority[
+            "tester_authority_receipt_sha256"
+        ]
     snapshot = collect_foundation_snapshot(_build_live_command_runner(contract))
     violations = evaluate_foundation_snapshot(snapshot, contract, mode=args.mode)
 

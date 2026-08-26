@@ -2,7 +2,7 @@ import importlib.util
 import json
 from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -37,6 +37,34 @@ def expected_contract() -> dict[str, Any]:
         "recovery_policy_review_status": "gate-2-evidence-required",
         "log_retention_days": 30,
     }
+
+
+def verifier_common_args(*, mode: str | None = None) -> list[str]:
+    args = [
+        "--project-id",
+        "example-project",
+        "--control-plane-project-id",
+        "state-project",
+        "--state-bucket-name",
+        "example-terraform-state",
+        "--state-authority-principal",
+        "serviceAccount:golden-rose-provisioner@state-project.iam.gserviceaccount.com",
+        "--recovery-authority-principal",
+        "group:recovery@example.com",
+        "--bootstrap-operator-principal",
+        "user:bootstrap@example.com",
+        "--bootstrap-operator-status",
+        "bootstrap-retired",
+        "--observability-viewer-principal",
+        "group:observability@example.com",
+        "--recovery-policy-review-status",
+        "gate-2-evidence-required",
+        "--log-retention-days",
+        "30",
+    ]
+    if mode is not None:
+        args.extend(["--mode", mode])
+    return args
 
 
 def valid_snapshot() -> dict[str, Any]:
@@ -281,32 +309,9 @@ def test_manifest_lists_verify_gcp_foundation_script_entrypoint() -> None:
 
 def test_live_foundation_verifier_derives_private_invoker_from_a_signed_receipt() -> None:
     module = load_module()
-    common_args = [
-        "--project-id",
-        "example-project",
-        "--control-plane-project-id",
-        "state-project",
-        "--state-bucket-name",
-        "example-terraform-state",
-        "--state-authority-principal",
-        "serviceAccount:golden-rose-provisioner@state-project.iam.gserviceaccount.com",
-        "--recovery-authority-principal",
-        "group:recovery@example.com",
-        "--bootstrap-operator-principal",
-        "user:bootstrap@example.com",
-        "--bootstrap-operator-status",
-        "bootstrap-retired",
-        "--observability-viewer-principal",
-        "group:observability@example.com",
-        "--recovery-policy-review-status",
-        "gate-2-evidence-required",
-        "--log-retention-days",
-        "30",
-    ]
-
     parsed = module._parse_args(
         [
-            *common_args,
+            *verifier_common_args(),
             "--tester-authority-receipt",
             "private/tester-receipt.json",
             "--tester-authority-bundle",
@@ -320,8 +325,108 @@ def test_live_foundation_verifier_derives_private_invoker_from_a_signed_receipt(
     assert parsed.tester_authority_bundle.name == "tester-receipt.sigstore.json"
     with pytest.raises(SystemExit):
         module._parse_args(
-            [*common_args, "--private-invoker-principal", "user:attacker@example.com"]
+            [
+                *verifier_common_args(),
+                "--private-invoker-principal",
+                "user:attacker@example.com",
+            ]
         )
+
+
+def test_foundation_and_migration_modes_accept_absent_tester_inputs() -> None:
+    module = load_module()
+
+    foundation = module._parse_args(verifier_common_args(mode="foundation"))
+    migration = module._parse_args(verifier_common_args(mode="migration"))
+
+    assert foundation.mode == "foundation"
+    assert foundation.tester_authority_receipt is None
+    assert foundation.tester_authority_bundle is None
+    assert foundation.tester_authority_certificate_identity is None
+    assert migration.mode == "migration"
+    assert migration.tester_authority_receipt is None
+    assert migration.tester_authority_bundle is None
+    assert migration.tester_authority_certificate_identity is None
+
+
+def test_service_mode_rejects_absent_tester_inputs_before_live_reads() -> None:
+    module = load_module()
+    mutable_module = cast(Any, module)
+
+    def fail_derive(**_: Any) -> dict[str, str]:
+        raise AssertionError(
+            "service-mode missing-tester rejection should happen before derivation"
+        )
+
+    def fail_collect(_: Any) -> dict[str, Any]:
+        raise AssertionError(
+            "service-mode missing-tester rejection should happen before live reads"
+        )
+
+    def fail_evaluate(*_: Any, **__: Any) -> list[str]:
+        raise AssertionError(
+            "service-mode missing-tester rejection should happen before evaluation"
+        )
+
+    mutable_module.derive_tester_authority_contract = fail_derive
+    mutable_module.collect_foundation_snapshot = fail_collect
+    mutable_module.evaluate_foundation_snapshot = fail_evaluate
+
+    with pytest.raises(module.VerificationError, match="tester authority"):
+        module.main(verifier_common_args(mode="service"))
+
+
+def test_service_mode_derives_tester_authority_contract_before_evaluation(tmp_path: Path) -> None:
+    module = load_module()
+    mutable_module = cast(Any, module)
+    receipt = tmp_path / "tester-receipt.json"
+    bundle = tmp_path / "tester-receipt.sigstore.json"
+    calls: dict[str, Any] = {}
+
+    def fake_derive(**kwargs: Any) -> dict[str, str]:
+        calls["derive"] = kwargs
+        return {
+            "private_invoker_principal": "user:private.tester@example.com",
+            "tester_authority_receipt_sha256": "a" * 64,
+        }
+
+    def fake_collect(_: Any) -> dict[str, Any]:
+        calls["collect"] = True
+        return valid_snapshot()
+
+    def fake_evaluate(
+        snapshot: dict[str, Any], contract: dict[str, Any], *, mode: str
+    ) -> list[str]:
+        calls["evaluate"] = {"snapshot": snapshot, "contract": contract, "mode": mode}
+        return []
+
+    mutable_module.derive_tester_authority_contract = fake_derive
+    mutable_module.collect_foundation_snapshot = fake_collect
+    mutable_module.evaluate_foundation_snapshot = fake_evaluate
+
+    exit_code = module.main(
+        [
+            *verifier_common_args(mode="service"),
+            "--tester-authority-receipt",
+            str(receipt),
+            "--tester-authority-bundle",
+            str(bundle),
+            "--tester-authority-certificate-identity",
+            "https://github.com/example/authority/.github/workflows/tester-authority.yml@refs/heads/main",
+        ]
+    )
+
+    assert exit_code == 0
+    assert calls["derive"]["receipt_path"] == receipt
+    assert calls["derive"]["bundle_path"] == bundle
+    assert calls["derive"]["certificate_identity"] == (
+        "https://github.com/example/authority/.github/workflows/tester-authority.yml@refs/heads/main"
+    )
+    assert calls["evaluate"]["mode"] == "service"
+    assert calls["evaluate"]["contract"]["private_invoker_principal"] == (
+        "user:private.tester@example.com"
+    )
+    assert calls["evaluate"]["contract"]["tester_authority_receipt_sha256"] == "a" * 64
 
 
 def test_live_foundation_verifier_uses_receipt_derived_principal_and_digest(tmp_path: Path) -> None:
@@ -592,6 +697,70 @@ def test_foundation_mode_rejects_job_or_service_inventory() -> None:
     assert any(
         "foundation verifier mode rejects present cloud_run_job" in violation
         for violation in violations
+    )
+
+
+def test_foundation_mode_still_requires_private_cloud_sql_after_tester_decoupling() -> None:
+    module = load_module()
+
+    snapshot_missing_sql = valid_snapshot()
+    snapshot_missing_sql["resource_inventory"]["cloud_run_service"] = ""
+    snapshot_missing_sql["cloud_run_service"] = {}
+    snapshot_missing_sql["cloud_run_service_iam"] = {}
+    snapshot_missing_sql["resource_inventory"]["cloud_run_job"] = ""
+    snapshot_missing_sql["migration_job"] = {}
+    snapshot_missing_sql["migration_job_iam"] = {}
+    snapshot_missing_sql["resource_inventory"]["cloud_sql_instance"] = ""
+    snapshot_missing_sql["cloud_sql"] = {}
+
+    missing_sql_violations = module.evaluate_foundation_snapshot(
+        snapshot_missing_sql,
+        expected_contract(),
+        mode="foundation",
+    )
+
+    assert any(
+        "cloud sql inventory drifted from develop-postgres" in violation
+        for violation in missing_sql_violations
+    )
+
+    snapshot_public_sql = valid_snapshot()
+    snapshot_public_sql["resource_inventory"]["cloud_run_service"] = ""
+    snapshot_public_sql["cloud_run_service"] = {}
+    snapshot_public_sql["cloud_run_service_iam"] = {}
+    snapshot_public_sql["resource_inventory"]["cloud_run_job"] = ""
+    snapshot_public_sql["migration_job"] = {}
+    snapshot_public_sql["migration_job_iam"] = {}
+    snapshot_public_sql["cloud_sql"]["database_version"] = "POSTGRES_15"
+    snapshot_public_sql["cloud_sql"]["ipv4_enabled"] = True
+    snapshot_public_sql["cloud_sql"]["private_network"] = ""
+
+    public_sql_violations = module.evaluate_foundation_snapshot(
+        snapshot_public_sql,
+        expected_contract(),
+        mode="foundation",
+    )
+
+    assert any(
+        "cloud sql version drifted from POSTGRES_16" in violation
+        for violation in public_sql_violations
+    )
+    assert any("public Cloud SQL path detected" in violation for violation in public_sql_violations)
+
+    snapshot_with_workloads = valid_snapshot()
+    workload_violations = module.evaluate_foundation_snapshot(
+        snapshot_with_workloads,
+        expected_contract(),
+        mode="foundation",
+    )
+
+    assert any(
+        "foundation verifier mode rejects present cloud_run_service workload" in violation
+        for violation in workload_violations
+    )
+    assert any(
+        "foundation verifier mode rejects present cloud_run_job workload" in violation
+        for violation in workload_violations
     )
 
 

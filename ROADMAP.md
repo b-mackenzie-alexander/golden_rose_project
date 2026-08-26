@@ -201,14 +201,14 @@
 - [x] Rebaseline from the exact remediation merge and confirm a clean worktree.
 - [x] Obtain and execute the initial bounded Gate 2 read-only GCP qualification; identifiers, commands, and raw outputs remain in private operator-held evidence.
 - [x] Record the observed project, billing, IAM, API, quota, region, CIDR, and resource-collision findings privately; do not commit identifiers or sensitive output.
-- [ ] Reconcile the observed Gate 2 evidence with the separately approved partial foundation work, then freeze each remaining operator-held decision/input one at a time before any further transition.
+- [x] Reconcile the observed Gate 2 evidence with the separately approved partial foundation work and freeze the remaining operator-held decision/input dispositions: Terraform will become the future sole desired-state authority through a later reviewed adoption/reconciliation plan; recovery controls remain provisional; plan artifacts remain operator-held; monitoring-delivery confirmation, private-network/Cloud SQL inputs, and tester authority remain separate later-gate evidence.
 
-**Critical checkpoint:** The F1-F17 remediation is merged. Initial Gate 2 evidence and separately approved partial foundation work exist in private operator-held records, but the remaining decision/input freeze and source/live reconciliation must complete before any further transition.
+**Critical checkpoint:** Gate 2 is closed with its value-safe findings and decision dispositions recorded privately. The next transition remains blocked until a separate reviewed source/live adoption/reconciliation plan is accepted; no import, Terraform plan/apply, or cloud mutation is implied by this closure.
 
 ### Monday, August 24 — bootstrap, plan, and apply foundation only
 
 - [x] Complete separately approved partial control-plane/bootstrap and non-executable foundation work; its identifiers, commands, and raw evidence remain private, and it does not constitute a Terraform apply or a completed foundation gate.
-- [ ] Reconcile the partial live foundation with the Terraform-only desired-state contract; freeze the exact remaining bootstrap/backend, billing, non-secret input, recovery, and plan-artifact-custody decisions.
+- [ ] Prepare, review, and accept the source/live adoption/reconciliation plan that will make Terraform the future sole desired-state authority for the partial foundation. It must prohibit import, Terraform plan/apply, and cloud mutation until its own later approval gate.
 - [ ] Produce the exact `foundation` Terraform plan and confirm it contains no Cloud Run job or service.
 - [ ] Review resource inventory, IAM, APIs, budgets, networking, private SQL, secret metadata, logs, recovery controls, costs, and destruction/replacement actions.
 - [ ] Obtain explicit Gate 4 approval for the exact saved foundation plan.

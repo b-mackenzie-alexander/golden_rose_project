@@ -4,6 +4,8 @@ This runbook covers the one-time local bootstrap of the durable Terraform state 
 
 Current source status: PR #37 merged the no-cloud deployment-path remediation at `caf96a7`, and PR #42 merged the bounded service-stage tester-authority verifier reconciliation at `b2d79b5`. Private records show separately approved partial foundation work; this runbook remains future operator guidance for the remaining reconciliation and later explicitly approved gates.
 
+Before any later adoption/import request, prove privately that bootstrap and workload roots have distinct state objects/files, backend keys/prefixes, lock scopes, lineages, and import operations. Verify bootstrap-local-state provenance (or record its absence as a blocker), then migrate/read back bootstrap state and prove it contains bootstrap addresses only before any workload-root state initialization/import or bootstrap-authority retirement.
+
 ## Scope
 
 - local bootstrap only

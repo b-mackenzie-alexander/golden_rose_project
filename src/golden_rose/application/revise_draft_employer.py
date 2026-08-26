@@ -89,7 +89,11 @@ def revise_draft_employer(
             try:
                 existing_receipt = get_command_receipt(session=session, command_id=command_id)
             except NoResultFound as exc:
-                raise SafePersistenceError("persistence operation failed") from exc
+                session.rollback()
+                try:
+                    existing_receipt = get_command_receipt(session=session, command_id=command_id)
+                except NoResultFound as retry_exc:
+                    raise SafePersistenceError("persistence operation failed") from retry_exc
             result = _replay_existing_revision(
                 session=session,
                 existing_receipt=existing_receipt,

@@ -88,7 +88,7 @@ def revise_draft_employer(
         if not receipt_inserted:
             try:
                 existing_receipt = get_command_receipt(session=session, command_id=command_id)
-            except NoResultFound as exc:
+            except NoResultFound:
                 session.rollback()
                 try:
                     existing_receipt = get_command_receipt(session=session, command_id=command_id)

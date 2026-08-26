@@ -8,9 +8,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql.dml import Update
 
 import golden_rose.application.revise_draft_employer as revise_module
-from golden_rose.persistence.command_receipts import CommandReceiptRecord
 from golden_rose.application.revise_draft_employer import revise_draft_employer
 from golden_rose.auth.principal import StaffPrincipal
+from golden_rose.persistence.command_receipts import CommandReceiptRecord
 
 
 class FixedClock:

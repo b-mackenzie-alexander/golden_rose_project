@@ -10,6 +10,7 @@ from sqlalchemy.sql.dml import Update
 import golden_rose.application.revise_draft_employer as revise_module
 from golden_rose.application.revise_draft_employer import revise_draft_employer
 from golden_rose.auth.principal import StaffPrincipal
+from golden_rose.persistence.command_receipts import CommandReceiptRecord
 
 
 class FixedClock:
@@ -110,4 +111,63 @@ def test_revision_rechecks_locked_current_values_after_receipt_reservation_befor
         )
 
     assert inserted_events == []
+    assert session.commit_count == 0
+
+
+def test_revision_retries_receipt_lookup_after_transient_conflict_race_not_found(
+    monkeypatch,
+) -> None:
+    employer_id = UUID("51515151-5151-4515-8515-515151515151")
+    command_id = UUID("52525252-5252-4525-8525-525252525252")
+    actor_id = UUID("53535353-5353-4535-8535-535353535353")
+    now = datetime(2026, 8, 11, 20, 16, 0, tzinfo=UTC)
+    session = CatchUpRaceSession(employer_id=employer_id, actor_id=actor_id, now=now)
+
+    receipt = CommandReceiptRecord(
+        command_id=command_id,
+        command_schema_version=1,
+        command_type="revise_draft_employer",
+        actor_id=actor_id,
+        request_fingerprint=b"x" * 32,
+        result_entity_type="employer",
+        result_entity_id=employer_id,
+        result_record_version=3,
+        result_event_type="employer.draft_revised",
+        created_at=now,
+    )
+    get_receipt_calls = 0
+
+    def get_receipt(**_kwargs):
+        nonlocal get_receipt_calls
+        get_receipt_calls += 1
+        if get_receipt_calls in {1, 2}:
+            raise NoResultFound
+        return receipt
+
+    def reserve_receipt(**_kwargs) -> bool:
+        return False
+
+    monkeypatch.setattr(revise_module, "get_command_receipt", get_receipt)
+    monkeypatch.setattr(revise_module, "reserve_revision_command_receipt", reserve_receipt)
+
+    principal = StaffPrincipal(
+        actor_id=actor_id,
+        role_name="operations_staff",
+        permissions=frozenset({"employer:draft:revise"}),
+    )
+
+    with pytest.raises(RuntimeError, match="idempotency conflict"):
+        revise_draft_employer(
+            session=cast(Session, session),
+            principal=principal,
+            command_id=command_id,
+            employer_id=employer_id,
+            expected_version=2,
+            employer_type="household",
+            display_name="Synthetic Conflicting Replay Payload",
+            clock=FixedClock(now),
+        )
+
+    assert get_receipt_calls == 3
+    assert session.rollback_count == 2
     assert session.commit_count == 0

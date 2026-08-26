@@ -742,7 +742,7 @@ def test_tester_authority_rejects_substituted_extra_empty_group_domain_principal
         )
 
 
-def test_verifier_rejects_missing_or_extra_required_api_by_stage() -> None:
+def test_verifier_rejects_missing_required_api_even_when_extra_apis_are_observed() -> None:
     module = load_module()
     snapshot = valid_snapshot()
     snapshot["enabled_apis"].remove("billingbudgets.googleapis.com")
@@ -750,7 +750,17 @@ def test_verifier_rejects_missing_or_extra_required_api_by_stage() -> None:
 
     violations = module.evaluate_foundation_snapshot(snapshot, expected_contract(), mode="service")
 
-    assert any("approved APIs drifted" in violation for violation in violations)
+    assert any("required APIs missing" in violation for violation in violations)
+
+
+def test_verifier_allows_observed_extra_apis_when_every_required_api_is_enabled() -> None:
+    module = load_module()
+    snapshot = valid_snapshot()
+    snapshot["enabled_apis"].append("cloudbuild.googleapis.com")
+
+    violations = module.evaluate_foundation_snapshot(snapshot, expected_contract(), mode="service")
+
+    assert not any("approved APIs drifted" in violation for violation in violations)
 
 
 def test_verifier_rejects_arbitrary_deployer_principal_not_derived_from_control_plane_project() -> (

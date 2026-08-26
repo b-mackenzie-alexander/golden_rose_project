@@ -124,7 +124,7 @@ resource "google_monitoring_alert_policy" "health_failures" {
     display_name = "Health failure count"
 
     condition_threshold {
-      filter          = "resource.type=\"global\" AND metric.type=\"logging.googleapis.com/user/develop-health-failure-count\""
+      filter          = "resource.type=\"cloud_run_revision\" AND metric.type=\"logging.googleapis.com/user/develop-health-failure-count\""
       duration        = "300s"
       comparison      = "COMPARISON_GT"
       threshold_value = 0
@@ -191,7 +191,7 @@ resource "google_monitoring_alert_policy" "service_error_events" {
     display_name = "Service error event count"
 
     condition_threshold {
-      filter          = "resource.type=\"global\" AND metric.type=\"logging.googleapis.com/user/develop-service-error-count\""
+      filter          = "resource.type=\"cloud_run_revision\" AND metric.type=\"logging.googleapis.com/user/develop-service-error-count\""
       duration        = "300s"
       comparison      = "COMPARISON_GT"
       threshold_value = 0

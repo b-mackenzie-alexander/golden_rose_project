@@ -1,0 +1,43 @@
+{
+  "stage": "migration",
+  "source_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "plan_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "provider_lock_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "non_secret_input_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "approval_reference": "OPERATOR-HELD-REFERENCE",
+  "evaluated_inventory": {
+    "google_cloud_run_v2_job": 1,
+    "google_cloud_run_v2_service": 0
+  },
+  "workload_image_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "configuration_projection": {
+    "resource_type": "google_cloud_run_v2_job",
+    "name": "run-migrations",
+    "location": "us-east4",
+    "service_account": "golden-rose-migration@example.iam.gserviceaccount.com",
+    "image_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "environment": [
+      {
+        "name": "GOLDEN_ROSE_ENVIRONMENT",
+        "value": "develop"
+      },
+      {
+        "name": "GOLDEN_ROSE_DATABASE_URL",
+        "secret": "migration-database-url",
+        "version": "latest"
+      }
+    ],
+    "vpc_access": {
+      "egress": "PRIVATE_RANGES_ONLY",
+      "network": "projects/example/global/networks/develop",
+      "subnetwork": "projects/example/regions/us-east4/subnetworks/direct-vpc"
+    },
+    "command": [
+      "golden-rose-migrate"
+    ],
+    "max_retries": 0,
+    "timeout": "1800s",
+    "task_count": 1,
+    "parallelism": 1
+  }
+}

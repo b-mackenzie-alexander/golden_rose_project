@@ -1,0 +1,13 @@
+{
+  "schema": "golden-rose.tester-authority/v1",
+  "principal": "user:private.tester@example.com",
+  "scope": {
+    "project_id": "golden-rose-dev",
+    "region": "us-east4",
+    "service": "staff-tracer",
+    "role": "roles/run.invoker"
+  },
+  "approval_reference": "OPERATOR-HELD-REFERENCE",
+  "issued_at": "2026-08-25T00:00:00Z",
+  "expires_at": "2026-08-26T00:00:00Z"
+}

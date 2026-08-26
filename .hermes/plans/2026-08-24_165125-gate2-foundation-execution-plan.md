@@ -10,14 +10,16 @@
 
 **Decision relationship:** This plan operationalizes accepted ADR-0013; it does not amend or supersede that ADR and creates no additional cloud authority.
 
+> **Historical execution note:** This packet governed the initial Gate 2 read-only authorization and the original staged transition design. Subsequent separately approved operator phases established a partial non-executable foundation outside Terraform apply; private operator-held records, not this tracked plan, are authoritative for those command results and identifiers. Remaining decision inputs must be frozen one at a time before any further cloud transition.
+
 ---
 
 ## Current rebaseline evidence
 
-- PR #37 merged into protected `develop` at `caf96a72df87cd98114025627ad9f467f846f3a9` on 2026-08-24.
-- `origin/fix/post-pr33-deployment-path-remediation` was deleted after merge; the local branch was patch-equivalent to `origin/develop` and has been retired.
-- Local `develop` equals `origin/develop` at `caf96a7`; the sole worktree began clean and is now on `docs/gate2-foundation-plan`, created from that exact tip, with only this uncommitted planning artifact.
-- ADR-0013 and the PR #37 source contract remain authoritative. The same-repository-CI High is still open and accepted; no review or CI result is independent cloud authorization.
+- PR #38 published this planning packet into protected `develop` at `3e0a80a7697cb006d6b5eadca8ddccc9cef979d7` on 2026-08-24.
+- PR #37 merged the ADR-0013 no-cloud remediation at `caf96a72df87cd98114025627ad9f467f846f3a9`; PRs #39–#41 then merged the accepted private-SQL verifier planning and bounded follow-up fixes.
+- PR #42 merged the bounded service-stage tester-authority verifier reconciliation into protected `develop` at `b2d79b54d38dd24819509271646d0c71b593d92e` on 2026-08-26. Its branch and stale worktree records were retired after local patch-equivalence/rebaseline checks.
+- The active documentation lane is `docs/post-pr42-gate2-rebaseline` from `develop@b2d79b5`. ADR-0013 and the completed source contracts remain authoritative; the same-repository-CI High is still open and accepted, and no review or CI result is independent cloud authorization.
 
 ## Immutable boundaries
 
@@ -25,9 +27,9 @@
 - Do not store project IDs, billing IDs, domains, user emails, principal values, backend values, plans, state, endpoints, credentials, secret payloads, raw command output, or operator-record contents in Git, chat, or ordinary evidence.
 - Gate completion does not authorize the next gate. A failure, unknown result, permission gap, collision, quota issue, or unexpected provider behavior is a stop-and-record event, not a reason to broaden IAM or improvise configuration.
 
-## Task 1: Publish this planning-only rebaseline and status correction
+## Task 1: Publish this planning-only rebaseline and status correction — completed
 
-**Objective:** Make the repository truthfully describe PR #37 as merged and identify Gate 2 as the next requested authorization, without performing any cloud action.
+**Historical outcome:** PR #38 published this packet. Initial Gate 2 authorization/qualification and separately approved partial foundation work subsequently occurred under private owner records. The post-PR #42 rebaseline leaves remaining Gate 2 decision/input freezes and source/live reconciliation as the next work; it authorizes no new cloud action.
 
 **Files:**
 - Create: `.hermes/plans/2026-08-24_165125-gate2-foundation-execution-plan.md`
@@ -72,7 +74,7 @@
 **Steps:**
 1. Confirm the active source revision is the merged/reviewed `develop` tip and record it in the private operator record.
 2. Run only the approved read-only project, billing, IAM, Service Usage/API, quota, region, VPC/subnet CIDR, and resource-name collision inspection commands.
-3. Run the reviewed foundation verifier in `foundation` mode only when all required operator-held verifier inputs and tester-authority receipt material are available. Preserve its output only in the approved private evidence location.
+3. Run the reviewed foundation verifier in `foundation` mode only when its required operator-held foundation inputs are available. Tester-authority receipt material is service-stage-only and must not be required or fabricated for foundation/migration verification. Preserve output only in the approved private evidence location.
 4. Classify every observation as **Observed**, **Validated**, **Blocked**, or **Unknown**. Record each Gate 2 blocker and each operator-held Gate 3 input without copying the underlying sensitive value into tracked files.
 5. Confirm that expected `foundation` prerequisites are feasible: separate control-plane/workload boundary, state-bucket placement/recovery posture, least-privilege IAM/WIF feasibility, allowed APIs/quotas, non-overlapping network candidate, private SQL feasibility, budget/alert routing ownership, and no name collision requiring a design amendment.
 6. Stop. Do not run `terraform init` with a backend, `terraform plan`, `terraform apply`, API enablement, resource creation, or secret/database operation.
@@ -154,7 +156,7 @@
 
 - Existing documents contain stale pre-merge statements; Task 1 must correct them before Gate 2 work is represented as current.
 - Gate 2 may reveal project, IAM, API, quota, billing, CIDR, or collision blockers. These are expected decision inputs, not defects to bypass.
-- The foundation verifier has required operator-held inputs, including verified tester-authority receipt material, even though `foundation` must contain no service. If unavailable, document the blocker and do not weaken its contract.
+- The foundation verifier has required operator-held foundation inputs. Verified tester-authority receipt material is required only at service stage; do not treat its absence as a foundation/migration blocker or weaken the service-stage contract.
 - Cost/alert routing, support/emergency access, recovery objectives, and final handoff remain open decisions; a foundation plan may not invent them.
 
 ## Final stop boundary

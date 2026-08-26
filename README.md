@@ -81,10 +81,15 @@ automated hiring, matching, ranking, eligibility, or referral system.
   digest-bound Cosign/SLSA/SBOM verification; and authenticated `/readiness`
   availability monitoring. PR #35 merged the amended planning packet at
   `db1f293`; PR #37 then merged the no-cloud remediation into protected
-  `develop` at `caf96a7`. The next documentation-only planning lane operationalizes
-  ADR-0013's separate Gate 2 read-only qualification and Gate 3/4 foundation
-  sequence. No cloud action, plan/apply, publication, deployment, or
-  qualification has occurred.
+  `develop` at `caf96a7`. PR #42 subsequently merged the bounded source-only
+  verifier reconciliation at `b2d79b5`: tester authority is required only at
+  service stage, while private Cloud SQL remains a required lower-layer
+  foundation contract. The next step is to freeze the remaining Gate 2
+  decisions and reconcile the partial live foundation before distinct Terraform
+  plan/apply gates. Separately approved operator work has established a partial
+  non-executable foundation; private records hold its identifiers and raw
+  evidence. No image publication, executable deployment, or qualification has
+  occurred.
 - The current branch also carries a reviewed local clean-room qualification
   harness that exercises the approved pre-deployment bundle against a disposable
   repo copy plus Docker-backed synthetic PostgreSQL, including Terraform/static

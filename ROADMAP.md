@@ -44,7 +44,7 @@
 - [x] Publish and merge the private-SQL foundation / verifier reconciliation planning packet. PR #39 merged `.hermes/plans/2026-08-25_195726-private-sql-foundation-verifier-reconciliation-plan.md` plus receipt scaffolding into protected `develop` at `1c1a7b6`; it authorizes only the later bounded source reconciliation and grants no cloud mutation authority.
 - [x] Merge the bounded revise-draft-employer receipt-lookup follow-up. PR #40 merged into protected `develop` at `fabb78a`; it is historical context only and not a base for continued coding.
 - [x] Merge the observability / verifier API policy reconciliation. PR #41 merged into protected `develop` at `6ef2452`; local implementation of the next verifier slice must rebaseline from this exact tip rather than from the retired planning branch.
-- [ ] Implement the accepted private-SQL foundation / verifier reconciliation from exact `develop@6ef2452` on a fresh purpose branch, keeping the slice source-only and no-cloud while preserving the later separate private-network / Cloud SQL authority gate.
+- [x] Implement, independently rereview, and merge the accepted private-SQL foundation / verifier reconciliation. PR #42 merged the source-only, no-cloud slice into protected `develop` at `b2d79b5`; it makes tester-authority verification service-stage-only while retaining private Cloud SQL as a required lower-layer foundation contract. The separate private-network / Cloud SQL authority gate remains later and unapproved.
 - [ ] Establish and qualify the isolated GCP non-production environment with wholly fictional synthetic data only: Artifact Registry, Secret Manager metadata and out-of-band payload injection, Cloud Run, Cloud SQL, Logging/Monitoring, and GitHub Workload Identity Federation. Any client/live-derived data admission requires a new reviewed decision and is prohibited under ADR-0009.
 - [ ] Verify non-production deployment by immutable image digest, least-privilege runtime/deployment identities, budget/alert routing, migration/rollback, backup/restore, log redaction, and environment teardown/rebuild evidence.
 
@@ -199,16 +199,16 @@
 - [x] Pass exact-head quality/security checks, exact-range Gitleaks, `git diff --check`, and final cross-lane rereview.
 - [x] Push the exact reviewed head, pass protected CI, and merge the remediation PR. PR #37 merged into protected `develop` at `caf96a72df87cd98114025627ad9f467f846f3a9`; its remote and local feature branches were retired after patch-equivalence and clean-worktree rebaseline evidence.
 - [x] Rebaseline from the exact remediation merge and confirm a clean worktree.
-- [ ] Separately authorize Gate 2 read-only GCP qualification with named projects and commands.
-- [ ] Complete value-safe read-only project, billing, IAM, API, quota, region, CIDR, and resource-collision qualification.
-- [ ] Record every Gate 2 blocker and operator-held Gate 3 input without committing identifiers or sensitive output.
+- [x] Obtain and execute the initial bounded Gate 2 read-only GCP qualification; identifiers, commands, and raw outputs remain in private operator-held evidence.
+- [x] Record the observed project, billing, IAM, API, quota, region, CIDR, and resource-collision findings privately; do not commit identifiers or sensitive output.
+- [ ] Reconcile the observed Gate 2 evidence with the separately approved partial foundation work, then freeze each remaining operator-held decision/input one at a time before any further transition.
 
-**Critical checkpoint:** The F1-F17 remediation is merged and Gate 2 facts are sufficient to prepare—not apply—the exact foundation plan.
+**Critical checkpoint:** The F1-F17 remediation is merged. Initial Gate 2 evidence and separately approved partial foundation work exist in private operator-held records, but the remaining decision/input freeze and source/live reconciliation must complete before any further transition.
 
 ### Monday, August 24 — bootstrap, plan, and apply foundation only
 
-- [ ] Approve the exact bootstrap/backend ceremony, state controls, billing exposure, non-secret inputs, and plan-artifact custody.
-- [ ] Complete the reviewed local-bootstrap → remote-state → WIF-handoff → bootstrap-authority-retirement sequence.
+- [x] Complete separately approved partial control-plane/bootstrap and non-executable foundation work; its identifiers, commands, and raw evidence remain private, and it does not constitute a Terraform apply or a completed foundation gate.
+- [ ] Reconcile the partial live foundation with the Terraform-only desired-state contract; freeze the exact remaining bootstrap/backend, billing, non-secret input, recovery, and plan-artifact-custody decisions.
 - [ ] Produce the exact `foundation` Terraform plan and confirm it contains no Cloud Run job or service.
 - [ ] Review resource inventory, IAM, APIs, budgets, networking, private SQL, secret metadata, logs, recovery controls, costs, and destruction/replacement actions.
 - [ ] Obtain explicit Gate 4 approval for the exact saved foundation plan.

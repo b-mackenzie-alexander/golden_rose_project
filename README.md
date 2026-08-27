@@ -34,9 +34,10 @@ automated hiring, matching, ranking, eligibility, or referral system.
   behavior, and non-root local image build/inspection evidence.
 - Accepted ADR-0009 targets one private, fictional-synthetic-only Cloud Run +
   Cloud SQL testing environment. PR #24 merged the local validate-without-apply
-  Terraform scaffold into `develop` at `50451b3`; no cloud resource or running
-  shared system exists. No public access, real identity, live/client data, or
-  production claim is currently authorized or present.
+  Terraform scaffold into `develop` at `50451b3`; separately approved private
+  operator work later established a partial non-executable foundation outside
+  Terraform apply. No running shared application, public access, real identity,
+  live/client data, or production claim is currently authorized or present.
 - Terraform/IaC implementation now follows the accepted 14-decision private synthetic-only
   GCP `develop` posture: `us-east4` for Cloud Run, Cloud SQL, and Artifact
   Registry; Terraform-managed APIs; split bootstrap/WIF provisioning identity;
@@ -46,19 +47,19 @@ automated hiring, matching, ranking, eligibility, or referral system.
   invoker IAM; protected GitHub WIF gates; value-safe observability; standard
   labels; intentional teardown runbook support; and local state only until remote
   state is approved. Beatrice accepted a durable bootstrap/state control plane
-  separate from disposable workload teardown; the existing non-workload project
-  is the candidate boundary pending read-only qualification. The source-controlled
+  separate from disposable workload teardown; initial read-only qualification
+  and partial foundation evidence are held privately. The source-controlled
   implementation lane merged through PR #33 at `3c0118a`. A post-merge audit
   found F1-F17 deployment-path defects, including four Blockers; accepted
-  ADR-0013 and its paired plan now govern a documentation-gated no-cloud
-  remediation before any read-only qualification or Terraform progression. Terraform plan/apply,
+  ADR-0013 and its paired plan governed the subsequently merged no-cloud
+  remediation and continue to gate every Terraform progression. Terraform plan/apply,
   backend migration, cloud authentication/API calls, resource/service-identity
   provisioning, image push, deployment, real identity, live/client data, and
   production remain separately gated.
 - Source-controlled Gate 2 read-only verification tooling now exists: `scripts/verify_gcp_foundation.py`
   evaluates live foundation/effective-authority posture against the reviewed
   contract without adding any mutation mode, and `deploy/gcp/evidence-template.md`
-  defines the minimized redacted evidence shape for that later qualification step.
+  defines the minimized redacted evidence shape for approved verification runs.
 - Source-controlled private-synthetic qualification tooling now also exists:
   `scripts/qualify_develop_deployment.py` keeps health/readiness separate from
   bounded workflow qualification, requires authenticated private access, uses
@@ -70,8 +71,8 @@ automated hiring, matching, ranking, eligibility, or referral system.
   self-authorizing same-repository-CI High remains open accepted residual risk.
   Accepted ADR-0012 reflects the permanent single-maintainer reality: no
   unavailable second human is required, and agent/CI review is quality evidence
-  rather than independent authorization. Its consolidated plan covers all
-  remaining source-controlled pre-deployment work in one later PR while keeping
+  rather than independent authorization. PR #33 merged its consolidated
+  source-controlled pre-deployment work while keeping
   read-only GCP qualification, Terraform plan, foundation apply, first private
   synthetic deployment, and qualification as separate explicit owner gates.
 - Accepted ADR-0013 adds the required post-PR33 boundary: staged
@@ -81,20 +82,28 @@ automated hiring, matching, ranking, eligibility, or referral system.
   digest-bound Cosign/SLSA/SBOM verification; and authenticated `/readiness`
   availability monitoring. PR #35 merged the amended planning packet at
   `db1f293`; PR #37 then merged the no-cloud remediation into protected
-  `develop` at `caf96a7`. PR #42 subsequently merged the bounded source-only
-  verifier reconciliation at `b2d79b5`: tester authority is required only at
-  service stage, while private Cloud SQL remains a required lower-layer
-  foundation contract. The next step is to freeze the remaining Gate 2
-  decisions and reconcile the partial live foundation before distinct Terraform
-  plan/apply gates. Separately approved operator work has established a partial
+  `develop` at `caf96a7`. PR #42 subsequently made tester authority
+  service-stage-only at `b2d79b5`; PR #46 made the evaluated `foundation` root
+  omit network and Cloud SQL at `58aed28`; and PR #48 aligned the live verifier
+  with that workload-free, Cloud-SQL-free foundation stage at `5f265d8`. The
+  next candidate is a separately approved read-only private source/live
+  inventory, followed only through distinct approvals by bootstrap-root
+  adoption, workload-root adoption, and an exact foundation-plan request.
+  Separately approved operator work has established a partial
   non-executable foundation; private records hold its identifiers and raw
   evidence. No image publication, executable deployment, or qualification has
   occurred.
-- The current branch also carries a reviewed local clean-room qualification
+- Merged source also carries a reviewed local clean-room qualification
   harness that exercises the approved pre-deployment bundle against a disposable
   repo copy plus Docker-backed synthetic PostgreSQL, including Terraform/static
   checks, service-backed tests, provenance/SBOM checks, and source-repo Git/Gitleaks
   hygiene. That evidence is local-only and does not imply cloud qualification.
+- ADR-0014 now governs delivery granularity: one accepted outcome-scale plan may
+  span several roadmap items and implementation PRs, while TDD stays small and
+  every hazardous cloud/data/runtime operation keeps a separate approval. The
+  accepted-but-unmerged master plan targets a private fictional-synthetic shared
+  `develop` environment for bounded human feedback; it becomes source-planning
+  authority only after protected merge and never collapses operational approvals.
 - Automated frontend parity/accessibility evidence exists locally, but human
   browser/manual accessibility/fluent-language qualification remains deferred
   until a shared deployed `develop` target exists.

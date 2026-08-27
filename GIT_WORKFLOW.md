@@ -10,6 +10,18 @@
 - Use squash merge for ordinary feature branches to retain concise protected-branch history while preserving PR/CI/review evidence.
 - `main` represents reviewed, releasable source. Production is promoted from the qualified immutable artifact only after recorded approval.
 
+## Plan, PR, and TDD granularity
+
+- Planning is outcome-scale: a reviewed plan should normally cover multiple roadmap items and may define several ordered implementation PRs.
+- PRs remain coherent review surfaces. A predeclared follow-on PR does not need another planning PR merely because its predecessor merged.
+- RED → GREEN tests remain small implementation steps inside the accepted plan; normal failures and review remediation do not reopen planning.
+- Replanning is reserved for material architecture/trust/data/identity/vendor/schema/cloud-authority changes, assumption-invalidating Blocker/High findings, infeasible decomposition, or user/client feedback that changes the target workflow.
+- Splitting one predeclared PR into two for reviewability does not require replanning when scope, contracts, dependencies, and completion evidence remain unchanged.
+- Hazardous operational actions keep separate explicit approvals and readback even when one master plan defines them. Passing inventory, adoption, plan/apply, publication, migration, activation, tester-access, qualification, live-data, or production gates never grants the next gate.
+- A tranche closes on its declared observable integration or qualification result—not merely when its source PRs merge.
+
+ADR-0014 records this workflow-scale delivery policy. It changes planning granularity, not the protected-branch, review, evidence, or operational-authority controls below.
+
 ## Branch naming
 Allowed branch prefixes:
 ```text

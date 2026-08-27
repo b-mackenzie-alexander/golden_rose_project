@@ -136,6 +136,25 @@ This amendment was accepted by Beatrice on 2026-08-21 after independent review o
 
 This amendment authorizes only the corresponding no-cloud source, test, and documentation remediation. It does not authorize receipt signing, cloud authentication, Terraform planning/apply, publication, deployment, tester access, or live verification.
 
+### 10. Amendment B — separate private-OCI verification authority
+
+**Status:** Accepted by Beatrice on 2026-08-27 with the review-clean `.hermes/plans/2026-08-27_124046-private-develop-activation-human-feedback-plan.md`; unmerged and not implementable until protected publication.
+
+Direct deploy-time Cosign verification against the private Artifact Registry repository requires authenticated OCI read authority. ADR-0013's deployer is intentionally restricted to exact Cloud Run job execution/view authority and must not receive Artifact Registry read/write access. The image publisher is restricted to the build workflow and must not become reachable from the deploy workflow.
+
+The accepted narrow correction is a separate `golden-rose-artifact-verifier` control-plane service account:
+
+- it receives only exact-repository `roles/artifactregistry.reader` authority needed for direct signature/attestation retrieval;
+- its WIF binding permits only the exact protected `deploy-develop.yml@refs/heads/develop` direct workflow under the existing repository/owner/ref/environment/`workflow_dispatch` claim set;
+- it receives no publish, Cloud Run, Terraform, IAM-mutation, secret, database, or application-invocation authority;
+- the deployer continues to receive no Artifact Registry authority;
+- the deploy workflow authenticates as the verifier only for direct OCI verification through a dedicated temporary `DOCKER_CONFIG`/Google credential context, logs out and deletes/unsets that context with an absence assertion, then authenticates separately as the deployer for existing-resource Cloud Run operations;
+- tests and live readback must prove the identities cannot assume each other's authority and that verifier credentials are unavailable during deployer operations.
+
+The same source tranche must close the currently modeled-but-unproduced migration-success authority: only a successful waited migration execution may produce a minimized separately signed receipt bound to the exact migration receipt hash, source SHA, immutable image digest, and execution reference. Failure, cancellation, or unknown outcome emits no success receipt. Service activation still requires separate database/schema/authority readback and explicit approval before that signed receipt may be accepted.
+
+If implementation or live evidence shows that this identity split cannot satisfy private OCI verification without broader standing authority, stop and replan; do not broaden in place. This accepted-but-unmerged amendment grants no cloud, WIF, IAM, registry, migration, or deployment action.
+
 ## Consequences and constraints
 
 ### Positive

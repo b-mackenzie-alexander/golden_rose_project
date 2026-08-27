@@ -6,6 +6,8 @@
 - **Depends on:** ADR-0002, ADR-0004, ADR-0005, and merged ADR-0006
 - **Implementation authority:** Historical activation gate completed: PR #16 merged this planning packet at `1c66eeb`, Beatrice authorized implementation from that exact tip, PR #17 merged the bounded implementation at `1543248`, and PR #18 merged its bounded remediation at `a4d8f90`. Any adjacent Phase 1 product slice still requires a separately reviewed and merged plan.
 
+> **Planning-granularity update:** ADR-0014 supersedes only the last sentence's one-plan-per-adjacent-slice implication. Adjacent work still requires accepted planning authority, but one outcome-scale plan may now predeclare and authorize several ordered implementation PRs without a new planning packet between them.
+
 ## Context
 
 The merged staff Employer workspace can create one synthetic/local draft `Employer`, search authorized Employer records, and read exact Employer detail. PR #15 merged the independently rereviewed and exact-head-qualified post-merge closeout to `develop` at `7ae448e`; PR #16 merged this accepted planning packet at `1c66eeb`; and PR #17 merged the bounded draft-revision implementation at `1543248`. ADR-0006, database-authority constraints, FastAPI lifespan ownership, browser lifecycle/privacy remediation, diagnostics hardening, and SBOM validation remain predecessor authority.

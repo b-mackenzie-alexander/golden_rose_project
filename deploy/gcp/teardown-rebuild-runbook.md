@@ -2,7 +2,7 @@
 
 This runbook defines the controlled disposal and reconstruction of the private fictional-synthetic `develop` workload environment while preserving the lifecycle-independent control plane and remote state. It does not authorize any automatic scheduled destroy or unreviewed cloud mutation from this source-controlled branch.
 
-Current source status: PR #37 merged the teardown/rebuild source contracts at `caf96a7`, and PR #42 merged the bounded stage-aware verifier reconciliation at `b2d79b5`. Private records show separately approved partial foundation work; this runbook remains future operator guidance until the later explicitly approved operational gates.
+Current source status: PR #37 merged the teardown/rebuild source contracts at `caf96a7`, PR #42 made tester verification service-stage-only at `b2d79b5`, and PR #48 completed the separate foundation-stage verifier alignment at `5f265d8`. Private records show separately approved partial foundation work; this runbook remains future operator guidance until the later explicitly approved operational gates.
 
 ## Scope
 

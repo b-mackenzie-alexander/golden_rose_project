@@ -2,7 +2,7 @@
 
 This runbook defines how the first private fictional-synthetic `develop` deployment decides between rollback and forward recovery after a failed migration, failed rollout, or failed bounded qualification. It is executable guidance only after the separate deployment gate is approved; it does not authorize cloud actions from the source-controlled branch.
 
-Current source status: PR #37 merged the deploy/readiness and provenance source contracts at `caf96a7`, and PR #42 merged the bounded stage-aware verifier reconciliation at `b2d79b5`. Private records show separately approved partial foundation work; this runbook remains future operator guidance until the later explicitly approved deployment gate.
+Current source status: PR #37 merged the deploy/readiness and provenance source contracts at `caf96a7`, PR #42 made tester verification service-stage-only at `b2d79b5`, and PR #48 completed the separate foundation-stage verifier alignment at `5f265d8`. Private records show separately approved partial foundation work; this runbook remains future operator guidance until the later explicitly approved deployment gate.
 
 ## Scope
 

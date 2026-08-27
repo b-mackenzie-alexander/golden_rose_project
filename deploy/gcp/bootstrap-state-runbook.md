@@ -2,7 +2,7 @@
 
 This runbook covers the one-time local bootstrap of the durable Terraform state bucket and the later migration to remote state. It is intentionally value-safe: operator-held project, bucket, location, and principal inputs stay out of tracked source.
 
-Current source status: PR #37 merged the no-cloud deployment-path remediation at `caf96a7`, and PR #42 merged the bounded service-stage tester-authority verifier reconciliation at `b2d79b5`. Private records show separately approved partial foundation work; this runbook remains future operator guidance for the remaining reconciliation and later explicitly approved gates.
+Current source status: PR #37 merged the no-cloud deployment-path remediation at `caf96a7`; PR #46 made the evaluated foundation root workload-free and Cloud-SQL-free at `58aed28`; and PR #48 aligned the verifier at `5f265d8`. Private records show separately approved partial foundation work; this runbook remains future operator guidance for the still-unapproved private inventory and one-root-at-a-time adoption gates.
 
 Before any later adoption/import request, prove privately that bootstrap and workload roots have distinct state objects/files, backend keys/prefixes, lock scopes, lineages, and import operations. Verify bootstrap-local-state provenance (or record its absence as a blocker), then migrate/read back bootstrap state and prove it contains bootstrap addresses only before any workload-root state initialization/import or bootstrap-authority retirement.
 

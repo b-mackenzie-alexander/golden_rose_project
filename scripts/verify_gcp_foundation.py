@@ -331,7 +331,9 @@ def _atomic_write_text(
         os.close(directory_fd)
 
 
-def collect_foundation_snapshot(command_runner: Callable[[Sequence[str]], Any]) -> dict[str, Any]:
+def collect_foundation_snapshot(
+    command_runner: Callable[[Sequence[str]], Any], *, mode: str = "service"
+) -> dict[str, Any]:
     project_labels = _mapping(command_runner(("project-labels",)), label="project labels")
     enabled_apis = _dedupe_strings(command_runner(("enabled-apis",)), label="enabled APIs")
     service_account_payload = command_runner(("service-accounts",))
@@ -353,7 +355,15 @@ def collect_foundation_snapshot(command_runner: Callable[[Sequence[str]], Any]) 
     )
     migration_job = _mapping(command_runner(("migration-job",)), label="migration job")
     migration_job_iam = _mapping(command_runner(("migration-job-iam",)), label="migration job iam")
-    cloud_sql = _mapping(command_runner(("cloud-sql",)), label="cloud sql")
+    try:
+        cloud_sql = _mapping(command_runner(("cloud-sql",)), label="cloud sql")
+    except VerificationError as exc:
+        if mode == "foundation" and (
+            "not found" in str(exc).lower() or "not_found" in str(exc).lower()
+        ):
+            cloud_sql = {}
+        else:
+            raise
     service_account_keys = _mapping(
         command_runner(("service-account-keys",)), label="service account keys"
     )
@@ -604,7 +614,11 @@ def evaluate_foundation_snapshot(
         violations.append("migration job inventory drifted from run-migrations")
     if mode == "service" and resource_inventory.get("cloud_run_service") != "staff-tracer":
         violations.append("cloud run service inventory drifted from staff-tracer")
-    if resource_inventory.get("cloud_sql_instance") != "develop-postgres":
+    cloud_sql_inventory_name = str(resource_inventory.get("cloud_sql_instance", ""))
+    if mode == "foundation":
+        if cloud_sql_inventory_name:
+            violations.append("unexpected cloud sql inventory present in foundation mode")
+    elif cloud_sql_inventory_name != "develop-postgres":
         violations.append("cloud sql inventory drifted from develop-postgres")
     if resource_inventory.get("state_bucket") != contract["state_bucket_name"]:
         violations.append("state bucket inventory drifted from the reviewed bucket name")
@@ -721,16 +735,22 @@ def evaluate_foundation_snapshot(
         violations.append("foundation verifier mode rejects migration job IAM presence")
 
     cloud_sql = _mapping(snapshot.get("cloud_sql", {}), label="cloud sql")
-    if cloud_sql.get("database_version") != "POSTGRES_16":
-        violations.append("cloud sql version drifted from POSTGRES_16")
-    if cloud_sql.get("deletion_protection") is not True:
-        violations.append("cloud sql deletion protection is not enabled")
-    if cloud_sql.get("ipv4_enabled") is not False or not cloud_sql.get("private_network"):
-        violations.append("public Cloud SQL path detected")
-    expected_sql_labels = dict(APPROVED_PROJECT_LABELS)
-    expected_sql_labels["recovery_policy_review_status"] = contract["recovery_policy_review_status"]
-    if cloud_sql.get("labels") != expected_sql_labels:
-        violations.append("cloud sql labels drifted from the approved recovery posture")
+    if mode == "foundation":
+        if cloud_sql:
+            violations.append("unexpected cloud sql configuration present in foundation mode")
+    else:
+        if cloud_sql.get("database_version") != "POSTGRES_16":
+            violations.append("cloud sql version drifted from POSTGRES_16")
+        if cloud_sql.get("deletion_protection") is not True:
+            violations.append("cloud sql deletion protection is not enabled")
+        if cloud_sql.get("ipv4_enabled") is not False or not cloud_sql.get("private_network"):
+            violations.append("public Cloud SQL path detected")
+        expected_sql_labels = dict(APPROVED_PROJECT_LABELS)
+        expected_sql_labels["recovery_policy_review_status"] = contract[
+            "recovery_policy_review_status"
+        ]
+        if cloud_sql.get("labels") != expected_sql_labels:
+            violations.append("cloud sql labels drifted from the approved recovery posture")
 
     service_account_keys = _mapping(
         snapshot.get("service_account_keys", {}), label="service account keys"
@@ -1641,7 +1661,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         contract["tester_authority_receipt_sha256"] = tester_authority[
             "tester_authority_receipt_sha256"
         ]
-    snapshot = collect_foundation_snapshot(_build_live_command_runner(contract))
+    snapshot = collect_foundation_snapshot(
+        _build_live_command_runner(contract),
+        mode=args.mode,
+    )
     violations = evaluate_foundation_snapshot(snapshot, contract, mode=args.mode)
 
     if args.evidence_root:

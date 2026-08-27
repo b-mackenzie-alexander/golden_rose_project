@@ -15,8 +15,8 @@ resource "google_cloud_run_v2_service" "staff_tracer" {
       egress = "PRIVATE_RANGES_ONLY"
 
       network_interfaces {
-        network    = google_compute_network.develop.id
-        subnetwork = google_compute_subnetwork.direct_vpc.id
+        network    = google_compute_network.develop[0].id
+        subnetwork = google_compute_subnetwork.direct_vpc[0].id
       }
     }
 

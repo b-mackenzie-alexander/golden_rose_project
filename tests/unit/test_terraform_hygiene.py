@@ -355,7 +355,6 @@ def test_gcp_terraform_variables_define_required_project_and_region_without_secr
     assert 'variable "credentials"' not in variables
     assert 'variable "secret"' not in variables.lower()
     assert 'variable "container_image_digest"' in variables
-    assert "default =" not in variables
     assert "nullable" in variables
     assert "= false" in variables
     assert 'contains(["us-east4"], var.region)' in variables
@@ -365,9 +364,7 @@ def test_gcp_terraform_variables_define_required_project_and_region_without_secr
     assert "golden_rose_secret" not in variables.lower()  # no secret values
 
 
-def test_gcp_terraform_variables_require_private_sql_subnet_input_without_committed_default() -> (
-    None
-):
+def test_gcp_terraform_variables_validate_private_sql_subnet_input() -> None:
     root_variables = (ROOT / "infra/gcp/variables.tf").read_text(encoding="utf-8")
     root_module = (ROOT / "infra/gcp/develop.tf").read_text(encoding="utf-8")
     develop_variables = (ROOT / "infra/gcp/develop/variables.tf").read_text(encoding="utf-8")
@@ -375,7 +372,6 @@ def test_gcp_terraform_variables_require_private_sql_subnet_input_without_commit
     expected_validation_fragments = [
         'variable "direct_vpc_subnet_cidr"',
         "type        = string",
-        "nullable    = false",
         "can(cidrnetmask(var.direct_vpc_subnet_cidr))",
         "can(regex(",
         "cidrhost(var.direct_vpc_subnet_cidr, 0) == split",
@@ -388,8 +384,6 @@ def test_gcp_terraform_variables_require_private_sql_subnet_input_without_commit
         for fragment in expected_validation_fragments:
             assert fragment in variables_text
 
-    assert "default =" not in root_variables
-    assert "default =" not in develop_variables
     assert _contains_normalized_fragment(
         root_module, "direct_vpc_subnet_cidr = var.direct_vpc_subnet_cidr"
     )
@@ -583,7 +577,7 @@ def test_gcp_develop_network_uses_dedicated_vpc_and_private_service_access_only(
     assert "var.direct_vpc_subnet_cidr" in network
     assert "region" in network
     assert "var.region" in network
-    assert "network       = google_compute_network.develop.id" in network
+    assert "google_compute_network.develop[0].id" in network
     assert "= false" in network
     assert "= true" in network
     assert "google_compute_global_address" in network
@@ -625,7 +619,7 @@ def test_gcp_develop_cloud_sql_is_private_minimal_postgresql_without_public_ip()
     assert "ipv4_enabled" in cloud_sql
     assert "= false" in cloud_sql
     assert "private_network" in cloud_sql
-    assert "google_compute_network.develop.id" in cloud_sql
+    assert "google_compute_network.develop[0].id" in cloud_sql
     assert "deletion_protection" in cloud_sql
     assert "local.standard_labels" in cloud_sql
     assert "backup_configuration" in cloud_sql
@@ -679,22 +673,126 @@ def test_gcp_develop_cloud_sql_is_private_minimal_postgresql_without_public_ip()
             for line in root_module.splitlines()
         )
 
-    cloud_sql_backup_enabled_section = develop_variables.split(
-        'variable "cloud_sql_backup_enabled"', 1
-    )[1]
-    cloud_sql_database_name_section = develop_variables.split(
-        'variable "cloud_sql_database_name"', 1
-    )[1]
-    assert (
-        "default ="
-        not in cloud_sql_backup_enabled_section.split('variable "cloud_sql_backup_start_time"', 1)[
-            0
-        ]
-    )
-    assert (
-        "default ="
-        not in cloud_sql_database_name_section.split('variable "cloud_sql_schema_owner_role"', 1)[0]
-    )
+
+def test_foundation_stage_omits_deferred_network_cloud_sql_and_tester_inputs() -> None:
+    network = (ROOT / "infra/gcp/develop/network.tf").read_text(encoding="utf-8")
+    cloud_sql = (ROOT / "infra/gcp/develop/cloud_sql.tf").read_text(encoding="utf-8")
+    develop_variables = (ROOT / "infra/gcp/develop/variables.tf").read_text(encoding="utf-8")
+    root_variables = (ROOT / "infra/gcp/variables.tf").read_text(encoding="utf-8")
+    develop_outputs = (ROOT / "infra/gcp/develop/outputs.tf").read_text(encoding="utf-8")
+
+    assert 'count = var.deployment_stage != "foundation" ? 1 : 0' in network
+    assert 'count = var.deployment_stage != "foundation" ? 1 : 0' in cloud_sql
+    assert "google_compute_network.develop[0].id" in cloud_sql
+    assert "google_service_networking_connection.private_service_access[0]" in cloud_sql
+    assert "google_sql_database_instance.develop[0].name" in cloud_sql
+
+    omitted_input_assertions = {
+        "container_image_digest": {
+            "next": 'variable "deployment_stage"',
+            "migration_service_guard": "var.container_image_digest != null && can(regex(",
+        },
+        "direct_vpc_subnet_cidr": {
+            "next": 'variable "tester_authority_receipt_path"',
+            "migration_service_guard": "var.direct_vpc_subnet_cidr != null && can(cidrnetmask(",
+        },
+        "tester_authority_receipt_path": {
+            "next": 'variable "tester_authority_bundle_path"',
+            "root_guard": None,
+            "develop_guard": 'var.deployment_stage != "service" || var.tester_authority_receipt_path != null',
+        },
+        "tester_authority_bundle_path": {
+            "next": 'variable "tester_authority_certificate_identity"',
+            "root_guard": None,
+            "develop_guard": 'var.deployment_stage != "service" || var.tester_authority_bundle_path != null',
+        },
+        "tester_authority_certificate_identity": {
+            "next": 'variable "billing_account_id"',
+            "root_guard": None,
+            "develop_guard": 'var.deployment_stage != "service" || var.tester_authority_certificate_identity != null',
+        },
+        "cloud_sql_backup_enabled": {
+            "next": 'variable "cloud_sql_backup_start_time"',
+            "migration_service_guard": "var.cloud_sql_backup_enabled != null",
+        },
+        "cloud_sql_backup_start_time": {
+            "next": 'variable "cloud_sql_point_in_time_recovery_enabled"',
+            "migration_service_guard": "var.cloud_sql_backup_start_time != null && can(regex(",
+        },
+        "cloud_sql_point_in_time_recovery_enabled": {
+            "next": 'variable "cloud_sql_transaction_log_retention_days"',
+            "migration_service_guard": "var.cloud_sql_point_in_time_recovery_enabled != null",
+        },
+        "cloud_sql_transaction_log_retention_days": {
+            "next": 'variable "cloud_sql_retained_backups"',
+            "migration_service_guard": "var.cloud_sql_transaction_log_retention_days != null && floor(",
+        },
+        "cloud_sql_retained_backups": {
+            "next": 'variable "cloud_sql_database_name"',
+            "migration_service_guard": "var.cloud_sql_retained_backups != null && floor(",
+        },
+        "cloud_sql_database_name": {
+            "next": 'variable "cloud_sql_schema_owner_role"',
+            "migration_service_guard": "var.cloud_sql_database_name != null && can(regex(",
+        },
+        "cloud_sql_schema_owner_role": {
+            "next": 'variable "cloud_sql_migrator_role"',
+            "migration_service_guard": "var.cloud_sql_schema_owner_role != null && can(regex(",
+        },
+        "cloud_sql_migrator_role": {
+            "next": 'variable "cloud_sql_runtime_role"',
+            "migration_service_guard": "var.cloud_sql_migrator_role != null && can(regex(",
+        },
+        "cloud_sql_runtime_role": {
+            "next": 'variable "cloud_sql_recovery_policy_review_status"',
+            "migration_service_guard": "var.cloud_sql_runtime_role != null && can(regex(",
+        },
+        "cloud_sql_recovery_policy_review_status": {
+            "next": 'variable "golden_rose_public_environment_label"',
+            "migration_service_guard": "var.cloud_sql_recovery_policy_review_status != null &&",
+        },
+    }
+    for variable_name, expectations in omitted_input_assertions.items():
+        assert f'variable "{variable_name}"' in develop_variables
+        assert f'variable "{variable_name}"' in root_variables
+
+        develop_section = develop_variables.split(f'variable "{variable_name}"', 1)[1].split(
+            expectations["next"], 1
+        )[0]
+        root_section = root_variables.split(f'variable "{variable_name}"', 1)[1].split(
+            expectations["next"], 1
+        )[0]
+        for section in (develop_section, root_section):
+            assert "nullable    = true" in section
+            assert "default     = null" in section
+
+        root_guard = expectations.get(
+            "root_guard",
+            f'var.deployment_stage == "foundation" ? var.{variable_name} == null',
+        )
+        if root_guard is not None:
+            assert root_guard in root_section
+        assert (
+            expectations.get(
+                "develop_guard",
+                f'var.deployment_stage == "foundation" ? var.{variable_name} == null',
+            )
+            in develop_section
+        )
+        assert (
+            expectations.get(
+                "migration_service_guard",
+                expectations.get(
+                    "develop_guard",
+                    f'var.deployment_stage == "foundation" ? var.{variable_name} == null',
+                ),
+            )
+            in develop_section
+        )
+
+    assert 'value = var.deployment_stage == "foundation" ? null :' in develop_outputs
+    assert "google_sql_database_instance.develop[0].name" in develop_outputs
+    assert "google_sql_database.application[0].name" in develop_outputs
 
 
 def test_gcp_terraform_outputs_minimize_database_metadata_and_mark_it_sensitive() -> None:
@@ -968,7 +1066,7 @@ def test_service_uses_accepted_iam_private_ingress_not_unreachable_internal_only
     assert "local.standard_labels" in cloud_run
     assert "vpc_access" in cloud_run
     assert "network_interfaces" in cloud_run
-    assert "google_compute_subnetwork.direct_vpc.id" in cloud_run
+    assert "google_compute_subnetwork.direct_vpc[0].id" in cloud_run
     assert "PRIVATE_RANGES_ONLY" in cloud_run
     assert "image" in cloud_run
     assert "local.managed_container_image" in cloud_run
@@ -1242,7 +1340,7 @@ def test_gcp_develop_migration_job_is_one_task_private_and_uses_exact_digest() -
         "max_retries = 0",
         "task_count  = 1",
         "parallelism = 1",
-        "google_compute_subnetwork.direct_vpc.id",
+        "google_compute_subnetwork.direct_vpc[0].id",
         "PRIVATE_RANGES_ONLY",
     ]
     for fragment in required_fragments:

@@ -1,20 +1,20 @@
 output "database_contract" {
   description = "Sensitive minimal database metadata and reviewed role identifiers for the private synthetic develop environment."
-  value = {
-    instance_name      = google_sql_database_instance.develop.name
-    database_name      = google_sql_database.application.name
+  value = var.deployment_stage == "foundation" ? null : {
+    instance_name      = google_sql_database_instance.develop[0].name
+    database_name      = google_sql_database.application[0].name
     schema_owner_role  = var.cloud_sql_schema_owner_role
     migrator_role      = var.cloud_sql_migrator_role
     runtime_role       = var.cloud_sql_runtime_role
-    database_version   = google_sql_database_instance.develop.database_version
-    deletion_protected = google_sql_database_instance.develop.deletion_protection
+    database_version   = google_sql_database_instance.develop[0].database_version
+    deletion_protected = google_sql_database_instance.develop[0].deletion_protection
   }
   sensitive = true
 }
 
 output "database_recovery_contract" {
   description = "Sensitive reviewed recovery-input contract for the private synthetic develop environment pending later gate approval."
-  value = {
+  value = var.deployment_stage == "foundation" ? null : {
     backup_enabled                 = var.cloud_sql_backup_enabled
     backup_start_time              = var.cloud_sql_backup_start_time
     point_in_time_recovery_enabled = var.cloud_sql_point_in_time_recovery_enabled

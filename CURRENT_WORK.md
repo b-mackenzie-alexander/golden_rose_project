@@ -52,8 +52,8 @@ Land the separate source amendment that makes `deployment_stage=foundation` work
 - Accepted correction/audit baseline: PostgreSQL domain rows hold current operational truth; append-only `AuditEvent` records preserve material history through atomic expected-version/idempotent commands; restricted prior/new values remain field-authorized; and derived projections are disposable rather than competing record stores. `docs/planning/phase-1-correction-audit-event-contract.md` is authoritative.
 
 ## Immediate next steps
-1. The independent rereview passed the remediated uncommitted working-tree packet `docs/review-handoffs/2026-08-26-foundation-root-stage-gating-independent-review-handoff.md` on `fix/foundation-root-stage-gating` with no Blocker, High, or Medium findings.
-2. Create the closeout commit, rerun exact-head verification and exact-range secret scanning, then push/open the reviewed PR to `develop` under explicit approval. The working-tree PASS is not committed-range evidence or merge authority.
+1. PR #46 is open from `fix/foundation-root-stage-gating` into `develop`. Its first application-quality run failed only at `uv run mypy src tests`: the new staged-input test inferred its heterogeneous assertion map as `dict[str, object]`, so lookups and indexing at the test boundary were rejected by strict typing.
+2. The narrow remediation types the assertion map as `dict[str, dict[str, str | None]]` and narrows each optional guard before use. Local reproduction now passes `env -u PYTHONPATH uv run mypy src tests` and the full Terraform-hygiene regression; commit, push, and verify the resulting PR check rerun before requesting review.
 3. After that amendment merges, request a separate approval for private source/live inventory collection and the later adoption ceremony; do not infer an import, backend/state action, Terraform plan/apply, or cloud mutation from this packet.
 
 ## Gate classification

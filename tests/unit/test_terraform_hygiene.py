@@ -687,7 +687,7 @@ def test_foundation_stage_omits_deferred_network_cloud_sql_and_tester_inputs() -
     assert "google_service_networking_connection.private_service_access[0]" in cloud_sql
     assert "google_sql_database_instance.develop[0].name" in cloud_sql
 
-    omitted_input_assertions = {
+    omitted_input_assertions: dict[str, dict[str, str | None]] = {
         "container_image_digest": {
             "next": 'variable "deployment_stage"',
             "migration_service_guard": "var.container_image_digest != null && can(regex(",
@@ -756,11 +756,13 @@ def test_foundation_stage_omits_deferred_network_cloud_sql_and_tester_inputs() -
         assert f'variable "{variable_name}"' in develop_variables
         assert f'variable "{variable_name}"' in root_variables
 
+        next_variable = expectations["next"]
+        assert next_variable is not None
         develop_section = develop_variables.split(f'variable "{variable_name}"', 1)[1].split(
-            expectations["next"], 1
+            next_variable, 1
         )[0]
         root_section = root_variables.split(f'variable "{variable_name}"', 1)[1].split(
-            expectations["next"], 1
+            next_variable, 1
         )[0]
         for section in (develop_section, root_section):
             assert "nullable    = true" in section
@@ -772,23 +774,15 @@ def test_foundation_stage_omits_deferred_network_cloud_sql_and_tester_inputs() -
         )
         if root_guard is not None:
             assert root_guard in root_section
-        assert (
-            expectations.get(
-                "develop_guard",
-                f'var.deployment_stage == "foundation" ? var.{variable_name} == null',
-            )
-            in develop_section
+        develop_guard = expectations.get(
+            "develop_guard",
+            f'var.deployment_stage == "foundation" ? var.{variable_name} == null',
         )
-        assert (
-            expectations.get(
-                "migration_service_guard",
-                expectations.get(
-                    "develop_guard",
-                    f'var.deployment_stage == "foundation" ? var.{variable_name} == null',
-                ),
-            )
-            in develop_section
-        )
+        assert develop_guard is not None
+        assert develop_guard in develop_section
+        migration_service_guard = expectations.get("migration_service_guard", develop_guard)
+        assert migration_service_guard is not None
+        assert migration_service_guard in develop_section
 
     assert 'value = var.deployment_stage == "foundation" ? null :' in develop_outputs
     assert "google_sql_database_instance.develop[0].name" in develop_outputs

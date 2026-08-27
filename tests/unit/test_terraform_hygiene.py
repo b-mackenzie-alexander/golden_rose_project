@@ -20,6 +20,7 @@ REQUIRED_TERRAFORM_RELATIVE_FILES = [
     Path("infra/gcp/variables.tf"),
     Path("infra/gcp/locals.tf"),
     Path("infra/gcp/outputs.tf"),
+    Path("infra/gcp/bootstrap/backend.tf"),
     Path("infra/gcp/bootstrap/versions.tf"),
     Path("infra/gcp/bootstrap/providers.tf"),
     Path("infra/gcp/bootstrap/variables.tf"),
@@ -154,6 +155,11 @@ def test_gcp_bootstrap_runbook_documents_bootstrap_migration_and_retirement() ->
         "local bootstrap",
         "remote state",
         "partial backend configuration",
+        "canonical private backend-config digest",
+        "resolved backend identity",
+        "state object or prefix",
+        "lock scope",
+        "pre-initialization comparison",
         "WIF handoff",
         "bootstrap authority retirement",
         "emergency recovery",
@@ -225,8 +231,36 @@ def test_gcp_recovery_and_teardown_runbooks_document_failure_handling_boundaries
         assert phrase in bootstrap_runbook
 
 
+def test_gcp_staged_plan_approval_binds_backend_fingerprint_before_apply() -> None:
+    procedure = (ROOT / "deploy/gcp/staged-plan-approval.md").read_text(encoding="utf-8")
+
+    required_phrases = [
+        "canonical private backend-config digest",
+        "resolved backend identity",
+        "state object or prefix",
+        "lock scope",
+        "pre-initialization comparison",
+        "bootstrap and workload roots remain distinct",
+    ]
+
+    for phrase in required_phrases:
+        assert phrase in procedure
+
+
 def test_gcp_terraform_backend_uses_partial_gcs_configuration_without_committed_values() -> None:
     backend = (ROOT / "infra/gcp/backend.tf").read_text(encoding="utf-8")
+
+    assert 'backend "gcs"' in backend
+    assert "bucket" not in backend
+    assert "prefix" not in backend
+    assert "project" not in backend
+    assert "credentials" not in backend
+    assert "access_token" not in backend
+    assert "impersonate_service_account" not in backend
+
+
+def test_gcp_bootstrap_backend_uses_partial_gcs_configuration_without_committed_values() -> None:
+    backend = (ROOT / "infra/gcp/bootstrap/backend.tf").read_text(encoding="utf-8")
 
     assert 'backend "gcs"' in backend
     assert "bucket" not in backend
@@ -2497,6 +2531,108 @@ def test_terraform_static_validation_harness_rejects_backend_configuration(tmp_p
     assert result.returncode == 1
     assert "committed backend value" in result.stdout
     assert "backend" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_bootstrap_backend_committed_prefix(
+    tmp_path: Path,
+) -> None:
+    terraform_root = tmp_path / "infra" / "gcp" / "bootstrap"
+    terraform_root.mkdir(parents=True)
+    bad_file = terraform_root / "backend.tf"
+    bad_file.write_text(
+        "\n".join(
+            [
+                "terraform {",
+                '  backend "gcs" {',
+                '    prefix = "shared-workload-state"',
+                "  }",
+                "}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "committed backend value" in result.stdout
+    assert "infra/gcp/bootstrap/backend.tf" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_bootstrap_backend_committed_prefix_with_extra_spacing(
+    tmp_path: Path,
+) -> None:
+    _write_current_terraform_scaffold(tmp_path)
+    policy_dir = tmp_path / "infra" / "policy"
+    policy_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(ROOT / "infra" / "policy" / "predeployment-authority-manifest.json", policy_dir)
+    terraform_root = tmp_path / "infra" / "gcp" / "bootstrap"
+    bad_file = terraform_root / "backend.tf"
+    bad_file.write_text(
+        "\n".join(
+            [
+                "terraform {",
+                '  backend   "gcs" {',
+                '    prefix = "shared-workload-state"',
+                "  }",
+                "}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "committed backend value" in result.stdout
+    assert "infra/gcp/bootstrap/backend.tf" in result.stdout
+
+
+def test_terraform_static_validation_harness_rejects_workload_backend_committed_bucket_with_extra_spacing(
+    tmp_path: Path,
+) -> None:
+    _write_current_terraform_scaffold(tmp_path)
+    policy_dir = tmp_path / "infra" / "policy"
+    policy_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(ROOT / "infra" / "policy" / "predeployment-authority-manifest.json", policy_dir)
+    terraform_root = tmp_path / "infra" / "gcp"
+    bad_file = terraform_root / "backend.tf"
+    bad_file.write_text(
+        "\n".join(
+            [
+                "terraform {",
+                '  backend   "gcs" {',
+                '    bucket = "shared-bootstrap-state"',
+                "  }",
+                "}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "committed backend value" in result.stdout
+    assert "infra/gcp/backend.tf" in result.stdout
 
 
 def test_terraform_static_validation_harness_rejects_variable_input_artifacts(

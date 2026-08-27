@@ -4,7 +4,7 @@ This runbook covers the one-time local bootstrap of the durable Terraform state 
 
 Current source status: PR #37 merged the no-cloud deployment-path remediation at `caf96a7`; PR #46 made the evaluated foundation root workload-free and Cloud-SQL-free at `58aed28`; and PR #48 aligned the verifier at `5f265d8`. Private records show separately approved partial foundation work; this runbook remains future operator guidance for the still-unapproved private inventory and one-root-at-a-time adoption gates.
 
-Before any later adoption/import request, prove privately that bootstrap and workload roots have distinct state objects/files, backend keys/prefixes, lock scopes, lineages, and import operations. Verify bootstrap-local-state provenance (or record its absence as a blocker), then migrate/read back bootstrap state and prove it contains bootstrap addresses only before any workload-root state initialization/import or bootstrap-authority retirement.
+Before any later adoption/import request, prove privately that bootstrap and workload roots have distinct state objects/files, backend keys/prefixes, lock scopes, lineages, and import operations. Bind each approval to the canonical private backend-config digest plus an opaque resolved backend identity, state object or prefix, and lock scope fingerprint, then require pre-initialization comparison against the reviewed source and operator-held inputs. Verify bootstrap-local-state provenance (or record its absence as a blocker), then migrate/read back bootstrap state and prove it contains bootstrap addresses only before any workload-root state initialization/import or bootstrap-authority retirement.
 
 ## Scope
 
@@ -19,7 +19,7 @@ Before any later adoption/import request, prove privately that bootstrap and wor
 1. local bootstrap in `infra/gcp/bootstrap` with operator-held values
 2. create the durable remote state bucket with lifecycle protection and recovery controls
 3. verify remote state access before any migration
-4. migrate the root module from local bootstrap to remote state using the partial backend configuration plus operator-held backend values
+4. migrate the root module from local bootstrap to remote state using the partial backend configuration plus operator-held backend values, after matching the canonical private backend-config digest and the opaque resolved backend identity/state object or prefix/lock scope fingerprint approved for that root
 5. complete the later WIF handoff after the reviewed trust contract exists
 6. perform bootstrap authority retirement so the one-time bootstrap operator path does not remain standing authority
 

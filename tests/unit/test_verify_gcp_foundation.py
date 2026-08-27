@@ -390,8 +390,8 @@ def test_service_mode_derives_tester_authority_contract_before_evaluation(tmp_pa
             "tester_authority_receipt_sha256": "a" * 64,
         }
 
-    def fake_collect(_: Any) -> dict[str, Any]:
-        calls["collect"] = True
+    def fake_collect(_: Any, *, mode: str = "service") -> dict[str, Any]:
+        calls["collect"] = mode
         return valid_snapshot()
 
     def fake_evaluate(
@@ -422,11 +422,73 @@ def test_service_mode_derives_tester_authority_contract_before_evaluation(tmp_pa
     assert calls["derive"]["certificate_identity"] == (
         "https://github.com/example/authority/.github/workflows/tester-authority.yml@refs/heads/main"
     )
+    assert calls["collect"] == "service"
     assert calls["evaluate"]["mode"] == "service"
     assert calls["evaluate"]["contract"]["private_invoker_principal"] == (
         "user:private.tester@example.com"
     )
     assert calls["evaluate"]["contract"]["tester_authority_receipt_sha256"] == "a" * 64
+
+
+def test_foundation_mode_main_allows_absent_cloud_sql_during_collection() -> None:
+    module = load_module()
+    mutable_module = cast(Any, module)
+    calls: dict[str, Any] = {"cloud_sql_requested": False, "commands": []}
+
+    def fake_build_live_command_runner(contract: dict[str, Any]) -> Any:
+        calls["contract"] = contract
+
+        def runner(command: Any) -> Any:
+            key = tuple(command)
+            calls["commands"].append(key)
+            if key == ("cloud-sql",):
+                calls["cloud_sql_requested"] = True
+                raise module.VerificationError("cloud sql failed: NOT_FOUND")
+            staged_values = {
+                ("project-labels",): valid_snapshot()["project_labels"],
+                ("enabled-apis",): valid_snapshot()["enabled_apis"],
+                ("service-accounts",): {
+                    "workload": valid_snapshot()["resource_inventory"]["service_accounts"],
+                    "control_plane": valid_snapshot()["resource_inventory"][
+                        "control_plane_service_accounts"
+                    ],
+                },
+                ("project-number",): expected_contract()["project_number"],
+                ("cloud-run-service",): {},
+                ("cloud-run-service-iam",): {},
+                ("migration-job",): {},
+                ("migration-job-iam",): {},
+                ("service-account-keys",): valid_snapshot()["service_account_keys"],
+                ("project-iam",): valid_snapshot()["project_iam"],
+                ("service-account-iam",): valid_snapshot()["service_account_iam"],
+                ("artifact-registry-iam",): valid_snapshot()["artifact_registry_iam"],
+                ("state-bucket",): valid_snapshot()["state_bucket"],
+                ("state-bucket-iam",): valid_snapshot()["state_bucket_iam"],
+                ("budget",): valid_snapshot()["budget"],
+                ("notification-channels",): valid_snapshot()["notification_channels"],
+                ("alert-policies",): valid_snapshot()["alert_policies"],
+                ("logging",): valid_snapshot()["logging"],
+                ("uptime-checks",): [],
+                ("workload-identity-provider",): valid_snapshot()["workload_identity_provider"],
+            }
+            return staged_values[key]
+
+        return runner
+
+    def fake_render(snapshot: dict[str, Any], contract: dict[str, Any], *, mode: str) -> list[str]:
+        calls["evaluate"] = {"snapshot": snapshot, "contract": contract, "mode": mode}
+        return []
+
+    mutable_module._build_live_command_runner = fake_build_live_command_runner
+    mutable_module.evaluate_foundation_snapshot = fake_render
+
+    exit_code = module.main(verifier_common_args(mode="foundation"))
+
+    assert exit_code == 0
+    assert calls["cloud_sql_requested"] is True
+    assert calls["evaluate"]["mode"] == "foundation"
+    assert calls["evaluate"]["snapshot"]["cloud_sql"] == {}
+    assert calls["evaluate"]["snapshot"]["resource_inventory"]["cloud_sql_instance"] == ""
 
 
 def test_live_foundation_verifier_uses_receipt_derived_principal_and_digest(tmp_path: Path) -> None:
@@ -700,7 +762,7 @@ def test_foundation_mode_rejects_job_or_service_inventory() -> None:
     )
 
 
-def test_foundation_mode_still_requires_private_cloud_sql_after_tester_decoupling() -> None:
+def test_foundation_mode_treats_cloud_sql_as_deferred_but_later_modes_still_require_it() -> None:
     module = load_module()
 
     snapshot_missing_sql = valid_snapshot()
@@ -719,9 +781,16 @@ def test_foundation_mode_still_requires_private_cloud_sql_after_tester_decouplin
         mode="foundation",
     )
 
-    assert any(
-        "cloud sql inventory drifted from develop-postgres" in violation
+    assert all(
+        "cloud sql inventory drifted from develop-postgres" not in violation
         for violation in missing_sql_violations
+    )
+    assert all(
+        "cloud sql version drifted from POSTGRES_16" not in violation
+        for violation in missing_sql_violations
+    )
+    assert all(
+        "public Cloud SQL path detected" not in violation for violation in missing_sql_violations
     )
 
     snapshot_public_sql = valid_snapshot()
@@ -742,10 +811,40 @@ def test_foundation_mode_still_requires_private_cloud_sql_after_tester_decouplin
     )
 
     assert any(
-        "cloud sql version drifted from POSTGRES_16" in violation
+        "unexpected cloud sql inventory present in foundation mode" in violation
         for violation in public_sql_violations
     )
-    assert any("public Cloud SQL path detected" in violation for violation in public_sql_violations)
+    assert all(
+        "cloud sql version drifted from POSTGRES_16" not in violation
+        for violation in public_sql_violations
+    )
+    assert all(
+        "public Cloud SQL path detected" not in violation for violation in public_sql_violations
+    )
+
+    migration_missing_sql_violations = module.evaluate_foundation_snapshot(
+        snapshot_missing_sql,
+        expected_contract(),
+        mode="migration",
+    )
+    assert any(
+        "cloud sql inventory drifted from develop-postgres" in violation
+        for violation in migration_missing_sql_violations
+    )
+
+    service_missing_sql_violations = module.evaluate_foundation_snapshot(
+        snapshot_missing_sql,
+        {
+            **expected_contract(),
+            "private_invoker_principal": "user:private.tester@example.com",
+            "tester_authority_receipt_sha256": "a" * 64,
+        },
+        mode="service",
+    )
+    assert any(
+        "cloud sql inventory drifted from develop-postgres" in violation
+        for violation in service_missing_sql_violations
+    )
 
     snapshot_with_workloads = valid_snapshot()
     workload_violations = module.evaluate_foundation_snapshot(

@@ -39,9 +39,10 @@ Region: us-east4
 - Project labels and inventory match the reviewed develop posture.
 - Only approved APIs are enabled.
 - Budget evidence preserves raw notification-channel resource names and compares them separately from human display names.
-- Cloud Run invoker access remains private and named.
+- Cloud Run invoker access remains private and named only when a later stage brings the service into scope.
 - Authenticated `/readiness` uptime evidence exists only in service and uses the reviewed monitoring service-agent path.
-- Cloud SQL remains private-path only.
+- In `foundation`, Cloud SQL is absent and out of scope for the reviewed lower-layer contract.
+- In `migration` and `service`, Cloud SQL remains private-path only.
 - No service-account keys exist.
 - Project/service-account IAM matches the reviewed effective-authority contract.
 - State bucket versioning/access/recovery posture is intact.

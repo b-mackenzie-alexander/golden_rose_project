@@ -233,6 +233,7 @@ REQUIRED_FILES = [
     TERRAFORM_ROOT / "variables.tf",
     TERRAFORM_ROOT / "locals.tf",
     TERRAFORM_ROOT / "outputs.tf",
+    TERRAFORM_ROOT / "bootstrap" / "backend.tf",
     TERRAFORM_ROOT / "bootstrap" / "versions.tf",
     TERRAFORM_ROOT / "bootstrap" / "providers.tf",
     TERRAFORM_ROOT / "bootstrap" / "variables.tf",
@@ -2847,7 +2848,10 @@ def _collect_backend_configuration_violations(
     root: Path, terraform_config_paths: list[Path]
 ) -> list[str]:
     violations: list[str] = []
-    allowed_backend_path = Path("infra/gcp/backend.tf")
+    allowed_backend_paths = {
+        Path("infra/gcp/backend.tf"),
+        Path("infra/gcp/bootstrap/backend.tf"),
+    }
     forbidden_backend_value_tokens = [
         "bucket",
         "prefix",
@@ -2860,15 +2864,41 @@ def _collect_backend_configuration_violations(
     for path in sorted(terraform_config_paths):
         relative_path = path.relative_to(root)
         text = path.read_text(encoding="utf-8")
-        if 'backend "gcs"' in text:
-            if relative_path != allowed_backend_path:
-                violations.append(
-                    f"{relative_path} contains backend configuration outside the approved partial backend path"
-                )
-                continue
-            for token in forbidden_backend_value_tokens:
-                if re.search(rf"\b{re.escape(token)}\s*=", text):
-                    violations.append(f"{relative_path} contains committed backend value {token!r}")
+        if path.suffix == ".tf":
+            try:
+                parsed_hcl = hcl2.loads(text)
+            except Exception:
+                parsed_hcl = None
+            terraform_blocks = parsed_hcl.get("terraform") if isinstance(parsed_hcl, dict) else None
+            if isinstance(terraform_blocks, list):
+                for terraform_block in terraform_blocks:
+                    if not isinstance(terraform_block, dict) or "backend" not in terraform_block:
+                        continue
+                    if relative_path not in allowed_backend_paths:
+                        violations.append(
+                            f"{relative_path} contains backend configuration outside the approved partial backend path"
+                        )
+                        continue
+                    backend_blocks = terraform_block.get("backend")
+                    if not isinstance(backend_blocks, list):
+                        continue
+                    for backend_block in backend_blocks:
+                        if not isinstance(backend_block, dict):
+                            continue
+                        for backend_type, backend_values in backend_block.items():
+                            normalized_backend_type = _normalize_hcl_scalar(str(backend_type))
+                            if normalized_backend_type != "gcs":
+                                violations.append(
+                                    f"{relative_path} contains unreviewed backend type {normalized_backend_type!r}"
+                                )
+                                continue
+                            if not isinstance(backend_values, dict):
+                                continue
+                            for token in forbidden_backend_value_tokens:
+                                if token in backend_values:
+                                    violations.append(
+                                        f"{relative_path} contains committed backend value {token!r}"
+                                    )
 
         if path.name.endswith(".tf.json"):
             try:

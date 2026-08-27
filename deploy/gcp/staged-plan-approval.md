@@ -6,6 +6,8 @@ This document defines the value-safe approval procedure for every future `founda
 
 Ensure every later cloud transition is tied to one reviewed saved plan, one exact source state, one exact workload digest posture, and one explicit approval record.
 
+Before any backend initialization or apply, the approval bundle must also bind the canonical private backend-config digest plus an opaque resolved backend identity, state object or prefix, and lock scope fingerprint. The pre-initialization comparison must prove bootstrap and workload roots remain distinct and that the reviewed source/inputs still resolve to the approved backend target for that root.
+
 ## Core rule
 
 No Terraform apply, migration execution, service activation, or reverse transition may proceed from chat approval, a remembered prior plan, or a mutable local worktree. Every transition requires its own saved artifacts and explicit operator approval.
@@ -25,20 +27,26 @@ For each approved stage transition, preserve these artifacts outside tracked sou
    - provider lock digest
    - reviewed non-secret input digest
    - plan file digest
-4. **Stage and workload binding**
+   - canonical private backend-config digest
+4. **Backend target fingerprint**
+   - opaque resolved backend identity
+   - opaque state object or prefix fingerprint
+   - opaque lock scope fingerprint
+   - pre-initialization comparison record for the approved root
+5. **Stage and workload binding**
    - target stage: `foundation`, `migration`, or `service`
    - exact workload image digest when executable workload is present
-5. **Approval record**
+6. **Approval record**
    - approving owner
    - approval timestamp
    - approved target stage
    - saved-plan artifact references
    - explicit go/no-go note
-6. **Post-apply verification record**
+7. **Post-apply verification record**
    - exact verifier command used
    - observed pass/fail result
    - any residual blockers
-7. **Reverse-transition review record**
+8. **Reverse-transition review record**
    - destruction/replacement intent
    - control-plane survival review
    - secret/tester/recovery handling review
@@ -68,20 +76,22 @@ For each approved stage transition, preserve these artifacts outside tracked sou
 ## Approval ceremony
 
 1. Confirm the remediation merge is the reviewed base for the plan.
-2. Generate the saved plan using only reviewed non-secret inputs.
-3. Record the plan digest, lock digest, source SHA, and stage.
-4. Export the JSON inventory from that exact saved plan.
-5. Verify stage/workload binding before any approval request is sent.
-6. Present the approval bundle to Beatrice with:
+2. Before any backend initialization, compare the reviewed source and operator-held inputs to the approved canonical private backend-config digest plus the opaque resolved backend identity/state object or prefix/lock scope fingerprint for that root.
+3. Generate the saved plan using only reviewed non-secret inputs.
+4. Record the plan digest, lock digest, source SHA, stage, and backend fingerprint bundle.
+5. Export the JSON inventory from that exact saved plan.
+6. Verify stage/workload binding before any approval request is sent.
+7. Present the approval bundle to Beatrice with:
    - target stage
    - artifact references
    - exact digests
+   - backend fingerprint bundle
    - expected inventory
    - destructive/replacement summary
-7. Record explicit approval or rejection.
-8. If approved, apply only that exact saved plan.
-9. Immediately run the reviewed post-apply verifier and record its result.
-10. Stop before the next gate unless that next gate receives its own explicit approval.
+8. Record explicit approval or rejection.
+9. If approved, apply only that exact saved plan.
+10. Immediately run the reviewed post-apply verifier and record its result.
+11. Stop before the next gate unless that next gate receives its own explicit approval.
 
 ## Reverse transitions
 

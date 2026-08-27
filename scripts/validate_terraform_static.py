@@ -2762,6 +2762,7 @@ def _approved_count_max(count_expr: str) -> int | None:
     approved_patterns = [
         r'var\.deployment_stage == "service" \? 1 : 0',
         r'var\.deployment_stage == "migration" \|\| var\.deployment_stage == "service" \? 1 : 0',
+        r'var\.deployment_stage != "foundation" \? 1 : 0',
         r'var\.bootstrap_operator_status == "bootstrap-active" \? 1 : 0',
     ]
     for pattern in approved_patterns:
@@ -3346,7 +3347,7 @@ def _collect_migration_job_violations(root: Path, terraform_config_paths: list[P
             "max_retries = 0",
             "task_count  = 1",
             "parallelism = 1",
-            "subnetwork = google_compute_subnetwork.direct_vpc.id",
+            "subnetwork = google_compute_subnetwork.direct_vpc[0].id",
             'egress = "PRIVATE_RANGES_ONLY"',
         ]
         for fragment in required_fragments:

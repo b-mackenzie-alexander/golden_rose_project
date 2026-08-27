@@ -25,9 +25,10 @@ variable "container_image_digest" {
   description = "Immutable sha256 digest supplied out of band for the managed Artifact Registry staff-tracer image. Nullable so the foundation stage may omit it; required for migration and service stages."
   type        = string
   nullable    = true
+  default     = null
 
   validation {
-    condition     = var.deployment_stage == "foundation" ? var.container_image_digest == null : can(regex("sha256:[0-9a-f]{64}$", var.container_image_digest))
+    condition     = var.deployment_stage == "foundation" ? var.container_image_digest == null : var.container_image_digest != null && can(regex("sha256:[0-9a-f]{64}$", var.container_image_digest))
     error_message = "Foundation requires no image digest; migration and service require only an immutable sha256 digest."
   }
 }
@@ -46,10 +47,11 @@ variable "deployment_stage" {
 variable "direct_vpc_subnet_cidr" {
   description = "RFC1918 /26-or-broader subnet CIDR reserved out of band for Direct VPC egress and private service access validation."
   type        = string
-  nullable    = false
+  nullable    = true
+  default     = null
 
   validation {
-    condition = can(cidrnetmask(var.direct_vpc_subnet_cidr)) && can(regex(
+    condition = var.deployment_stage == "foundation" ? var.direct_vpc_subnet_cidr == null : var.direct_vpc_subnet_cidr != null && can(cidrnetmask(var.direct_vpc_subnet_cidr)) && can(regex(
       "^(10\\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])/(8|9|1[0-9]|2[0-6])|172\\.(1[6-9]|2[0-9]|3[0-1])\\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])/(1[2-9]|2[0-6])|192\\.168\\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])/(1[6-9]|2[0-6]))$",
       var.direct_vpc_subnet_cidr
     )) && cidrhost(var.direct_vpc_subnet_cidr, 0) == split("/", var.direct_vpc_subnet_cidr)[0]
@@ -62,18 +64,21 @@ variable "tester_authority_receipt_path" {
   description = "Operator-held path to the signed tester-authority receipt; service plans derive the IAM principal from it rather than accepting a principal tfvar."
   type        = string
   nullable    = true
+  default     = null
 }
 
 variable "tester_authority_bundle_path" {
   description = "Operator-held path to the detached Sigstore bundle for the tester-authority receipt."
   type        = string
   nullable    = true
+  default     = null
 }
 
 variable "tester_authority_certificate_identity" {
   description = "Reviewed GitHub workflow certificate identity required to verify the tester-authority receipt."
   type        = string
   nullable    = true
+  default     = null
 }
 
 
@@ -120,16 +125,23 @@ variable "cloud_run_request_log_posture" {
 variable "cloud_sql_backup_enabled" {
   description = "Explicit backup enablement input for the reviewed develop Cloud SQL contract; no approved production value is implied until the later recovery gate accepts it."
   type        = bool
-  nullable    = false
+  nullable    = true
+  default     = null
+
+  validation {
+    condition     = var.deployment_stage == "foundation" ? var.cloud_sql_backup_enabled == null : var.cloud_sql_backup_enabled != null
+    error_message = "Foundation requires no Cloud SQL backup-enable input; migration and service require an explicit Cloud SQL backup-enable input."
+  }
 }
 
 variable "cloud_sql_backup_start_time" {
   description = "Explicit UTC backup window start time for the reviewed develop Cloud SQL contract; operator-held until the later recovery gate accepts it."
   type        = string
-  nullable    = false
+  nullable    = true
+  default     = null
 
   validation {
-    condition     = can(regex("^([01][0-9]|2[0-3]):[0-5][0-9]$", var.cloud_sql_backup_start_time))
+    condition     = var.deployment_stage == "foundation" ? var.cloud_sql_backup_start_time == null : var.cloud_sql_backup_start_time != null && can(regex("^([01][0-9]|2[0-3]):[0-5][0-9]$", var.cloud_sql_backup_start_time))
     error_message = "The Cloud SQL backup start time must be an exact HH:MM UTC value supplied out of band."
   }
 }
@@ -137,16 +149,23 @@ variable "cloud_sql_backup_start_time" {
 variable "cloud_sql_point_in_time_recovery_enabled" {
   description = "Explicit PITR enablement input for the reviewed develop Cloud SQL contract; no approved production recovery posture is implied until the later gate accepts it."
   type        = bool
-  nullable    = false
+  nullable    = true
+  default     = null
+
+  validation {
+    condition     = var.deployment_stage == "foundation" ? var.cloud_sql_point_in_time_recovery_enabled == null : var.cloud_sql_point_in_time_recovery_enabled != null
+    error_message = "Foundation requires no Cloud SQL PITR input; migration and service require an explicit Cloud SQL PITR input."
+  }
 }
 
 variable "cloud_sql_transaction_log_retention_days" {
   description = "Explicit transaction-log retention input for the reviewed develop Cloud SQL contract; operator-held until recovery evidence is accepted."
   type        = number
-  nullable    = false
+  nullable    = true
+  default     = null
 
   validation {
-    condition     = floor(var.cloud_sql_transaction_log_retention_days) == var.cloud_sql_transaction_log_retention_days && var.cloud_sql_transaction_log_retention_days >= 1 && var.cloud_sql_transaction_log_retention_days <= 7
+    condition     = var.deployment_stage == "foundation" ? var.cloud_sql_transaction_log_retention_days == null : var.cloud_sql_transaction_log_retention_days != null && floor(var.cloud_sql_transaction_log_retention_days) == var.cloud_sql_transaction_log_retention_days && var.cloud_sql_transaction_log_retention_days >= 1 && var.cloud_sql_transaction_log_retention_days <= 7
     error_message = "The Cloud SQL transaction log retention input must be a whole number between 1 and 7 days."
   }
 }
@@ -154,10 +173,11 @@ variable "cloud_sql_transaction_log_retention_days" {
 variable "cloud_sql_retained_backups" {
   description = "Explicit retained-backup count for the reviewed develop Cloud SQL contract; operator-held until recovery evidence is accepted."
   type        = number
-  nullable    = false
+  nullable    = true
+  default     = null
 
   validation {
-    condition     = floor(var.cloud_sql_retained_backups) == var.cloud_sql_retained_backups && var.cloud_sql_retained_backups >= 1 && var.cloud_sql_retained_backups <= 365
+    condition     = var.deployment_stage == "foundation" ? var.cloud_sql_retained_backups == null : var.cloud_sql_retained_backups != null && floor(var.cloud_sql_retained_backups) == var.cloud_sql_retained_backups && var.cloud_sql_retained_backups >= 1 && var.cloud_sql_retained_backups <= 365
     error_message = "The Cloud SQL retained backup count must be a whole number between 1 and 365 backups."
   }
 }
@@ -165,10 +185,11 @@ variable "cloud_sql_retained_backups" {
 variable "cloud_sql_database_name" {
   description = "Non-secret reviewed application database identifier for the private synthetic develop environment."
   type        = string
-  nullable    = false
+  nullable    = true
+  default     = null
 
   validation {
-    condition     = can(regex("^[a-z][a-z0-9_]{2,62}$", var.cloud_sql_database_name))
+    condition     = var.deployment_stage == "foundation" ? var.cloud_sql_database_name == null : var.cloud_sql_database_name != null && can(regex("^[a-z][a-z0-9_]{2,62}$", var.cloud_sql_database_name))
     error_message = "The Cloud SQL database name must be a lowercase PostgreSQL-safe identifier supplied out of band."
   }
 }
@@ -176,10 +197,11 @@ variable "cloud_sql_database_name" {
 variable "cloud_sql_schema_owner_role" {
   description = "Non-secret reviewed schema-owner role identifier for the private synthetic develop environment."
   type        = string
-  nullable    = false
+  nullable    = true
+  default     = null
 
   validation {
-    condition     = can(regex("^[a-z][a-z0-9_]{2,62}$", var.cloud_sql_schema_owner_role))
+    condition     = var.deployment_stage == "foundation" ? var.cloud_sql_schema_owner_role == null : var.cloud_sql_schema_owner_role != null && can(regex("^[a-z][a-z0-9_]{2,62}$", var.cloud_sql_schema_owner_role))
     error_message = "The Cloud SQL schema-owner role must be a lowercase PostgreSQL-safe identifier supplied out of band."
   }
 }
@@ -187,10 +209,11 @@ variable "cloud_sql_schema_owner_role" {
 variable "cloud_sql_migrator_role" {
   description = "Non-secret reviewed migration role identifier for the private synthetic develop environment."
   type        = string
-  nullable    = false
+  nullable    = true
+  default     = null
 
   validation {
-    condition     = can(regex("^[a-z][a-z0-9_]{2,62}$", var.cloud_sql_migrator_role))
+    condition     = var.deployment_stage == "foundation" ? var.cloud_sql_migrator_role == null : var.cloud_sql_migrator_role != null && can(regex("^[a-z][a-z0-9_]{2,62}$", var.cloud_sql_migrator_role))
     error_message = "The Cloud SQL migrator role must be a lowercase PostgreSQL-safe identifier supplied out of band."
   }
 }
@@ -198,10 +221,11 @@ variable "cloud_sql_migrator_role" {
 variable "cloud_sql_runtime_role" {
   description = "Non-secret reviewed runtime role identifier for the private synthetic develop environment."
   type        = string
-  nullable    = false
+  nullable    = true
+  default     = null
 
   validation {
-    condition     = can(regex("^[a-z][a-z0-9_]{2,62}$", var.cloud_sql_runtime_role))
+    condition     = var.deployment_stage == "foundation" ? var.cloud_sql_runtime_role == null : var.cloud_sql_runtime_role != null && can(regex("^[a-z][a-z0-9_]{2,62}$", var.cloud_sql_runtime_role))
     error_message = "The Cloud SQL runtime role must be a lowercase PostgreSQL-safe identifier supplied out of band."
   }
 }
@@ -209,10 +233,11 @@ variable "cloud_sql_runtime_role" {
 variable "cloud_sql_recovery_policy_review_status" {
   description = "Explicit marker showing Cloud SQL backup, PITR, retention, and restore values remain pending the later recovery-evidence gate."
   type        = string
-  nullable    = false
+  nullable    = true
+  default     = null
 
   validation {
-    condition     = var.cloud_sql_recovery_policy_review_status == "gate-2-evidence-required"
+    condition     = var.deployment_stage == "foundation" ? var.cloud_sql_recovery_policy_review_status == null : var.cloud_sql_recovery_policy_review_status != null && var.cloud_sql_recovery_policy_review_status == "gate-2-evidence-required"
     error_message = "The Cloud SQL recovery-policy marker must remain gate-2-evidence-required until later recovery evidence is accepted."
   }
 }

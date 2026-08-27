@@ -1,4 +1,6 @@
 resource "google_sql_database_instance" "develop" {
+  count = var.deployment_stage != "foundation" ? 1 : 0
+
   project             = var.project_id
   name                = "develop-postgres"
   region              = var.region
@@ -24,7 +26,7 @@ resource "google_sql_database_instance" "develop" {
 
     ip_configuration {
       ipv4_enabled    = false
-      private_network = google_compute_network.develop.id
+      private_network = google_compute_network.develop[0].id
     }
 
     user_labels = merge(
@@ -37,12 +39,14 @@ resource "google_sql_database_instance" "develop" {
 
   depends_on = [
     google_project_service.approved["sqladmin.googleapis.com"],
-    google_service_networking_connection.private_service_access,
+    google_service_networking_connection.private_service_access[0],
   ]
 }
 
 resource "google_sql_database" "application" {
+  count = var.deployment_stage != "foundation" ? 1 : 0
+
   project  = var.project_id
   name     = var.cloud_sql_database_name
-  instance = google_sql_database_instance.develop.name
+  instance = google_sql_database_instance.develop[0].name
 }

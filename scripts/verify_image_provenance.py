@@ -1,4 +1,5 @@
 import argparse
+import base64
 import hashlib
 import json
 import re
@@ -139,10 +140,74 @@ def _validate_provenance_verification(
         raise ValueError("provenance verification builder_id must be non-empty")
 
 
-def _validate_image_sbom(path: Path, *, expected_digest: str) -> None:
+def _decode_image_sbom_attestation(
+    path: Path, *, expected_digest: str, expected_subject: str
+) -> dict[str, Any]:
     payload = _load_json(path)
+    if payload.get("bomFormat") == "CycloneDX":
+        return payload
+    if payload.get("payloadType") != "application/vnd.in-toto+json":
+        raise ValueError("image SBOM must be CycloneDX JSON or a verified DSSE envelope")
+    encoded_statement = payload.get("payload")
+    signatures = payload.get("signatures")
+    if not isinstance(encoded_statement, str) or not isinstance(signatures, list) or not signatures:
+        raise ValueError("image SBOM DSSE envelope is incomplete")
+    try:
+        statement = json.loads(base64.b64decode(encoded_statement, validate=True))
+    except (ValueError, json.JSONDecodeError) as exc:
+        raise ValueError("image SBOM DSSE payload is malformed") from exc
+    if not isinstance(statement, dict):
+        raise ValueError("image SBOM DSSE statement must be an object")
+    if statement.get("_type") != "https://in-toto.io/Statement/v0.1":
+        raise ValueError("image SBOM attestation must be an in-toto v0.1 statement")
+    if statement.get("predicateType") != "https://spdx.dev/Document":
+        raise ValueError("image SBOM attestation predicate type must be SPDX")
+    subjects = statement.get("subject")
+    expected_repository = expected_subject.removesuffix(f"@{expected_digest}")
+    if not isinstance(subjects, list) or not any(
+        isinstance(subject, dict)
+        and subject.get("name") == expected_repository
+        and isinstance(subject.get("digest"), dict)
+        and subject["digest"].get("sha256") == expected_digest.removeprefix("sha256:")
+        for subject in subjects
+    ):
+        raise ValueError("image SBOM attestation subject must match the reviewed immutable image")
+    predicate = statement.get("predicate")
+    if not isinstance(predicate, dict):
+        raise ValueError("image SBOM attestation predicate must be an object")
+    return predicate
+
+
+def _validate_image_sbom(path: Path, *, expected_digest: str, expected_subject: str) -> None:
+    payload = _decode_image_sbom_attestation(
+        path, expected_digest=expected_digest, expected_subject=expected_subject
+    )
     if payload.get("bomFormat") != "CycloneDX":
-        raise ValueError("image SBOM must declare CycloneDX bomFormat")
+        if payload.get("spdxVersion") is None:
+            raise ValueError("image SBOM must declare CycloneDX bomFormat or SPDX version")
+        packages = payload.get("packages")
+        described = payload.get("documentDescribes")
+        if (
+            not isinstance(packages, list)
+            or not packages
+            or not all(
+                isinstance(package, dict)
+                and isinstance(package.get("SPDXID"), str)
+                and package["SPDXID"].strip()
+                and isinstance(package.get("name"), str)
+                and package["name"].strip()
+                for package in packages
+            )
+        ):
+            raise ValueError("image SBOM attestation must contain a non-empty component inventory")
+        package_ids = {package["SPDXID"] for package in packages}
+        if (
+            not isinstance(described, list)
+            or not described
+            or not all(isinstance(item, str) and item in package_ids for item in described)
+        ):
+            raise ValueError("image SBOM attestation must describe a final-image subject")
+        return
     metadata = payload.get("metadata")
     if not isinstance(metadata, dict):
         raise ValueError("image SBOM must include metadata")
@@ -317,7 +382,9 @@ def verify_image_provenance(
         expected_digest=digest,
         expected_subject=canonical_image_ref,
     )
-    _validate_image_sbom(image_sbom_path, expected_digest=digest)
+    _validate_image_sbom(
+        image_sbom_path, expected_digest=digest, expected_subject=canonical_image_ref
+    )
     _validate_application_sbom_attestation(
         application_sbom_verification_path,
         expected_digest=digest,

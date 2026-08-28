@@ -34,6 +34,14 @@ on:
         description: Detached Sigstore bundle for migration-success receipt required only for service
         required: false
         type: string
+      migration_readback_receipt_base64:
+        description: Signed post-migration database/schema/authority readback receipt required only for service
+        required: false
+        type: string
+      migration_readback_receipt_bundle_base64:
+        description: Detached Sigstore bundle for the post-migration database/schema/authority readback receipt required only for service
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -91,24 +99,38 @@ jobs:
           MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY: ${{ vars.MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY }}
           MIGRATION_RECEIPT_BASE64: ${{ inputs.migration_receipt_base64 }}
           MIGRATION_RECEIPT_BUNDLE_BASE64: ${{ inputs.migration_receipt_bundle_base64 }}
+          MIGRATION_READBACK_RECEIPT_BASE64: ${{ inputs.migration_readback_receipt_base64 }}
+          MIGRATION_READBACK_RECEIPT_BUNDLE_BASE64: ${{ inputs.migration_readback_receipt_bundle_base64 }}
+          MIGRATION_READBACK_RECEIPT_CERTIFICATE_IDENTITY: ${{ vars.MIGRATION_READBACK_RECEIPT_CERTIFICATE_IDENTITY }}
           DEPLOYMENT_STAGE: ${{ inputs.deployment_stage }}
         run: |
           set -euo pipefail
           mkdir -p build/transition-authority
+          test -n "$STAGE_RECEIPT_BASE64"
+          test -n "$STAGE_RECEIPT_BUNDLE_BASE64"
+          test -n "$STAGE_RECEIPT_CERTIFICATE_IDENTITY"
           printf '%s' "$STAGE_RECEIPT_BASE64" | base64 --decode > build/transition-authority/stage-receipt.json
           printf '%s' "$STAGE_RECEIPT_BUNDLE_BASE64" | base64 --decode > build/transition-authority/stage-receipt.sigstore.json
           cosign verify-blob build/transition-authority/stage-receipt.json --bundle build/transition-authority/stage-receipt.sigstore.json --certificate-identity "$STAGE_RECEIPT_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
           if [ "$DEPLOYMENT_STAGE" = "service" ]; then
             test -n "$MIGRATION_SUCCESS_RECEIPT_BASE64"
             test -n "$MIGRATION_SUCCESS_RECEIPT_BUNDLE_BASE64"
+            test -n "$MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY"
             test -n "$MIGRATION_RECEIPT_BASE64"
             test -n "$MIGRATION_RECEIPT_BUNDLE_BASE64"
+            test -n "$MIGRATION_READBACK_RECEIPT_BASE64"
+            test -n "$MIGRATION_READBACK_RECEIPT_BUNDLE_BASE64"
+            test -n "$MIGRATION_READBACK_RECEIPT_CERTIFICATE_IDENTITY"
             printf '%s' "$MIGRATION_RECEIPT_BASE64" | base64 --decode > build/transition-authority/migration-receipt.json
             printf '%s' "$MIGRATION_RECEIPT_BUNDLE_BASE64" | base64 --decode > build/transition-authority/migration-receipt.sigstore.json
             cosign verify-blob build/transition-authority/migration-receipt.json --bundle build/transition-authority/migration-receipt.sigstore.json --certificate-identity "$STAGE_RECEIPT_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
             printf '%s' "$MIGRATION_SUCCESS_RECEIPT_BASE64" | base64 --decode > build/transition-authority/migration-success-receipt.json
             printf '%s' "$MIGRATION_SUCCESS_RECEIPT_BUNDLE_BASE64" | base64 --decode > build/transition-authority/migration-success-receipt.sigstore.json
             cosign verify-blob build/transition-authority/migration-success-receipt.json --bundle build/transition-authority/migration-success-receipt.sigstore.json --certificate-identity "$MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+            printf '%s' "$MIGRATION_READBACK_RECEIPT_BASE64" | base64 --decode > build/transition-authority/migration-database-authority-readback.json
+            printf '%s' "$MIGRATION_READBACK_RECEIPT_BUNDLE_BASE64" | base64 --decode > build/transition-authority/migration-database-authority-readback.sigstore.json
+            cosign verify-blob build/transition-authority/migration-database-authority-readback.json --bundle build/transition-authority/migration-database-authority-readback.sigstore.json --certificate-identity "$MIGRATION_READBACK_RECEIPT_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+            uv run python scripts/verify_migration_database_readback.py --readback-receipt build/transition-authority/migration-database-authority-readback.json --migration-receipt build/transition-authority/migration-receipt.json --migration-success-receipt build/transition-authority/migration-success-receipt.json
           fi
 
       - name: Initialize failed deploy result
@@ -121,12 +143,27 @@ jobs:
           Path("build/deploy-result.json").write_text(json.dumps({"result": "failed", "current_stage": "pre_deploy_validation", "qualification_executed": False, "recovery_disposition": "forward recovery or teardown/rebuild required"}, indent=2) + "\n", encoding="utf-8")
           PY
 
+      - name: Authenticate artifact verifier to Google Cloud
+        id: artifact_verifier_auth
+        # v2.1.10
+        uses: google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_ARTIFACT_VERIFIER_SERVICE_ACCOUNT }}
+          token_format: access_token
+          create_credentials_file: true
+
       - name: Verify direct OCI image authority
         env:
           MANAGED_REPOSITORY: us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer
           BUILD_CERTIFICATE_IDENTITY: ${{ vars.BUILD_CERTIFICATE_IDENTITY }}
+          ARTIFACT_VERIFIER_ACCESS_TOKEN: ${{ steps.artifact_verifier_auth.outputs.access_token }}
+          DOCKER_CONFIG: ${{ runner.temp }}/artifact-verifier-docker
         run: |
           set -euo pipefail
+          test -n "$ARTIFACT_VERIFIER_ACCESS_TOKEN"
+          mkdir -p "$DOCKER_CONFIG"
+          printf '%s' "$ARTIFACT_VERIFIER_ACCESS_TOKEN" | docker login us-east4-docker.pkg.dev --username oauth2accesstoken --password-stdin
           IMAGE_TAG="$MANAGED_REPOSITORY:${GITHUB_SHA}"
           mkdir -p build/oci-authority
           cosign verify --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$IMAGE_TAG" > build/oci-authority/signature.json
@@ -144,6 +181,30 @@ jobs:
           uv run python scripts/verify_deploy_image_authority.py --image "$MANAGED_IMAGE" --signature build/oci-authority/signature.json --provenance build/oci-authority/provenance.json --image-sbom build/oci-authority/image-sbom.json --application-sbom build/oci-authority/application-sbom.json --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --source-commit "$GITHUB_SHA"
           printf 'MANAGED_IMAGE=%s\nIMAGE_DIGEST=%s\n' "$MANAGED_IMAGE" "$IMAGE_DIGEST" >> "$GITHUB_ENV"
 
+      - name: Clear artifact verifier credential context
+        env:
+          DOCKER_CONFIG: ${{ runner.temp }}/artifact-verifier-docker
+        run: |
+          set -euo pipefail
+          verifier_google_application_credentials="${GOOGLE_APPLICATION_CREDENTIALS:-}"
+          verifier_cloudsdk_credentials="${CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE:-}"
+          verifier_google_gha_creds_path="${GOOGLE_GHA_CREDS_PATH:-}"
+          docker logout us-east4-docker.pkg.dev
+          rm -rf "$DOCKER_CONFIG"
+          for credential_path in "$verifier_google_application_credentials" "$verifier_cloudsdk_credentials" "$verifier_google_gha_creds_path"; do
+            if [ -n "$credential_path" ]; then
+              rm -f "$credential_path"
+            fi
+          done
+          printf 'GOOGLE_APPLICATION_CREDENTIALS=\n' >> "$GITHUB_ENV"
+          printf 'CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE=\n' >> "$GITHUB_ENV"
+          printf 'GOOGLE_GHA_CREDS_PATH=\n' >> "$GITHUB_ENV"
+          printf 'DOCKER_CONFIG=\n' >> "$GITHUB_ENV"
+          test ! -e "$DOCKER_CONFIG"
+          [ -z "$verifier_google_application_credentials" ] || test ! -e "$verifier_google_application_credentials"
+          [ -z "$verifier_cloudsdk_credentials" ] || test ! -e "$verifier_cloudsdk_credentials"
+          [ -z "$verifier_google_gha_creds_path" ] || test ! -e "$verifier_google_gha_creds_path"
+
       - name: Validate signed stage receipt after image digest
         env:
           DEPLOYMENT_STAGE: ${{ inputs.deployment_stage }}
@@ -156,14 +217,15 @@ jobs:
           fi
           uv run python scripts/verify_stage_receipt.py "${args[@]}" > build/transition-authority/stage-receipt.sha256
 
-      - name: Authenticate to Google Cloud
-        id: auth
+      - name: Authenticate deployer to Google Cloud
+        id: deployer_auth
         # v2.1.10
         uses: google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_DEPLOYER_SERVICE_ACCOUNT }}
           token_format: access_token
+          create_credentials_file: true
 
       - name: Set up gcloud
         # v2.1.4
@@ -219,7 +281,53 @@ jobs:
         if: inputs.deployment_stage == 'migration'
         run: |
           set -euo pipefail
-          gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --wait >/dev/null
+          mkdir -p build/transition-authority
+          gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --wait --format=json > build/transition-authority/migration-execution.json
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path("build/deploy-result.json")
+          payload = json.loads(path.read_text(encoding="utf-8"))
+          payload.update({"result": "success", "current_stage": "migration_execution", "image_digest": os.environ["IMAGE_DIGEST"]})
+          path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+          PY
+
+      - name: Write migration success receipt
+        if: inputs.deployment_stage == 'migration'
+        run: |
+          set -euo pipefail
+          uv run python scripts/write_migration_success_receipt.py --migration-receipt build/transition-authority/stage-receipt.json --deploy-result build/deploy-result.json --execution build/transition-authority/migration-execution.json --output build/transition-authority/migration-success-receipt.json
+
+      - name: Sign migration success receipt
+        if: inputs.deployment_stage == 'migration'
+        env:
+          MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY: ${{ vars.MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY }}
+        run: |
+          set -euo pipefail
+          test -n "$MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY"
+          cosign sign-blob --yes --bundle build/transition-authority/migration-success-receipt.sigstore.json build/transition-authority/migration-success-receipt.json >/dev/null
+
+      - name: Upload migration success receipt
+        if: inputs.deployment_stage == 'migration'
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: migration-success-receipt
+          path: build/transition-authority/migration-success-receipt.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload migration success receipt bundle
+        if: inputs.deployment_stage == 'migration'
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: migration-success-receipt-bundle
+          path: build/transition-authority/migration-success-receipt.sigstore.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Verify service readiness transition
         if: inputs.deployment_stage == 'service'

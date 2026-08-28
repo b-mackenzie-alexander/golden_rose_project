@@ -5,7 +5,7 @@
         "max_count": 1
       },
       "google_artifact_registry_repository_iam_member": {
-        "max_count": 1
+        "max_count": 2
       },
       "google_billing_budget": {
         "max_count": 1
@@ -85,10 +85,10 @@
         "max_count": 8
       },
       "google_service_account": {
-        "max_count": 5
+        "max_count": 6
       },
       "google_service_account_iam_member": {
-        "max_count": 2
+        "max_count": 3
       },
       "google_service_networking_connection": {
         "max_count": 1
@@ -178,12 +178,18 @@
               "name:Install Cosign",
               "name:Verify signed stage receipt before cloud authentication",
               "name:Initialize failed deploy result",
+              "name:Authenticate artifact verifier to Google Cloud",
               "name:Verify direct OCI image authority",
+              "name:Clear artifact verifier credential context",
               "name:Validate signed stage receipt after image digest",
-              "name:Authenticate to Google Cloud",
+              "name:Authenticate deployer to Google Cloud",
               "name:Set up gcloud",
               "name:Extract and validate selected live configuration projection",
               "name:Execute migration transition",
+              "name:Write migration success receipt",
+              "name:Sign migration success receipt",
+              "name:Upload migration success receipt",
+              "name:Upload migration success receipt bundle",
               "name:Verify service readiness transition",
               "name:Record deploy result",
               "name:Upload deploy result evidence"
@@ -236,10 +242,12 @@
       "scripts/verify_gcp_foundation.py",
       "scripts/verify_image_provenance.py",
       "scripts/verify_stage_receipt.py",
+      "scripts/verify_migration_database_readback.py",
       "scripts/verify_tester_authority_receipt.py",
       "scripts/validate_sbom.py",
       "scripts/validate_terraform_static.py",
-      "scripts/verify_deploy_image_authority.py"
+      "scripts/verify_deploy_image_authority.py",
+      "scripts/write_migration_success_receipt.py"
     ]
   },
   "protected_deployment_paths": [

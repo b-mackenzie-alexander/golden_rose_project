@@ -429,6 +429,7 @@ def _expected_service_accounts(project_id: str) -> set[str]:
 
 def _expected_control_plane_service_accounts(control_plane_project_id: str) -> set[str]:
     return {
+        f"golden-rose-artifact-verifier@{control_plane_project_id}.iam.gserviceaccount.com",
         f"golden-rose-deployer@{control_plane_project_id}.iam.gserviceaccount.com",
         f"golden-rose-image-publisher@{control_plane_project_id}.iam.gserviceaccount.com",
         f"golden-rose-provisioner@{control_plane_project_id}.iam.gserviceaccount.com",
@@ -541,6 +542,15 @@ def _expected_workload_identity_provider_snapshot() -> dict[str, Any]:
             "attribute.event_name": "assertion.event_name",
             "attribute.workflow_ref": "assertion.workflow_ref",
         },
+        "attribute_condition": (
+            f'attribute.repository == "{GITHUB_REPOSITORY}" && '
+            'attribute.repository_owner == "b-mackenzie-alexander" && '
+            f'attribute.ref == "{GITHUB_PROTECTED_REF}" && '
+            'attribute.environment == "develop" && '
+            'attribute.event_name == "workflow_dispatch" && '
+            f'( attribute.workflow_ref == "{BUILD_IMAGE_WORKFLOW_REF}" || '
+            f'attribute.workflow_ref == "{DEPLOY_DEVELOP_WORKFLOW_REF}" )'
+        ),
         "required_condition_fragments": {
             f'attribute.repository == "{GITHUB_REPOSITORY}"',
             'attribute.repository_owner == "b-mackenzie-alexander"',
@@ -562,8 +572,25 @@ def _expected_control_plane_service_account_iam(
         f"golden-rose-image-publisher@{control_plane_project_id}.iam.gserviceaccount.com": {
             WIF_ROLE: f"/attribute.workflow_ref/{BUILD_IMAGE_WORKFLOW_REF}"
         },
+        f"golden-rose-artifact-verifier@{control_plane_project_id}.iam.gserviceaccount.com": {
+            WIF_ROLE: f"/attribute.workflow_ref/{DEPLOY_DEVELOP_WORKFLOW_REF}"
+        },
         f"golden-rose-deployer@{control_plane_project_id}.iam.gserviceaccount.com": {
             WIF_ROLE: f"/attribute.workflow_ref/{DEPLOY_DEVELOP_WORKFLOW_REF}"
+        },
+    }
+
+
+def _expected_artifact_registry_iam(
+    contract: dict[str, Any],
+) -> dict[str, set[str]]:
+    control_plane_project_id = str(contract["control_plane_project_id"])
+    return {
+        "roles/artifactregistry.writer": {
+            f"serviceAccount:golden-rose-image-publisher@{control_plane_project_id}.iam.gserviceaccount.com"
+        },
+        "roles/artifactregistry.reader": {
+            f"serviceAccount:golden-rose-artifact-verifier@{control_plane_project_id}.iam.gserviceaccount.com"
         },
     }
 
@@ -820,26 +847,36 @@ def evaluate_foundation_snapshot(
     ):
         violations.append("workload identity provider attribute mapping drifted")
     attribute_condition = str(workload_identity_provider.get("attribute_condition", ""))
-    for fragment in expected_provider["required_condition_fragments"]:
-        if fragment not in attribute_condition:
-            violations.append(
-                f"workload identity provider missing required exact authority claim {fragment!r}"
-            )
+    expected_attribute_condition = str(expected_provider["attribute_condition"])
+    if " ".join(attribute_condition.split()) != " ".join(expected_attribute_condition.split()):
+        violations.append(
+            "workload identity provider attribute condition drifted from reviewed trust"
+        )
 
     artifact_registry_iam = _mapping(
         snapshot.get("artifact_registry_iam", {}), label="artifact registry iam"
     )
-    if set(artifact_registry_iam) != {"roles/artifactregistry.writer"}:
-        violations.append("Artifact Registry IAM roles drifted from reviewed writer-only boundary")
+    expected_artifact_registry_iam = _expected_artifact_registry_iam(contract)
+    if set(artifact_registry_iam) != set(expected_artifact_registry_iam):
+        violations.append(
+            "Artifact Registry IAM roles drifted from reviewed writer-reader boundary"
+        )
     artifact_registry_writers = _as_set(artifact_registry_iam.get("roles/artifactregistry.writer"))
-    if (
-        "allUsers" in artifact_registry_writers
-        or "allAuthenticatedUsers" in artifact_registry_writers
+    artifact_registry_readers = _as_set(artifact_registry_iam.get("roles/artifactregistry.reader"))
+    for members, label in (
+        (artifact_registry_writers, "writer"),
+        (artifact_registry_readers, "reader"),
     ):
-        violations.append("public Artifact Registry writer detected")
-    if artifact_registry_writers != {_expected_artifact_registry_writer_member(contract)}:
+        if "allUsers" in members or "allAuthenticatedUsers" in members:
+            violations.append(f"public Artifact Registry {label} detected")
+    if artifact_registry_writers != expected_artifact_registry_iam["roles/artifactregistry.writer"]:
         violations.append(
             "Artifact Registry writer bindings drifted from the reviewed publisher principal"
+        )
+    if artifact_registry_readers != expected_artifact_registry_iam["roles/artifactregistry.reader"]:
+        violations.append(
+            "Artifact Registry reader bindings drifted from the reviewed artifact verifier "
+            "principal"
         )
 
     state_bucket = _mapping(snapshot.get("state_bucket", {}), label="state bucket")

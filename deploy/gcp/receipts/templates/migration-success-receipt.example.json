@@ -1,0 +1,8 @@
+{
+  "stage": "migration",
+  "result": "success",
+  "migration_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "source_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "workload_image_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "execution_reference": "projects/example-project/locations/us-east4/jobs/run-migrations/executions/exec-123"
+}

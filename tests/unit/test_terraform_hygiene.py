@@ -195,6 +195,55 @@ def test_gcp_first_deployment_runbook_documents_recovery_and_secret_boundaries()
         assert phrase in runbook
 
 
+def test_gcp_first_deployment_runbook_documents_migration_success_service_approval_boundary() -> (
+    None
+):
+    runbook = (ROOT / "deploy/gcp/first-deployment-runbook.md").read_text(encoding="utf-8")
+
+    required_phrases = [
+        "migration-success receipt",
+        "detached Sigstore bundle",
+        "database/schema/authority readback",
+        "before service approval",
+        "before cloud authentication",
+    ]
+
+    for phrase in required_phrases:
+        assert phrase in runbook
+
+
+def test_gcp_first_deployment_runbook_documents_reviewed_identity_for_migration_success_verification() -> (
+    None
+):
+    runbook = (ROOT / "deploy/gcp/first-deployment-runbook.md").read_text(encoding="utf-8")
+
+    required_phrases = [
+        "reviewed GitHub Actions certificate identity",
+        "OIDC issuer",
+        "migration-success receipt",
+        "detached Sigstore bundle",
+    ]
+
+    for phrase in required_phrases:
+        assert phrase in runbook
+
+
+def test_gcp_first_deployment_runbook_documents_migration_receipt_as_separate_service_gate_input() -> (
+    None
+):
+    runbook = (ROOT / "deploy/gcp/first-deployment-runbook.md").read_text(encoding="utf-8")
+
+    required_phrases = [
+        "migration receipt",
+        "separate service gate",
+        "migration-success receipt",
+        "reviewed GitHub Actions certificate identity",
+    ]
+
+    for phrase in required_phrases:
+        assert phrase in runbook
+
+
 def test_gcp_recovery_and_teardown_runbooks_document_failure_handling_boundaries() -> None:
     rollback_runbook = (ROOT / "deploy/gcp/rollback-forward-recovery-runbook.md").read_text(
         encoding="utf-8"
@@ -324,14 +373,18 @@ def test_gcp_bootstrap_wif_contract_requires_exact_github_claims() -> None:
     assert 'attribute.event_name != "pull_request"' not in wif
 
 
-def test_gcp_bootstrap_iam_separates_provisioner_image_publisher_and_deployer() -> None:
+def test_gcp_bootstrap_iam_separates_provisioner_image_publisher_artifact_verifier_and_deployer() -> (
+    None
+):
     iam = (ROOT / "infra/gcp/bootstrap/iam.tf").read_text(encoding="utf-8")
 
     required_fragments = [
         'resource "google_service_account" "provisioner"',
         'resource "google_service_account" "image_publisher"',
+        'resource "google_service_account" "artifact_verifier"',
         'resource "google_service_account" "deployer"',
         'resource "google_service_account_iam_member" "image_publisher_wif"',
+        'resource "google_service_account_iam_member" "artifact_verifier_wif"',
         'resource "google_service_account_iam_member" "deployer_wif"',
         'role               = "roles/iam.workloadIdentityUser"',
         "member             = local.build_image_workflow_principal_set",
@@ -1187,6 +1240,7 @@ def test_gcp_develop_iam_models_least_privilege_runtime_migration_deployer_and_i
         'resource "google_secret_manager_secret_iam_member" "runtime_synthetic_staff_secret_access"',
         'resource "google_secret_manager_secret_iam_member" "migration_synthetic_staff_secret_access"',
         'resource "google_artifact_registry_repository_iam_member" "image_publisher_writer"',
+        'resource "google_artifact_registry_repository_iam_member" "artifact_verifier_reader"',
         'resource "google_cloud_run_v2_service_iam_member" "private_invoker"',
         "roles/cloudsql.client",
         "roles/logging.logWriter",
@@ -1195,10 +1249,12 @@ def test_gcp_develop_iam_models_least_privilege_runtime_migration_deployer_and_i
         "roles/run.viewer",
         "roles/secretmanager.secretAccessor",
         "roles/artifactregistry.writer",
+        "roles/artifactregistry.reader",
         "roles/run.invoker",
         "serviceAccount:${google_service_account.runtime.email}",
         "serviceAccount:${google_service_account.migration.email}",
         "golden-rose-image-publisher@${var.control_plane_project_id}.iam.gserviceaccount.com",
+        "golden-rose-artifact-verifier@${var.control_plane_project_id}.iam.gserviceaccount.com",
         "golden-rose-deployer@${var.control_plane_project_id}.iam.gserviceaccount.com",
         "data.external.tester_authority[0].result.private_invoker_principal",
     ]
@@ -1219,6 +1275,8 @@ def test_gcp_develop_iam_models_least_privilege_runtime_migration_deployer_and_i
         "google_service_account_key",
         "allUsers",
         "allAuthenticatedUsers",
+        'resource "google_artifact_registry_repository_iam_member" "deployer_reader"',
+        'resource "google_artifact_registry_repository_iam_member" "image_publisher_reader"',
         "var.deployer_principal",
     ]
     for fragment in forbidden_fragments:
@@ -1752,6 +1810,13 @@ def test_build_image_workflow_verifies_sboms_and_emits_value_safe_artifacts() ->
     assert "cosign attest --yes --type slsaprovenance" in workflow
     assert "cosign verify --certificate-identity" in workflow
     assert "cosign verify-attestation --type slsaprovenance" in workflow
+
+
+def test_build_image_workflow_captures_actual_cosign_image_sbom_evidence() -> None:
+    workflow = (ROOT / ".github/workflows/build-image.yml").read_text(encoding="utf-8")
+
+    assert "cosign verify-attestation --type https://spdx.dev/Document" in workflow
+    assert 'Path("build/image-sbom.cdx.json").write_text' not in workflow
 
 
 def test_privileged_jobs_have_bounded_timeouts() -> None:
@@ -4817,6 +4882,37 @@ def test_terraform_static_validation_harness_rejects_bootstrap_wif_non_dispatch_
     assert "workflow_dispatch" in result.stdout
 
 
+@pytest.mark.parametrize(
+    "broadening",
+    [
+        " || true",
+        ' || attribute.repository == "unreviewed/example"',
+    ],
+)
+def test_terraform_static_validation_harness_rejects_additive_bootstrap_wif_condition(
+    tmp_path: Path, broadening: str
+) -> None:
+    _write_current_terraform_scaffold(tmp_path)
+    (tmp_path / "infra" / "policy").mkdir(parents=True)
+    shutil.copy2(
+        ROOT / "infra" / "policy" / "predeployment-authority-manifest.json",
+        tmp_path / "infra" / "policy" / "predeployment-authority-manifest.json",
+    )
+    bootstrap_root = tmp_path / "infra" / "gcp" / "bootstrap"
+    wif = (ROOT / "infra" / "gcp" / "bootstrap" / "wif.tf").read_text(encoding="utf-8")
+    wif = wif.replace("  EOT\n", f"  {broadening}\n  EOT\n")
+    (bootstrap_root / "wif.tf").write_text(wif, encoding="utf-8")
+    (bootstrap_root / "iam.tf").write_text(
+        (ROOT / "infra" / "gcp" / "bootstrap" / "iam.tf").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode == 1
+    assert "attribute condition" in result.stdout
+
+
 def test_terraform_static_validation_harness_rejects_bootstrap_provisioner_wif_path(
     tmp_path: Path,
 ) -> None:
@@ -7617,9 +7713,232 @@ def test_deploy_workflow_uses_operator_receipts_and_direct_oci_authority() -> No
     assert "reviewed-stage-plan-receipt" not in workflow
     assert "Download reviewed publish artifacts" not in workflow
     assert (
+        workflow.index("Authenticate artifact verifier to Google Cloud")
+        < workflow.index("Verify direct OCI image authority")
+        < workflow.index("Clear artifact verifier credential context")
+        < workflow.index("Validate signed stage receipt after image digest")
+        < workflow.index("Authenticate deployer to Google Cloud")
+        < workflow.index("Set up gcloud")
+    )
+    assert (
         workflow.index("Verify direct OCI image authority")
         < workflow.index("Validate signed stage receipt after image digest")
-        < workflow.index("Authenticate to Google Cloud")
+        < workflow.index("Authenticate deployer to Google Cloud")
+    )
+
+
+def test_deploy_workflow_separates_artifact_verifier_credentials_from_deployer_credentials() -> (
+    None
+):
+    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
+
+    required = [
+        "Authenticate artifact verifier to Google Cloud",
+        "GCP_ARTIFACT_VERIFIER_SERVICE_ACCOUNT",
+        "create_credentials_file: true",
+        "Verify direct OCI image authority",
+        "DOCKER_CONFIG",
+        "docker logout us-east4-docker.pkg.dev",
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        "CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE",
+        "GOOGLE_GHA_CREDS_PATH",
+        "Authenticate deployer to Google Cloud",
+        "GCP_DEPLOYER_SERVICE_ACCOUNT",
+    ]
+    for fragment in required:
+        assert fragment in workflow
+
+    assert workflow.index("Authenticate artifact verifier to Google Cloud") < workflow.index(
+        "Verify direct OCI image authority"
+    )
+    assert workflow.index("Verify direct OCI image authority") < workflow.index(
+        "Authenticate deployer to Google Cloud"
+    )
+    assert workflow.index("docker logout us-east4-docker.pkg.dev") < workflow.index(
+        "Authenticate deployer to Google Cloud"
+    )
+
+
+def test_deploy_workflow_writes_and_uploads_migration_success_receipt_only_for_migration_stage() -> (
+    None
+):
+    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
+
+    required = [
+        "Write migration success receipt",
+        "scripts/write_migration_success_receipt.py",
+        "migration-success-receipt.json",
+        "migration-execution.json",
+        "Upload migration success receipt",
+        "migration-success-receipt",
+        "if: inputs.deployment_stage == 'migration'",
+    ]
+    for fragment in required:
+        assert fragment in workflow
+
+    assert (
+        workflow.index("Execute migration transition")
+        < workflow.index("Write migration success receipt")
+        < workflow.index("Upload migration success receipt")
+    )
+    execution_step = workflow.split("- name: Execute migration transition\n", 1)[1].split(
+        "\n      - name: Write migration success receipt\n", 1
+    )[0]
+    assert '"image_digest": os.environ["IMAGE_DIGEST"]' in execution_step
+
+
+def test_deploy_workflow_signs_and_uploads_migration_success_bundle_only_for_migration_stage() -> (
+    None
+):
+    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
+
+    required = [
+        "cosign sign-blob",
+        "migration-success-receipt.sigstore.json",
+        "MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY",
+        "Upload migration success receipt bundle",
+        "migration-success-receipt-bundle",
+        "if: inputs.deployment_stage == 'migration'",
+    ]
+    for fragment in required:
+        assert fragment in workflow
+
+    assert (
+        workflow.index("Write migration success receipt")
+        < workflow.index("cosign sign-blob")
+        < workflow.index("Upload migration success receipt bundle")
+    )
+
+
+def test_service_gate_requires_migration_success_bundle_and_certificate_identity_before_cloud_auth() -> (
+    None
+):
+    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
+    verification_step = workflow.split(
+        "- name: Verify signed stage receipt before cloud authentication\n", 1
+    )[1].split("\n      - name: Initialize failed deploy result\n", 1)[0]
+
+    required = [
+        'test -n "$MIGRATION_SUCCESS_RECEIPT_BUNDLE_BASE64"',
+        'test -n "$MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY"',
+        "printf '%s' \"$MIGRATION_SUCCESS_RECEIPT_BUNDLE_BASE64\" | base64 --decode > build/transition-authority/migration-success-receipt.sigstore.json",
+        'cosign verify-blob build/transition-authority/migration-success-receipt.json --bundle build/transition-authority/migration-success-receipt.sigstore.json --certificate-identity "$MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY"',
+    ]
+    for fragment in required:
+        assert fragment in verification_step
+
+    assert verification_step.index(
+        'test -n "$MIGRATION_SUCCESS_RECEIPT_BUNDLE_BASE64"'
+    ) < verification_step.index(
+        "cosign verify-blob build/transition-authority/migration-success-receipt.json"
+    )
+
+
+def test_service_gate_requires_signed_post_migration_database_authority_readback_before_cloud_auth() -> (
+    None
+):
+    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
+
+    required = [
+        "migration_readback_receipt_base64:",
+        "migration_readback_receipt_bundle_base64:",
+        'test -n "$MIGRATION_READBACK_RECEIPT_BASE64"',
+        'test -n "$MIGRATION_READBACK_RECEIPT_BUNDLE_BASE64"',
+        'test -n "$MIGRATION_READBACK_RECEIPT_CERTIFICATE_IDENTITY"',
+        "migration-database-authority-readback.json",
+        "migration-database-authority-readback.sigstore.json",
+        "scripts/verify_migration_database_readback.py",
+    ]
+    for fragment in required:
+        assert fragment in workflow
+    assert workflow.index(
+        "Verify signed stage receipt before cloud authentication"
+    ) < workflow.index("Authenticate artifact verifier to Google Cloud")
+
+
+def test_static_validator_binds_artifact_verifier_reader_resource_fields_not_comments(
+    tmp_path: Path,
+) -> None:
+    shutil.copytree(
+        ROOT,
+        tmp_path,
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns(".git", ".venv", ".ruff_cache", "__pycache__"),
+    )
+    iam_path = tmp_path / "infra" / "gcp" / "develop" / "iam.tf"
+    iam = iam_path.read_text(encoding="utf-8")
+    reader_start = iam.index(
+        'resource "google_artifact_registry_repository_iam_member" "artifact_verifier_reader"'
+    )
+    reader_end = iam.index("\n}\n", reader_start) + len("\n}\n")
+    reader = iam[reader_start:reader_end]
+    mutated_reader = reader.replace(
+        "golden-rose-artifact-verifier@${var.control_plane_project_id}.iam.gserviceaccount.com",
+        "golden-rose-deployer@${var.control_plane_project_id}.iam.gserviceaccount.com",
+    )
+    iam_path.write_text(
+        iam[:reader_start]
+        + mutated_reader
+        + iam[reader_end:]
+        + '\n# member     = "serviceAccount:golden-rose-artifact-verifier@${var.control_plane_project_id}.iam.gserviceaccount.com"\n',
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode == 1
+    assert "artifact verifier reader" in result.stdout.lower()
+
+
+def test_service_gate_requires_migration_receipt_and_bundle_inputs_before_decode() -> None:
+    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
+    verification_step = workflow.split(
+        "- name: Verify signed stage receipt before cloud authentication\n", 1
+    )[1].split("\n      - name: Initialize failed deploy result\n", 1)[0]
+
+    assert 'test -n "$MIGRATION_RECEIPT_BASE64"' in verification_step
+    assert 'test -n "$MIGRATION_RECEIPT_BUNDLE_BASE64"' in verification_step
+    assert verification_step.index('test -n "$MIGRATION_RECEIPT_BASE64"') < verification_step.index(
+        "printf '%s' \"$MIGRATION_RECEIPT_BASE64\" | base64 --decode > build/transition-authority/migration-receipt.json"
+    )
+    assert verification_step.index(
+        'test -n "$MIGRATION_RECEIPT_BUNDLE_BASE64"'
+    ) < verification_step.index(
+        "printf '%s' \"$MIGRATION_RECEIPT_BUNDLE_BASE64\" | base64 --decode > build/transition-authority/migration-receipt.sigstore.json"
+    )
+
+
+def test_pre_auth_stage_receipt_verification_requires_certificate_identity_before_any_cosign_call() -> (
+    None
+):
+    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
+    verification_step = workflow.split(
+        "- name: Verify signed stage receipt before cloud authentication\n", 1
+    )[1].split("\n      - name: Initialize failed deploy result\n", 1)[0]
+
+    assert 'test -n "$STAGE_RECEIPT_CERTIFICATE_IDENTITY"' in verification_step
+    assert verification_step.index(
+        'test -n "$STAGE_RECEIPT_CERTIFICATE_IDENTITY"'
+    ) < verification_step.index("cosign verify-blob build/transition-authority/stage-receipt.json")
+
+
+def test_pre_auth_stage_receipt_verification_requires_receipt_and_bundle_inputs_before_decode() -> (
+    None
+):
+    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
+    verification_step = workflow.split(
+        "- name: Verify signed stage receipt before cloud authentication\n", 1
+    )[1].split("\n      - name: Initialize failed deploy result\n", 1)[0]
+
+    assert 'test -n "$STAGE_RECEIPT_BASE64"' in verification_step
+    assert 'test -n "$STAGE_RECEIPT_BUNDLE_BASE64"' in verification_step
+    assert verification_step.index('test -n "$STAGE_RECEIPT_BASE64"') < verification_step.index(
+        "printf '%s' \"$STAGE_RECEIPT_BASE64\" | base64 --decode > build/transition-authority/stage-receipt.json"
+    )
+    assert verification_step.index(
+        'test -n "$STAGE_RECEIPT_BUNDLE_BASE64"'
+    ) < verification_step.index(
+        "printf '%s' \"$STAGE_RECEIPT_BUNDLE_BASE64\" | base64 --decode > build/transition-authority/stage-receipt.sigstore.json"
     )
 
 
@@ -7695,8 +8014,8 @@ def test_static_policy_rejects_appended_deploy_environment_mutation(tmp_path: Pa
     policy_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy(ROOT / "infra" / "policy" / "predeployment-authority-manifest.json", policy_dir)
     workflow = _current_workflow_text("deploy-develop.yml").replace(
-        '          gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --wait >/dev/null\n',
-        '          gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --wait >/dev/null\n'
+        '          gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --wait --format=json > build/transition-authority/migration-execution.json\n',
+        '          gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --wait --format=json > build/transition-authority/migration-execution.json\n'
         '          gcloud run services update staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --update-env-vars UNREVIEWED_MUTATION=true\n',
         1,
     )
@@ -7738,8 +8057,8 @@ def test_static_policy_rejects_every_unreviewed_deploy_run_command(
     policy_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy(ROOT / "infra" / "policy" / "predeployment-authority-manifest.json", policy_dir)
     workflow = _current_workflow_text("deploy-develop.yml").replace(
-        '          gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --wait >/dev/null\n',
-        '          gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --wait >/dev/null\n'
+        '          gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --wait --format=json > build/transition-authority/migration-execution.json\n',
+        '          gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --wait --format=json > build/transition-authority/migration-execution.json\n'
         f"          {unreviewed_command}\n",
         1,
     )

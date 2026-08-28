@@ -97,6 +97,14 @@ resource "google_artifact_registry_repository_iam_member" "image_publisher_write
   member     = "serviceAccount:golden-rose-image-publisher@${var.control_plane_project_id}.iam.gserviceaccount.com"
 }
 
+resource "google_artifact_registry_repository_iam_member" "artifact_verifier_reader" {
+  project    = var.project_id
+  location   = var.region
+  repository = google_artifact_registry_repository.application_images.repository_id
+  role       = "roles/artifactregistry.reader"
+  member     = "serviceAccount:golden-rose-artifact-verifier@${var.control_plane_project_id}.iam.gserviceaccount.com"
+}
+
 data "external" "tester_authority" {
   count   = var.deployment_stage == "service" ? 1 : 0
   program = ["python3", "${path.root}/../../scripts/verify_tester_authority_receipt.py", "--external"]

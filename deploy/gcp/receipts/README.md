@@ -18,6 +18,7 @@ Use them to:
 ## Contents
 - `templates/tester-authority-receipt.example.json` — reviewed tester-authority receipt skeleton matching `scripts/verify_tester_authority_receipt.py`
 - `templates/stage-receipt.example.json` — reviewed stage receipt skeleton matching `scripts/verify_stage_receipt.py`
+- `templates/migration-success-receipt.example.json` — reviewed migration-success receipt skeleton matching `scripts/write_migration_success_receipt.py` and `scripts/verify_stage_receipt.py`
 
 ## Related sources
 - `scripts/verify_tester_authority_receipt.py`

@@ -83,6 +83,15 @@ If later deployment wiring uses a different secret-to-environment mapping, updat
 - Grant the migration login only the `golden_rose_migrator` group role and require the reviewed migration path to assume `golden_rose_schema_owner` explicitly through `GOLDEN_ROSE_MIGRATION_ASSUMED_ROLE`.
 - Before treating deployment authority as qualified, run `scripts/verify_database_authority.py` with reviewed admin/runtime/migration connection material and confirm the live login-role chain plus representative bounded-login probes pass.
 
+## Migration-success receipt and service approval boundary
+
+- The later service gate also requires the signed migration receipt as a separate service gate input; the migration-success receipt supplements it and never replaces it.
+- A migration-success receipt is authority only after a successful waited migration execution produces the reviewed JSON plus detached Sigstore bundle.
+- The later service gate must verify the migration-success receipt and its detached Sigstore bundle before cloud authentication.
+- That verification must bind to the reviewed GitHub Actions certificate identity and OIDC issuer rather than trusting a blob or bundle without its reviewed signer identity.
+- Service approval still requires separate database/schema/authority readback after migration completion and before service approval; a signed migration-success artifact set is necessary but not sufficient by itself.
+- Do not treat a present migration-success receipt, bundle, or signature as permission to skip the separate database authority and schema readback evidence.
+
 ## Private tester access boundary
 
 While application auth remains synthetic, platform-level access to the private Cloud Run service is the only tester gate. The private tester ceremony must therefore:

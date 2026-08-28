@@ -338,14 +338,37 @@ def validate_stage_receipt(
 
 
 def validate_migration_success_receipt(
-    receipt: dict[str, Any], *, migration_receipt_sha256: str, expected_digest: str
+    receipt: dict[str, Any],
+    *,
+    migration_receipt_sha256: str,
+    expected_digest: str,
+    expected_source_sha: str,
 ) -> None:
+    receipt = _require_exact_object(
+        receipt,
+        fields={
+            "stage",
+            "result",
+            "migration_receipt_sha256",
+            "source_sha",
+            "workload_image_digest",
+            "execution_reference",
+        },
+        label="migration success receipt",
+    )
     if receipt.get("stage") != "migration" or receipt.get("result") != "success":
         raise ReceiptError("migration success receipt must record a successful migration stage")
     if receipt.get("migration_receipt_sha256") != migration_receipt_sha256:
         raise ReceiptError("migration success receipt is not bound to the migration stage receipt")
+    if receipt.get("source_sha") != expected_source_sha:
+        raise ReceiptError(
+            "migration success receipt source SHA does not match the reviewed source"
+        )
     if receipt.get("workload_image_digest") != expected_digest:
         raise ReceiptError("migration success receipt is not bound to the reviewed image digest")
+    execution_reference = receipt.get("execution_reference")
+    if not isinstance(execution_reference, str) or not execution_reference.strip():
+        raise ReceiptError("migration success receipt execution reference is required")
 
 
 def main() -> int:
@@ -389,6 +412,7 @@ def main() -> int:
             migration_success_receipt,
             migration_receipt_sha256=migration_receipt_sha256,
             expected_digest=args.image_digest,
+            expected_source_sha=args.source_sha,
         )
     print(receipt_sha256)
     return 0

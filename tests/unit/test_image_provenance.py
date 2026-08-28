@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import importlib.util
 import json
@@ -132,6 +133,34 @@ def valid_image_sbom(digest: str) -> dict[str, object]:
             }
         },
         "components": [{"name": "busybox", "version": "1.0.0"}],
+    }
+
+
+def valid_image_sbom_attestation(digest: str) -> dict[str, object]:
+    statement = {
+        "_type": "https://in-toto.io/Statement/v0.1",
+        "predicateType": "https://spdx.dev/Document",
+        "subject": [
+            {
+                "name": "us-east4-docker.pkg.dev/example-project/application-images/staff-tracer",
+                "digest": {"sha256": digest.removeprefix("sha256:")},
+            }
+        ],
+        "predicate": {
+            "spdxVersion": "SPDX-2.3",
+            "dataLicense": "CC0-1.0",
+            "SPDXID": "SPDXRef-DOCUMENT",
+            "name": "sbom-staff-tracer",
+            "documentNamespace": "https://anchore.com/syft/image/staff-tracer",
+            "creationInfo": {"creators": ["Tool: syft-v1.20.0"]},
+            "documentDescribes": ["SPDXRef-Image-staff-tracer"],
+            "packages": [{"SPDXID": "SPDXRef-Image-staff-tracer", "name": "staff-tracer"}],
+        },
+    }
+    return {
+        "payloadType": "application/vnd.in-toto+json",
+        "payload": base64.b64encode(json.dumps(statement).encode()).decode(),
+        "signatures": [{"sig": "verified-by-cosign"}],
     }
 
 
@@ -383,6 +412,38 @@ def test_image_sbom_is_schema_valid_linux_amd64_digest_bound_and_nonempty(
     result = _verify_publish(module, paths)
 
     assert result.digest == digest
+
+
+def test_publish_mode_requires_actual_cosign_image_sbom_attestation(tmp_path: Path) -> None:
+    module = load_module()
+    paths, digest, _ = _write_valid_publish_evidence(tmp_path)
+    write_json(paths["image_sbom"], valid_image_sbom_attestation(digest))
+
+    result = _verify_publish(module, paths)
+
+    assert result.digest == digest
+
+
+@pytest.mark.parametrize("field", ["name", "digest"])
+def test_publish_mode_rejects_spdx_dsse_attestation_for_a_different_image(
+    tmp_path: Path, field: str
+) -> None:
+    module = load_module()
+    paths, digest, _ = _write_valid_publish_evidence(tmp_path)
+    envelope = valid_image_sbom_attestation(digest)
+    payload = envelope["payload"]
+    assert isinstance(payload, str)
+    statement = json.loads(base64.b64decode(payload))
+    subject = statement["subject"][0]
+    if field == "name":
+        subject["name"] = "us-east4-docker.pkg.dev/example-project/other-images/other"
+    else:
+        subject["digest"]["sha256"] = "f" * 64
+    envelope["payload"] = base64.b64encode(json.dumps(statement).encode()).decode()
+    write_json(paths["image_sbom"], envelope)
+
+    with pytest.raises(ValueError, match="subject"):
+        _verify_publish(module, paths)
 
 
 @pytest.mark.parametrize(

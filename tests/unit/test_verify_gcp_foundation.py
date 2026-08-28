@@ -100,6 +100,7 @@ def valid_snapshot() -> dict[str, Any]:
                 "staff-tracer-runtime@example-project.iam.gserviceaccount.com",
             ],
             "control_plane_service_accounts": [
+                "golden-rose-artifact-verifier@state-project.iam.gserviceaccount.com",
                 "golden-rose-deployer@state-project.iam.gserviceaccount.com",
                 "golden-rose-image-publisher@state-project.iam.gserviceaccount.com",
                 "golden-rose-provisioner@state-project.iam.gserviceaccount.com",
@@ -176,6 +177,7 @@ def valid_snapshot() -> dict[str, Any]:
             },
         },
         "service_account_keys": {
+            "golden-rose-artifact-verifier@state-project.iam.gserviceaccount.com": [],
             "golden-rose-deployer@state-project.iam.gserviceaccount.com": [],
             "golden-rose-image-publisher@state-project.iam.gserviceaccount.com": [],
             "golden-rose-provisioner@state-project.iam.gserviceaccount.com": [],
@@ -207,6 +209,11 @@ def valid_snapshot() -> dict[str, Any]:
                     "principalSet://iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/golden-rose-github/attribute.workflow_ref/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop"
                 ],
             },
+            "golden-rose-artifact-verifier@state-project.iam.gserviceaccount.com": {
+                "roles/iam.workloadIdentityUser": [
+                    "principalSet://iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/golden-rose-github/attribute.workflow_ref/b-mackenzie-alexander/golden_rose_project/.github/workflows/deploy-develop.yml@refs/heads/develop"
+                ],
+            },
             "golden-rose-deployer@state-project.iam.gserviceaccount.com": {
                 "roles/iam.workloadIdentityUser": [
                     "principalSet://iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/golden-rose-github/attribute.workflow_ref/b-mackenzie-alexander/golden_rose_project/.github/workflows/deploy-develop.yml@refs/heads/develop"
@@ -216,6 +223,9 @@ def valid_snapshot() -> dict[str, Any]:
         "artifact_registry_iam": {
             "roles/artifactregistry.writer": [
                 "serviceAccount:golden-rose-image-publisher@state-project.iam.gserviceaccount.com"
+            ],
+            "roles/artifactregistry.reader": [
+                "serviceAccount:golden-rose-artifact-verifier@state-project.iam.gserviceaccount.com"
             ],
         },
         "state_bucket": {
@@ -589,6 +599,25 @@ def test_collect_foundation_snapshot_accepts_reviewed_fixture() -> None:
     assert snapshot["state_bucket"]["versioning_enabled"] is True
 
 
+def test_control_plane_inventory_and_live_collection_include_artifact_verifier() -> None:
+    module = load_module()
+    expected_email = "golden-rose-artifact-verifier@state-project.iam.gserviceaccount.com"
+
+    assert expected_email in module._expected_control_plane_service_accounts("state-project")
+
+
+def test_evaluate_foundation_snapshot_fails_closed_on_artifact_verifier_user_managed_key() -> None:
+    module = load_module()
+    snapshot = valid_snapshot()
+    snapshot["service_account_keys"][
+        "golden-rose-artifact-verifier@state-project.iam.gserviceaccount.com"
+    ] = [{"name": "redacted-key-id"}]
+
+    violations = module.evaluate_foundation_snapshot(snapshot, expected_contract())
+
+    assert any("service account keys detected" in violation for violation in violations)
+
+
 def test_collect_foundation_snapshot_rejects_duplicate_enabled_apis() -> None:
     module = load_module()
     commands = {
@@ -711,6 +740,18 @@ def test_evaluate_foundation_snapshot_requires_exact_authority_specific_workflow
     assert any("WIF principal binding drifted" in violation for violation in violations)
 
 
+def test_evaluate_foundation_snapshot_requires_exact_artifact_verifier_reader_binding() -> None:
+    module = load_module()
+    snapshot = valid_snapshot()
+    snapshot["artifact_registry_iam"]["roles/artifactregistry.reader"] = [
+        "serviceAccount:golden-rose-deployer@state-project.iam.gserviceaccount.com"
+    ]
+
+    violations = module.evaluate_foundation_snapshot(snapshot, expected_contract())
+
+    assert any("Artifact Registry reader bindings drifted" in violation for violation in violations)
+
+
 def test_evaluate_foundation_snapshot_requires_workflow_dispatch_event_claim() -> None:
     module = load_module()
     snapshot = valid_snapshot()
@@ -723,7 +764,26 @@ def test_evaluate_foundation_snapshot_requires_workflow_dispatch_event_claim() -
 
     violations = module.evaluate_foundation_snapshot(snapshot, expected_contract())
 
-    assert any("workflow_dispatch" in violation for violation in violations)
+    assert any("attribute condition drifted" in violation for violation in violations)
+
+
+@pytest.mark.parametrize(
+    "broadening",
+    [
+        " || true",
+        ' || attribute.repository == "unreviewed/example"',
+    ],
+)
+def test_evaluate_foundation_snapshot_rejects_additive_wif_condition_broadening(
+    broadening: str,
+) -> None:
+    module = load_module()
+    snapshot = valid_snapshot()
+    snapshot["workload_identity_provider"]["attribute_condition"] += broadening
+
+    violations = module.evaluate_foundation_snapshot(snapshot, expected_contract())
+
+    assert any("attribute condition drifted" in violation for violation in violations)
 
 
 def test_budget_channel_resource_name_is_resolved_to_expected_channel_identity() -> None:

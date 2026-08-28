@@ -549,6 +549,16 @@ ALLOWED_WORKFLOW_STEP_IF = {
         "publish-image",
         "name:Upload application SBOM attestation evidence",
     ): "always()",
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Upload migration success receipt",
+    ): "always()",
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Upload migration success receipt bundle",
+    ): "always()",
     ("build-image.yml", "publish-image", "name:Upload published image reference"): "always()",
     ("deploy-develop.yml", "deploy", "name:Upload deploy compatibility evidence"): "always()",
     ("deploy-develop.yml", "deploy", "name:Upload deploy result evidence"): "always()",
@@ -806,11 +816,22 @@ ALLOWED_WORKFLOW_STEP_WITH = {
     (
         "deploy-develop.yml",
         "deploy",
-        "name:Authenticate to Google Cloud",
+        "name:Authenticate artifact verifier to Google Cloud",
+    ): {
+        "workload_identity_provider": "${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}",
+        "service_account": "${{ vars.GCP_ARTIFACT_VERIFIER_SERVICE_ACCOUNT }}",
+        "token_format": "access_token",
+        "create_credentials_file": True,
+    },
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Authenticate deployer to Google Cloud",
     ): {
         "workload_identity_provider": "${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}",
         "service_account": "${{ vars.GCP_DEPLOYER_SERVICE_ACCOUNT }}",
         "token_format": "access_token",
+        "create_credentials_file": True,
     },
     (
         "deploy-develop.yml",
@@ -819,6 +840,26 @@ ALLOWED_WORKFLOW_STEP_WITH = {
     ): {
         "name": "deploy-compatibility",
         "path": "build/deploy-compatibility.json",
+        "if-no-files-found": "error",
+        "retention-days": 14,
+    },
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Upload migration success receipt",
+    ): {
+        "name": "migration-success-receipt",
+        "path": "build/transition-authority/migration-success-receipt.json",
+        "if-no-files-found": "error",
+        "retention-days": 14,
+    },
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Upload migration success receipt bundle",
+    ): {
+        "name": "migration-success-receipt-bundle",
+        "path": "build/transition-authority/migration-success-receipt.sigstore.json",
         "if-no-files-found": "error",
         "retention-days": 14,
     },
@@ -1031,7 +1072,12 @@ ALLOWED_WORKFLOW_STEP_USES = {
     (
         "deploy-develop.yml",
         "deploy",
-        "name:Authenticate to Google Cloud",
+        "name:Authenticate artifact verifier to Google Cloud",
+    ): "google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193",
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Authenticate deployer to Google Cloud",
     ): "google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193",
     (
         "deploy-develop.yml",
@@ -1042,6 +1088,16 @@ ALLOWED_WORKFLOW_STEP_USES = {
         "deploy-develop.yml",
         "deploy",
         "name:Upload deploy compatibility evidence",
+    ): "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Upload migration success receipt",
+    ): "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Upload migration success receipt bundle",
     ): "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
     (
         "deploy-develop.yml",
@@ -1256,6 +1312,7 @@ cosign attest --yes --type slsaprovenance --predicate build/image-metadata.json 
 cosign attest --yes --type https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1 --predicate build/application-sbom-checksums-predicate.json "$MANAGED_IMAGE"
 cosign verify --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" >/dev/null
 cosign verify-attestation --type slsaprovenance --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" >/dev/null
+cosign verify-attestation --type https://spdx.dev/Document --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/image-sbom.cdx.json
 cosign verify-attestation --type https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1 --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" >/dev/null
 python - <<'PY'
 import hashlib
@@ -1296,35 +1353,6 @@ Path("build/publish-application-sbom-verification.json").write_text(
             "predicate_type": "https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1",
             "backend_sbom_sha256": hashlib.sha256(Path("build/backend-sbom.cdx.json").read_bytes()).hexdigest(),
             "frontend_sbom_sha256": hashlib.sha256(Path("build/frontend-sbom.cdx.json").read_bytes()).hexdigest(),
-        },
-        indent=2,
-    )
-    + "\n",
-    encoding="utf-8",
-)
-Path("build/image-sbom.cdx.json").write_text(
-    json.dumps(
-        {
-            "bomFormat": "CycloneDX",
-            "specVersion": "1.6",
-            "metadata": {
-                "component": {
-                    "name": "staff-tracer",
-                    "purl": f"pkg:oci/staff-tracer@{image_digest}?repository_url={os.environ['MANAGED_REPOSITORY']}",
-                    "properties": [
-                        {
-                            "name": "syft:source:image:platform",
-                            "value": "linux/amd64",
-                        }
-                    ],
-                }
-            },
-            "components": [
-                {
-                    "name": "staff-tracer-runtime",
-                    "version": image_digest,
-                }
-            ],
         },
         indent=2,
     )
@@ -1535,7 +1563,7 @@ test -f .gitignore
 
 EXACT_WORKFLOW_RUN_SHA256 = {
     ("build-image.yml", "publish-image", "name:Sign and verify published image attestation set"): (
-        "a72505d2304a88160a61d70a3489980f93b83d33fc198c8465c770f9c615ff81"
+        "c44acf4409f9a870854cad82ccd3f884893d6acd36dac57c5470905183c4908b"
     ),
     ("deploy-develop.yml", "deploy", "name:Initialize failed deploy result"): (
         "931d39097ca97bc9a49f5227f4287d19f0709adfff40ca6f540f673703622b40"
@@ -1570,9 +1598,9 @@ ALLOWED_WORKFLOW_STEP_RUN_SUBSTRINGS = {
         "cosign attest --yes --type slsaprovenance",
         "cosign verify --certificate-identity",
         "cosign verify-attestation --type slsaprovenance",
+        "cosign verify-attestation --type https://spdx.dev/Document",
         '"predicate_type": "https://slsa.dev/provenance/v1"',
         '"predicate_type": "https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1"',
-        '"value": "linux/amd64"',
         "scripts/verify_image_provenance.py --mode publish",
     ],
     (
@@ -1643,6 +1671,26 @@ ALLOWED_WORKFLOW_STEP_RUN_SUBSTRINGS = {
     (
         "deploy-develop.yml",
         "deploy",
+        "name:Write migration success receipt",
+    ): [
+        "scripts/write_migration_success_receipt.py",
+        "--migration-receipt build/transition-authority/stage-receipt.json",
+        "--deploy-result build/deploy-result.json",
+        "--execution build/transition-authority/migration-execution.json",
+        "--output build/transition-authority/migration-success-receipt.json",
+    ],
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Sign migration success receipt",
+    ): [
+        "MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY",
+        "cosign sign-blob --yes --bundle build/transition-authority/migration-success-receipt.sigstore.json",
+        "build/transition-authority/migration-success-receipt.json",
+    ],
+    (
+        "deploy-develop.yml",
+        "deploy",
         "name:Record schema compatibility posture",
     ): [
         "build/deploy-compatibility.json",
@@ -1666,6 +1714,8 @@ ALLOWED_WORKFLOW_STEP_RUN_SUBSTRINGS = {
         "name:Execute migration job",
     ): [
         "gcloud run jobs execute run-migrations --project",
+        "migration-execution.json",
+        'payload.update({"result": "success", "current_stage": "migration_execution"})',
         'payload["current_stage"] = "migration_execution"',
         'payload["recovery_disposition"] = "forward recovery or teardown/rebuild required"',
     ],
@@ -1705,7 +1755,16 @@ ALLOWED_WORKFLOW_STEP_TIMEOUT_MINUTES = {}
 
 ALLOWED_WORKFLOW_STEP_ID = {
     ("build-image.yml", "publish-image", "name:Authenticate to Google Cloud"): "auth",
-    ("deploy-develop.yml", "deploy", "name:Authenticate to Google Cloud"): "auth",
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Authenticate artifact verifier to Google Cloud",
+    ): "artifact_verifier_auth",
+    (
+        "deploy-develop.yml",
+        "deploy",
+        "name:Authenticate deployer to Google Cloud",
+    ): "deployer_auth",
 }
 
 ALLOWED_WORKFLOW_STEP_ENV = {
@@ -1794,12 +1853,18 @@ DEPLOY_WORKFLOW_STEPS = [
     "name:Install Cosign",
     "name:Verify signed stage receipt before cloud authentication",
     "name:Initialize failed deploy result",
+    "name:Authenticate artifact verifier to Google Cloud",
     "name:Verify direct OCI image authority",
+    "name:Clear artifact verifier credential context",
     "name:Validate signed stage receipt after image digest",
-    "name:Authenticate to Google Cloud",
+    "name:Authenticate deployer to Google Cloud",
     "name:Set up gcloud",
     "name:Extract and validate selected live configuration projection",
     "name:Execute migration transition",
+    "name:Write migration success receipt",
+    "name:Sign migration success receipt",
+    "name:Upload migration success receipt",
+    "name:Upload migration success receipt bundle",
     "name:Verify service readiness transition",
     "name:Record deploy result",
     "name:Upload deploy result evidence",
@@ -1816,6 +1881,18 @@ ALLOWED_WORKFLOW_STEP_IF[("deploy-develop.yml", "deploy", "name:Execute migratio
     "inputs.deployment_stage == 'migration'"
 )
 ALLOWED_WORKFLOW_STEP_IF[
+    ("deploy-develop.yml", "deploy", "name:Write migration success receipt")
+] = "inputs.deployment_stage == 'migration'"
+ALLOWED_WORKFLOW_STEP_IF[
+    ("deploy-develop.yml", "deploy", "name:Sign migration success receipt")
+] = "inputs.deployment_stage == 'migration'"
+ALLOWED_WORKFLOW_STEP_IF[
+    ("deploy-develop.yml", "deploy", "name:Upload migration success receipt")
+] = "inputs.deployment_stage == 'migration'"
+ALLOWED_WORKFLOW_STEP_IF[
+    ("deploy-develop.yml", "deploy", "name:Upload migration success receipt bundle")
+] = "inputs.deployment_stage == 'migration'"
+ALLOWED_WORKFLOW_STEP_IF[
     ("deploy-develop.yml", "deploy", "name:Verify service readiness transition")
 ] = "inputs.deployment_stage == 'service'"
 ALLOWED_WORKFLOW_STEP_IF[("deploy-develop.yml", "deploy", "name:Record deploy result")] = "always()"
@@ -1830,6 +1907,9 @@ ALLOWED_WORKFLOW_STEP_ENV[
     "MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY": "${{ vars.MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY }}",
     "MIGRATION_RECEIPT_BASE64": "${{ inputs.migration_receipt_base64 }}",
     "MIGRATION_RECEIPT_BUNDLE_BASE64": "${{ inputs.migration_receipt_bundle_base64 }}",
+    "MIGRATION_READBACK_RECEIPT_BASE64": "${{ inputs.migration_readback_receipt_base64 }}",
+    "MIGRATION_READBACK_RECEIPT_BUNDLE_BASE64": "${{ inputs.migration_readback_receipt_bundle_base64 }}",
+    "MIGRATION_READBACK_RECEIPT_CERTIFICATE_IDENTITY": "${{ vars.MIGRATION_READBACK_RECEIPT_CERTIFICATE_IDENTITY }}",
     "DEPLOYMENT_STAGE": "${{ inputs.deployment_stage }}",
 }
 ALLOWED_WORKFLOW_STEP_ENV.pop(
@@ -1840,11 +1920,21 @@ ALLOWED_WORKFLOW_STEP_ENV[
 ] = {
     "MANAGED_REPOSITORY": "us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer",
     "BUILD_CERTIFICATE_IDENTITY": "${{ vars.BUILD_CERTIFICATE_IDENTITY }}",
+    "ARTIFACT_VERIFIER_ACCESS_TOKEN": "${{ steps.artifact_verifier_auth.outputs.access_token }}",
+    "DOCKER_CONFIG": "${{ runner.temp }}/artifact-verifier-docker",
 }
+ALLOWED_WORKFLOW_STEP_ENV[
+    ("deploy-develop.yml", "deploy", "name:Clear artifact verifier credential context")
+] = {"DOCKER_CONFIG": "${{ runner.temp }}/artifact-verifier-docker"}
 ALLOWED_WORKFLOW_STEP_ENV[
     ("deploy-develop.yml", "deploy", "name:Validate signed stage receipt after image digest")
 ] = {
     "DEPLOYMENT_STAGE": "${{ inputs.deployment_stage }}",
+}
+ALLOWED_WORKFLOW_STEP_ENV[
+    ("deploy-develop.yml", "deploy", "name:Sign migration success receipt")
+] = {
+    "MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY": "${{ vars.MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY }}"
 }
 ALLOWED_WORKFLOW_STEP_ENV[
     (
@@ -1874,7 +1964,7 @@ EXACT_WORKFLOW_RUN_SHA256.update(
             "deploy-develop.yml",
             "deploy",
             "name:Verify signed stage receipt before cloud authentication",
-        ): "4c6808f0dadffdd9928015544da4a5f01ee29276a86d3ccb561ff04997f79b2e",
+        ): "3fe5e79c52cb5c4aedf941aad1313158812b98c9b4e86ec03816a0307adda0f6",
         (
             "deploy-develop.yml",
             "deploy",
@@ -1884,7 +1974,12 @@ EXACT_WORKFLOW_RUN_SHA256.update(
             "deploy-develop.yml",
             "deploy",
             "name:Verify direct OCI image authority",
-        ): "24555e0c0dca73edfd117741cd9be7a92d6a463406b57751e6209ea806629799",
+        ): "b1bc0e6d7e8f6c90f0362ac38e04f6ab2ddd93f4461fe46cf07bafbad1842516",
+        (
+            "deploy-develop.yml",
+            "deploy",
+            "name:Clear artifact verifier credential context",
+        ): "8268ec5783478b0e1400b05a8531831600510b147a1db80f0af629671c91481b",
         (
             "deploy-develop.yml",
             "deploy",
@@ -1899,7 +1994,17 @@ EXACT_WORKFLOW_RUN_SHA256.update(
             "deploy-develop.yml",
             "deploy",
             "name:Execute migration transition",
-        ): "a3dcc21f6e4fdcd0fe7552e1c0a402a34c4c538a916e914872e5998d314ba336",
+        ): "1de550a4757f0ec643b0120e0f10313145575773ac4f515052ac5072c08b93f6",
+        (
+            "deploy-develop.yml",
+            "deploy",
+            "name:Write migration success receipt",
+        ): "8184d8c9c59e1b3e600ca06486a4a4b600677521d1306d8a44ff888a7eee54e6",
+        (
+            "deploy-develop.yml",
+            "deploy",
+            "name:Sign migration success receipt",
+        ): "ed4afd052f514b0b84f28e65c286e8f9e20c75eec8b3a7c6b5c03f8de08a4ab8",
         (
             "deploy-develop.yml",
             "deploy",
@@ -3142,6 +3247,34 @@ def _collect_bootstrap_wif_violations(root: Path) -> list[str]:
                     f"{wif_path.relative_to(root)} missing exact GitHub claim {claim!r}"
                 )
 
+        expected_attribute_condition = " ".join(
+            [
+                'attribute.repository == "b-mackenzie-alexander/golden_rose_project" &&',
+                'attribute.repository_owner == "b-mackenzie-alexander" &&',
+                'attribute.ref == "refs/heads/develop" &&',
+                'attribute.environment == "develop" &&',
+                'attribute.event_name == "workflow_dispatch" &&',
+                "(",
+                'attribute.workflow_ref == "b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" ||',
+                'attribute.workflow_ref == "b-mackenzie-alexander/golden_rose_project/.github/workflows/deploy-develop.yml@refs/heads/develop"',
+                ")",
+            ]
+        )
+        condition_match = re.search(
+            r"attribute_condition\s*=\s*<<-?EOT\s*\n(?P<condition>.*?)\n\s*EOT",
+            wif_text,
+            re.DOTALL,
+        )
+        observed_attribute_condition = (
+            " ".join(condition_match.group("condition").split())
+            if condition_match is not None
+            else ""
+        )
+        if observed_attribute_condition != expected_attribute_condition:
+            violations.append(
+                f"{wif_path.relative_to(root)} attribute condition drifted from reviewed trust"
+            )
+
         wildcard_claim_patterns = [
             (r'attribute\.repository\s*==\s*"[^"]*\*[^"]*"', "attribute.repository"),
             (r'attribute\.repository_owner\s*==\s*"[^"]*\*[^"]*"', "attribute.repository_owner"),
@@ -3179,8 +3312,10 @@ def _collect_bootstrap_wif_violations(root: Path) -> list[str]:
                 violations.append(f"{iam_path.relative_to(root)} contains principal-set broadening")
         required_fragments = [
             'resource "google_service_account_iam_member" "image_publisher_wif"',
+            'resource "google_service_account_iam_member" "artifact_verifier_wif"',
             'resource "google_service_account_iam_member" "deployer_wif"',
             "member             = local.build_image_workflow_principal_set",
+            "member             = local.deploy_develop_workflow_principal_set",
             "member             = local.deploy_develop_workflow_principal_set",
         ]
         for fragment in required_fragments:
@@ -3281,6 +3416,7 @@ def _collect_develop_iam_violations(root: Path, terraform_config_paths: list[Pat
             'resource "google_secret_manager_secret_iam_member" "runtime_synthetic_staff_secret_access"',
             'resource "google_secret_manager_secret_iam_member" "migration_synthetic_staff_secret_access"',
             'resource "google_artifact_registry_repository_iam_member" "image_publisher_writer"',
+            'resource "google_artifact_registry_repository_iam_member" "artifact_verifier_reader"',
             'resource "google_cloud_run_v2_service_iam_member" "private_invoker"',
             'role    = "roles/cloudsql.client"',
             'role    = "roles/logging.logWriter"',
@@ -3289,10 +3425,12 @@ def _collect_develop_iam_violations(root: Path, terraform_config_paths: list[Pat
             'role     = "roles/run.viewer"',
             'role      = "roles/secretmanager.secretAccessor"',
             'role       = "roles/artifactregistry.writer"',
+            'role       = "roles/artifactregistry.reader"',
             'role     = "roles/run.invoker"',
             'member  = "serviceAccount:${google_service_account.runtime.email}"',
             'member  = "serviceAccount:${google_service_account.migration.email}"',
             'member     = "serviceAccount:golden-rose-image-publisher@${var.control_plane_project_id}.iam.gserviceaccount.com"',
+            'member     = "serviceAccount:golden-rose-artifact-verifier@${var.control_plane_project_id}.iam.gserviceaccount.com"',
             'member   = "serviceAccount:golden-rose-deployer@${var.control_plane_project_id}.iam.gserviceaccount.com"',
             'data "external" "tester_authority"',
             "verify_tester_authority_receipt.py",
@@ -3304,6 +3442,40 @@ def _collect_develop_iam_violations(root: Path, terraform_config_paths: list[Pat
                 violations.append(
                     f"{relative_path} missing required least-privilege IAM fragment {fragment!r}"
                 )
+
+        try:
+            parsed_iam = hcl2.loads(text)
+        except Exception as exc:
+            violations.append(f"{relative_path} contains invalid HCL IAM configuration: {exc}")
+            parsed_iam = {}
+        artifact_verifier_readers: list[object] = []
+        for resource in parsed_iam.get("resource", []) if isinstance(parsed_iam, dict) else []:
+            if not isinstance(resource, dict):
+                continue
+            typed_resources = resource.get('"google_artifact_registry_repository_iam_member"')
+            if not isinstance(typed_resources, dict):
+                continue
+            reader = typed_resources.get('"artifact_verifier_reader"')
+            if reader is not None:
+                artifact_verifier_readers.append(reader)
+        if len(artifact_verifier_readers) != 1 or not isinstance(
+            artifact_verifier_readers[0], dict
+        ):
+            violations.append(
+                f"{relative_path} must declare exactly one artifact verifier reader IAM resource"
+            )
+        else:
+            reader = artifact_verifier_readers[0]
+            expected_reader_fields = {
+                "repository": "${google_artifact_registry_repository.application_images.repository_id}",
+                "role": '"roles/artifactregistry.reader"',
+                "member": '"serviceAccount:golden-rose-artifact-verifier@${var.control_plane_project_id}.iam.gserviceaccount.com"',
+            }
+            for field, expected in expected_reader_fields.items():
+                if reader.get(field) != expected:
+                    violations.append(
+                        f"{relative_path} artifact verifier reader {field} must match the reviewed value"
+                    )
 
         migration_job_iam_count = 'count    = var.deployment_stage == "migration" || var.deployment_stage == "service" ? 1 : 0'
         for resource_name in ["deployer_jobs_executor", "deployer_migration_job_viewer"]:
@@ -3336,6 +3508,8 @@ def _collect_develop_iam_violations(root: Path, terraform_config_paths: list[Pat
             'resource "google_service_account_iam_member" "deployer_migration_user"',
             'resource "google_project_iam_member" "deployer_jobs_executor"',
             'resource "google_project_iam_member" "deployer_run_viewer"',
+            'resource "google_artifact_registry_repository_iam_member" "deployer_reader"',
+            'resource "google_artifact_registry_repository_iam_member" "image_publisher_reader"',
             "var.deployer_principal",
         ]
         for fragment in forbidden_fragments:

@@ -12,6 +12,13 @@ resource "google_service_account" "image_publisher" {
   description  = "Image publishing identity kept separate from infrastructure and deployment authority."
 }
 
+resource "google_service_account" "artifact_verifier" {
+  project      = var.state_project_id
+  account_id   = "golden-rose-artifact-verifier"
+  display_name = "Golden Rose artifact verifier"
+  description  = "Artifact verification identity kept separate from image publication and Cloud Run deployment authority."
+}
+
 resource "google_service_account" "deployer" {
   project      = var.state_project_id
   account_id   = "golden-rose-deployer"
@@ -23,6 +30,12 @@ resource "google_service_account_iam_member" "image_publisher_wif" {
   service_account_id = google_service_account.image_publisher.name
   role               = "roles/iam.workloadIdentityUser"
   member             = local.build_image_workflow_principal_set
+}
+
+resource "google_service_account_iam_member" "artifact_verifier_wif" {
+  service_account_id = google_service_account.artifact_verifier.name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = local.deploy_develop_workflow_principal_set
 }
 
 resource "google_service_account_iam_member" "deployer_wif" {

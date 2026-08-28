@@ -198,15 +198,87 @@ def test_service_requires_separate_migration_success_receipt_bound_to_its_receip
         "stage": "migration",
         "result": "success",
         "migration_receipt_sha256": "f" * 64,
+        "source_sha": "a" * 40,
         "workload_image_digest": "sha256:" + "e" * 64,
+        "execution_reference": (
+            "projects/example/locations/us-east4/jobs/run-migrations/executions/exec-123"
+        ),
     }
     module.validate_migration_success_receipt(
-        migration, migration_receipt_sha256="f" * 64, expected_digest="sha256:" + "e" * 64
+        migration,
+        migration_receipt_sha256="f" * 64,
+        expected_digest="sha256:" + "e" * 64,
+        expected_source_sha="a" * 40,
     )
     migration["migration_receipt_sha256"] = "0" * 64
     with pytest.raises(module.ReceiptError, match="not bound"):
         module.validate_migration_success_receipt(
-            migration, migration_receipt_sha256="f" * 64, expected_digest="sha256:" + "e" * 64
+            migration,
+            migration_receipt_sha256="f" * 64,
+            expected_digest="sha256:" + "e" * 64,
+            expected_source_sha="a" * 40,
+        )
+
+
+def test_service_rejects_migration_success_receipt_missing_source_or_execution_reference() -> None:
+    module = load_module()
+    missing_source = {
+        "stage": "migration",
+        "result": "success",
+        "migration_receipt_sha256": "f" * 64,
+        "workload_image_digest": "sha256:" + "e" * 64,
+        "source_sha": "",
+        "execution_reference": (
+            "projects/example/locations/us-east4/jobs/run-migrations/executions/exec-123"
+        ),
+    }
+
+    with pytest.raises(module.ReceiptError, match="source SHA"):
+        module.validate_migration_success_receipt(
+            missing_source,
+            migration_receipt_sha256="f" * 64,
+            expected_digest="sha256:" + "e" * 64,
+            expected_source_sha="a" * 40,
+        )
+
+    missing_execution = {
+        "stage": "migration",
+        "result": "success",
+        "migration_receipt_sha256": "f" * 64,
+        "source_sha": "a" * 40,
+        "workload_image_digest": "sha256:" + "e" * 64,
+        "execution_reference": "",
+    }
+
+    with pytest.raises(module.ReceiptError, match="execution reference"):
+        module.validate_migration_success_receipt(
+            missing_execution,
+            migration_receipt_sha256="f" * 64,
+            expected_digest="sha256:" + "e" * 64,
+            expected_source_sha="a" * 40,
+        )
+
+
+def test_service_rejects_migration_success_receipt_with_unreviewed_extra_fields() -> None:
+    module = load_module()
+    receipt = {
+        "stage": "migration",
+        "result": "success",
+        "migration_receipt_sha256": "f" * 64,
+        "source_sha": "a" * 40,
+        "workload_image_digest": "sha256:" + "e" * 64,
+        "execution_reference": (
+            "projects/example/locations/us-east4/jobs/run-migrations/executions/exec-123"
+        ),
+        "unexpected": True,
+    }
+
+    with pytest.raises(module.ReceiptError, match="exactly"):
+        module.validate_migration_success_receipt(
+            receipt,
+            migration_receipt_sha256="f" * 64,
+            expected_digest="sha256:" + "e" * 64,
+            expected_source_sha="a" * 40,
         )
 
 

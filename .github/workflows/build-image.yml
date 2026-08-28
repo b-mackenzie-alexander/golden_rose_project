@@ -226,6 +226,7 @@ jobs:
           cosign attest --yes --type https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1 --predicate build/application-sbom-checksums-predicate.json "$MANAGED_IMAGE"
           cosign verify --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" >/dev/null
           cosign verify-attestation --type slsaprovenance --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" >/dev/null
+          cosign verify-attestation --type https://spdx.dev/Document --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/image-sbom.cdx.json
           cosign verify-attestation --type https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1 --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" >/dev/null
           python - <<'PY'
           import hashlib
@@ -266,35 +267,6 @@ jobs:
                       "predicate_type": "https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1",
                       "backend_sbom_sha256": hashlib.sha256(Path("build/backend-sbom.cdx.json").read_bytes()).hexdigest(),
                       "frontend_sbom_sha256": hashlib.sha256(Path("build/frontend-sbom.cdx.json").read_bytes()).hexdigest(),
-                  },
-                  indent=2,
-              )
-              + "\n",
-              encoding="utf-8",
-          )
-          Path("build/image-sbom.cdx.json").write_text(
-              json.dumps(
-                  {
-                      "bomFormat": "CycloneDX",
-                      "specVersion": "1.6",
-                      "metadata": {
-                          "component": {
-                              "name": "staff-tracer",
-                              "purl": f"pkg:oci/staff-tracer@{image_digest}?repository_url={os.environ['MANAGED_REPOSITORY']}",
-                              "properties": [
-                                  {
-                                      "name": "syft:source:image:platform",
-                                      "value": "linux/amd64",
-                                  }
-                              ],
-                          }
-                      },
-                      "components": [
-                          {
-                              "name": "staff-tracer-runtime",
-                              "version": image_digest,
-                          }
-                      ],
                   },
                   indent=2,
               )

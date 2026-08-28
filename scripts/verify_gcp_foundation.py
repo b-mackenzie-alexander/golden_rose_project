@@ -195,7 +195,16 @@ def _is_absent_workload_resource_error(error: VerificationError) -> bool:
 
 
 def _is_absent_cloud_sql_error(error: VerificationError) -> bool:
-    return str(error).lower().endswith("the cloud sql instance does not exist.")
+    return (
+        re.fullmatch(
+            r"cloud sql failed: ERROR: \(gcloud\.sql\.instances\.describe\) HTTPError 404: "
+            r"The Cloud SQL instance does not exist\. This command is authenticated as "
+            r"[a-z0-9][a-z0-9._%+@-]* which is the active account specified by the "
+            r"\[core/account\] property\.",
+            str(error),
+        )
+        is not None
+    )
 
 
 def _dedupe_strings(values: object, *, label: str) -> list[str]:

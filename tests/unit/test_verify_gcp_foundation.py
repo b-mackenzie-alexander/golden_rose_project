@@ -455,7 +455,9 @@ def test_foundation_mode_main_allows_absent_cloud_sql_during_collection() -> Non
                 calls["cloud_sql_requested"] = True
                 raise module.VerificationError(
                     "cloud sql failed: ERROR: (gcloud.sql.instances.describe) HTTPError 404: "
-                    "The Cloud SQL instance does not exist."
+                    "The Cloud SQL instance does not exist. This command is authenticated as "
+                    "operator@example.com which is the active account specified by the "
+                    "[core/account] property."
                 )
             staged_values = {
                 ("project-labels",): valid_snapshot()["project_labels"],
@@ -538,7 +540,9 @@ def test_foundation_collection_allows_gcloud_absent_cloud_sql_instance_message()
         if command == ("cloud-sql",):
             raise module.VerificationError(
                 "cloud sql failed: ERROR: (gcloud.sql.instances.describe) HTTPError 404: "
-                "The Cloud SQL instance does not exist."
+                "The Cloud SQL instance does not exist. This command is authenticated as "
+                "operator@example.com which is the active account specified by the "
+                "[core/account] property."
             )
         return commands[command]
 
@@ -555,6 +559,16 @@ def test_foundation_collection_allows_gcloud_absent_cloud_sql_instance_message()
         "The unrelated instance does not exist.",
         "NOT_FOUND",
         "resource not found",
+        "ERROR: (gcloud.sql.instances.describe) HTTPError 404: "
+        "The Cloud SQL instance does not exist. This command is authenticated as "
+        "foreign account which is the active account specified by the [core/account] property.",
+        "ERROR: (gcloud.sql.instances.describe) HTTPError 404: "
+        "The Cloud SQL instance does not exist. This command is authenticated as "
+        "operator@EXAMPLE.com which is the active account specified by the [core/account] property.",
+        "ERROR: (gcloud.sql.instances.describe) HTTPError 404: "
+        "The Cloud SQL instance does not exist. This command is authenticated as "
+        "operator@example.com which is the active account specified by the "
+        "[core/account] property. retryable transport fault",
     ],
 )
 def test_cloud_sql_absence_matcher_rejects_near_matches(message: str) -> None:

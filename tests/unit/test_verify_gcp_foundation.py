@@ -501,6 +501,46 @@ def test_foundation_mode_main_allows_absent_cloud_sql_during_collection() -> Non
     assert calls["evaluate"]["snapshot"]["resource_inventory"]["cloud_sql_instance"] == ""
 
 
+def test_live_runner_treats_gcloud_cannot_find_service_as_absent() -> None:
+    module = load_module()
+    mutable_module = cast(Any, module)
+
+    def fake_run_json_command(command: list[str], *, context: str) -> dict[str, Any]:
+        assert context == "cloud run service"
+        raise module.VerificationError(
+            "cloud run service failed: ERROR: (gcloud.run.services.describe) "
+            "Cannot find service [staff-tracer]"
+        )
+
+    mutable_module._run_json_command = fake_run_json_command
+
+    runner = module._build_live_command_runner(expected_contract())
+
+    assert runner(("cloud-run-service",)) == {}
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Cannot find service account [unexpected]",
+        "Cannot find jobber [unexpected]",
+    ],
+)
+def test_live_runner_does_not_treat_near_match_as_absent(message: str) -> None:
+    module = load_module()
+    mutable_module = cast(Any, module)
+
+    def fake_run_json_command(command: list[str], *, context: str) -> dict[str, Any]:
+        assert context == "cloud run service"
+        raise module.VerificationError(f"cloud run service failed: {message}")
+
+    mutable_module._run_json_command = fake_run_json_command
+    runner = module._build_live_command_runner(expected_contract())
+
+    with pytest.raises(module.VerificationError, match="cloud run service failed"):
+        runner(("cloud-run-service",))
+
+
 def test_live_foundation_verifier_uses_receipt_derived_principal_and_digest(tmp_path: Path) -> None:
     module = load_module()
     receipt = tmp_path / "tester-receipt.json"

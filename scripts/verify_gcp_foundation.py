@@ -183,6 +183,15 @@ def _run_json_command(command: Sequence[str], *, context: str) -> Any:
     return _load_json(result.stdout, context=context)
 
 
+def _is_absent_resource_error(error: VerificationError) -> bool:
+    message = str(error).lower()
+    return (
+        "not found" in message
+        or "not_found" in message
+        or re.search(r"cannot find (?:service|job|instance) \[", message) is not None
+    )
+
+
 def _dedupe_strings(values: object, *, label: str) -> list[str]:
     if not isinstance(values, list):
         raise VerificationError(f"{label} must be a list")
@@ -358,9 +367,7 @@ def collect_foundation_snapshot(
     try:
         cloud_sql = _mapping(command_runner(("cloud-sql",)), label="cloud sql")
     except VerificationError as exc:
-        if mode == "foundation" and (
-            "not found" in str(exc).lower() or "not_found" in str(exc).lower()
-        ):
+        if mode == "foundation" and _is_absent_resource_error(exc):
             cloud_sql = {}
         else:
             raise
@@ -1205,7 +1212,7 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                     context="cloud run service",
                 )
             except VerificationError as exc:
-                if "not found" in str(exc).lower() or "not_found" in str(exc).lower():
+                if _is_absent_resource_error(exc):
                     return {}
                 raise
             template = _mapping(service, label="service").get("template", {})
@@ -1239,7 +1246,7 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                     context="cloud run service iam",
                 )
             except VerificationError as exc:
-                if "not found" in str(exc).lower() or "not_found" in str(exc).lower():
+                if _is_absent_resource_error(exc):
                     return {}
                 raise
             return _bindings_to_role_map(policy)
@@ -1261,7 +1268,7 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                     context="migration job",
                 )
             except VerificationError as exc:
-                if "not found" in str(exc).lower() or "not_found" in str(exc).lower():
+                if _is_absent_resource_error(exc):
                     return {}
                 raise
             template = _mapping(job, label="job").get("template", {})
@@ -1294,7 +1301,7 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                     context="migration job iam",
                 )
             except VerificationError as exc:
-                if "not found" in str(exc).lower() or "not_found" in str(exc).lower():
+                if _is_absent_resource_error(exc):
                     return {}
                 raise
             return _bindings_to_role_map(policy)

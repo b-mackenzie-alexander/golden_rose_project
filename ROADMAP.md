@@ -13,7 +13,7 @@
 - [ ] Complete the next outcome-scale tranche: a qualified private fictional-synthetic `develop` environment where approved humans can exercise the current Employer/EmployerContact product and provide structured feedback.
 - [x] Complete, qualify, and merge PR A artifact/transition-authority remediation. PR #51 merged into protected `develop` at `a7f0649`; the source-only branch is retired, and no later operational gate is authorized until PR B and the remaining source-readiness requirements merge.
 - [x] Complete, qualify, and merge PR B qualification/human-feedback readiness. PR #52 merged the source-only readiness contract into protected `develop` at `7272907`; no cloud, service, tester, human, live-data, or production authority was granted.
-- [ ] Complete conditional PR C contract-preserving remediation. A1 read-only inventory found that `scripts/verify_gcp_foundation.py` did not recognize the actual GCP CLI `Cannot find service […]` absence response, preventing workload-free foundation evidence. The focused RED→GREEN source fix is locally verified; independently rereview and merge it before retrying A1 or beginning any adoption action.
+- [ ] Complete conditional PR C contract-preserving remediation. PR #53 merged the absent-Cloud-Run verifier correction at `673f6d5`; A1 retry then found the exact absent-Cloud-SQL CLI `HTTPError 404: The Cloud SQL instance does not exist.` form was not recognized. The follow-up RED→GREEN source fix is locally verified; independently rereview and merge it before another A1 retry or any adoption action.
 
 ## Phase 0 — Discovery and planning baseline
 - [x] Record source-material ledger and evidence notes for received client artifacts.

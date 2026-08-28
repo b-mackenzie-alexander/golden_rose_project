@@ -23,10 +23,15 @@ Region: us-east4
 
 ## Qualification posture
 - Qualification must use approved authenticated private access only.
+- The approved and unapproved tokens use separate non-argv handoffs; tracked evidence records only bounded outcomes, never token values.
+- The authenticated-but-unapproved denial probe requires cryptographic verification of the actual valid Google identity token (issuer, exact service audience, subject, issued-at/expiry/not-before claims) plus a fresh IAM Policy Troubleshooter `NOT_GRANTED` result for that verified subject, exact Cloud Run service resource, and `run.routes.invoke`; this proves the subject has no direct, inherited, group/domain, public, or broad invocation path; operator-authored JSON assertions are not evidence.
 - `/health` and `/readiness` remain non-mutating probes and are not substitutes for bounded workflow qualification.
 - Qualification uses newly generated fictional values only.
+- Every exercised response row, including safe generated `404`, cursor `422`, stale `412`, and changed-key `409` controls, must preserve `Cache-Control: no-store`; controlled error outcomes that are unavailable, authorization-related, or otherwise unsafe to induce remain source-controlled static contract evidence.
 - Evidence must not include submitted names, UUIDs, command IDs, cursors, raw bodies, DSNs, tokens, or exception payloads.
 - Cleanup must state teardown/rebuild disposition without inventing product delete semantics.
+- See `deploy/gcp/qualification-status-contract.md` for the exact final status vocabulary and overclaim boundaries.
+- See `deploy/gcp/human-qualification-checklist.md` and `deploy/gcp/human-feedback-template.md` for the separate manual and structured feedback gates.
 
 ## Image provenance posture
 - Deploy evidence must bind to one immutable `sha256:` image digest; tags alone are not acceptable proof.
@@ -55,7 +60,17 @@ Region: us-east4
 ## Qualification result
 - Employer create/read/search/revision/replay: [passed|failed]
 - EmployerContact create/query/read: [passed|failed]
+- manual_browser: [not_run|pass|fail]
+- accessibility: [not_evidenced|pass|fail]
+- fluent_language: [not_evidenced|pass|fail]
+- tester_access: [not_evidenced|pass|fail]
+- monitoring: [not_evidenced|pass|fail]
+- recovery: [not_evidenced|pass|fail]
+- feedback: [not_triaged|triaged]
+- final_status: [qualified_private_develop_for_human_feedback|operational_private_develop_technical_feedback_only|not_qualified|torn_down_after_failed_activation]
 - Cleanup/rebuild disposition: [REDACTED]
+
+Do not replace the explicit `not_run`, `not_evidenced`, or `not_triaged` states with passing language unless the later separately approved human/tester/accessibility/language/feedback gate actually produced value-safe evidence.
 
 ## Value-safety notes
 - Redact project IDs, principals, emails, URLs, tokens, exception payloads, and raw policy blobs.

@@ -1,10 +1,12 @@
 from pathlib import Path
 
 import pytest
+from sqlalchemy.exc import SQLAlchemyError
 
 from scripts.verify_database_authority import (
     _required_authenticated_probe_urls,
     evaluate_authority_snapshot,
+    main,
     validate_database_identities,
 )
 
@@ -207,3 +209,36 @@ def test_verify_database_authority_accepts_matching_database_identities() -> Non
         )
         == []
     )
+
+
+def test_verify_database_authority_main_fails_bounded_on_sqlalchemy_error(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv(
+        "GOLDEN_ROSE_RUNTIME_DATABASE_URL",
+        "postgresql+psycopg://runtime:[REDACTED]@db.example/golden_rose",
+    )
+    monkeypatch.setenv(
+        "GOLDEN_ROSE_MIGRATION_DATABASE_URL",
+        "postgresql+psycopg://migration:[REDACTED]@db.example/golden_rose",
+    )
+    monkeypatch.setattr(
+        "scripts.verify_database_authority.get_database_url",
+        lambda: "postgresql+psycopg://authority:[REDACTED]@db.example/golden_rose",
+    )
+
+    def fail_identify_database(_database_url: str) -> tuple[str, str, int]:
+        raise SQLAlchemyError(
+            "could not connect to postgresql+psycopg://authority:[REDACTED]@db.example/golden_rose"
+        )
+
+    monkeypatch.setattr(
+        "scripts.verify_database_authority.identify_database", fail_identify_database
+    )
+
+    assert main() == 1
+    output = capsys.readouterr().out
+    assert "database authority verification failed" in output
+    assert "database connection boundary failed" in output
+    assert "postgresql+psycopg" not in output
+    assert "db.example" not in output

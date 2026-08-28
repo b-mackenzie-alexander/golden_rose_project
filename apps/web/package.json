@@ -15,8 +15,8 @@
     "lint": "eslint . --max-warnings 0",
     "validate:lock": "node scripts/validate-lockfile.mjs package-lock.json",
     "test:lock": "node --test scripts/validate-lockfile.test.mjs",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test": "NODE_ENV=test vitest run",
+    "test:coverage": "NODE_ENV=test vitest run --coverage",
     "typecheck": "tsc -b --pretty false",
     "verify": "npm run validate:lock && npm run test:lock && npm run lint && npm run typecheck && npm run test:coverage && npm run build"
   },

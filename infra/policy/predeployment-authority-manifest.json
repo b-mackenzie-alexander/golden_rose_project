@@ -239,6 +239,7 @@
       "apps/web/scripts/validate-lockfile.mjs",
       "apps/web/scripts/validate-lockfile.test.mjs",
       "scripts/qualify_develop_deployment.py",
+      "scripts/verify_database_authority.py",
       "scripts/verify_gcp_foundation.py",
       "scripts/verify_image_provenance.py",
       "scripts/verify_stage_receipt.py",

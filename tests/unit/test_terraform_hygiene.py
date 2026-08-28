@@ -179,6 +179,270 @@ def test_gcp_evidence_template_documents_stage_modes_and_budget_channel_identity
     assert "display names" in template
 
 
+def test_develop_qualification_evidence_and_tester_docs_preserve_pr_b_gate_contracts() -> None:
+    evidence_template = (ROOT / "deploy/gcp/evidence-template.md").read_text(encoding="utf-8")
+    tester_access = (ROOT / "deploy/gcp/private-tester-access.md").read_text(encoding="utf-8")
+    combined = f"{evidence_template}\n{tester_access}"
+
+    required_phrases = [
+        "qualification-status-contract.md",
+        "human-qualification-checklist.md",
+        "human-feedback-template.md",
+        "approved and unapproved tokens use separate non-argv handoffs",
+        "authenticated-but-unapproved",
+        "valid Google identity token",
+        "no direct, inherited, group/domain, public, or broad invocation path",
+        "Cache-Control: no-store",
+        "controlled error outcomes",
+        "source-controlled static contract",
+        "manual_browser",
+        "accessibility",
+        "fluent_language",
+        "tester_access",
+        "monitoring",
+        "recovery",
+        "feedback",
+        "not_run",
+        "not_evidenced",
+        "not_triaged",
+        "qualified_private_develop_for_human_feedback",
+        "operational_private_develop_technical_feedback_only",
+        "not_qualified",
+        "torn_down_after_failed_activation",
+    ]
+    for phrase in required_phrases:
+        assert phrase in combined
+
+    forbidden_overclaims = [
+        "human qualification passed",
+        "accessibility passed",
+        "language review passed",
+        "client accepted",
+        "staff pilot ready",
+        "production ready",
+    ]
+    for phrase in forbidden_overclaims:
+        assert phrase not in combined.lower()
+
+
+def test_pr_b_frontend_regression_evidence_surface_is_source_complete() -> None:
+    required_frontend_files = [
+        "apps/web/src/app/App.test.tsx",
+        "apps/web/src/app/AppShell.test.tsx",
+        "apps/web/src/employers/EmployerWorkspace.test.tsx",
+        "apps/web/src/employers/EmployerRevisionForm.test.tsx",
+        "apps/web/src/i18n/LanguageProvider.test.tsx",
+        "apps/web/src/test/valueSafeDiagnostics.test.ts",
+    ]
+
+    for relative_path in required_frontend_files:
+        assert (ROOT / relative_path).is_file()
+
+    frontend_tests = "\n".join(
+        (ROOT / relative_path).read_text(encoding="utf-8")
+        for relative_path in required_frontend_files
+    )
+    required_regression_nodes = [
+        "has no automated axe violations in both locales",
+        "passes axe in both locales across every revision and recovery state",
+        "keeps exact English and Spanish revision keys in parity",
+        "provides focus hooks for every interactive control",
+        "announces and focuses every revision transition with reduced-motion-safe behavior",
+        "honors reduced motion and narrow single-column structure",
+        "keeps workspace query failures value-independent",
+        "keeps create authority data out of browser side channels",
+        "revision flow never accesses Cache API or service workers and never exposes values in browser or diagnostic channels",
+        "revision controls preserve value-independent Testing Library diagnostics",
+        "reloads the canonical document after a persisted restore",
+        "does not restore Employer state from browser back-forward cache",
+    ]
+
+    for node in required_regression_nodes:
+        assert node in frontend_tests
+
+
+def test_web_verify_scripts_pin_test_environment_for_react_act() -> None:
+    package_json = json.loads((ROOT / "apps/web/package.json").read_text(encoding="utf-8"))
+
+    assert package_json["scripts"]["test"].startswith("NODE_ENV=test ")
+    assert package_json["scripts"]["test:coverage"].startswith("NODE_ENV=test ")
+
+
+def test_human_feedback_template_defines_value_safe_structured_issue_fields() -> None:
+    template = (ROOT / "deploy/gcp/human-feedback-template.md").read_text(encoding="utf-8")
+
+    required_fields = [
+        "synthetic scenario",
+        "tester role",
+        "language",
+        "browser",
+        "viewport",
+        "expected behavior",
+        "observed behavior",
+        "severity",
+        "workflow blocker",
+        "accessibility impact",
+        "privacy impact",
+        "security impact",
+        "reproduction",
+        "evidence reference",
+        "owner",
+        "disposition",
+        "retest result",
+    ]
+
+    for field in required_fields:
+        assert field in template
+    forbidden_values = [
+        "submitted names",
+        "UUIDs",
+        "commands",
+        "cursors",
+        "tester identities",
+        "endpoints",
+        "tokens",
+        "raw bodies",
+    ]
+    for forbidden_value in forbidden_values:
+        assert forbidden_value in template
+
+
+def test_human_qualification_checklist_requires_manual_matrix_without_tracked_values() -> None:
+    checklist = (ROOT / "deploy/gcp/human-qualification-checklist.md").read_text(encoding="utf-8")
+
+    required_entries = [
+        "macOS Safari",
+        "Chromium desktop",
+        "browser",
+        "OS",
+        "device or viewport",
+        "assistive technology",
+        "network condition",
+        "English Employer path",
+        "Spanish Employer path",
+        "keyboard",
+        "focus",
+        "responsive reflow",
+        "reduced motion",
+        "text spacing",
+        "contrast",
+        "refresh/back/forward/BFCache",
+        "constrained network",
+        "safe error/recovery",
+        "pass/fail/not-run",
+        "tester role",
+        "language",
+        "evidence reference",
+        "disposition",
+    ]
+
+    for entry in required_entries:
+        assert entry in checklist
+    forbidden_values = [
+        "submitted names",
+        "UUIDs",
+        "commands",
+        "cursors",
+        "tester identities",
+        "endpoints",
+        "tokens",
+        "screenshots containing sensitive values",
+        "raw bodies",
+    ]
+    for forbidden_value in forbidden_values:
+        assert forbidden_value in checklist
+
+
+def test_qualification_status_contract_lists_exact_statuses_and_overclaim_boundaries() -> None:
+    contract = (ROOT / "deploy/gcp/qualification-status-contract.md").read_text(encoding="utf-8")
+
+    exact_statuses = [
+        "qualified_private_develop_for_human_feedback",
+        "operational_private_develop_technical_feedback_only",
+        "not_qualified",
+        "torn_down_after_failed_activation",
+    ]
+    for status in exact_statuses:
+        assert status in contract
+    assert "exactly one" in contract
+    required_boundaries = [
+        "synthetic-only",
+        "not staff-pilot identity",
+        "not client-accepted",
+        "does not authorize live/client data or production",
+        "fluent-language content-quality review",
+        "No other missing/failed row qualifies",
+        "blockers and stop/cleanup disposition",
+    ]
+    for boundary in required_boundaries:
+        assert boundary in contract
+
+
+def test_predeployment_manifest_registers_database_authority_verifier_entrypoint() -> None:
+    manifest = json.loads(
+        (ROOT / "infra/policy/predeployment-authority-manifest.json").read_text(encoding="utf-8")
+    )
+
+    assert "scripts/verify_database_authority.py" in manifest["scripts"]["entrypoints"]
+
+
+def test_database_authority_integration_suite_retains_controlled_postgresql_coverage() -> None:
+    integration = (ROOT / "tests/integration/test_database_authority.py").read_text(
+        encoding="utf-8"
+    )
+
+    required_coverage = [
+        "test_database_authority_live_verifier_accepts_upgraded_schema",
+        "test_database_authority_runtime_login_cannot_assume_owner_or_mutate_append_only_tables",
+        "TRUNCATE TABLE command_receipts",
+        "CREATE TABLE public.runtime_leak",
+        "ALTER TABLE audit_events DISABLE TRIGGER ALL",
+        "GRANT golden_rose_schema_owner TO golden_rose_runtime",
+        "test_database_authority_migration_login_can_assume_only_schema_owner",
+        "SELECT SESSION_USER",
+        "SELECT CURRENT_USER",
+        "SET ROLE golden_rose_schema_owner",
+        "test_database_authority_live_verifier_fails_closed_on_runtime_privilege_drift",
+        "test_database_authority_verifier_script_passes_on_reviewed_head",
+    ]
+
+    for coverage in required_coverage:
+        assert coverage in integration
+
+
+def test_staff_api_integration_suite_retains_no_store_controlled_error_coverage() -> None:
+    integration = "\n".join(
+        [
+            (ROOT / "tests/integration/api/test_staff_employer_reads.py").read_text(
+                encoding="utf-8"
+            ),
+            (ROOT / "tests/integration/api/test_staff_employers.py").read_text(encoding="utf-8"),
+        ]
+    )
+
+    required_coverage = [
+        "test_post_staff_employer_contact_failure_matrix_is_exact_no_store_value_safe_and_write_free",
+        "test_post_staff_employer_contact_query_failure_matrix_is_exact_no_store_value_safe_and_write_free",
+        "test_get_staff_employer_contact_failure_matrix_is_exact_no_store_value_safe_and_write_free",
+        "test_existing_search_failure_matrix_media_cache_body_headers_and_read_only_contract_remains_exact",
+        "test_existing_detail_failure_matrix_media_cache_body_headers_and_read_only_contract_remains_exact",
+        "test_post_staff_employer_revision_maps_bounded_failure_matrix_without_values",
+        'response.headers["Cache-Control"] == "no-store"',
+        '"status": 403',
+        '"status": 404',
+        '"status": 409',
+        '"status": 412',
+        '"status": 422',
+        '"status": 500',
+        '"status": 503',
+        "Idempotency-Result-Version",
+        "assert sql_statements == []",
+    ]
+
+    for coverage in required_coverage:
+        assert coverage in integration
+
+
 def test_gcp_first_deployment_runbook_documents_recovery_and_secret_boundaries() -> None:
     runbook = (ROOT / "deploy/gcp/first-deployment-runbook.md").read_text(encoding="utf-8")
 

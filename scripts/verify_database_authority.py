@@ -665,39 +665,45 @@ def main() -> int:
         runtime_login_database_url, migration_login_database_url = (
             _required_authenticated_probe_urls()
         )
+        probe_violations: list[str] = []
+        authority_database_url = get_database_url()
+        probe_violations.extend(
+            validate_database_identities(
+                {
+                    "authority": identify_database(authority_database_url),
+                    "migration": identify_database(migration_login_database_url),
+                    "runtime": identify_database(runtime_login_database_url),
+                }
+            )
+        )
+
+        runtime_login_role, runtime_probe_violations = probe_runtime_login(
+            runtime_login_database_url
+        )
+        probe_violations.extend(runtime_probe_violations)
+        migration_login_role, migration_probe_violations = probe_migration_login(
+            migration_login_database_url
+        )
+        probe_violations.extend(migration_probe_violations)
+
+        engine = create_engine(authority_database_url, future=True)
+        try:
+            with engine.connect() as connection:
+                snapshot = collect_authority_snapshot(
+                    connection,
+                    migration_login_role=migration_login_role,
+                    runtime_login_role=runtime_login_role,
+                )
+        finally:
+            engine.dispose()
     except ValueError as exc:
         print("database authority verification failed")
         print(f"- {exc}")
         return 1
-    probe_violations: list[str] = []
-    authority_database_url = get_database_url()
-    probe_violations.extend(
-        validate_database_identities(
-            {
-                "authority": identify_database(authority_database_url),
-                "migration": identify_database(migration_login_database_url),
-                "runtime": identify_database(runtime_login_database_url),
-            }
-        )
-    )
-
-    runtime_login_role, runtime_probe_violations = probe_runtime_login(runtime_login_database_url)
-    probe_violations.extend(runtime_probe_violations)
-    migration_login_role, migration_probe_violations = probe_migration_login(
-        migration_login_database_url
-    )
-    probe_violations.extend(migration_probe_violations)
-
-    engine = create_engine(authority_database_url, future=True)
-    try:
-        with engine.connect() as connection:
-            snapshot = collect_authority_snapshot(
-                connection,
-                migration_login_role=migration_login_role,
-                runtime_login_role=runtime_login_role,
-            )
-    finally:
-        engine.dispose()
+    except SQLAlchemyError:
+        print("database authority verification failed")
+        print("- database connection boundary failed")
+        return 1
 
     violations = [
         *evaluate_authority_snapshot(snapshot),

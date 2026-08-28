@@ -49,12 +49,17 @@ Do not place tester identities or emails into repo docs, Terraform vars, or PR c
 ## Qualification invocation boundary
 
 - `scripts/qualify_develop_deployment.py` must not receive the private bearer token on the command line.
+- The approved and unapproved tokens use separate non-argv handoffs; raw token substitution is a stop condition before any approved synthetic flow runs.
 - Provide the token only through one of the reviewed non-echoing handoffs:
   - `--access-token-stdin` with the token piped from a protected source
   - `--access-token-env <ENV_NAME>` where the environment variable is populated outside shell history and cleared immediately after use
   - `--access-token-file <path>` where the file has restrictive local permissions and is deleted immediately after use
+- Provide the authenticated-but-unapproved probe token through the matching unapproved-token handoff. The harness cryptographically verifies the actual Google token's issuer, exact service audience, subject, and temporal claims, then requires IAM Policy Troubleshooter to return `NOT_GRANTED` for that verified subject, exact service resource, and `run.routes.invoke`; no operator-authored assertion file can substitute for either proof.
 - Use only the reviewed IAM-authenticated Cloud Run `https://...a.run.app` authority for `--base-url`; do not add userinfo, query strings, fragments, alternate ports, or paths.
 - Pass `--allow-synthetic-writes` only when the operator explicitly intends to run the synthetic create/revision/contact qualification flow.
+- The tracked output must preserve the schema-stable `manual_browser`, `accessibility`, `fluent_language`, `tester_access`, `monitoring`, `recovery`, and `feedback` fields as `not_run`, `not_evidenced`, or `not_triaged` until those separate gates run.
+- The automated evidence must require `Cache-Control: no-store` for exercised responses, including safe generated not-found/cursor/stale/idempotency controls; it may use source-controlled static contract evidence only for unavailable, authorization, and other unsafe-to-induce outcomes.
+- Reconcile the final status through `deploy/gcp/qualification-status-contract.md`, `deploy/gcp/human-qualification-checklist.md`, and `deploy/gcp/human-feedback-template.md`; the only tracked status labels are `qualified_private_develop_for_human_feedback`, `operational_private_develop_technical_feedback_only`, `not_qualified`, and `torn_down_after_failed_activation`.
 
 ## Verification checklist
 

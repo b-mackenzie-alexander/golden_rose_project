@@ -453,7 +453,10 @@ def test_foundation_mode_main_allows_absent_cloud_sql_during_collection() -> Non
             calls["commands"].append(key)
             if key == ("cloud-sql",):
                 calls["cloud_sql_requested"] = True
-                raise module.VerificationError("cloud sql failed: NOT_FOUND")
+                raise module.VerificationError(
+                    "cloud sql failed: ERROR: (gcloud.sql.instances.describe) HTTPError 404: "
+                    "The Cloud SQL instance does not exist."
+                )
             staged_values = {
                 ("project-labels",): valid_snapshot()["project_labels"],
                 ("enabled-apis",): valid_snapshot()["enabled_apis"],
@@ -499,6 +502,86 @@ def test_foundation_mode_main_allows_absent_cloud_sql_during_collection() -> Non
     assert calls["evaluate"]["mode"] == "foundation"
     assert calls["evaluate"]["snapshot"]["cloud_sql"] == {}
     assert calls["evaluate"]["snapshot"]["resource_inventory"]["cloud_sql_instance"] == ""
+
+
+def test_foundation_collection_allows_gcloud_absent_cloud_sql_instance_message() -> None:
+    module = load_module()
+    commands: dict[tuple[str, ...], Any] = {
+        ("project-labels",): valid_snapshot()["project_labels"],
+        ("enabled-apis",): valid_snapshot()["enabled_apis"],
+        ("service-accounts",): {
+            "workload": valid_snapshot()["resource_inventory"]["service_accounts"],
+            "control_plane": valid_snapshot()["resource_inventory"][
+                "control_plane_service_accounts"
+            ],
+        },
+        ("project-number",): expected_contract()["project_number"],
+        ("cloud-run-service",): {},
+        ("cloud-run-service-iam",): {},
+        ("migration-job",): {},
+        ("migration-job-iam",): {},
+        ("service-account-keys",): valid_snapshot()["service_account_keys"],
+        ("project-iam",): valid_snapshot()["project_iam"],
+        ("service-account-iam",): valid_snapshot()["service_account_iam"],
+        ("artifact-registry-iam",): valid_snapshot()["artifact_registry_iam"],
+        ("state-bucket",): valid_snapshot()["state_bucket"],
+        ("state-bucket-iam",): valid_snapshot()["state_bucket_iam"],
+        ("budget",): valid_snapshot()["budget"],
+        ("notification-channels",): valid_snapshot()["notification_channels"],
+        ("alert-policies",): valid_snapshot()["alert_policies"],
+        ("logging",): valid_snapshot()["logging"],
+        ("uptime-checks",): [],
+        ("workload-identity-provider",): valid_snapshot()["workload_identity_provider"],
+    }
+
+    def runner(command: tuple[str, ...]) -> Any:
+        if command == ("cloud-sql",):
+            raise module.VerificationError(
+                "cloud sql failed: ERROR: (gcloud.sql.instances.describe) HTTPError 404: "
+                "The Cloud SQL instance does not exist."
+            )
+        return commands[command]
+
+    snapshot = module.collect_foundation_snapshot(runner, mode="foundation")
+
+    assert snapshot["cloud_sql"] == {}
+    assert snapshot["resource_inventory"]["cloud_sql_instance"] == ""
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "The Cloud SQL instance does not exist. retryable transport fault",
+        "The unrelated instance does not exist.",
+        "NOT_FOUND",
+        "resource not found",
+    ],
+)
+def test_cloud_sql_absence_matcher_rejects_near_matches(message: str) -> None:
+    module = load_module()
+    error = module.VerificationError(f"cloud sql failed: {message}")
+
+    assert module._is_absent_cloud_sql_error(error) is False
+
+
+def test_workload_absence_matcher_rejects_cloud_sql_specific_message() -> None:
+    module = load_module()
+    error = module.VerificationError("cloud sql failed: The Cloud SQL instance does not exist.")
+
+    assert module._is_absent_workload_resource_error(error) is False
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "cloud sql failed: NOT_FOUND",
+        "cloud sql failed: The Cloud SQL instance was not found",
+    ],
+)
+def test_workload_absence_matcher_rejects_cloud_sql_not_found_forms(message: str) -> None:
+    module = load_module()
+
+    assert module._is_absent_workload_resource_error(module.VerificationError(message)) is False
 
 
 def test_live_runner_treats_gcloud_cannot_find_service_as_absent() -> None:

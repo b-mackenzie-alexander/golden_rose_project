@@ -183,13 +183,19 @@ def _run_json_command(command: Sequence[str], *, context: str) -> Any:
     return _load_json(result.stdout, context=context)
 
 
-def _is_absent_resource_error(error: VerificationError) -> bool:
+def _is_absent_workload_resource_error(error: VerificationError) -> bool:
     message = str(error).lower()
+    if "cloud sql" in message:
+        return False
     return (
         "not found" in message
         or "not_found" in message
         or re.search(r"cannot find (?:service|job|instance) \[", message) is not None
     )
+
+
+def _is_absent_cloud_sql_error(error: VerificationError) -> bool:
+    return str(error).lower().endswith("the cloud sql instance does not exist.")
 
 
 def _dedupe_strings(values: object, *, label: str) -> list[str]:
@@ -367,7 +373,7 @@ def collect_foundation_snapshot(
     try:
         cloud_sql = _mapping(command_runner(("cloud-sql",)), label="cloud sql")
     except VerificationError as exc:
-        if mode == "foundation" and _is_absent_resource_error(exc):
+        if mode == "foundation" and _is_absent_cloud_sql_error(exc):
             cloud_sql = {}
         else:
             raise
@@ -1212,7 +1218,7 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                     context="cloud run service",
                 )
             except VerificationError as exc:
-                if _is_absent_resource_error(exc):
+                if _is_absent_workload_resource_error(exc):
                     return {}
                 raise
             template = _mapping(service, label="service").get("template", {})
@@ -1246,7 +1252,7 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                     context="cloud run service iam",
                 )
             except VerificationError as exc:
-                if _is_absent_resource_error(exc):
+                if _is_absent_workload_resource_error(exc):
                     return {}
                 raise
             return _bindings_to_role_map(policy)
@@ -1268,7 +1274,7 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                     context="migration job",
                 )
             except VerificationError as exc:
-                if _is_absent_resource_error(exc):
+                if _is_absent_workload_resource_error(exc):
                     return {}
                 raise
             template = _mapping(job, label="job").get("template", {})
@@ -1301,7 +1307,7 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                     context="migration job iam",
                 )
             except VerificationError as exc:
-                if _is_absent_resource_error(exc):
+                if _is_absent_workload_resource_error(exc):
                     return {}
                 raise
             return _bindings_to_role_map(policy)

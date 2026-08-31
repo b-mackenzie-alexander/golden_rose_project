@@ -1,10 +1,10 @@
 # Bootstrap state runbook
 
-This runbook covers the one-time local bootstrap of the durable Terraform state bucket and the later migration to remote state. It is intentionally value-safe: operator-held project, bucket, location, and principal inputs stay out of tracked source.
+This runbook covers the durable bootstrap bucket and the later establishment of new Terraform state lineage for it. It is intentionally value-safe: operator-held project, bucket, location, and principal inputs stay out of tracked source.
 
-Current source status: PR #37 merged the no-cloud deployment-path remediation at `caf96a7`; PR #46 made the evaluated foundation root workload-free and Cloud-SQL-free at `58aed28`; PR #48 aligned the verifier at `5f265d8`; and PR #57 closed A1 live-foundation remediation with zero current-source violations. Private records show separately approved partial foundation work. This runbook remains future operator guidance: after the narrow source amendment merges, separately approved read-only binding/readback and bounded workload-scope delta must complete in the same operator session before either root adoption gate; PR #57's A1 closure is not reopened.
+Current source status: PR #57 closed A1; PR #58/PR #59 and separately approved WP-2/WP-3 completed the workload binding/scope-delta sequence without mutation. A2 is complete: the bucket was manually established before Terraform state, so empty state and absent local state retire prior-state adoption/import. This runbook remains future operator guidance pending a separately approved bootstrap-state establishment/reconciliation decision with new lineage; PR #57's A1 closure is not reopened.
 
-Before any later adoption/import request, prove privately that bootstrap and workload roots have distinct state objects/files, backend keys/prefixes, lock scopes, lineages, and import operations. Bind each approval to the canonical private backend-config digest plus an opaque resolved backend identity, state object or prefix, and lock scope fingerprint, then require pre-initialization comparison against the reviewed source and operator-held inputs. Verify bootstrap-local-state provenance (or record its absence as a blocker), then migrate/read back bootstrap state and prove it contains bootstrap addresses only before any workload-root state initialization/import or bootstrap-authority retirement.
+Before any bootstrap-state establishment/reconciliation request, prove privately that bootstrap and workload roots have distinct state objects/files, backend keys/prefixes, lock scopes, lineages, and recovery paths. Bind each approval to the canonical private backend-config digest plus an opaque resolved backend identity, state object or prefix, and lock scope fingerprint, then require pre-initialization comparison against the reviewed source and operator-held inputs. Establish/read back bootstrap state with the approved existing bootstrap inventory and prove it contains bootstrap addresses only before any workload-root state path or bootstrap-authority retirement.
 
 ## Scope
 
@@ -16,12 +16,11 @@ Before any later adoption/import request, prove privately that bootstrap and wor
 
 ## Ceremony sequence
 
-1. local bootstrap in `infra/gcp/bootstrap` with operator-held values
-2. create the durable remote state bucket with lifecycle protection and recovery controls
-3. verify remote state access before any migration
-4. migrate the root module from local bootstrap to remote state using the partial backend configuration plus operator-held backend values, after matching the canonical private backend-config digest and the opaque resolved backend identity/state object or prefix/lock scope fingerprint approved for that root
-5. complete the later WIF handoff after the reviewed trust contract exists
-6. perform bootstrap authority retirement so the one-time bootstrap operator path does not remain standing authority
+1. bind the exact existing bootstrap candidate inventory, source/lock/input digests, and private backend/recovery references
+2. establish the bootstrap root's new remote Terraform state lineage against the existing durable bucket through a separately approved reconciliation path
+3. read back state lineage/serial, backend object or prefix, lock scope, bootstrap-only address set, and recovery access before any workload-state decision
+4. complete the later WIF handoff after the reviewed trust contract exists
+5. perform bootstrap authority retirement only through its separate approved transition
 
 ## Exact GitHub WIF trust contract
 

@@ -87,13 +87,7 @@ automated hiring, matching, ranking, eligibility, or referral system.
   omit network and Cloud SQL at `58aed28`; and PR #48 aligned the live verifier
   with that workload-free, Cloud-SQL-free foundation stage at `5f265d8`. PR #57
   then closed A1 live-foundation remediation with zero current-source violations.
-  The next source boundary is review of a packet that prohibits new-project creation;
-  after merge, a separately approved read-only binding/readback for the existing
-  dedicated workload project and a separately approved bounded workload-scope
-  delta must occur immediately after binding readback. This preserves PR #57's
-  A1 closure; it does not re-run the closed control-plane collection. Only then
-  may A2 provenance/import, bootstrap-root adoption, workload-root adoption, or
-  an exact foundation-plan request.
+  The next source boundary is E1 review of the bootstrap-state establishment/reconciliation packet. A later separately approved E2 bootstrap-only state establishment/reconciliation creates new lineage against the manually established bucket; only then may a distinct workload-state path, A5 augmentation, or exact foundation-plan request be considered.
   Separately approved operator work has established a partial
   non-executable foundation; private records hold its identifiers and raw
   evidence. No image publication, executable deployment, or qualification has

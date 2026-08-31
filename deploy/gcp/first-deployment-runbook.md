@@ -2,7 +2,7 @@
 
 This runbook defines the human/operator ceremony for the first private fictional-synthetic `develop` deployment after the separate cloud-read, Terraform-plan, and foundation-apply gates are complete. It is intentionally value-safe: project IDs, domains, tester identities, secret payloads, passwords, tokens, and exact private endpoints stay in operator-held records rather than tracked source.
 
-Current source status: PR #37 merged the no-cloud deployment-path remediation at `caf96a7`; PR #42 made tester verification service-stage-only at `b2d79b5`; PR #46 made the evaluated foundation root workload-free and Cloud-SQL-free at `58aed28`; and PR #48 aligned the verifier at `5f265d8`. Private records show separately approved partial foundation work; this runbook remains future operator guidance until private inventory/adoption, foundation planning/apply, and later workload gates are explicitly approved and completed.
+Current source status: PR #37 merged the no-cloud deployment-path remediation at `caf96a7`; PR #42 made tester verification service-stage-only at `b2d79b5`; PR #46 made the evaluated foundation root workload-free and Cloud-SQL-free at `58aed28`; PR #48 aligned the verifier at `5f265d8`; PR #57 closed A1; and later WP-2/WP-3/A2 evidence selected bootstrap-state establishment/reconciliation with new lineage rather than prior-state adoption/import. This runbook remains future operator guidance until that separately approved bootstrap-state path, later workload-state path, foundation planning/apply, and workload gates are explicitly approved and completed.
 
 ## Scope
 

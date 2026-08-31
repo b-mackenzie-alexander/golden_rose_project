@@ -89,8 +89,10 @@ automated hiring, matching, ranking, eligibility, or referral system.
   then closed A1 live-foundation remediation with zero current-source violations.
   The next source boundary is review of a packet that prohibits new-project creation;
   after merge, a separately approved read-only binding/readback for the existing
-  dedicated workload project and a separately approved A1 recollection must occur
-  before A2 provenance/import, bootstrap-root adoption, workload-root adoption, or
+  dedicated workload project and a separately approved bounded workload-scope
+  delta must occur immediately after binding readback. This preserves PR #57's
+  A1 closure; it does not re-run the closed control-plane collection. Only then
+  may A2 provenance/import, bootstrap-root adoption, workload-root adoption, or
   an exact foundation-plan request.
   Separately approved operator work has established a partial
   non-executable foundation; private records hold its identifiers and raw

@@ -1,10 +1,10 @@
-# Dedicated Workload Project Binding and A1 Recollection Decision Plan
+# Dedicated Workload Project Binding and A1 Scope-Delta Decision Plan
 
-> **For Hermes:** This is a decision-and-publication packet. Its acceptance and merge authorize **only WP-1**. They do not authorize a cloud command or make any private execution-input bundle sufficient for later action: WP-2 and WP-3 each require their own explicit, separately recorded approval before any readback or collection command. Do not exceed the listed read-only binding/recollection or later gate boundaries.
+> **For Hermes:** This is a decision-and-publication packet. Its acceptance and merge authorize **only WP-1**. They do not authorize a cloud command or make any private execution-input bundle sufficient for later action: WP-2 and WP-3 each require their own explicit, separately recorded approval before any readback or collection command. Do not exceed the listed read-only binding/scope-delta or later gate boundaries.
 
-**Status:** Decision-and-publication packet. The existing private dedicated workload project is the accepted disposable `develop` target and is verified billing-enabled in operator-held evidence. A duplicate created during the retired new-project path is `DELETE_REQUESTED` and must not be reused; no provider quota request was submitted. This packet prohibits another project-creation transaction. The later A1 recollection, A2 provenance/import, state, Terraform, and deployment gates remain separate.
+**Status:** Decision-and-publication packet. PR #57 remains the closed A1 live-foundation remediation record. The existing private dedicated workload project is the accepted disposable `develop` target and is verified billing-enabled in operator-held evidence. A duplicate created during the retired new-project path is `DELETE_REQUESTED` and must not be reused; no provider quota request was submitted. This packet prohibits another project-creation transaction and a repeat of the completed A1 collection. WP-3 records only the bounded workload-scope delta needed to attach the confirmed target to the closed A1 evidence. A2 provenance/import, state, Terraform, and deployment gates remain separate.
 
-**Goal:** Bind the existing dedicated disposable workload project to the A1 evidence path through a bounded private readback and then rerun the complete A1 read-only collection, while preserving the lifecycle-independent control-plane/state boundary.
+**Goal:** Bind the existing dedicated disposable workload project through a bounded private readback, record only its required workload-scope delta against PR #57's closed A1 evidence, and preserve the lifecycle-independent control-plane/state boundary.
 
 **Architecture:** The existing control-plane project remains the exclusive durable state/bootstrap/WIF candidate. The existing billing-enabled workload project is the disposable workload target; the duplicate under deletion is excluded. The current Terraform workload root remains the authority for later workload resources only. This packet does not authorize creation, billing mutation, labels, IAM, API enablement, or resource creation inside the workload project.
 
@@ -38,27 +38,27 @@ The owner-operated approval bundle must privately record and bind:
 2. billing-enabled readback and interim billing custody/alert ownership;
 3. the approved `us-east4` posture for later regional services, without treating it as an authorization to create any regional resource;
 4. the explicitly excluded duplicate project's disposition and a prohibition on its reuse;
-5. operator identity and the limited read-only permissions needed for custody readback and A1 recollection;
+5. operator identity and the limited read-only permissions needed for custody readback and the bounded workload-scope delta;
 6. the readback/evidence location, source SHA, and operator-held run identifier;
 7. explicit no-create/no-billing-mutation/no-label/no-API/no-IAM/no-resource/no-state/no-Terraform boundaries;
-8. the exact read-only collection commands and stop conditions.
+8. the exact read-only delta collection commands, PR #57 evidence reference, and stop conditions.
 
 ## 4. Ordered execution gates
 
 ### Gate WP-1: Decision-packet review and protected publication
 
-**Objective:** Independently review and merge this binding/recollection planning packet before any workload-project binding readback or A1 recollection.
+**Objective:** Independently review and merge this binding/scope-delta amendment before any workload-project binding readback or workload-scope delta collection.
 
 **Files:**
 - Create: this plan
-- Create: `docs/review-handoffs/<UTC-date>-workload-project-binding-recollection-review-handoff.md`
+- Create: `docs/review-handoffs/<UTC-date>-workload-project-binding-scope-delta-review-handoff.md`
 - Modify: `CURRENT_WORK.md`, `ROADMAP.md`, `NOTES.md`, `TECHNOLOGY_DECISIONS.md`, `infra/gcp/README.md`, and relevant ADR/architecture status surfaces
 
 **Verification:**
 - Markdown/reference integrity checks
 - `git diff --check`
 - exact committed-range Gitleaks before protected PR
-- independent planning/security review of lifecycle separation, existing-project custody/billing evidence, duplicate exclusion, no-creation authority, and A1 recollection boundaries
+- independent planning/security review of lifecycle separation, existing-project custody/billing evidence, duplicate exclusion, no-creation authority, bounded workload-scope delta, and preserved A1 closure
 
 **Stop boundary:** No cloud command or workload-project selection, creation, mutation, or adoption action.
 
@@ -78,17 +78,17 @@ The owner-operated approval bundle must privately record and bind:
 
 **Acceptance:** A private readback record proves the existing distinct workload project is the approved target, is billing-enabled under the approved custody, remains separate from control-plane/state, and has no approved resource or authority change from this gate.
 
-### Gate WP-3: Re-scope A1 read-only inventory
+### Gate WP-3: Bounded workload-scope delta approval
 
-**Objective:** Bind the confirmed private workload-project identifier to the approved A1 evidence record and rerun the complete reviewed read-only collection against exactly the control-plane and workload projects.
+**Objective:** Under a separate explicit read-only approval, collect only the confirmed workload project's facts and required cross-project binding references, then attach one classified delta to PR #57's closed A1 evidence. This does **not** reopen, repeat, or re-disposition the completed A1 control-plane collection.
 
 **Files:**
-- Private only: A1 approval/custody record, raw run directory, minimized inventory/disposition files
+- Private only: PR #57 A1 evidence reference, workload-scope delta record, raw run directory, and one delta disposition register
 - Value-safe updates: `CURRENT_WORK.md`, `ROADMAP.md`, `NOTES.md`, and the existing Obsidian A1 closeout
 
-**Required collection:** project labels/IAM; service-account and user-managed-key inventory; WIF pool/provider/condition; Artifact Registry IAM; state-bucket metadata/IAM; logging sinks; and Cloud Run service/job absence guard.
+**Required collection:** only workload-project labels/IAM, workload service-account and user-managed-key inventory, applicable workload WIF bindings, Artifact Registry IAM needed by the workload root, workload-scoped logging/service-job absence posture, and the readback references required to prove separation from the already-recorded control plane. Reuse PR #57's closed evidence for unchanged control-plane facts.
 
-**Acceptance:** Every in-scope fact is classified exactly once. Expected greenfield absence is separated from drift, and every unknown/public/broad/state-lineage/unreviewed-action finding blocks A2.
+**Acceptance:** Every workload-scope delta fact is classified exactly once. Expected greenfield absence remains distinct from drift. Unknown/public/broad/state-lineage/unreviewed-action findings block A2. A clean delta preserves PR #57's A1 closure; it is not a second A1 gate.
 
 **Stop boundary:** No state adoption, Terraform operation, remediation, resource mutation, or deployment.
 
@@ -107,4 +107,4 @@ Return to planning before execution if any of the following changes:
 - The existing workload-project boundary, duplicate exclusion, and external project-container ownership are accepted.
 - WP-1 has passed independent review and merged through protected `develop`.
 - WP-2 remains a separate explicit read-only binding/readback approval, not an implied consequence of plan merge.
-- The post-WP-2 A1 recollection, A2 provenance/import, A3/A4 state adoption, A5 augmentation, foundation saved plan/apply, and all later deployment gates remain distinct approvals.
+- The post-WP-2 bounded workload-scope delta, A2 provenance/import, A3/A4 state adoption, A5 augmentation, foundation saved plan/apply, and all later deployment gates remain distinct approvals; PR #57's closed A1 record is not reopened.

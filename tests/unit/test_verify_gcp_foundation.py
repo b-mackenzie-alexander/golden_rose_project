@@ -1,7 +1,7 @@
 import importlib.util
 import json
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 from typing import Any, cast
 
 import pytest
@@ -741,6 +741,180 @@ def test_control_plane_inventory_and_live_collection_include_artifact_verifier()
     expected_email = "golden-rose-artifact-verifier@state-project.iam.gserviceaccount.com"
 
     assert expected_email in module._expected_control_plane_service_accounts("state-project")
+
+
+def test_live_runner_skips_key_and_iam_queries_for_absent_future_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    mutable_module = cast(Any, module)
+    contract = expected_contract()
+    future_identity = "golden-rose-artifact-verifier@state-project.iam.gserviceaccount.com"
+    calls: list[tuple[str, ...]] = []
+
+    def fake_run_json_command(command: list[str], *, context: str) -> Any:
+        calls.append(tuple(command))
+        if context == "service accounts":
+            return [
+                {"email": email} for email in module._expected_service_accounts("example-project")
+            ]
+        if context == "control-plane service accounts":
+            return [
+                {"email": email}
+                for email in module._expected_control_plane_service_accounts("state-project")
+                if email != future_identity
+            ]
+        return [] if context.startswith("service account keys") else {"bindings": []}
+
+    monkeypatch.setattr(mutable_module, "_run_json_command", fake_run_json_command)
+    runner = module._build_live_command_runner(contract)
+
+    runner(("service-accounts",))
+    keys = runner(("service-account-keys",))
+    iam = runner(("service-account-iam",))
+
+    assert keys[future_identity] == []
+    assert iam[future_identity] == {}
+    assert all(future_identity not in " ".join(command) for command in calls[2:])
+
+
+def test_list_logging_exclusions_uses_token_header_and_pagination(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    mutable_module = cast(Any, module)
+    requests: list[Any] = []
+    payloads: list[dict[str, Any]] = [
+        {"exclusions": [{"name": "first"}], "nextPageToken": "next-token"},
+        {"exclusions": [{"name": "second"}]},
+    ]
+
+    class FakeResponse:
+        def __init__(self, payload: dict[str, Any]) -> None:
+            self._payload = payload
+
+        def __enter__(self) -> "FakeResponse":
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps(self._payload).encode("utf-8")
+
+    def fake_urlopen(request: Any, *, timeout: int) -> FakeResponse:
+        assert timeout == 30
+        requests.append(request)
+        return FakeResponse(payloads.pop(0))
+
+    monkeypatch.setattr(
+        mutable_module.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout="short-lived-token\n"),
+    )
+    monkeypatch.setattr(mutable_module, "urlopen", fake_urlopen)
+
+    exclusions = module._list_logging_exclusions("example-project")
+
+    assert exclusions == [{"name": "first"}, {"name": "second"}]
+    assert requests[0].get_header("Authorization") == "Bearer short-lived-token"
+    assert requests[0].full_url.endswith("/projects/example-project/exclusions")
+    assert requests[1].full_url.endswith("?pageToken=next-token")
+
+
+def test_list_logging_exclusions_rejects_malformed_next_page_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    mutable_module = cast(Any, module)
+
+    class FakeResponse:
+        def __enter__(self) -> "FakeResponse":
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return b'{"exclusions": [], "nextPageToken": 7}'
+
+    monkeypatch.setattr(
+        mutable_module.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout="short-lived-token\n"),
+    )
+    monkeypatch.setattr(mutable_module, "urlopen", lambda *_args, **_kwargs: FakeResponse())
+
+    with pytest.raises(
+        module.VerificationError, match="logging exclusions returned malformed JSON"
+    ):
+        module._list_logging_exclusions("example-project")
+
+
+def test_list_logging_exclusions_rejects_repeated_page_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    mutable_module = cast(Any, module)
+    requests: list[Any] = []
+
+    class FakeResponse:
+        def __enter__(self) -> "FakeResponse":
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return b'{"exclusions": [], "nextPageToken": "repeat"}'
+
+    monkeypatch.setattr(
+        mutable_module.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout="short-lived-token\n"),
+    )
+
+    def fake_urlopen(request: Any, **_kwargs: Any) -> FakeResponse:
+        requests.append(request)
+        if len(requests) > 2:
+            raise RuntimeError("unexpected third page request")
+        return FakeResponse()
+
+    monkeypatch.setattr(mutable_module, "urlopen", fake_urlopen)
+
+    with pytest.raises(
+        module.VerificationError, match="logging exclusions returned malformed JSON"
+    ):
+        module._list_logging_exclusions("example-project")
+
+    assert len(requests) == 2
+
+
+def test_list_logging_exclusions_normalizes_non_utf8_response_to_safe_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    mutable_module = cast(Any, module)
+
+    class FakeResponse:
+        def __enter__(self) -> "FakeResponse":
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return b"\xff"
+
+    monkeypatch.setattr(
+        mutable_module.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout="short-lived-token\n"),
+    )
+    monkeypatch.setattr(mutable_module, "urlopen", lambda *_args, **_kwargs: FakeResponse())
+
+    with pytest.raises(module.VerificationError, match="logging exclusions read failed"):
+        module._list_logging_exclusions("example-project")
 
 
 def test_evaluate_foundation_snapshot_fails_closed_on_artifact_verifier_user_managed_key() -> None:

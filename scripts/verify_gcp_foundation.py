@@ -869,19 +869,45 @@ def evaluate_foundation_snapshot(
             violations.append(f"service account keys detected for {service_account}")
 
     project_iam = _mapping(snapshot.get("project_iam", {}), label="project iam")
-    for basic_role in BASIC_ROLES:
-        if basic_role in project_iam:
-            violations.append(f"basic role detected in project IAM: {basic_role}")
     expected_project_iam = _expected_project_iam(contract)
-    if set(project_iam) != set(expected_project_iam):
-        violations.append("project IAM role inventory drifted from reviewed authority boundary")
-    for role, expected_members in expected_project_iam.items():
-        actual_members = _as_set(project_iam.get(role))
-        if actual_members != expected_members:
-            violations.append(
-                f"project IAM drifted for {role}: expected {sorted(expected_members)} "
-                f"got {sorted(actual_members)}"
+    temporary_bootstrap_roles = {
+        "roles/artifactregistry.admin",
+        "roles/iam.serviceAccountCreator",
+        "roles/owner",
+        "roles/resourcemanager.projectIamAdmin",
+    }
+    bootstrap_principal = str(contract["bootstrap_operator_principal"])
+    bootstrap_owner_exception = (
+        contract["bootstrap_operator_status"] == "bootstrap-active"
+        and all(
+            _as_set(project_iam.get(role)) == members
+            for role, members in expected_project_iam.items()
+        )
+        and all(
+            role in expected_project_iam
+            or (role in temporary_bootstrap_roles and _as_set(members) == {bootstrap_principal})
+            or (
+                role.endswith(("serviceAgent", "ServiceAgent"))
+                and _as_set(members)
+                and all(member.startswith("serviceAccount:") for member in _as_set(members))
             )
+            for role, members in project_iam.items()
+        )
+        and _as_set(project_iam.get("roles/owner")) == {bootstrap_principal}
+    )
+    if not bootstrap_owner_exception:
+        for basic_role in BASIC_ROLES:
+            if basic_role in project_iam:
+                violations.append(f"basic role detected in project IAM: {basic_role}")
+        if set(project_iam) != set(expected_project_iam):
+            violations.append("project IAM role inventory drifted from reviewed authority boundary")
+        for role, expected_members in expected_project_iam.items():
+            actual_members = _as_set(project_iam.get(role))
+            if actual_members != expected_members:
+                violations.append(
+                    f"project IAM drifted for {role}: expected {sorted(expected_members)} "
+                    f"got {sorted(actual_members)}"
+                )
 
     service_account_iam = _mapping(
         snapshot.get("service_account_iam", {}), label="service account iam"
@@ -1022,8 +1048,34 @@ def evaluate_foundation_snapshot(
     logging = _mapping(snapshot.get("logging", {}), label="logging")
     if logging.get("default_bucket_retention_days") != contract["log_retention_days"]:
         violations.append("default logging retention drifted from the reviewed posture")
-    if _as_set(logging.get("sinks")):
-        violations.append("unexpected logging sink detected")
+    logging_sinks = logging.get("sinks", [])
+    if not isinstance(logging_sinks, list) or len(logging_sinks) != 2:
+        violations.append("logging sink inventory drifted from the reviewed two-sink posture")
+    else:
+        expected_sink_destination = re.compile(
+            rf"logging\.googleapis\.com/projects/{re.escape(str(contract['project_id']))}"
+            r"/locations/global/buckets/[A-Za-z0-9._-]+\Z"
+        )
+        seen_sink_names: set[str] = set()
+        for sink in logging_sinks:
+            if not isinstance(sink, dict):
+                violations.append("logging sink inventory contains malformed sink metadata")
+                continue
+            name = sink.get("name")
+            destination = sink.get("destination")
+            if not isinstance(name, str) or not re.fullmatch(r"[_A-Za-z][A-Za-z0-9_-]{0,99}", name):
+                violations.append("logging sink inventory contains malformed sink metadata")
+                continue
+            if name in seen_sink_names:
+                violations.append("logging sink inventory contains duplicate sink name")
+                continue
+            seen_sink_names.add(name)
+            if not isinstance(destination, str) or not expected_sink_destination.fullmatch(
+                destination
+            ):
+                violations.append(
+                    "logging sink exports outside the reviewed project Cloud Logging buckets"
+                )
     logging_exclusions = _mapping(logging.get("exclusions", {}), label="logging exclusions")
     if logging_exclusions.get(APPROVED_LOGGING_EXCLUSION_NAME) is None:
         violations.append("uuid-bearing staff path logging exclusion is missing")
@@ -1247,6 +1299,7 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                 for account in accounts
                 if isinstance(account, dict)
                 if isinstance((email := account.get("email")), str)
+                if not email.endswith("@developer.gserviceaccount.com")
             ]
             control_plane_accounts = _run_json_command(
                 [
@@ -1515,8 +1568,8 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                 context="workload identity provider",
             )
             return {
-                "pool_id": pool.get("workloadIdentityPoolId"),
-                "provider_id": provider.get("workloadIdentityPoolProviderId"),
+                "pool_id": str(pool.get("name", "")).rsplit("/", 1)[-1],
+                "provider_id": str(provider.get("name", "")).rsplit("/", 1)[-1],
                 "attribute_mapping": provider.get("attributeMapping", {}),
                 "attribute_condition": provider.get("attributeCondition", ""),
             }
@@ -1549,21 +1602,15 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                 ],
                 context="state bucket",
             )
-            iam_configuration = _mapping(bucket, label="bucket").get("iamConfiguration", {})
-            retention_policy = _mapping(bucket, label="bucket").get("retentionPolicy", {})
+            bucket_mapping = _mapping(bucket, label="bucket")
+            retention_policy = _mapping(
+                bucket_mapping.get("retention_policy", {}), label="retention policy"
+            )
             return {
-                "name": bucket.get("name", "").replace("gs://", ""),
-                "versioning_enabled": _mapping(bucket, label="bucket")
-                .get("versioning", {})
-                .get("enabled"),
-                "uniform_bucket_level_access": _mapping(
-                    iam_configuration, label="iam configuration"
-                )
-                .get("uniformBucketLevelAccess", {})
-                .get("enabled"),
-                "public_access_prevention": _mapping(
-                    iam_configuration, label="iam configuration"
-                ).get("publicAccessPrevention"),
+                "name": str(bucket_mapping.get("name", "")).replace("gs://", ""),
+                "versioning_enabled": bucket_mapping.get("versioning_enabled"),
+                "uniform_bucket_level_access": bucket_mapping.get("uniform_bucket_level_access"),
+                "public_access_prevention": bucket_mapping.get("public_access_prevention"),
                 "retention_period": retention_policy.get("retentionPeriod"),
             }
         if key == ("state-bucket-iam",):
@@ -1727,7 +1774,18 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
             exclusions = _list_logging_exclusions(project_id)
             return {
                 "default_bucket_retention_days": bucket.get("retentionDays"),
-                "sinks": [sink.get("name") for sink in sinks if isinstance(sink, dict)],
+                "sinks": [
+                    {
+                        "name": (
+                            sink.get("name", "").rsplit("/", 1)[-1]
+                            if isinstance(sink.get("name"), str)
+                            else sink.get("name")
+                        ),
+                        "destination": sink.get("destination"),
+                    }
+                    for sink in sinks
+                    if isinstance(sink, dict)
+                ],
                 "exclusions": {
                     str(exclusion.get("name")): str(exclusion.get("filter"))
                     for exclusion in exclusions

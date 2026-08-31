@@ -258,7 +258,16 @@ def valid_snapshot() -> dict[str, Any]:
         ],
         "logging": {
             "default_bucket_retention_days": contract["log_retention_days"],
-            "sinks": [],
+            "sinks": [
+                {
+                    "name": "reviewed-sink-a",
+                    "destination": "logging.googleapis.com/projects/example-project/locations/global/buckets/_Default",
+                },
+                {
+                    "name": "reviewed-sink-b",
+                    "destination": "logging.googleapis.com/projects/example-project/locations/global/buckets/_Required",
+                },
+            ],
             "exclusions": {
                 "develop-exclude-uuid-bearing-staff-paths": 'resource.type="cloud_run_revision" AND httpRequest.requestUrl=~"/api/staff/v1/employers/[0-9a-fA-F-]{36}(/contacts(/[0-9a-fA-F-]{36})?)?$"'
             },
@@ -616,6 +625,89 @@ def test_live_runner_treats_gcloud_cannot_find_service_as_absent() -> None:
     assert runner(("cloud-run-service",)) == {}
 
 
+def test_live_runner_reads_gcloud_storage_snake_case_bucket_posture(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+
+    def fake_run_json_command(command: list[str], *, context: str) -> dict[str, Any]:
+        assert context == "state bucket"
+        return {
+            "name": "example-terraform-state",
+            "versioning_enabled": True,
+            "uniform_bucket_level_access": True,
+            "public_access_prevention": "enforced",
+            "retention_policy": {"retentionPeriod": 604800},
+        }
+
+    monkeypatch.setattr(module, "_run_json_command", fake_run_json_command)
+
+    assert module._build_live_command_runner(expected_contract())(("state-bucket",)) == {
+        "name": "example-terraform-state",
+        "versioning_enabled": True,
+        "uniform_bucket_level_access": True,
+        "public_access_prevention": "enforced",
+        "retention_period": 604800,
+    }
+
+
+def test_live_runner_reads_wif_ids_from_gcloud_resource_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+
+    def fake_run_json_command(command: list[str], *, context: str) -> dict[str, Any]:
+        if context == "workload identity pool":
+            return {
+                "name": "projects/example/locations/global/workloadIdentityPools/golden-rose-github"
+            }
+        assert context == "workload identity provider"
+        return {
+            "name": "projects/example/locations/global/workloadIdentityPools/golden-rose-github/providers/golden-rose-github-provider",
+            "attributeMapping": {"google.subject": "assertion.sub"},
+            "attributeCondition": "attribute.repository == 'example/repository'",
+        }
+
+    monkeypatch.setattr(module, "_run_json_command", fake_run_json_command)
+
+    snapshot = module._build_live_command_runner(expected_contract())(
+        ("workload-identity-provider",)
+    )
+
+    assert snapshot["pool_id"] == "golden-rose-github"
+    assert snapshot["provider_id"] == "golden-rose-github-provider"
+
+
+def test_live_runner_excludes_provider_managed_service_accounts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+
+    def fake_run_json_command(command: list[str], *, context: str) -> list[dict[str, str]]:
+        if context == "service accounts":
+            return [
+                {"email": "staff-tracer-migration@example-project.iam.gserviceaccount.com"},
+                {"email": "staff-tracer-runtime@example-project.iam.gserviceaccount.com"},
+                {"email": "123456789-compute@developer.gserviceaccount.com"},
+            ]
+        assert context == "control-plane service accounts"
+        return [
+            {"email": "golden-rose-artifact-verifier@state-project.iam.gserviceaccount.com"},
+            {"email": "golden-rose-deployer@state-project.iam.gserviceaccount.com"},
+            {"email": "golden-rose-image-publisher@state-project.iam.gserviceaccount.com"},
+            {"email": "golden-rose-provisioner@state-project.iam.gserviceaccount.com"},
+        ]
+
+    monkeypatch.setattr(module, "_run_json_command", fake_run_json_command)
+
+    snapshot = module._build_live_command_runner(expected_contract())(("service-accounts",))
+
+    assert snapshot["workload"] == [
+        "staff-tracer-migration@example-project.iam.gserviceaccount.com",
+        "staff-tracer-runtime@example-project.iam.gserviceaccount.com",
+    ]
+
+
 @pytest.mark.parametrize(
     "message",
     [
@@ -963,6 +1055,82 @@ def test_evaluate_foundation_snapshot_accepts_expected_snapshot() -> None:
     module = load_module()
 
     assert module.evaluate_foundation_snapshot(valid_snapshot(), expected_contract()) == []
+
+
+def test_evaluate_foundation_snapshot_allows_only_two_logging_to_logging_sinks() -> None:
+    module = load_module()
+    snapshot = valid_snapshot()
+    snapshot["logging"]["sinks"] = [
+        {
+            "name": "reviewed-sink-a",
+            "destination": "logging.googleapis.com/projects/example-project/locations/global/buckets/_Default",
+        },
+        {
+            "name": "reviewed-sink-b",
+            "destination": "logging.googleapis.com/projects/example-project/locations/global/buckets/_Required",
+        },
+    ]
+
+    violations = module.evaluate_foundation_snapshot(snapshot, expected_contract())
+
+    assert not any("logging sink" in violation for violation in violations)
+
+
+@pytest.mark.parametrize(
+    ("name", "destination"),
+    [
+        (
+            "reviewed-sink",
+            "logging.googleapis.com/projects/foreign-project/locations/global/buckets/export",
+        ),
+        ("reviewed-sink", "logging.googleapis.com/"),
+        ("", "logging.googleapis.com/projects/example-project/locations/global/buckets/_Default"),
+        ("reviewed-sink", "storage.googleapis.com/projects/example-project/buckets/export"),
+    ],
+)
+def test_evaluate_foundation_snapshot_rejects_unreviewed_logging_sink_destination(
+    name: str, destination: str
+) -> None:
+    module = load_module()
+    snapshot = valid_snapshot()
+    snapshot["logging"]["sinks"][0] = {"name": name, "destination": destination}
+
+    violations = module.evaluate_foundation_snapshot(snapshot, expected_contract())
+
+    assert any("logging sink" in violation for violation in violations)
+
+
+def test_evaluate_foundation_snapshot_rejects_duplicate_logging_sink_id() -> None:
+    module = load_module()
+    snapshot = valid_snapshot()
+    snapshot["logging"]["sinks"][1] = dict(snapshot["logging"]["sinks"][0])
+
+    violations = module.evaluate_foundation_snapshot(snapshot, expected_contract())
+
+    assert any("logging sink" in violation for violation in violations)
+
+
+def test_evaluate_foundation_snapshot_allows_exact_active_bootstrap_owner_exception() -> None:
+    module = load_module()
+    snapshot = valid_snapshot()
+    contract = expected_contract()
+    contract["bootstrap_operator_status"] = "bootstrap-active"
+    snapshot["project_iam"] = {
+        **snapshot["project_iam"],
+        "roles/owner": [contract["bootstrap_operator_principal"]],
+        "roles/artifactregistry.admin": [contract["bootstrap_operator_principal"]],
+        "roles/iam.serviceAccountCreator": [contract["bootstrap_operator_principal"]],
+        "roles/resourcemanager.projectIamAdmin": [contract["bootstrap_operator_principal"]],
+        "roles/containerregistry.ServiceAgent": [
+            "serviceAccount:service-agent@example-project.iam.gserviceaccount.com"
+        ],
+    }
+
+    violations = module.evaluate_foundation_snapshot(snapshot, contract)
+
+    assert not any(
+        "project IAM" in violation or "basic role" in violation for violation in violations
+    )
 
 
 def test_evaluate_foundation_snapshot_fails_closed_on_public_invoker_and_basic_role() -> None:

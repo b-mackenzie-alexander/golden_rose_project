@@ -12,7 +12,9 @@ from collections.abc import Callable, Sequence
 from contextlib import suppress
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode, urlparse
+from urllib.request import Request, urlopen
 
 APPROVED_PROJECT_LABELS = {
     "environment": "develop",
@@ -205,6 +207,59 @@ def _is_absent_cloud_sql_error(error: VerificationError) -> bool:
         )
         is not None
     )
+
+
+def _list_logging_exclusions(project_id: str) -> list[dict[str, Any]]:
+    token_result = subprocess.run(
+        ["gcloud", "auth", "print-access-token"],
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    if token_result.returncode != 0 or not token_result.stdout.strip():
+        raise VerificationError("logging exclusions token acquisition failed")
+
+    exclusions: list[dict[str, Any]] = []
+    page_token: str | None = None
+    seen_page_tokens: set[str] = set()
+    while True:
+        query = urlencode({"pageToken": page_token}) if page_token else ""
+        url = f"https://logging.googleapis.com/v2/projects/{project_id}/exclusions"
+        if query:
+            url = f"{url}?{query}"
+        request = Request(
+            url,
+            headers={"Authorization": f"Bearer {token_result.stdout.strip()}"},
+        )
+        try:
+            with urlopen(request, timeout=30) as response:  # noqa: S310
+                payload = json.loads(response.read().decode("utf-8"))
+        except (
+            HTTPError,
+            URLError,
+            TimeoutError,
+            UnicodeDecodeError,
+            OSError,
+            json.JSONDecodeError,
+        ) as exc:
+            raise VerificationError("logging exclusions read failed") from exc
+        if not isinstance(payload, dict):
+            raise VerificationError("logging exclusions returned malformed JSON")
+        page_exclusions = payload.get("exclusions", [])
+        if not isinstance(page_exclusions, list) or not all(
+            isinstance(exclusion, dict) for exclusion in page_exclusions
+        ):
+            raise VerificationError("logging exclusions returned malformed JSON")
+        exclusions.extend(page_exclusions)
+        next_page_token = payload.get("nextPageToken")
+        if next_page_token is None or next_page_token == "":
+            return exclusions
+        if not isinstance(next_page_token, str):
+            raise VerificationError("logging exclusions returned malformed JSON")
+        if next_page_token in seen_page_tokens:
+            raise VerificationError("logging exclusions returned malformed JSON")
+        seen_page_tokens.add(next_page_token)
+        page_token = next_page_token
 
 
 def _dedupe_strings(values: object, *, label: str) -> list[str]:
@@ -1137,6 +1192,7 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
     region = str(contract["region"])
     state_bucket_name = str(contract["state_bucket_name"])
     billing_account_id = contract.get("billing_account_id")
+    known_service_account_projects: dict[str, str] = {}
 
     def command_runner(command: Sequence[str]) -> Any:
         key = tuple(command)
@@ -1187,7 +1243,10 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                 context="service accounts",
             )
             workload_accounts = [
-                account.get("email") for account in accounts if isinstance(account, dict)
+                email
+                for account in accounts
+                if isinstance(account, dict)
+                if isinstance((email := account.get("email")), str)
             ]
             control_plane_accounts = _run_json_command(
                 [
@@ -1201,13 +1260,19 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                 ],
                 context="control-plane service accounts",
             )
+            control_plane_account_emails = [
+                email
+                for account in control_plane_accounts
+                if isinstance(account, dict)
+                if isinstance((email := account.get("email")), str)
+            ]
+            known_service_account_projects.update(dict.fromkeys(workload_accounts, project_id))
+            known_service_account_projects.update(
+                dict.fromkeys(control_plane_account_emails, control_plane_project_id)
+            )
             return {
                 "workload": workload_accounts,
-                "control_plane": [
-                    account.get("email")
-                    for account in control_plane_accounts
-                    if isinstance(account, dict)
-                ],
+                "control_plane": control_plane_account_emails,
             }
         if key == ("cloud-run-service",):
             try:
@@ -1360,6 +1425,9 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                 ),
             }
             for email, account_project_id in sorted(account_projects.items()):
+                if email not in known_service_account_projects:
+                    keys[email] = []
+                    continue
                 key_list = _run_json_command(
                     [
                         "gcloud",
@@ -1394,6 +1462,9 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                 ),
             }
             for email, account_project_id in sorted(account_projects.items()):
+                if email not in known_service_account_projects:
+                    service_account_policies[email] = {}
+                    continue
                 policy = _run_json_command(
                     [
                         "gcloud",
@@ -1520,6 +1591,8 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                     "list",
                     "--billing-account",
                     str(billing_account_id),
+                    "--billing-project",
+                    control_plane_project_id,
                     "--format=json",
                 ],
                 context="budget",
@@ -1544,6 +1617,7 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
             channels = _run_json_command(
                 [
                     "gcloud",
+                    "beta",
                     "monitoring",
                     "channels",
                     "list",
@@ -1650,18 +1724,7 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                 ["gcloud", "logging", "sinks", "list", "--project", project_id, "--format=json"],
                 context="logging sinks",
             )
-            exclusions = _run_json_command(
-                [
-                    "gcloud",
-                    "logging",
-                    "exclusions",
-                    "list",
-                    "--project",
-                    project_id,
-                    "--format=json",
-                ],
-                context="logging exclusions",
-            )
+            exclusions = _list_logging_exclusions(project_id)
             return {
                 "default_bucket_retention_days": bucket.get("retentionDays"),
                 "sinks": [sink.get("name") for sink in sinks if isinstance(sink, dict)],

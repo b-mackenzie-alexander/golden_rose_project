@@ -2620,29 +2620,28 @@ def test_terraform_static_validation_harness_rejects_workflow_step_not_listed_in
         (
             'role   = "roles/storage.objectAdmin"',
             'role   = "roles/storage.admin"',
-            "roles/storage.admin",
+            "object-admin role",
         ),
         (
-            "member = var.recovery_authority_principal",
-            'member = "user:unexpected@example.com"',
-            "recovery_authority_principal",
+            "for_each = toset(local.active_state_bucket_object_admin_principals)",
+            "for_each = tolist(local.active_state_bucket_object_admin_principals)",
+            "active_state_bucket_object_admin_principals",
         ),
         (
-            'count  = var.bootstrap_operator_status == "bootstrap-active" ? 1 : 0\n',
-            "",
-            "bootstrap-active",
+            'var.bootstrap_operator_status == "bootstrap-active" ? [var.bootstrap_operator_principal] : [],',
+            'var.bootstrap_operator_status == "bootstrap-retired" ? [var.bootstrap_operator_principal] : [],',
+            "active state-bucket object-admin principal collection",
         ),
     ],
 )
 def test_terraform_static_validation_harness_rejects_state_bucket_iam_drift(
     tmp_path: Path, old_fragment: str, new_fragment: str, expected_fragment: str
 ) -> None:
-    _write_minimal_required_terraform_scaffold(tmp_path)
+    _write_current_terraform_scaffold(tmp_path)
+    policy_dir = tmp_path / "infra" / "policy"
+    policy_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(ROOT / "infra" / "policy" / "predeployment-authority-manifest.json", policy_dir)
     bootstrap_dir = tmp_path / "infra" / "gcp" / "bootstrap"
-    (bootstrap_dir / "state.tf").write_text(
-        (ROOT / "infra/gcp/bootstrap/state.tf").read_text(encoding="utf-8"),
-        encoding="utf-8",
-    )
     (bootstrap_dir / "iam.tf").write_text(
         (ROOT / "infra/gcp/bootstrap/iam.tf")
         .read_text(encoding="utf-8")
@@ -2662,22 +2661,18 @@ def test_terraform_static_validation_harness_rejects_state_bucket_iam_drift(
     assert expected_fragment in result.stdout
 
 
-def test_terraform_static_validation_binds_each_state_iam_resource_to_its_principal(
+def test_terraform_static_validation_binds_bucket_iam_to_each_deduplicated_principal(
     tmp_path: Path,
 ) -> None:
-    _write_minimal_required_terraform_scaffold(tmp_path)
+    _write_current_terraform_scaffold(tmp_path)
+    policy_dir = tmp_path / "infra" / "policy"
+    policy_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(ROOT / "infra" / "policy" / "predeployment-authority-manifest.json", policy_dir)
     bootstrap_dir = tmp_path / "infra" / "gcp" / "bootstrap"
-    (bootstrap_dir / "state.tf").write_text(
-        (ROOT / "infra/gcp/bootstrap/state.tf").read_text(encoding="utf-8"), encoding="utf-8"
-    )
     (bootstrap_dir / "iam.tf").write_text(
         (ROOT / "infra/gcp/bootstrap/iam.tf")
         .read_text(encoding="utf-8")
-        .replace("member = var.state_authority_principal", "member = var.placeholder", 1)
-        .replace(
-            "member = var.recovery_authority_principal", "member = var.state_authority_principal", 1
-        )
-        .replace("member = var.placeholder", "member = var.recovery_authority_principal", 1),
+        .replace("member = each.value", "member = var.state_authority_principal", 1),
         encoding="utf-8",
     )
 
@@ -2690,7 +2685,128 @@ def test_terraform_static_validation_binds_each_state_iam_resource_to_its_princi
     )
 
     assert result.returncode == 1
-    assert "state_authority_object_admin" in result.stdout
+    assert "deduplicated member binding" in result.stdout
+
+
+def test_bootstrap_bucket_iam_uses_one_deduplicated_address_per_principal() -> None:
+    iam = (ROOT / "infra/gcp/bootstrap/iam.tf").read_text(encoding="utf-8")
+
+    assert "locals {" in iam
+    assert "active_state_bucket_object_admin_principals" in iam
+    assert "toset(" in iam
+    assert 'resource "google_storage_bucket_iam_member" "object_admin"' in iam
+    assert re.search(
+        r"for_each\s*=\s*toset\(\s*local\.active_state_bucket_object_admin_principals\s*\)",
+        iam,
+    )
+    assert re.search(r"member\s*=\s*each\.value", iam)
+    assert "state_authority_object_admin" not in iam
+    assert "recovery_authority_object_admin" not in iam
+    assert "bootstrap_operator_object_admin" not in iam
+
+
+def test_terraform_static_validation_rejects_nondeduplicated_bootstrap_bucket_iam(
+    tmp_path: Path,
+) -> None:
+    _write_current_terraform_scaffold(tmp_path)
+    policy_dir = tmp_path / "infra" / "policy"
+    policy_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(ROOT / "infra" / "policy" / "predeployment-authority-manifest.json", policy_dir)
+    bootstrap_dir = tmp_path / "infra" / "gcp" / "bootstrap"
+    (bootstrap_dir / "iam.tf").write_text(
+        (ROOT / "infra/gcp/bootstrap/iam.tf")
+        .read_text(encoding="utf-8")
+        .replace(
+            "for_each = toset(local.active_state_bucket_object_admin_principals)",
+            "for_each = tolist(local.active_state_bucket_object_admin_principals)",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "active_state_bucket_object_admin_principals" in result.stdout
+
+
+def test_terraform_static_validation_accepts_whitespace_equivalent_deduplicated_bootstrap_iam(
+    tmp_path: Path,
+) -> None:
+    _write_current_terraform_scaffold(tmp_path)
+    policy_dir = tmp_path / "infra" / "policy"
+    policy_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(ROOT / "infra" / "policy" / "predeployment-authority-manifest.json", policy_dir)
+    bootstrap_dir = tmp_path / "infra" / "gcp" / "bootstrap"
+    (bootstrap_dir / "iam.tf").write_text(
+        (ROOT / "infra/gcp/bootstrap/iam.tf")
+        .read_text(encoding="utf-8")
+        .replace(
+            "active_state_bucket_object_admin_principals = concat(",
+            "active_state_bucket_object_admin_principals   =   concat( ",
+            1,
+        )
+        .replace(
+            "for_each = toset(local.active_state_bucket_object_admin_principals)",
+            "for_each   =   toset( local.active_state_bucket_object_admin_principals )",
+            1,
+        )
+        .replace(
+            "bucket = google_storage_bucket.terraform_state.name",
+            "bucket   =   google_storage_bucket.terraform_state.name",
+            1,
+        )
+        .replace('role   = "roles/storage.objectAdmin"', 'role = "roles/storage.objectAdmin"', 1)
+        .replace("member = each.value", "member     =     each.value", 1),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 0
+
+
+def test_terraform_static_validation_rejects_unconditionally_active_bootstrap_operator(
+    tmp_path: Path,
+) -> None:
+    _write_current_terraform_scaffold(tmp_path)
+    policy_dir = tmp_path / "infra" / "policy"
+    policy_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(ROOT / "infra" / "policy" / "predeployment-authority-manifest.json", policy_dir)
+    bootstrap_dir = tmp_path / "infra" / "gcp" / "bootstrap"
+    (bootstrap_dir / "iam.tf").write_text(
+        (ROOT / "infra/gcp/bootstrap/iam.tf")
+        .read_text(encoding="utf-8")
+        .replace(
+            "      var.recovery_authority_principal,\n",
+            "      var.recovery_authority_principal,\n      var.bootstrap_operator_principal,\n",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "active state-bucket object-admin principal collection" in result.stdout
 
 
 def test_terraform_static_validation_harness_rejects_tf_json_backend_configuration(

@@ -2877,8 +2877,35 @@ def _approved_count_max(count_expr: str) -> int | None:
     return None
 
 
+def _has_reviewed_active_state_bucket_object_admin_principals(text: str) -> bool:
+    return bool(
+        re.search(
+            r"""
+            locals\s*\{\s*
+            active_state_bucket_object_admin_principals\s*=\s*concat\s*\(
+            \s*\[\s*
+            var\.state_authority_principal\s*,\s*
+            var\.recovery_authority_principal\s*,?\s*
+            \]\s*,\s*
+            var\.bootstrap_operator_status\s*==\s*"bootstrap-active"\s*\?\s*
+            \[\s*var\.bootstrap_operator_principal\s*\]\s*:\s*\[\s*\]\s*,?\s*
+            \)\s*
+            \}
+            """,
+            text,
+            re.DOTALL | re.VERBOSE,
+        )
+    )
+
+
 def _approved_for_each_max(for_each_expr: str, text: str) -> int | None:
     normalized = " ".join(for_each_expr.split())
+    if re.fullmatch(
+        r"toset\(\s*local\.active_state_bucket_object_admin_principals\s*\)", normalized
+    ):
+        if _has_reviewed_active_state_bucket_object_admin_principals(text):
+            return 3
+        return None
     match = re.fullmatch(r"local\.([A-Za-z0-9_]+)", normalized)
     if match is None:
         return None
@@ -3127,41 +3154,31 @@ def _collect_bootstrap_boundary_violations(
                 )
 
         if relative_path == bootstrap_root / "iam.tf" and bootstrap_state_bucket_declared:
-            required_fragments = [
-                'resource "google_storage_bucket_iam_member" "state_authority_object_admin"',
-                'resource "google_storage_bucket_iam_member" "recovery_authority_object_admin"',
-                'resource "google_storage_bucket_iam_member" "bootstrap_operator_object_admin"',
-                'count  = var.bootstrap_operator_status == "bootstrap-active" ? 1 : 0',
-                'role   = "roles/storage.objectAdmin"',
-                "member = var.state_authority_principal",
-                "member = var.recovery_authority_principal",
-                "member = var.bootstrap_operator_principal",
+            if not _has_reviewed_active_state_bucket_object_admin_principals(text):
+                violations.append(
+                    f"{relative_path} active state-bucket object-admin principal collection drifted from reviewed authority boundary"
+                )
+            required_patterns = [
+                (
+                    r'resource\s+"google_storage_bucket_iam_member"\s+"object_admin"',
+                    "object-admin resource",
+                ),
+                (
+                    r"for_each\s*=\s*toset\(\s*local\.active_state_bucket_object_admin_principals\s*\)",
+                    "deduplicated active-principal for_each",
+                ),
+                (
+                    r"bucket\s*=\s*google_storage_bucket\.terraform_state\.name",
+                    "state bucket target",
+                ),
+                (r'role\s*=\s*"roles/storage\.objectAdmin"', "object-admin role"),
+                (r"member\s*=\s*each\.value", "deduplicated member binding"),
             ]
-            for fragment in required_fragments:
-                if fragment not in text:
+            for pattern, description in required_patterns:
+                if not re.search(pattern, text):
                     violations.append(
-                        f"{relative_path} missing reviewed state-bucket IAM fragment {fragment!r}"
+                        f"{relative_path} missing reviewed state-bucket IAM fragment {description!r}"
                     )
-            state_iam_contracts = {
-                "state_authority_object_admin": {
-                    "bucket": "google_storage_bucket.terraform_state.name",
-                    "role": "roles/storage.objectAdmin",
-                    "member": "var.state_authority_principal",
-                    "count": None,
-                },
-                "recovery_authority_object_admin": {
-                    "bucket": "google_storage_bucket.terraform_state.name",
-                    "role": "roles/storage.objectAdmin",
-                    "member": "var.recovery_authority_principal",
-                    "count": None,
-                },
-                "bootstrap_operator_object_admin": {
-                    "bucket": "google_storage_bucket.terraform_state.name",
-                    "role": "roles/storage.objectAdmin",
-                    "member": "var.bootstrap_operator_principal",
-                    "count": 'var.bootstrap_operator_status == "bootstrap-active" ? 1 : 0',
-                },
-            }
             resource_pattern = re.compile(
                 r'resource\s+"google_storage_bucket_iam_member"\s+"(?P<name>[^"]+)"\s*\{(?P<body>.*?)^\}',
                 re.MULTILINE | re.DOTALL,
@@ -3171,39 +3188,32 @@ def _collect_bootstrap_boundary_violations(
                 resource_name = match.group("name")
                 body = match.group("body")
                 observed_resource_names.add(resource_name)
-                expected = state_iam_contracts.get(resource_name)
-                if expected is None:
+                if resource_name != "object_admin":
                     violations.append(
                         f"{relative_path} contains unreviewed state-bucket IAM resource {resource_name!r}"
                     )
                     continue
-                for attribute in ("bucket", "role", "member"):
-                    expected_value = expected[attribute]
+                expected_attributes = {
+                    "bucket": r"google_storage_bucket\.terraform_state\.name",
+                    "role": r'"roles/storage\.objectAdmin"',
+                    "member": r"each\.value",
+                    "for_each": r"toset\(\s*local\.active_state_bucket_object_admin_principals\s*\)",
+                }
+                for attribute, expected_pattern in expected_attributes.items():
                     if not re.search(
-                        rf"^\s*{attribute}\s*=\s*(?:\"{re.escape(str(expected_value))}\"|{re.escape(str(expected_value))})\s*$",
+                        rf"^\s*{attribute}\s*=\s*{expected_pattern}\s*$",
                         body,
                         re.MULTILINE,
                     ):
                         violations.append(
                             f"{relative_path} state-bucket IAM resource {resource_name!r} "
-                            f"must bind {attribute} to {expected_value!r}"
+                            f"must bind {attribute} to its reviewed value"
                         )
-                expected_count = expected["count"]
-                if expected_count is None:
-                    if re.search(r"^\s*count\s*=", body, re.MULTILINE):
-                        violations.append(
-                            f"{relative_path} state-bucket IAM resource {resource_name!r} must not have count"
-                        )
-                elif not re.search(
-                    rf"^\s*count\s*=\s*{re.escape(str(expected_count))}\s*$",
-                    body,
-                    re.MULTILINE,
-                ):
+                if re.search(r"^\s*count\s*=", body, re.MULTILINE):
                     violations.append(
-                        f"{relative_path} state-bucket IAM resource {resource_name!r} "
-                        "must retain its reviewed active-only count"
+                        f"{relative_path} state-bucket IAM resource {resource_name!r} must not have count"
                     )
-            if observed_resource_names != set(state_iam_contracts):
+            if observed_resource_names != {"object_admin"}:
                 violations.append(
                     f"{relative_path} state-bucket IAM resource inventory drifted from reviewed authority boundary"
                 )

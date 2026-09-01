@@ -44,21 +44,20 @@ resource "google_service_account_iam_member" "deployer_wif" {
   member             = local.deploy_develop_workflow_principal_set
 }
 
-resource "google_storage_bucket_iam_member" "state_authority_object_admin" {
-  bucket = google_storage_bucket.terraform_state.name
-  role   = "roles/storage.objectAdmin"
-  member = var.state_authority_principal
+locals {
+  active_state_bucket_object_admin_principals = concat(
+    [
+      var.state_authority_principal,
+      var.recovery_authority_principal,
+    ],
+    var.bootstrap_operator_status == "bootstrap-active" ? [var.bootstrap_operator_principal] : [],
+  )
 }
 
-resource "google_storage_bucket_iam_member" "recovery_authority_object_admin" {
-  bucket = google_storage_bucket.terraform_state.name
-  role   = "roles/storage.objectAdmin"
-  member = var.recovery_authority_principal
-}
+resource "google_storage_bucket_iam_member" "object_admin" {
+  for_each = toset(local.active_state_bucket_object_admin_principals)
 
-resource "google_storage_bucket_iam_member" "bootstrap_operator_object_admin" {
-  count  = var.bootstrap_operator_status == "bootstrap-active" ? 1 : 0
   bucket = google_storage_bucket.terraform_state.name
   role   = "roles/storage.objectAdmin"
-  member = var.bootstrap_operator_principal
+  member = each.value
 }

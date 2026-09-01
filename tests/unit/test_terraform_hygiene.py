@@ -7364,6 +7364,17 @@ def test_foundation_stage_does_not_require_or_resolve_container_image_digest() -
 
         assert "nullable" in block
         assert "= true" in block
+        assert re.search(r"^\s*default\s*=\s*null\s*$", block, re.MULTILINE)
+
+    develop_locals = (ROOT / "infra" / "gcp" / "develop" / "locals.tf").read_text(encoding="utf-8")
+    assignments = re.findall(
+        r"^\s*managed_container_image\s*=\s*(.+)$", develop_locals, re.MULTILINE
+    )
+    assert len(assignments) == 1
+    assert re.match(
+        r"var\.container_image_digest\s*==\s*null\s*\?\s*null\s*:",
+        assignments[0],
+    )
 
 
 def test_local_stage_inventory_evaluator_rejects_job_or_service_in_foundation(

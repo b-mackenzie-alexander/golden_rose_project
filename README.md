@@ -87,7 +87,7 @@ automated hiring, matching, ranking, eligibility, or referral system.
   omit network and Cloud SQL at `58aed28`; and PR #48 aligned the live verifier
   with that workload-free, Cloud-SQL-free foundation stage at `5f265d8`. PR #57
   then closed A1 live-foundation remediation with zero current-source violations.
-  PR #62 merged the E2 bootstrap-IAM source reconciliation. Separately approved E2 bootstrap-only state establishment/reconciliation then created and independently read back new private bootstrap state lineage against the manually established bucket. E3 completed workload-state preparation and initialized a distinct empty workload lineage, then stopped before imports on a bounded foundation null-image source defect; its private source correction/review/rebind must complete before workload imports resume. A5 augmentation and any exact foundation-plan request remain later approvals.
+  PR #62 merged the E2 bootstrap-IAM source reconciliation, and PR #63 merged the bounded foundation null-image correction. Separately approved E2 bootstrap-only establishment/reconciliation and E3 workload-state imports now have independently read-back private state; E3 contains all 37 approved resource addresses plus one expected evaluated data-source address. Fresh A5 disposition readbacks confirmed that the artifact-verifier identity, exact deploy-workflow WIF binding, and exact repository-reader binding already converge, so no empty augmentation apply was needed. Any exact foundation-plan request remains a separate approval.
   Separately approved operator work has established a partial
   non-executable foundation; private records hold its identifiers and raw
   evidence. No image publication, executable deployment, or qualification has

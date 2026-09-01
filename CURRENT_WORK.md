@@ -1,7 +1,7 @@
 # Current Work — Golden Rose Operations Platform
 
 **Updated:** 2026-09-01
-**Lane:** PR #62 merged the deduplicated bootstrap-IAM representation into `develop@0d13ebc`. Under separately approved E2 scope, bootstrap-only Terraform state establishment/reconciliation completed with a new private lineage and independently read-back bootstrap-only address set. E3 workload preparation completed its exact private custody/backend/input/inventory/recovery bindings. The first workload import exposed a source-only foundation-stage null-image interpolation defect before any address entered state; an empty workload lineage was read back and preserved without repair. The active source correction is a minimal guarded image local plus regression; workload imports remain paused until that source correction is independently reviewed, merged, and rebound.
+**Lane:** PR #63 merged the foundation-stage null-image local correction into `develop@2fb7d2f`. Under separately approved E2 scope, bootstrap-only Terraform state establishment/reconciliation completed with a new private lineage and independently read-back bootstrap-only address set. E3 then completed its distinct workload-state import/readback path: all 37 approved resource addresses are present, with one expected evaluated data-source address also in workload state. The A5 disposition verified that the artifact-verifier identity, exact deploy-workflow WIF binding, and exact repository-reader binding already converge across source, state, and live IAM; no augmentation plan/apply is needed.
 **Authority:** The master account is the explicitly documented temporary bootstrap/state/recovery authority for private synthetic setup and must be replaced by designated dedicated identities before handoff/production. The prior inaccessible-bucket replacement path is retired: recovery access was granted, exact `Storage Object Admin` convergence/readback succeeded, and no bucket deletion/replacement occurred. The two retained logging-only sinks are bounded to Cloud Logging by the verifier source contract. No Terraform backend/state operation, deployment, tester, runtime, live-data, or production action is authorized.
 **Verification:** PR #56 merged `fix(deploy): complete A1 inventory collection` at `72c56c4` after all required checks passed. Local CI-parity application quality passed with 746 tests and 95.93% Python coverage; frontend verification passed with 116 tests; Terraform static validation plus 264 hygiene tests, exact-range Gitleaks, and diff hygiene also passed. The disposable loopback PostgreSQL service was removed after verification.
 
@@ -53,10 +53,10 @@ PR B completed from the exact PR #51 merge tip and merged as PR #52; its source-
 - Accepted correction/audit baseline: PostgreSQL domain rows hold current operational truth; append-only `AuditEvent` records preserve material history through atomic expected-version/idempotent commands; restricted prior/new values remain field-authorized; and derived projections are disposable rather than competing record stores. `docs/planning/phase-1-correction-audit-event-contract.md` is authoritative.
 
 ## Immediate next steps
-1. Complete the independent review, protected merge, and private-artifact rebind for the bounded foundation-stage null-image correction; it changes no cloud authority.
-2. Resume only the already approved E3 workload imports from the corrected merged source, preserve the existing empty workload lineage, and independently read back the exact imported address set, lineage, and serial.
-3. Keep A5 augmentation and the foundation saved plan as later separate gates.
-4. Keep living docs and private value-sensitive evidence synchronized through each Gate A boundary; no Terraform plan/apply, service start, tester grant, publication, secret/database, migration, service, qualification, or production action is implied.
+1. Independently review and merge the bounded foundation-stage readiness-host local correction, then rebind the private plan-request artifacts to the merged source revision.
+2. Request, review, and explicitly approve the exact workload-free `foundation` saved-plan generation only after that rebind; do not infer it from completed E2/E3/A5 evidence.
+3. Keep the four absent secret-access IAM source addresses for exact-plan disposition; do not fabricate imports or create live resources to fill them.
+4. Keep every plan/apply, publication, secret/database, migration, service, tester, qualification, live-data, and production action separately gated.
 
 ## Gate classification
 

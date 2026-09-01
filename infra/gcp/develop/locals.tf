@@ -9,5 +9,5 @@ locals {
     teardown      = "intentional-runbook-only"
   }
 
-  managed_container_image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.application_images.repository_id}/staff-tracer@${var.container_image_digest}"
+  managed_container_image = var.container_image_digest == null ? null : "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.application_images.repository_id}/staff-tracer@${var.container_image_digest}"
 }

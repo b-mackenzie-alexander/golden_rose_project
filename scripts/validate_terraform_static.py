@@ -1291,6 +1291,7 @@ PY
 )"
 MANAGED_IMAGE="${MANAGED_REPOSITORY}@${IMAGE_DIGEST}"
 export IMAGE_DIGEST MANAGED_IMAGE
+docker sbom "$MANAGED_IMAGE" --format spdx-json > build/image-sbom.spdx.json
 python - <<'PY'
 import hashlib
 import json
@@ -1309,6 +1310,7 @@ Path("build/application-sbom-checksums-predicate.json").write_text(
 PY
 cosign sign --yes "$MANAGED_IMAGE"
 cosign attest --yes --type slsaprovenance --predicate build/image-metadata.json "$MANAGED_IMAGE"
+cosign attest --yes --type https://spdx.dev/Document --predicate build/image-sbom.spdx.json "$MANAGED_IMAGE"
 cosign attest --yes --type https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1 --predicate build/application-sbom-checksums-predicate.json "$MANAGED_IMAGE"
 cosign verify --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" >/dev/null
 cosign verify-attestation --type slsaprovenance --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" >/dev/null
@@ -1563,7 +1565,7 @@ test -f .gitignore
 
 EXACT_WORKFLOW_RUN_SHA256 = {
     ("build-image.yml", "publish-image", "name:Sign and verify published image attestation set"): (
-        "c44acf4409f9a870854cad82ccd3f884893d6acd36dac57c5470905183c4908b"
+        "899607e98bd58e4b2578d80eed68c29c48ae74e1d7d6cadcff1e7f207402375c"
     ),
     ("deploy-develop.yml", "deploy", "name:Initialize failed deploy result"): (
         "931d39097ca97bc9a49f5227f4287d19f0709adfff40ca6f540f673703622b40"

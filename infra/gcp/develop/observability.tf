@@ -3,9 +3,11 @@ data "google_project" "current" {
 }
 
 locals {
-  request_log_posture             = var.cloud_run_request_log_posture
-  monitoring_service_agent_member = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-monitoring-notification.iam.gserviceaccount.com"
-  readiness_uptime_host           = var.deployment_stage == "service" ? replace(google_cloud_run_v2_service.staff_tracer[0].uri, "https://", "") : null
+  canonical_workload_project_name   = "projects/${data.google_project.current.project_id}"
+  canonical_workload_project_number = data.google_project.current.number
+  request_log_posture               = var.cloud_run_request_log_posture
+  monitoring_service_agent_member   = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-monitoring-notification.iam.gserviceaccount.com"
+  readiness_uptime_host             = var.deployment_stage == "service" ? replace(google_cloud_run_v2_service.staff_tracer[0].uri, "https://", "") : null
 }
 
 resource "google_monitoring_notification_channel" "alerts" {
@@ -22,7 +24,7 @@ resource "google_monitoring_notification_channel" "alerts" {
 }
 
 resource "google_logging_project_bucket_config" "default" {
-  project        = var.project_id
+  project        = local.canonical_workload_project_name
   location       = "global"
   bucket_id      = "_Default"
   retention_days = var.log_retention_days

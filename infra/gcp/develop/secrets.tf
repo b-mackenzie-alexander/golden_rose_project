@@ -10,7 +10,7 @@ locals {
 resource "google_secret_manager_secret" "metadata_only" {
   for_each = local.metadata_only_secret_ids
 
-  project   = var.project_id
+  project   = local.canonical_workload_project_number
   secret_id = each.value
   labels    = local.standard_labels
 

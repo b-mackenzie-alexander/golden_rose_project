@@ -7389,6 +7389,159 @@ def test_foundation_stage_does_not_require_or_resolve_container_image_digest() -
     )
 
 
+def test_imported_foundation_controls_use_canonical_workload_parent_shapes() -> None:
+    """Same-project imports use the provider's canonical parent shape per resource family."""
+    observability = (ROOT / "infra/gcp/develop/observability.tf").read_text(encoding="utf-8")
+    secrets = (ROOT / "infra/gcp/develop/secrets.tf").read_text(encoding="utf-8")
+
+    assert re.search(
+        r'^\s*canonical_workload_project_name\s*=\s*"projects/\$\{data\.google_project\.current\.project_id\}"\s*$',
+        observability,
+        re.MULTILINE,
+    )
+    assert re.search(
+        r"^\s*canonical_workload_project_number\s*=\s*data\.google_project\.current\.number\s*$",
+        observability,
+        re.MULTILINE,
+    )
+
+    logging_bucket = re.search(
+        r'resource\s+"google_logging_project_bucket_config"\s+"default"\s*\{(?P<body>.*?)^\}',
+        observability,
+        re.DOTALL | re.MULTILINE,
+    )
+    assert logging_bucket is not None
+    assert re.search(
+        r"^\s*project\s*=\s*local\.canonical_workload_project_name\s*$",
+        logging_bucket.group("body"),
+        re.MULTILINE,
+    )
+
+    metadata_secrets = re.search(
+        r'resource\s+"google_secret_manager_secret"\s+"metadata_only"\s*\{(?P<body>.*?)^\}',
+        secrets,
+        re.DOTALL | re.MULTILINE,
+    )
+    assert metadata_secrets is not None
+    assert re.search(
+        r"^\s*project\s*=\s*local\.canonical_workload_project_number\s*$",
+        metadata_secrets.group("body"),
+        re.MULTILINE,
+    )
+
+
+def _foundation_deferred_reference_violations(text: str, relative_path: str) -> list[str]:
+    guarded_references = {
+        "google_cloud_run_v2_service.staff_tracer[0]",
+        "google_cloud_run_v2_job.migration[0]",
+        "google_compute_network.develop[0]",
+        "google_compute_subnetwork.direct_vpc[0]",
+        "google_compute_global_address.private_service_access[0]",
+        "google_service_networking_connection.private_service_access[0]",
+        "google_sql_database_instance.develop[0]",
+        "google_sql_database.application[0]",
+        "google_monitoring_uptime_check_config.readiness[0]",
+        "data.external.tester_authority[0]",
+    }
+    violations: list[str] = []
+
+    def is_foundation_safe(assignment: str, reference: str) -> bool:
+        service_only = re.search(
+            r'var\.deployment_stage\s*==\s*"service"\s*\?\s*(?P<service>.*?)\s*:\s*null',
+            assignment,
+            re.DOTALL,
+        )
+        if service_only and reference in service_only.group("service"):
+            return True
+        foundation_null = re.search(
+            r'var\.deployment_stage\s*==\s*"foundation"\s*\?\s*null\s*:\s*(?P<later>.+)',
+            assignment,
+            re.DOTALL,
+        )
+        return foundation_null is not None and reference in foundation_null.group("later")
+
+    blocks = re.finditer(
+        r'(?P<kind>locals|output\s+"[^\"]+")\s*\{(?P<body>.*?)^\}',
+        text,
+        re.DOTALL | re.MULTILINE,
+    )
+    for block in blocks:
+        body = block.group("body")
+        if block.group("kind") == "locals":
+            assignment_starts = list(re.finditer(r"(?m)^(?P<indent>[ \t]+)[A-Za-z0-9_]+\s*=", body))
+            top_level_indent = min(
+                (len(match.group("indent")) for match in assignment_starts), default=0
+            )
+            assignments = (
+                re.split(rf"(?m)^[ \t]{{{top_level_indent}}}[A-Za-z0-9_]+\s*=", body)[1:]
+                if top_level_indent
+                else [body]
+            )
+        else:
+            assignments = [body]
+        for assignment in assignments:
+            for reference in guarded_references:
+                if reference in assignment and not is_foundation_safe(assignment, reference):
+                    violations.append(
+                        f"{relative_path} has an unguarded deferred reference: {reference}"
+                    )
+    return violations
+
+
+def test_foundation_locals_and_outputs_guard_count_zero_references() -> None:
+    """Foundation-evaluated locals and outputs must not dereference count-zero resources."""
+    terraform_files = list((ROOT / "infra/gcp").glob("*.tf")) + list(
+        (ROOT / "infra/gcp/develop").glob("*.tf")
+    )
+    violations = [
+        violation
+        for path in terraform_files
+        for violation in _foundation_deferred_reference_violations(
+            path.read_text(encoding="utf-8"), str(path.relative_to(ROOT))
+        )
+    ]
+
+    assert violations == []
+
+
+def test_foundation_deferred_reference_guard_rejects_mixed_local_assignments() -> None:
+    mixed_locals = """
+locals {
+  readiness_host = var.deployment_stage == "service" ? google_cloud_run_v2_service.staff_tracer[0].uri : null
+  migration_name = google_cloud_run_v2_job.migration[0].name
+}
+"""
+
+    assert _foundation_deferred_reference_violations(mixed_locals, "mixed.tf") == [
+        "mixed.tf has an unguarded deferred reference: google_cloud_run_v2_job.migration[0]"
+    ]
+
+
+def test_foundation_deferred_reference_guard_rejects_inverted_service_conditional() -> None:
+    inverted_local = """
+locals {
+  unsafe = var.deployment_stage == "service" ? null : google_cloud_run_v2_service.staff_tracer[0].uri
+}
+"""
+
+    assert _foundation_deferred_reference_violations(inverted_local, "inverted.tf") == [
+        "inverted.tf has an unguarded deferred reference: google_cloud_run_v2_service.staff_tracer[0]"
+    ]
+
+
+def test_foundation_deferred_reference_guard_rejects_four_space_local_assignment() -> None:
+    indented_local = """
+locals {
+    readiness_host = var.deployment_stage == "service" ? google_cloud_run_v2_service.staff_tracer[0].uri : null
+    migration_name = google_cloud_run_v2_job.migration[0].name
+}
+"""
+
+    assert _foundation_deferred_reference_violations(indented_local, "indented.tf") == [
+        "indented.tf has an unguarded deferred reference: google_cloud_run_v2_job.migration[0]"
+    ]
+
+
 def test_local_stage_inventory_evaluator_rejects_job_or_service_in_foundation(
     tmp_path: Path,
 ) -> None:

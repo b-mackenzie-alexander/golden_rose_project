@@ -1291,7 +1291,7 @@ PY
 )"
 MANAGED_IMAGE="${MANAGED_REPOSITORY}@${IMAGE_DIGEST}"
 export IMAGE_DIGEST MANAGED_IMAGE
-docker sbom "$MANAGED_IMAGE" --format spdx-json > build/image-sbom.spdx.json
+docker scout sbom --format spdx --output build/image-sbom.spdx.json "$MANAGED_IMAGE"
 python - <<'PY'
 import hashlib
 import json
@@ -1565,7 +1565,7 @@ test -f .gitignore
 
 EXACT_WORKFLOW_RUN_SHA256 = {
     ("build-image.yml", "publish-image", "name:Sign and verify published image attestation set"): (
-        "899607e98bd58e4b2578d80eed68c29c48ae74e1d7d6cadcff1e7f207402375c"
+        "31a417ff1aee90913c514e8c04280c3902e45e9acd47ad2434de60c7845bd9ef"
     ),
     ("deploy-develop.yml", "deploy", "name:Initialize failed deploy result"): (
         "931d39097ca97bc9a49f5227f4287d19f0709adfff40ca6f540f673703622b40"

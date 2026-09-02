@@ -86,14 +86,10 @@ def revise_draft_employer(
             created_at=now,
         )
         if not receipt_inserted:
-            try:
-                existing_receipt = get_command_receipt(session=session, command_id=command_id)
-            except NoResultFound:
-                session.rollback()
-                try:
-                    existing_receipt = get_command_receipt(session=session, command_id=command_id)
-                except NoResultFound as retry_exc:
-                    raise SafePersistenceError("persistence operation failed") from retry_exc
+            existing_receipt = _get_revision_receipt_after_conflict(
+                session=session,
+                command_id=command_id,
+            )
             result = _replay_existing_revision(
                 session=session,
                 existing_receipt=existing_receipt,
@@ -191,6 +187,21 @@ def revise_draft_employer(
         replayed=False,
         result_record_version=expected_version + 1,
     )
+
+
+def _get_revision_receipt_after_conflict(
+    *,
+    session: Session,
+    command_id: UUID,
+) -> CommandReceiptRecord:
+    last_error: NoResultFound | None = None
+    for _ in range(3):
+        try:
+            return get_command_receipt(session=session, command_id=command_id)
+        except NoResultFound as exc:
+            last_error = exc
+            session.rollback()
+    raise SafePersistenceError("persistence operation failed") from last_error
 
 
 def _replay_existing_revision(

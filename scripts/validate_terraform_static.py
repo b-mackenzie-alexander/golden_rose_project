@@ -307,6 +307,7 @@ ALLOWED_WORKFLOW_STEP_IDENTIFIERS = {
         "name:Authenticate to Google Cloud",
         "name:Log in to Artifact Registry",
         "name:Build publish image and evidence",
+        "name:Download pinned Syft",
         "name:Sign and verify published image attestation set",
         "name:Upload backend SBOM evidence",
         "name:Upload frontend SBOM evidence",
@@ -392,6 +393,7 @@ REQUIRED_WORKFLOW_STEP_ORDER = {
         "name:Authenticate to Google Cloud",
         "name:Log in to Artifact Registry",
         "name:Build publish image and evidence",
+        "name:Download pinned Syft",
         "name:Sign and verify published image attestation set",
         "name:Upload backend SBOM evidence",
         "name:Upload frontend SBOM evidence",
@@ -704,6 +706,11 @@ ALLOWED_WORKFLOW_STEP_WITH = {
     (
         "build-image.yml",
         "publish-image",
+        "name:Download pinned Syft",
+    ): {"syft-version": "1.37.0"},
+    (
+        "build-image.yml",
+        "publish-image",
         "name:Authenticate to Google Cloud",
     ): {
         "workload_identity_provider": "${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}",
@@ -1007,6 +1014,11 @@ ALLOWED_WORKFLOW_STEP_USES = {
     (
         "build-image.yml",
         "publish-image",
+        "name:Download pinned Syft",
+    ): "anchore/sbom-action/download-syft@fbfd9c6c189226748411491745178e0c2017392d",
+    (
+        "build-image.yml",
+        "publish-image",
         "name:Authenticate to Google Cloud",
     ): "google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193",
     (
@@ -1291,7 +1303,7 @@ PY
 )"
 MANAGED_IMAGE="${MANAGED_REPOSITORY}@${IMAGE_DIGEST}"
 export IMAGE_DIGEST MANAGED_IMAGE
-docker scout sbom --format spdx --output build/image-sbom.spdx.json "$MANAGED_IMAGE"
+"${{ steps.syft.outputs.cmd }}" "$MANAGED_IMAGE" --output spdx-json=build/image-sbom.spdx.json
 python - <<'PY'
 import hashlib
 import json
@@ -1565,7 +1577,7 @@ test -f .gitignore
 
 EXACT_WORKFLOW_RUN_SHA256 = {
     ("build-image.yml", "publish-image", "name:Sign and verify published image attestation set"): (
-        "31a417ff1aee90913c514e8c04280c3902e45e9acd47ad2434de60c7845bd9ef"
+        "cc7a9c56620eb50a6ef2f3ae5f9131246f31b9bdd0905f1d3359ab243d83b223"
     ),
     ("deploy-develop.yml", "deploy", "name:Initialize failed deploy result"): (
         "931d39097ca97bc9a49f5227f4287d19f0709adfff40ca6f540f673703622b40"
@@ -1756,6 +1768,7 @@ ALLOWED_WORKFLOW_STEP_CONTINUE_ON_ERROR = {}
 ALLOWED_WORKFLOW_STEP_TIMEOUT_MINUTES = {}
 
 ALLOWED_WORKFLOW_STEP_ID = {
+    ("build-image.yml", "publish-image", "name:Download pinned Syft"): "syft",
     ("build-image.yml", "publish-image", "name:Authenticate to Google Cloud"): "auth",
     (
         "deploy-develop.yml",

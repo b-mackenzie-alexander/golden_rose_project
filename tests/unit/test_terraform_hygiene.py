@@ -2086,7 +2086,9 @@ def test_build_image_workflow_captures_actual_cosign_image_sbom_evidence() -> No
 def test_build_image_workflow_attests_a_real_spdx_image_sbom_before_verification() -> None:
     workflow = (ROOT / ".github/workflows/build-image.yml").read_text(encoding="utf-8")
 
-    sbom_command = 'docker sbom "$MANAGED_IMAGE" --format spdx-json > build/image-sbom.spdx.json'
+    sbom_command = (
+        'docker scout sbom --format spdx --output build/image-sbom.spdx.json "$MANAGED_IMAGE"'
+    )
     attest_command = 'cosign attest --yes --type https://spdx.dev/Document --predicate build/image-sbom.spdx.json "$MANAGED_IMAGE"'
     verify_command = "cosign verify-attestation --type https://spdx.dev/Document"
 

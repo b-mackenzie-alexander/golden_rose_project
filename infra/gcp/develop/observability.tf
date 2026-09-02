@@ -5,7 +5,7 @@ data "google_project" "current" {
 locals {
   request_log_posture             = var.cloud_run_request_log_posture
   monitoring_service_agent_member = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-monitoring-notification.iam.gserviceaccount.com"
-  readiness_uptime_host           = replace(google_cloud_run_v2_service.staff_tracer[0].uri, "https://", "")
+  readiness_uptime_host           = var.deployment_stage == "service" ? replace(google_cloud_run_v2_service.staff_tracer[0].uri, "https://", "") : null
 }
 
 resource "google_monitoring_notification_channel" "alerts" {

@@ -7376,6 +7376,18 @@ def test_foundation_stage_does_not_require_or_resolve_container_image_digest() -
         assignments[0],
     )
 
+    observability_locals = (ROOT / "infra" / "gcp" / "develop" / "observability.tf").read_text(
+        encoding="utf-8"
+    )
+    readiness_assignments = re.findall(
+        r"^\s*readiness_uptime_host\s*=\s*(.+)$", observability_locals, re.MULTILINE
+    )
+    assert len(readiness_assignments) == 1
+    assert re.fullmatch(
+        r'var\.deployment_stage\s*==\s*"service"\s*\?\s*replace\(.+\)\s*:\s*null',
+        readiness_assignments[0],
+    )
+
 
 def test_local_stage_inventory_evaluator_rejects_job_or_service_in_foundation(
     tmp_path: Path,

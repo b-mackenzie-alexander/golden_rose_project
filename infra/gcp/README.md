@@ -29,7 +29,7 @@ Terraform is executed from `infra/gcp` for the disposable workload root and from
 - Secret metadata and IAM may be modeled later, but No secret payloads belong in Terraform source, state, plans, logs, artifacts, containers, or ordinary docs.
 - Private tester access must remain named and service-level only; `allUsers`, `allAuthenticatedUsers`, and project-wide convenience bindings are forbidden.
 - Project IDs, billing IDs, domains, user emails, credentials, and cloud-specific input values must stay in ignored/operator-held inputs, not tracked source.
-- The approved state ceremony remains explicit: manually established durable bootstrap bucket → completed E2 bootstrap-state establishment/reconciliation with new lineage → E3 workload-state preparation and empty-lineage initialization → correction review/merge/rebind → already approved workload-import resumption → later WIF handoff → separately approved bootstrap-authority retirement. State access, emergency recovery, client handoff, and teardown exclusions remain runbook-controlled and value-safe.
+- The approved state ceremony remains explicit: manually established durable bootstrap bucket → completed E2 bootstrap-state establishment/reconciliation with new lineage → completed E3 workload-state import/readback → verified A5 artifact-verifier disposition with no empty augmentation apply → later separately approved foundation saved-plan request. State access, emergency recovery, client handoff, and teardown exclusions remain runbook-controlled and value-safe.
 
 ## Allowed local validation
 

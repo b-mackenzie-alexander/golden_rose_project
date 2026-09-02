@@ -2083,6 +2083,22 @@ def test_build_image_workflow_captures_actual_cosign_image_sbom_evidence() -> No
     assert 'Path("build/image-sbom.cdx.json").write_text' not in workflow
 
 
+def test_build_image_workflow_attests_a_real_spdx_image_sbom_before_verification() -> None:
+    workflow = (ROOT / ".github/workflows/build-image.yml").read_text(encoding="utf-8")
+
+    sbom_command = 'docker sbom "$MANAGED_IMAGE" --format spdx-json > build/image-sbom.spdx.json'
+    attest_command = 'cosign attest --yes --type https://spdx.dev/Document --predicate build/image-sbom.spdx.json "$MANAGED_IMAGE"'
+    verify_command = "cosign verify-attestation --type https://spdx.dev/Document"
+
+    assert sbom_command in workflow
+    assert attest_command in workflow
+    assert (
+        workflow.index(sbom_command)
+        < workflow.index(attest_command)
+        < workflow.index(verify_command)
+    )
+
+
 def test_privileged_jobs_have_bounded_timeouts() -> None:
     workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
 

@@ -122,7 +122,7 @@ def test_terraform_local_state_plan_and_secret_inputs_are_ignored() -> None:
     assert ".terraform.lock.hcl" not in entries
 
 
-def test_gcp_terraform_readme_preserves_validate_without_apply_boundary() -> None:
+def test_gcp_terraform_readme_distinguishes_historical_local_and_completed_remote_state() -> None:
     readme = (ROOT / "infra/gcp/README.md").read_text(encoding="utf-8")
 
     required_phrases = [
@@ -135,8 +135,9 @@ def test_gcp_terraform_readme_preserves_validate_without_apply_boundary() -> Non
         "No resource provisioning",
         "No secret payloads",
         "fictional synthetic-only",
-        "local state only",
-        "remote state must be approved before shared apply",
+        "original validate-without-apply slice used local state only",
+        "separately approved E2/E3 operations later established and verified distinct remote bootstrap/workload state lineages",
+        "do not authorize another backend/state action",
         "scripts/validate_terraform_static.py",
         "infrastructure-quality",
         "static validation",

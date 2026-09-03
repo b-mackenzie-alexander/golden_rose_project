@@ -1,5 +1,7 @@
 # Gate P pinned-Syft source-only review handoff
 
+> **Historical closeout:** This artifact records the pre-merge PR #69 review surface. PR #69 subsequently passed protected checks and merged into `develop@64f4ae5` on 2026-09-03. Its former branch and pre-merge next steps are not continuation authority; current work is controlled by `CURRENT_WORK.md` and requires fresh Gate P publication approval.
+
 ## Review surface
 
 - **Base:** `develop@a431b3c6a35f16ae014dbe21c091d5739ed52dbf`.
@@ -23,12 +25,12 @@
 ## CI remediation review surface
 
 - **Pre-remediation branch tip:** `dc14cc888256a87de1e0090b48df0a71db486cf8` against the stated `develop` base.
-- **Committed/pushed remediation:** the two revision receipt-race files above plus this handoff and required living-document closeout updates are amended into open PR #69.
+- **Committed/pushed remediation:** the two revision receipt-race files above plus this handoff and required living-document closeout updates were amended into PR #69, which later merged at `develop@64f4ae5`.
 - **CI finding:** `test_concurrent_same_key_changed_actor_or_payload_has_one_success_and_one_conflict` observed `SafePersistenceError("persistence operation failed")` for a same-key changed actor/payload loser rather than `RuntimeError("idempotency conflict")`; the pinned-Syft change did not cause it.
 - **Minimal remediation:** after failed receipt reservation, `_get_revision_receipt_after_conflict()` performs up to three fresh receipt lookups, rolling back after each absent read. It preserves fail-closed `SafePersistenceError` exhaustion and existing replay validation.
 - **Observed verification:** the new regression was first RED, then focused unit coverage passed (`3 passed`); the exact PostgreSQL selector passed once and 30 consecutive repetitions. Local CI-equivalent application quality passed with frontend `116 passed`, Python `767 passed`, and `95.94%` Python coverage. The disposable loopback PostgreSQL service was removed after verification.
 - **Secret-scanning status:** the exact six-file working-tree candidate scan reported `0` Gitleaks findings; after amendment, the exact committed PR range also reported `0` findings.
-- **Rereview status:** independent review is CLEAN with no Blocker, High, Medium, or Low findings; it verified the retry/rollback/fail-closed semantics and handoff scope. The remediation is pushed; await protected CI and merge before seeking fresh publication approval.
+- **Rereview status:** independent review was CLEAN with no Blocker, High, Medium, or Low findings; it verified the retry/rollback/fail-closed semantics and handoff scope. Protected CI later passed and PR #69 merged at `develop@64f4ae5`; any publication retry still requires fresh approval.
 
 ## Observed evidence
 

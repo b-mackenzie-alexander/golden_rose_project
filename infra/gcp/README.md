@@ -59,8 +59,9 @@ publish path plus the reviewed `deploy-develop.yml` deployer path while keeping 
 pull-request path cloud-blind; this is not limited to `infrastructure*` workflow
 filenames.
 The manifest also records `scripts/verify_gcp_foundation.py` as an approved
-read-only verification entrypoint so later Gate 2 qualification can use a
-reviewed source-controlled tool instead of ad-hoc cloud inspection notes.
+read-only verification entrypoint. It has completed the current foundation-mode
+verification; later migration/service stages must reuse the reviewed tool and
+stage-specific contract rather than ad-hoc cloud inspection notes.
 Independent final-head probes on the earlier PR #24 surface proved the original
 implementation was still a lexically bypassable policy boundary. The ADR-0011
 solo-maintainer remediation sequence merged through PR #29. Those
@@ -68,7 +69,9 @@ controls remain quality evidence rather than independent authorization, and
 they do not clear the open same-repository-CI High or grant cloud authority by
 themselves. Accepted ADR-0012 now governs the consolidated local implementation boundary and later gate-evidence closeout.
 
-## Explicit non-scope
+## Historical non-scope of the original local/static scaffold slice
+
+The following constraints describe the original source-only scaffold work. They do not deny the separately approved state/foundation operations now recorded above, and they grant no authority for any current or future cloud action.
 
 - No terraform apply
 - No Terraform plan

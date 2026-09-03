@@ -2073,9 +2073,9 @@ def test_build_image_workflow_verifies_sboms_and_emits_value_safe_artifacts() ->
     assert "oauth2accesstoken" in workflow
     assert "docker.pkg.dev" in workflow
     assert "cosign sign --yes" in workflow
-    assert "cosign attest --yes --type slsaprovenance" in workflow
+    assert "cosign attest --yes --type slsaprovenance1" in workflow
     assert "cosign verify --certificate-identity" in workflow
-    assert "cosign verify-attestation --type slsaprovenance" in workflow
+    assert "cosign verify-attestation --type slsaprovenance1" in workflow
 
 
 def test_build_image_workflow_captures_actual_cosign_image_sbom_evidence() -> None:
@@ -2083,6 +2083,60 @@ def test_build_image_workflow_captures_actual_cosign_image_sbom_evidence() -> No
 
     assert "cosign verify-attestation --type https://spdx.dev/Document" in workflow
     assert 'Path("build/image-sbom.cdx.json").write_text' not in workflow
+
+
+def test_build_validation_executes_pinned_syft_against_local_linux_image() -> None:
+    workflow = (ROOT / ".github/workflows/build-image.yml").read_text(encoding="utf-8")
+    build_validation = workflow.split("  build-validate:", 1)[1].split("  publish-image:", 1)[0]
+
+    syft_action = "anchore/sbom-action/download-syft@fbfd9c6c189226748411491745178e0c2017392d"
+    sbom_command = '"${{ steps.syft_pr.outputs.cmd }}" golden-rose:workflow-pr --output spdx-json=build/image-sbom.spdx.json'
+    verify_argument = "--pr-image-sbom-path build/image-sbom.spdx.json"
+
+    assert syft_action in build_validation
+    assert "id: syft_pr" in build_validation
+    assert 'syft-version: "v1.37.0"' in build_validation
+    assert sbom_command in build_validation
+    assert verify_argument in build_validation
+    assert build_validation.index(syft_action) < build_validation.index(sbom_command)
+    assert build_validation.index(sbom_command) < build_validation.index(verify_argument)
+
+
+def test_publish_workflow_validates_raw_signed_cosign_predicates_and_sbom_checksums() -> None:
+    workflow = (ROOT / ".github/workflows/build-image.yml").read_text(encoding="utf-8")
+    publish = workflow.split("  publish-image:", 1)[1]
+
+    signature = "cosign verify --certificate-identity"
+    provenance = "> build/publish-provenance-verification.json"
+    image_sbom = "> build/image-sbom.cdx.json"
+    application_sbom = "> build/publish-application-sbom-verification.json"
+    generator = "uv run python scripts/generate_slsa_provenance.py"
+    provenance_attest = (
+        "cosign attest --yes --type slsaprovenance1 "
+        "--predicate build/slsa-provenance-predicate.json"
+    )
+    verifier = "uv run python scripts/verify_deploy_image_authority.py"
+
+    assert generator in publish
+    assert '"infra/policy/spdx-2.3.schema.json"' in workflow
+    assert "--source-ref refs/heads/develop" in publish
+    assert '--source-commit "$SOURCE_COMMIT"' in publish
+    assert provenance_attest in publish
+    assert "> build/publish-signature-verification.json" in publish
+    assert provenance in publish
+    assert image_sbom in publish
+    assert application_sbom in publish
+    assert verifier in publish
+    assert "--backend-sbom build/backend-sbom.cdx.json" in publish
+    assert "--frontend-sbom build/frontend-sbom.cdx.json" in publish
+    assert '"backend_sbom_base64": base64.b64encode(backend_sbom).decode()' in publish
+    assert '"frontend_sbom_base64": base64.b64encode(frontend_sbom).decode()' in publish
+    assert '"transparency_log_included": True' not in publish
+    assert 'Path("build/publish-signature-verification.json").write_text' not in publish
+    assert publish.index(signature) < publish.index(verifier)
+    assert publish.index(provenance) < publish.index(verifier)
+    assert publish.index(image_sbom) < publish.index(verifier)
+    assert publish.index(application_sbom) < publish.index(verifier)
 
 
 def test_build_image_workflow_attests_a_real_spdx_image_sbom_before_verification() -> None:
@@ -2094,7 +2148,7 @@ def test_build_image_workflow_attests_a_real_spdx_image_sbom_before_verification
     verify_command = "cosign verify-attestation --type https://spdx.dev/Document"
 
     assert syft_action in workflow
-    assert 'syft-version: "1.37.0"' in workflow
+    assert 'syft-version: "v1.37.0"' in workflow
     assert sbom_command in workflow
     assert "docker scout sbom" not in workflow
     assert attest_command in workflow
@@ -8277,7 +8331,7 @@ def test_deploy_workflow_uses_operator_receipts_and_direct_oci_authority() -> No
         "cosign verify-blob",
         "Verify direct OCI image authority",
         "cosign verify --certificate-identity",
-        "cosign verify-attestation --type slsaprovenance",
+        "cosign verify-attestation --type slsaprovenance1",
         "https://spdx.dev/Document",
         "scripts/verify_deploy_image_authority.py",
         '--source-commit "$GITHUB_SHA"',

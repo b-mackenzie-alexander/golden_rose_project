@@ -175,7 +175,7 @@ jobs:
           PY
           )"
           MANAGED_IMAGE="${MANAGED_REPOSITORY}@${IMAGE_DIGEST}"
-          cosign verify-attestation --type slsaprovenance --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/oci-authority/provenance.json
+          cosign verify-attestation --type slsaprovenance1 --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/oci-authority/provenance.json
           cosign verify-attestation --type https://spdx.dev/Document --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/oci-authority/image-sbom.json
           cosign verify-attestation --type https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1 --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/oci-authority/application-sbom.json
           uv run python scripts/verify_deploy_image_authority.py --image "$MANAGED_IMAGE" --signature build/oci-authority/signature.json --provenance build/oci-authority/provenance.json --image-sbom build/oci-authority/image-sbom.json --application-sbom build/oci-authority/application-sbom.json --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --source-commit "$GITHUB_SHA"

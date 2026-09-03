@@ -5,7 +5,9 @@ import json
 import re
 from pathlib import Path
 from typing import Any, Literal
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
+
+from jsonschema import Draft7Validator
 
 DIGEST_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 ARTIFACT_REGISTRY_REPOSITORY_PATTERN = re.compile(
@@ -38,6 +40,8 @@ EXPECTED_APPLICATION_SBOM_ATTESTATION_PREDICATE = (
     "https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1"
 )
 EXPECTED_IMAGE_SBOM_PLATFORM = "linux/amd64"
+SPDX_SCHEMA_PATH = Path(__file__).resolve().parents[1] / "infra/policy/spdx-2.3.schema.json"
+SPDX_SCHEMA_SHA256 = "239208b7ac287b3cf5d9a9af23f9d69863971102a5e1587a27a398b43490b89b"
 
 
 class VerificationResult:
@@ -178,35 +182,189 @@ def _decode_image_sbom_attestation(
     return predicate
 
 
+def _validate_spdx_schema(payload: dict[str, Any]) -> None:
+    try:
+        schema_bytes = SPDX_SCHEMA_PATH.read_bytes()
+        if hashlib.sha256(schema_bytes).hexdigest() != SPDX_SCHEMA_SHA256:
+            raise ValueError("pinned SPDX 2.3 schema checksum is unexpected")
+        schema = json.loads(schema_bytes)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("pinned SPDX 2.3 schema is unavailable") from exc
+    errors = sorted(
+        Draft7Validator(schema).iter_errors(payload), key=lambda error: list(error.path)
+    )
+    if errors:
+        path = ".".join(str(part) for part in errors[0].path) or "document"
+        raise ValueError(f"image SBOM fails pinned SPDX 2.3 schema at {path}")
+
+
+def _validate_spdx_image_inventory(
+    payload: dict[str, Any],
+    *,
+    expected_name: str,
+    expected_version: str,
+    expected_tag: str | None,
+) -> None:
+    _validate_spdx_schema(payload)
+    if payload.get("spdxVersion") != "SPDX-2.3":
+        raise ValueError("image SBOM must use SPDX-2.3")
+    if payload.get("dataLicense") != "CC0-1.0":
+        raise ValueError("image SBOM data license must be CC0-1.0")
+    if payload.get("SPDXID") != "SPDXRef-DOCUMENT":
+        raise ValueError("image SBOM document identifier is missing")
+    if payload.get("name") != expected_name:
+        raise ValueError("image SBOM document name must match the scanned image")
+    namespace = payload.get("documentNamespace")
+    if not isinstance(namespace, str) or not namespace.startswith(
+        "https://anchore.com/syft/image/"
+    ):
+        raise ValueError("image SBOM document namespace is unexpected")
+    creation_info = payload.get("creationInfo")
+    creators = creation_info.get("creators") if isinstance(creation_info, dict) else None
+    created = creation_info.get("created") if isinstance(creation_info, dict) else None
+    if (
+        not isinstance(creators, list)
+        or "Tool: syft-1.37.0" not in creators
+        or not isinstance(created, str)
+        or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", created)
+    ):
+        raise ValueError("image SBOM creationInfo must identify Syft 1.37.0")
+    packages = payload.get("packages")
+    required_package_fields = {
+        "SPDXID",
+        "name",
+        "downloadLocation",
+        "filesAnalyzed",
+        "licenseConcluded",
+        "licenseDeclared",
+        "copyrightText",
+    }
+    if (
+        not isinstance(packages, list)
+        or not packages
+        or not all(
+            isinstance(package, dict)
+            and required_package_fields.issubset(package)
+            and isinstance(package.get("SPDXID"), str)
+            and package["SPDXID"].strip()
+            and isinstance(package.get("name"), str)
+            and package["name"].strip()
+            for package in packages
+        )
+    ):
+        raise ValueError(
+            "image SBOM attestation must contain a schema-complete component inventory"
+        )
+    package_ids = {package["SPDXID"] for package in packages}
+    document_describes = payload.get("documentDescribes")
+    has_document_describes = "documentDescribes" in payload
+    if has_document_describes and (
+        not isinstance(document_describes, list)
+        or not document_describes
+        or not all(isinstance(item, str) and item in package_ids for item in document_describes)
+    ):
+        raise ValueError("image SBOM documentDescribes must name declared packages")
+
+    document_id = payload.get("SPDXID")
+    relationships = payload.get("relationships")
+    if "relationships" in payload and (
+        not isinstance(relationships, list)
+        or not all(
+            isinstance(relationship, dict)
+            and isinstance(relationship.get("spdxElementId"), str)
+            and isinstance(relationship.get("relationshipType"), str)
+            and isinstance(relationship.get("relatedSpdxElement"), str)
+            for relationship in relationships
+        )
+    ):
+        raise ValueError("image SBOM relationships are malformed")
+    described_by_relationship = [
+        relationship["relatedSpdxElement"]
+        for relationship in relationships or []
+        if relationship["spdxElementId"] == document_id
+        and relationship["relationshipType"] == "DESCRIBES"
+    ]
+    if described_by_relationship and not all(
+        item in package_ids for item in described_by_relationship
+    ):
+        raise ValueError("image SBOM attestation must describe a final-image subject")
+    if not has_document_describes and not described_by_relationship:
+        raise ValueError("image SBOM attestation must describe a final-image subject")
+    described_ids = set(document_describes or []) | set(described_by_relationship)
+    described_packages = [package for package in packages if package["SPDXID"] in described_ids]
+    if len(described_packages) != 1:
+        raise ValueError("image SBOM must describe exactly one image package")
+    image_package = described_packages[0]
+    if (
+        image_package.get("name") != expected_name
+        or image_package.get("versionInfo") != expected_version
+        or image_package.get("primaryPackagePurpose") != "CONTAINER"
+        or image_package.get("filesAnalyzed") is not False
+        or image_package.get("downloadLocation") != "NOASSERTION"
+    ):
+        raise ValueError("image SBOM described package does not match the scanned image")
+    checksums = image_package.get("checksums")
+    sha256_checksums = {
+        checksum.get("checksumValue")
+        for checksum in checksums or []
+        if isinstance(checksum, dict) and checksum.get("algorithm") == "SHA256"
+    }
+    if not sha256_checksums or not all(
+        isinstance(checksum, str) and re.fullmatch(r"[0-9a-f]{64}", checksum)
+        for checksum in sha256_checksums
+    ):
+        raise ValueError("image SBOM image package checksum is missing")
+    valid_purl = False
+    for reference in image_package.get("externalRefs") or []:
+        if (
+            not isinstance(reference, dict)
+            or reference.get("referenceCategory") != "PACKAGE-MANAGER"
+            or reference.get("referenceType") != "purl"
+            or not isinstance(reference.get("referenceLocator"), str)
+        ):
+            continue
+        decoded = unquote(reference["referenceLocator"])
+        purl_base, separator, purl_query = decoded.partition("?")
+        purl_digest = purl_base.removeprefix(f"pkg:oci/{expected_name}@sha256:")
+        query = parse_qs(purl_query)
+        if (
+            separator
+            and re.fullmatch(r"[0-9a-f]{64}", purl_digest)
+            and purl_digest in sha256_checksums
+            and query.get("arch") == ["amd64"]
+            and (expected_tag is None or query.get("tag") == [expected_tag])
+        ):
+            valid_purl = True
+            break
+    if not valid_purl:
+        raise ValueError("image SBOM must bind the image package to the expected amd64 OCI purl")
+
+
+def _validate_raw_spdx_image_sbom(path: Path, *, image_name: str) -> None:
+    local_reference = image_name.rsplit("/", 1)[-1]
+    expected_name, separator, expected_tag = local_reference.rpartition(":")
+    if not separator or not expected_name or not expected_tag:
+        raise ValueError("PR image name must include a repository and tag")
+    _validate_spdx_image_inventory(
+        _load_json(path),
+        expected_name=expected_name,
+        expected_version=expected_tag,
+        expected_tag=expected_tag,
+    )
+
+
 def _validate_image_sbom(path: Path, *, expected_digest: str, expected_subject: str) -> None:
     payload = _decode_image_sbom_attestation(
         path, expected_digest=expected_digest, expected_subject=expected_subject
     )
     if payload.get("bomFormat") != "CycloneDX":
-        if payload.get("spdxVersion") is None:
-            raise ValueError("image SBOM must declare CycloneDX bomFormat or SPDX version")
-        packages = payload.get("packages")
-        described = payload.get("documentDescribes")
-        if (
-            not isinstance(packages, list)
-            or not packages
-            or not all(
-                isinstance(package, dict)
-                and isinstance(package.get("SPDXID"), str)
-                and package["SPDXID"].strip()
-                and isinstance(package.get("name"), str)
-                and package["name"].strip()
-                for package in packages
-            )
-        ):
-            raise ValueError("image SBOM attestation must contain a non-empty component inventory")
-        package_ids = {package["SPDXID"] for package in packages}
-        if (
-            not isinstance(described, list)
-            or not described
-            or not all(isinstance(item, str) and item in package_ids for item in described)
-        ):
-            raise ValueError("image SBOM attestation must describe a final-image subject")
+        expected_repository = expected_subject.removesuffix(f"@{expected_digest}")
+        _validate_spdx_image_inventory(
+            payload,
+            expected_name=expected_repository,
+            expected_version=expected_digest,
+            expected_tag=None,
+        )
         return
     metadata = payload.get("metadata")
     if not isinstance(metadata, dict):
@@ -332,6 +490,7 @@ def verify_image_provenance(
     provenance_verification_path: Path | None = None,
     image_sbom_path: Path | None = None,
     application_sbom_verification_path: Path | None = None,
+    pr_image_sbom_path: Path | None = None,
 ) -> VerificationResult:
     _validate_dockerfile_bases(dockerfile_path)
     _validate_sbom(backend_sbom_path)
@@ -352,8 +511,15 @@ def verify_image_provenance(
             )
         ):
             raise ValueError("publish attestation evidence is not allowed in pr mode")
+        if pr_image_sbom_path is not None:
+            image_name = metadata.get("image.name")
+            if not isinstance(image_name, str):
+                raise ValueError("Buildx metadata image.name is required for PR SBOM binding")
+            _validate_raw_spdx_image_sbom(pr_image_sbom_path, image_name=image_name)
         return VerificationResult(digest=digest, canonical_image_ref=None)
 
+    if pr_image_sbom_path is not None:
+        raise ValueError("PR image SBOM evidence is not allowed in publish mode")
     if published_image_repository is None:
         raise ValueError("published image repository is required in publish mode")
     repository = _validate_repository(published_image_repository)
@@ -409,6 +575,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--provenance-verification-path", type=Path)
     parser.add_argument("--image-sbom-path", type=Path)
     parser.add_argument("--application-sbom-verification-path", type=Path)
+    parser.add_argument("--pr-image-sbom-path", type=Path)
     return parser.parse_args()
 
 
@@ -425,6 +592,7 @@ def main() -> int:
         provenance_verification_path=args.provenance_verification_path,
         image_sbom_path=args.image_sbom_path,
         application_sbom_verification_path=args.application_sbom_verification_path,
+        pr_image_sbom_path=args.pr_image_sbom_path,
     )
     if result.canonical_image_ref is not None:
         print(result.canonical_image_ref)

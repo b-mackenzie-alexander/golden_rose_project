@@ -13,7 +13,10 @@ on:
       - "src/**"
       - "migrations/**"
       - "scripts/validate_sbom.py"
+      - "scripts/generate_slsa_provenance.py"
       - "scripts/verify_image_provenance.py"
+      - "scripts/verify_deploy_image_authority.py"
+      - "infra/policy/spdx-2.3.schema.json"
       - ".github/workflows/build-image.yml"
   workflow_dispatch:
 
@@ -73,7 +76,19 @@ jobs:
           uv run cyclonedx-py environment --pyproject pyproject.toml --output-reproducible --of JSON -o build/backend-sbom.cdx.json
           uv run python scripts/validate_sbom.py build/backend-sbom.cdx.json --spec 1.6 --name golden-rose --version 0.1.0
           docker buildx build --load --platform linux/amd64 --metadata-file build/image-metadata.json --tag golden-rose:workflow-pr .
-          uv run python scripts/verify_image_provenance.py --mode pr --dockerfile Dockerfile --metadata-path build/image-metadata.json --backend-sbom-path build/backend-sbom.cdx.json --frontend-sbom-path build/frontend-sbom.cdx.json
+
+      - name: Download pinned Syft for PR validation
+        id: syft_pr
+        # v0.20.10
+        uses: anchore/sbom-action/download-syft@fbfd9c6c189226748411491745178e0c2017392d
+        with:
+          syft-version: "v1.37.0"
+
+      - name: Validate image SBOM with pinned Syft
+        run: |
+          set -euo pipefail
+          "${{ steps.syft_pr.outputs.cmd }}" golden-rose:workflow-pr --output spdx-json=build/image-sbom.spdx.json
+          uv run python scripts/verify_image_provenance.py --mode pr --dockerfile Dockerfile --metadata-path build/image-metadata.json --backend-sbom-path build/backend-sbom.cdx.json --frontend-sbom-path build/frontend-sbom.cdx.json --pr-image-sbom-path build/image-sbom.spdx.json
 
       - name: Upload backend SBOM evidence
         if: always()
@@ -102,6 +117,16 @@ jobs:
         with:
           name: image-metadata
           path: build/image-metadata.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload PR image SBOM evidence
+        if: always()
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: image-sbom-spdx
+          path: build/image-sbom.spdx.json
           if-no-files-found: error
           retention-days: 14
 
@@ -195,7 +220,7 @@ jobs:
         # v0.20.10
         uses: anchore/sbom-action/download-syft@fbfd9c6c189226748411491745178e0c2017392d
         with:
-          syft-version: "1.37.0"
+          syft-version: "v1.37.0"
 
       - name: Sign and verify published image attestation set
         env:
@@ -214,14 +239,19 @@ jobs:
           export IMAGE_DIGEST MANAGED_IMAGE
           "${{ steps.syft.outputs.cmd }}" "$MANAGED_IMAGE" --output spdx-json=build/image-sbom.spdx.json
           python - <<'PY'
+          import base64
           import hashlib
           import json
           import os
           from pathlib import Path
 
+          backend_sbom = Path("build/backend-sbom.cdx.json").read_bytes()
+          frontend_sbom = Path("build/frontend-sbom.cdx.json").read_bytes()
           payload = {
-              "backend_sbom_sha256": hashlib.sha256(Path("build/backend-sbom.cdx.json").read_bytes()).hexdigest(),
-              "frontend_sbom_sha256": hashlib.sha256(Path("build/frontend-sbom.cdx.json").read_bytes()).hexdigest(),
+              "backend_sbom_sha256": hashlib.sha256(backend_sbom).hexdigest(),
+              "frontend_sbom_sha256": hashlib.sha256(frontend_sbom).hexdigest(),
+              "backend_sbom_base64": base64.b64encode(backend_sbom).decode(),
+              "frontend_sbom_base64": base64.b64encode(frontend_sbom).decode(),
               "image_digest": os.environ["IMAGE_DIGEST"],
           }
           Path("build/application-sbom-checksums-predicate.json").write_text(
@@ -229,62 +259,19 @@ jobs:
               encoding="utf-8",
           )
           PY
+          uv run python scripts/generate_slsa_provenance.py --metadata build/image-metadata.json --output build/slsa-provenance-predicate.json --source-repository https://github.com/b-mackenzie-alexander/golden_rose_project --source-ref refs/heads/develop --source-commit "$SOURCE_COMMIT" --invocation-id "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}"
+          uv run python scripts/verify_image_provenance.py --mode pr --dockerfile Dockerfile --metadata-path build/image-metadata.json --backend-sbom-path build/backend-sbom.cdx.json --frontend-sbom-path build/frontend-sbom.cdx.json --pr-image-sbom-path build/image-sbom.spdx.json
           cosign sign --yes "$MANAGED_IMAGE"
-          cosign attest --yes --type slsaprovenance --predicate build/image-metadata.json "$MANAGED_IMAGE"
+          cosign attest --yes --type slsaprovenance1 --predicate build/slsa-provenance-predicate.json "$MANAGED_IMAGE"
           cosign attest --yes --type https://spdx.dev/Document --predicate build/image-sbom.spdx.json "$MANAGED_IMAGE"
           cosign attest --yes --type https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1 --predicate build/application-sbom-checksums-predicate.json "$MANAGED_IMAGE"
-          cosign verify --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" >/dev/null
-          cosign verify-attestation --type slsaprovenance --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" >/dev/null
+          cosign verify --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/publish-signature-verification.json
+          cosign verify-attestation --type slsaprovenance1 --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/publish-provenance-verification.json
           cosign verify-attestation --type https://spdx.dev/Document --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/image-sbom.cdx.json
-          cosign verify-attestation --type https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1 --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" >/dev/null
-          python - <<'PY'
-          import hashlib
-          import json
-          import os
-          from pathlib import Path
-
-          managed_image = os.environ["MANAGED_IMAGE"]
-          image_digest = os.environ["IMAGE_DIGEST"]
-          trust = {
-              "subject": managed_image,
-              "digest": image_digest,
-              "certificate_identity": "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop",
-              "certificate_oidc_issuer": "https://token.actions.githubusercontent.com",
-              "transparency_log_included": True,
-          }
-          Path("build/published-image.txt").write_text(managed_image + "\n", encoding="utf-8")
-          Path("build/publish-signature-verification.json").write_text(
-              json.dumps(trust, indent=2) + "\n", encoding="utf-8"
-          )
-          Path("build/publish-provenance-verification.json").write_text(
-              json.dumps(
-                  {
-                      **trust,
-                      "predicate_type": "https://slsa.dev/provenance/v1",
-                      "source_commit": os.environ["SOURCE_COMMIT"],
-                      "builder_id": "https://github.com/actions/runner",
-                  },
-                  indent=2,
-              )
-              + "\n",
-              encoding="utf-8",
-          )
-          Path("build/publish-application-sbom-verification.json").write_text(
-              json.dumps(
-                  {
-                      **trust,
-                      "predicate_type": "https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1",
-                      "backend_sbom_sha256": hashlib.sha256(Path("build/backend-sbom.cdx.json").read_bytes()).hexdigest(),
-                      "frontend_sbom_sha256": hashlib.sha256(Path("build/frontend-sbom.cdx.json").read_bytes()).hexdigest(),
-                  },
-                  indent=2,
-              )
-              + "\n",
-              encoding="utf-8",
-          )
-          PY
-          # never deploy by tag; capture and verify the immutable digest and trust evidence emitted by the publish build
-          uv run python scripts/verify_image_provenance.py --mode publish --dockerfile Dockerfile --metadata-path build/image-metadata.json --backend-sbom-path build/backend-sbom.cdx.json --frontend-sbom-path build/frontend-sbom.cdx.json --published-image-repository "$MANAGED_REPOSITORY" --signature-verification-path build/publish-signature-verification.json --provenance-verification-path build/publish-provenance-verification.json --image-sbom-path build/image-sbom.cdx.json --application-sbom-verification-path build/publish-application-sbom-verification.json > build/published-image.txt
+          cosign verify-attestation --type https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1 --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/publish-application-sbom-verification.json
+          uv run python scripts/verify_deploy_image_authority.py --image "$MANAGED_IMAGE" --signature build/publish-signature-verification.json --provenance build/publish-provenance-verification.json --image-sbom build/image-sbom.cdx.json --application-sbom build/publish-application-sbom-verification.json --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --source-commit "$SOURCE_COMMIT" --backend-sbom build/backend-sbom.cdx.json --frontend-sbom build/frontend-sbom.cdx.json >/dev/null
+          # never deploy by tag; retain only the verifier-approved immutable reference
+          printf '%s\n' "$MANAGED_IMAGE" > build/published-image.txt
 
       - name: Upload backend SBOM evidence
         if: always()

@@ -2010,6 +2010,7 @@ def test_build_image_workflow_separates_pull_request_validation_from_publish_aut
         "astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e",
         "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
         "docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435",
+        "anchore/sbom-action/download-syft@fbfd9c6c189226748411491745178e0c2017392d",
         "sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22",
         "google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193",
         "docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1",
@@ -2086,16 +2087,19 @@ def test_build_image_workflow_captures_actual_cosign_image_sbom_evidence() -> No
 def test_build_image_workflow_attests_a_real_spdx_image_sbom_before_verification() -> None:
     workflow = (ROOT / ".github/workflows/build-image.yml").read_text(encoding="utf-8")
 
-    sbom_command = (
-        'docker scout sbom --format spdx --output build/image-sbom.spdx.json "$MANAGED_IMAGE"'
-    )
+    syft_action = "anchore/sbom-action/download-syft@fbfd9c6c189226748411491745178e0c2017392d"
+    sbom_command = '"${{ steps.syft.outputs.cmd }}" "$MANAGED_IMAGE" --output spdx-json=build/image-sbom.spdx.json'
     attest_command = 'cosign attest --yes --type https://spdx.dev/Document --predicate build/image-sbom.spdx.json "$MANAGED_IMAGE"'
     verify_command = "cosign verify-attestation --type https://spdx.dev/Document"
 
+    assert syft_action in workflow
+    assert 'syft-version: "1.37.0"' in workflow
     assert sbom_command in workflow
+    assert "docker scout sbom" not in workflow
     assert attest_command in workflow
     assert (
-        workflow.index(sbom_command)
+        workflow.index(syft_action)
+        < workflow.index(sbom_command)
         < workflow.index(attest_command)
         < workflow.index(verify_command)
     )

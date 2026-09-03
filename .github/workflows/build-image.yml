@@ -190,6 +190,13 @@ jobs:
           uv run python scripts/validate_sbom.py build/backend-sbom.cdx.json --spec 1.6 --name golden-rose --version 0.1.0
           docker buildx build --push --platform linux/amd64 --provenance=mode=max --sbom=true --metadata-file build/image-metadata.json --tag us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer:${{ github.sha }} .
 
+      - name: Download pinned Syft
+        id: syft
+        # v0.20.10
+        uses: anchore/sbom-action/download-syft@fbfd9c6c189226748411491745178e0c2017392d
+        with:
+          syft-version: "1.37.0"
+
       - name: Sign and verify published image attestation set
         env:
           MANAGED_REPOSITORY: us-east4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/staff-tracer-images/staff-tracer
@@ -205,7 +212,7 @@ jobs:
           )"
           MANAGED_IMAGE="${MANAGED_REPOSITORY}@${IMAGE_DIGEST}"
           export IMAGE_DIGEST MANAGED_IMAGE
-          docker scout sbom --format spdx --output build/image-sbom.spdx.json "$MANAGED_IMAGE"
+          "${{ steps.syft.outputs.cmd }}" "$MANAGED_IMAGE" --output spdx-json=build/image-sbom.spdx.json
           python - <<'PY'
           import hashlib
           import json

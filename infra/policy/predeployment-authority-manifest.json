@@ -154,6 +154,7 @@
               "name:Authenticate to Google Cloud",
               "name:Log in to Artifact Registry",
               "name:Build publish image and evidence",
+              "name:Download pinned Syft",
               "name:Sign and verify published image attestation set",
               "name:Upload backend SBOM evidence",
               "name:Upload frontend SBOM evidence",

@@ -3,6 +3,7 @@ import base64
 import hashlib
 import json
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import parse_qs, unquote, urlparse
@@ -229,6 +230,10 @@ def _validate_spdx_image_inventory(
         or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", created)
     ):
         raise ValueError("image SBOM creationInfo must identify Syft 1.37.0")
+    try:
+        datetime.strptime(created, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError as exc:
+        raise ValueError("image SBOM creationInfo must contain a valid timestamp") from exc
     packages = payload.get("packages")
     required_package_fields = {
         "SPDXID",
@@ -249,6 +254,16 @@ def _validate_spdx_image_inventory(
             and package["SPDXID"].strip()
             and isinstance(package.get("name"), str)
             and package["name"].strip()
+            and isinstance(package.get("filesAnalyzed"), bool)
+            and all(
+                isinstance(package.get(field), str) and package[field].strip()
+                for field in (
+                    "downloadLocation",
+                    "licenseConcluded",
+                    "licenseDeclared",
+                    "copyrightText",
+                )
+            )
             for package in packages
         )
     ):

@@ -66,8 +66,8 @@ Review the single source-only remediation assembled after the first post-PR71 Ga
 - Exact immutable failed-run image scan: passed with 144 packages; actual SPDX structure inspected.
 - Disposable Cosign v3 chain: signature plus SLSA v1, SPDX, and application-SBOM attest/verify all passed.
 - Raw verified envelopes through `verify_deploy_image_authority.py`: passed for the immutable local digest.
-- Full unit suite: `619 passed, 1 warning`.
-- Focused generator/deployment/image/workflow suites: `328 passed`.
+- Full unit suite: `623 passed, 1 warning`.
+- Focused generator/deployment/image/workflow suites: `332 passed`.
 - Frontend verification: `116 passed`, coverage thresholds and production build passed.
 - Terraform static validation and formatting: passed.
 - Ruff format/check: passed.
@@ -78,7 +78,7 @@ Review the single source-only remediation assembled after the first post-PR71 Ga
 - Tracked diff and untracked-handoff whitespace hygiene: passed.
 - Disposable registry, temporary workspace, and ephemeral key material: removed and absence verified.
 
-One initial full-unit attempt reported 605 passes plus one Terraform-provider registry timeout. The exact node passed on retry and the complete suite then passed; this was an external setup failure, not a product regression. PR #72 opened one commit ahead of the base at `6949502`; its exact-range Gitleaks evidence and protected checks passed and remain bound to that head. Only the purl-prefix follow-up described below is currently uncommitted.
+One initial full-unit attempt reported 605 passes plus one Terraform-provider registry timeout. The exact node passed on retry and the complete suite then passed; this was an external setup failure, not a product regression. PR #72 now has two source-remediation commits through `c561681`; exact-range Gitleaks and protected checks passed for that head and remain bound to it. Only the timestamp/package-semantics follow-up described below is currently uncommitted.
 
 ## Independent review findings and remediation
 
@@ -94,7 +94,7 @@ Focused remediation and full unit tests pass. The complete post-remediation loca
 
 Final security rereview independently fetched the upstream SPDX `v2.3` schema, detected and caused removal of one initially appended newline, and proved the current 45,312-byte file is byte-identical at SHA-256 `239208b7ac287b3cf5d9a9af23f9d69863971102a5e1587a27a398b43490b89b`. It closed the application-SBOM High, original SPDX-shape Medium, and schema-byte mismatch. Final documentation rereview closed all continuity findings, matched all 26 files, and found no privacy issue.
 
-After PR #72 opened at `6949502` and all protected checks passed, a delayed review result exposed one remaining Medium: both purl validators extracted a digest with `removeprefix` without first proving the required `pkg:oci/<repository>@sha256:` prefix. Exact PR and deployment adversarial regressions failed before the fix and now pass after an explicit prefix check. Full unit and focused totals are updated above. Fresh independent security and documentation rereviews are CLEAN at Blocker/High/Medium. This bounded uncommitted follow-up may now be committed/pushed and exact-head/range plus protected-check evidence refreshed; the PR's current clean evidence remains bound only to `6949502` until then.
+After PR #72 opened at `6949502` and all protected checks passed, delayed reviews exposed three schema-adjacent Medium issues across successive surfaces: missing exact OCI purl-prefix enforcement, regex-shaped but impossible creation timestamps, and required package fields that could be present but empty. Exact PR and deployment adversarial regressions failed before each remediation. The purl fix was committed/pushed at `c561681`; the current uncommitted follow-up parses timestamps semantically and requires boolean `filesAnalyzed` plus non-empty string values for `downloadLocation`, `licenseConcluded`, `licenseDeclared`, and `copyrightText`. Full unit and focused totals are updated above. Fresh independent security and documentation rereviews are CLEAN at Blocker/High/Medium. The semantic follow-up may now be committed/pushed and exact-head/range plus protected-check evidence refreshed; current PR evidence remains bound to `c561681` until then.
 
 ## Review focus
 

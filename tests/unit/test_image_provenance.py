@@ -543,6 +543,14 @@ def test_pr_mode_accepts_actual_syft_spdx_inventory(tmp_path: Path) -> None:
             ),
             "amd64 OCI purl",
         ),
+        (
+            lambda payload: payload["creationInfo"].update({"created": "9999-99-99T99:99:99Z"}),
+            "creationInfo",
+        ),
+        (
+            lambda payload: payload["packages"][0].update({"licenseConcluded": ""}),
+            "schema-complete component inventory",
+        ),
         (lambda payload: payload.update({"name": "other-image"}), "document name"),
         (
             lambda payload: payload.update({"documentDescribes": "SPDXRef-Image-staff-tracer"}),

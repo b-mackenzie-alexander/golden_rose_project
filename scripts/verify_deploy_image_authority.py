@@ -5,6 +5,7 @@ import base64
 import hashlib
 import json
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote
@@ -210,6 +211,12 @@ def _assert_image_sbom_semantics(predicate: Any, *, repository: str, digest: str
         raise DeployImageAuthorityError(
             "image SBOM predicate creationInfo must identify Syft 1.37.0"
         )
+    try:
+        datetime.strptime(created, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError as exc:
+        raise DeployImageAuthorityError(
+            "image SBOM predicate creationInfo must contain a valid timestamp"
+        ) from exc
     packages = predicate.get("packages")
     required_package_fields = {
         "SPDXID",
@@ -230,6 +237,16 @@ def _assert_image_sbom_semantics(predicate: Any, *, repository: str, digest: str
             and package["SPDXID"].strip()
             and isinstance(package.get("name"), str)
             and package["name"].strip()
+            and isinstance(package.get("filesAnalyzed"), bool)
+            and all(
+                isinstance(package.get(field), str) and package[field].strip()
+                for field in (
+                    "downloadLocation",
+                    "licenseConcluded",
+                    "licenseDeclared",
+                    "copyrightText",
+                )
+            )
             for package in packages
         )
     ):

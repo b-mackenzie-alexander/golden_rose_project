@@ -33,29 +33,22 @@ automated hiring, matching, ranking, eligibility, or referral system.
   `/health`, bounded `/readiness`, same-origin static serving, entrypoint/runtime
   behavior, and non-root local image build/inspection evidence.
 - Accepted ADR-0009 targets one private, fictional-synthetic-only Cloud Run +
-  Cloud SQL testing environment. PR #24 merged the local validate-without-apply
-  Terraform scaffold into `develop` at `50451b3`; separately approved private
-  operator work later established a partial non-executable foundation outside
-  Terraform apply. No running shared application, public access, real identity,
-  live/client data, or production claim is currently authorized or present.
-- Terraform/IaC implementation now follows the accepted 14-decision private synthetic-only
-  GCP `develop` posture: `us-east4` for Cloud Run, Cloud SQL, and Artifact
-  Registry; Terraform-managed APIs; split bootstrap/WIF provisioning identity;
-  separate runtime/migration identities; private Artifact Registry digest
-  deployment; Terraform-managed $50/$75/$100 budget alerts; Secret Manager
-  metadata/IAM only; private Cloud SQL and VPC access; private Cloud Run
-  invoker IAM; protected GitHub WIF gates; value-safe observability; standard
-  labels; intentional teardown runbook support; and local state only until remote
-  state is approved. Beatrice accepted a durable bootstrap/state control plane
-  separate from disposable workload teardown; initial read-only qualification
-  and partial foundation evidence are held privately. The source-controlled
-  implementation lane merged through PR #33 at `3c0118a`. A post-merge audit
-  found F1-F17 deployment-path defects, including four Blockers; accepted
-  ADR-0013 and its paired plan governed the subsequently merged no-cloud
-  remediation and continue to gate every Terraform progression. Terraform plan/apply,
-  backend migration, cloud authentication/API calls, resource/service-identity
-  provisioning, image push, deployment, real identity, live/client data, and
-  production remain separately gated.
+  Cloud SQL testing environment. State establishment, ownership reconciliation,
+  exact foundation apply, and workload-free post-apply verification are complete.
+  PR #69 merged the Gate P commit-pinned Syft correction into
+  `develop@64f4ae5`, but publication evidence remains incomplete. No running
+  shared application, public access, real identity, live/client data, or
+  production claim is currently authorized or present.
+- Terraform/IaC follows the accepted private synthetic-only GCP `develop`
+  posture: `us-east4`; split bootstrap, publication, deployment, runtime, and
+  migration identities; durable remote state; immutable digest promotion;
+  Secret Manager metadata/IAM only; staged private Cloud SQL/VPC; named private
+  Cloud Run invocation; value-safe observability; and intentional teardown.
+  Gate F is complete with 41 managed addresses plus one expected data source and
+  no executable workload. Gate P and every later Secret, migration, service,
+  tester, qualification, real-identity, live-data, and production action remain
+  separately approved. Private identifiers and secret payloads stay outside
+  tracked source and ordinary documentation.
 - Source-controlled Gate 2 read-only verification tooling now exists: `scripts/verify_gcp_foundation.py`
   evaluates live foundation/effective-authority posture against the reviewed
   contract without adding any mutation mode, and `deploy/gcp/evidence-template.md`
@@ -75,23 +68,16 @@ automated hiring, matching, ranking, eligibility, or referral system.
   source-controlled pre-deployment work while keeping
   read-only GCP qualification, Terraform plan, foundation apply, first private
   synthetic deployment, and qualification as separate explicit owner gates.
-- Accepted ADR-0013 adds the required post-PR33 boundary: staged
-  `foundation → migration → service` Terraform authority; Terraform-only
-  configuration ownership; IAM-private internet-reachable named testers;
-  exact viewer/job-executor and direct-workflow WIF authority; keyless
-  digest-bound Cosign/SLSA/SBOM verification; and authenticated `/readiness`
-  availability monitoring. PR #35 merged the amended planning packet at
-  `db1f293`; PR #37 then merged the no-cloud remediation into protected
-  `develop` at `caf96a7`. PR #42 subsequently made tester authority
-  service-stage-only at `b2d79b5`; PR #46 made the evaluated `foundation` root
-  omit network and Cloud SQL at `58aed28`; and PR #48 aligned the live verifier
-  with that workload-free, Cloud-SQL-free foundation stage at `5f265d8`. PR #57
-  then closed A1 live-foundation remediation with zero current-source violations.
-  PR #62 merged the E2 bootstrap-IAM source reconciliation, PR #63 guarded the nullable foundation image local, and PR #64 guarded the service-only readiness local. Separately approved E2 bootstrap-only establishment/reconciliation and E3 workload-state imports have independently read-back private state; E3 contains all 37 approved resource addresses plus one expected evaluated data-source address. Fresh A5 disposition readbacks confirmed that the artifact-verifier identity, exact deploy-workflow WIF binding, and exact repository-reader binding already converge. The first valid workload-free foundation plan exposes five project-identity replacements, so the accepted ownership-alignment plan must remove or truthfully escalate them before a separately approved foundation apply.
-  Separately approved operator work has established a partial
-  non-executable foundation; private records hold its identifiers and raw
-  evidence. No image publication, executable deployment, or qualification has
-  occurred.
+- Accepted ADR-0013 defines staged `foundation → migration → service` Terraform
+  authority, Terraform-only configuration ownership, IAM-private named testers,
+  exact viewer/job-executor and direct-workflow WIF authority, digest-bound
+  Cosign/SLSA/SBOM verification, and authenticated `/readiness` monitoring.
+  PR #37/PR #42/PR #46/PR #48 closed the source and verifier blockers; PR #57
+  closed A1; PR #62/PR #63/PR #64 closed the later state/evaluation source
+  corrections. E2/E3 state establishment/readback, A5, ownership alignment, the
+  replacement-free foundation plan/apply, and post-apply verification are now
+  complete. PR #69 merged the pinned-Syft correction after protected checks;
+  Gate P is the next separately approved operational boundary.
 - Merged source also carries a reviewed local clean-room qualification
   harness that exercises the approved pre-deployment bundle against a disposable
   repo copy plus Docker-backed synthetic PostgreSQL, including Terraform/static
@@ -100,9 +86,10 @@ automated hiring, matching, ranking, eligibility, or referral system.
 - ADR-0014 now governs delivery granularity: one accepted outcome-scale plan may
   span several roadmap items and implementation PRs, while TDD stays small and
   every hazardous cloud/data/runtime operation keeps a separate approval. The
-  accepted-but-unmerged master plan targets a private fictional-synthetic shared
-  `develop` environment for bounded human feedback; it becomes source-planning
-  authority only after protected merge and never collapses operational approvals.
+  accepted master plan merged through PR #49 and continues to govern the private
+  fictional-synthetic shared `develop` target for bounded human feedback. It
+  predeclares ordered source and operational gates without collapsing their
+  separate approvals.
 - Automated frontend parity/accessibility evidence exists locally, but human
   browser/manual accessibility/fluent-language qualification remains deferred
   until a shared deployed `develop` target exists.

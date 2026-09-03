@@ -4,6 +4,7 @@ import importlib.util
 import json
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 import pytest
 
@@ -35,6 +36,7 @@ def valid_sbom() -> dict[str, object]:
 
 def valid_metadata() -> dict[str, object]:
     return {
+        "image.name": "docker.io/library/golden-rose:workflow-pr",
         "containerimage.digest": "sha256:" + "a" * 64,
         "containerimage.descriptor": {
             "digest": "sha256:" + "a" * 64,
@@ -62,6 +64,7 @@ def valid_metadata() -> dict[str, object]:
 
 def valid_buildkit_metadata() -> dict[str, object]:
     return {
+        "image.name": "docker.io/library/golden-rose:workflow-pr",
         "containerimage.digest": "sha256:" + "a" * 64,
         "containerimage.descriptor": {
             "digest": "sha256:" + "a" * 64,
@@ -137,31 +140,100 @@ def valid_image_sbom(digest: str) -> dict[str, object]:
 
 
 def valid_image_sbom_attestation(digest: str) -> dict[str, object]:
+    repository = "us-east4-docker.pkg.dev/example-project/application-images/staff-tracer"
+    predicate = valid_syft_spdx_image_sbom(digest)
+    platform_digest = "e" * 64
+    predicate["name"] = repository
+    image_package = predicate["packages"][0]
+    image_package["name"] = repository
+    image_package["versionInfo"] = digest
+    image_package["externalRefs"][0]["referenceLocator"] = (
+        f"pkg:oci/{repository}@sha256%3A{platform_digest}?arch=amd64"
+    )
+    predicate.pop("relationships")
+    predicate["documentDescribes"] = ["SPDXRef-Image-staff-tracer"]
     statement = {
         "_type": "https://in-toto.io/Statement/v0.1",
         "predicateType": "https://spdx.dev/Document",
         "subject": [
             {
-                "name": "us-east4-docker.pkg.dev/example-project/application-images/staff-tracer",
+                "name": repository,
                 "digest": {"sha256": digest.removeprefix("sha256:")},
             }
         ],
-        "predicate": {
-            "spdxVersion": "SPDX-2.3",
-            "dataLicense": "CC0-1.0",
-            "SPDXID": "SPDXRef-DOCUMENT",
-            "name": "sbom-staff-tracer",
-            "documentNamespace": "https://anchore.com/syft/image/staff-tracer",
-            "creationInfo": {"creators": ["Tool: syft-v1.20.0"]},
-            "documentDescribes": ["SPDXRef-Image-staff-tracer"],
-            "packages": [{"SPDXID": "SPDXRef-Image-staff-tracer", "name": "staff-tracer"}],
-        },
+        "predicate": predicate,
     }
     return {
         "payloadType": "application/vnd.in-toto+json",
         "payload": base64.b64encode(json.dumps(statement).encode()).decode(),
         "signatures": [{"sig": "verified-by-cosign"}],
     }
+
+
+def valid_syft_spdx_image_sbom(digest: str) -> dict[str, Any]:
+    platform_digest = "e" * 64
+    return {
+        "spdxVersion": "SPDX-2.3",
+        "dataLicense": "CC0-1.0",
+        "SPDXID": "SPDXRef-DOCUMENT",
+        "name": "golden-rose",
+        "documentNamespace": "https://anchore.com/syft/image/golden-rose-test",
+        "creationInfo": {
+            "creators": ["Organization: Anchore, Inc", "Tool: syft-1.37.0"],
+            "created": "2026-09-03T17:00:54Z",
+        },
+        "packages": [
+            {
+                "SPDXID": "SPDXRef-Image-staff-tracer",
+                "name": "golden-rose",
+                "versionInfo": "workflow-pr",
+                "downloadLocation": "NOASSERTION",
+                "filesAnalyzed": False,
+                "licenseConcluded": "NOASSERTION",
+                "licenseDeclared": "NOASSERTION",
+                "copyrightText": "NOASSERTION",
+                "primaryPackagePurpose": "CONTAINER",
+                "checksums": [{"algorithm": "SHA256", "checksumValue": platform_digest}],
+                "externalRefs": [
+                    {
+                        "referenceCategory": "PACKAGE-MANAGER",
+                        "referenceType": "purl",
+                        "referenceLocator": (
+                            f"pkg:oci/golden-rose@sha256%3A{platform_digest}"
+                            "?arch=amd64&tag=workflow-pr"
+                        ),
+                    }
+                ],
+            }
+        ],
+        "relationships": [
+            {
+                "spdxElementId": "SPDXRef-DOCUMENT",
+                "relationshipType": "DESCRIBES",
+                "relatedSpdxElement": "SPDXRef-Image-staff-tracer",
+            }
+        ],
+    }
+
+
+def valid_syft_image_sbom_attestation(digest: str) -> dict[str, object]:
+    envelope = valid_image_sbom_attestation(digest)
+    payload = envelope["payload"]
+    assert isinstance(payload, str)
+    statement = json.loads(base64.b64decode(payload))
+    predicate = valid_syft_spdx_image_sbom(digest)
+    repository = "us-east4-docker.pkg.dev/example-project/application-images/staff-tracer"
+    platform_digest = "e" * 64
+    predicate["name"] = repository
+    image_package = predicate["packages"][0]
+    image_package["name"] = repository
+    image_package["versionInfo"] = digest
+    image_package["externalRefs"][0]["referenceLocator"] = (
+        f"pkg:oci/{repository}@sha256%3A{platform_digest}?arch=amd64"
+    )
+    statement["predicate"] = predicate
+    envelope["payload"] = base64.b64encode(json.dumps(statement).encode()).decode()
+    return envelope
 
 
 def valid_application_sbom_attestation(
@@ -412,6 +484,120 @@ def test_image_sbom_is_schema_valid_linux_amd64_digest_bound_and_nonempty(
     result = _verify_publish(module, paths)
 
     assert result.digest == digest
+
+
+def test_publish_mode_accepts_actual_syft_spdx_describes_relationship(tmp_path: Path) -> None:
+    module = load_module()
+    paths, digest, _ = _write_valid_publish_evidence(tmp_path)
+    write_json(paths["image_sbom"], valid_syft_image_sbom_attestation(digest))
+
+    result = _verify_publish(module, paths)
+
+    assert result.digest == digest
+
+
+def test_spdx_schema_is_pinned_to_the_reviewed_official_bytes() -> None:
+    module = load_module()
+    schema_path = ROOT / "infra/policy/spdx-2.3.schema.json"
+
+    assert hashlib.sha256(schema_path.read_bytes()).hexdigest() == module.SPDX_SCHEMA_SHA256
+
+
+def test_pr_mode_accepts_actual_syft_spdx_inventory(tmp_path: Path) -> None:
+    module = load_module()
+    paths, digest, _ = _write_valid_publish_evidence(tmp_path)
+    raw_image_sbom_path = tmp_path / "raw-image-sbom.spdx.json"
+    write_json(raw_image_sbom_path, valid_syft_spdx_image_sbom(digest))
+
+    result = module.verify_image_provenance(
+        mode="pr",
+        dockerfile_path=ROOT / "Dockerfile",
+        metadata_path=paths["metadata"],
+        backend_sbom_path=paths["backend_sbom"],
+        frontend_sbom_path=paths["frontend_sbom"],
+        published_image_repository=None,
+        pr_image_sbom_path=raw_image_sbom_path,
+    )
+
+    assert result.digest == digest
+
+
+@pytest.mark.parametrize(
+    ("mutate", "error"),
+    [
+        (lambda payload: payload.update({"spdxVersion": "SPDX-999.999"}), "SPDX-2.3"),
+        (lambda payload: payload.pop("dataLicense"), "pinned SPDX 2.3 schema"),
+        (
+            lambda payload: payload["packages"][0].update({"name": "fabricated-image"}),
+            "described package",
+        ),
+        (
+            lambda payload: payload["packages"][0]["externalRefs"][0].update(
+                {"referenceLocator": "pkg:oci/golden-rose@sha256%3A" + "e" * 64 + "?arch=arm64"}
+            ),
+            "amd64 OCI purl",
+        ),
+        (
+            lambda payload: payload["packages"][0]["externalRefs"][0].update(
+                {"referenceLocator": "e" * 64 + "?arch=amd64&tag=workflow-pr"}
+            ),
+            "amd64 OCI purl",
+        ),
+        (
+            lambda payload: payload["creationInfo"].update({"created": "9999-99-99T99:99:99Z"}),
+            "creationInfo",
+        ),
+        (
+            lambda payload: payload["packages"][0].update({"licenseConcluded": ""}),
+            "schema-complete component inventory",
+        ),
+        (lambda payload: payload.update({"name": "other-image"}), "document name"),
+        (
+            lambda payload: payload.update({"documentDescribes": "SPDXRef-Image-staff-tracer"}),
+            "pinned SPDX 2.3 schema",
+        ),
+    ],
+)
+def test_pr_mode_rejects_malformed_or_wrong_syft_image_identity(
+    tmp_path: Path, mutate, error: str
+) -> None:
+    module = load_module()
+    paths, digest, _ = _write_valid_publish_evidence(tmp_path)
+    raw_image_sbom_path = tmp_path / "raw-image-sbom.spdx.json"
+    image_sbom = valid_syft_spdx_image_sbom(digest)
+    mutate(image_sbom)
+    write_json(raw_image_sbom_path, image_sbom)
+
+    with pytest.raises(ValueError, match=error):
+        module.verify_image_provenance(
+            mode="pr",
+            dockerfile_path=ROOT / "Dockerfile",
+            metadata_path=paths["metadata"],
+            backend_sbom_path=paths["backend_sbom"],
+            frontend_sbom_path=paths["frontend_sbom"],
+            published_image_repository=None,
+            pr_image_sbom_path=raw_image_sbom_path,
+        )
+
+
+def test_pr_mode_rejects_spdx_without_a_described_image_package(tmp_path: Path) -> None:
+    module = load_module()
+    paths, _, _ = _write_valid_publish_evidence(tmp_path)
+    raw_image_sbom_path = tmp_path / "raw-image-sbom.spdx.json"
+    image_sbom = valid_syft_spdx_image_sbom("sha256:" + "a" * 64)
+    image_sbom["relationships"] = []
+    write_json(raw_image_sbom_path, image_sbom)
+
+    with pytest.raises(ValueError, match="describe a final-image subject"):
+        module.verify_image_provenance(
+            mode="pr",
+            dockerfile_path=ROOT / "Dockerfile",
+            metadata_path=paths["metadata"],
+            backend_sbom_path=paths["backend_sbom"],
+            frontend_sbom_path=paths["frontend_sbom"],
+            published_image_repository=None,
+            pr_image_sbom_path=raw_image_sbom_path,
+        )
 
 
 def test_publish_mode_requires_actual_cosign_image_sbom_attestation(tmp_path: Path) -> None:

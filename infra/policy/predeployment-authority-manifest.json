@@ -137,9 +137,12 @@
               "name:Set up Node.js 22.22.3",
               "name:Set up Docker Buildx",
               "name:Build validation image and evidence",
+              "name:Download pinned Syft for PR validation",
+              "name:Validate image SBOM with pinned Syft",
               "name:Upload backend SBOM evidence",
               "name:Upload frontend SBOM evidence",
-              "name:Upload image metadata evidence"
+              "name:Upload image metadata evidence",
+              "name:Upload PR image SBOM evidence"
             ]
           },
           "publish-image": {
@@ -240,6 +243,7 @@
       "apps/web/scripts/validate-lockfile.mjs",
       "apps/web/scripts/validate-lockfile.test.mjs",
       "scripts/qualify_develop_deployment.py",
+      "scripts/generate_slsa_provenance.py",
       "scripts/verify_database_authority.py",
       "scripts/verify_gcp_foundation.py",
       "scripts/verify_image_provenance.py",

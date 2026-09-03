@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import importlib.util
 import json
 from collections.abc import Callable
@@ -54,53 +55,99 @@ def envelope(predicate_type: str, predicate: dict[str, Any]) -> dict[str, Any]:
 
 def provenance_predicate() -> dict[str, Any]:
     return {
-        "containerimage.digest": DIGEST,
-        "containerimage.descriptor": {
-            "mediaType": "application/vnd.oci.image.index.v1+json",
-            "digest": DIGEST,
-            "size": 856,
-        },
-        "buildx.build.provenance": {
-            "builder": {"id": ""},
+        "buildDefinition": {
             "buildType": "https://mobyproject.org/buildkit@v1",
-            "materials": [],
-            "invocation": {
-                "configSource": {"entryPoint": "Dockerfile"},
-                "parameters": {
-                    "frontend": "dockerfile.v0",
-                    "root": {
-                        "configSource": {"path": "Dockerfile"},
-                        "request": {
-                            "args": {
-                                "vcs:revision": SOURCE_COMMIT,
-                                "vcs:source": "https://github.com/b-mackenzie-alexander/golden_rose_project.git",
-                            }
-                        },
+            "externalParameters": {
+                "source": {
+                    "repository": "https://github.com/b-mackenzie-alexander/golden_rose_project",
+                    "ref": "refs/heads/develop",
+                },
+                "dockerfile": "Dockerfile",
+                "platform": "linux/amd64",
+            },
+            "internalParameters": {},
+            "resolvedDependencies": [
+                {
+                    "uri": "git+https://github.com/b-mackenzie-alexander/golden_rose_project@refs/heads/develop",
+                    "digest": {"gitCommit": SOURCE_COMMIT},
+                },
+                {
+                    "uri": "pkg:docker/node@22.22.3-bookworm-slim?platform=linux%2Famd64",
+                    "digest": {
+                        "sha256": "16d364eebf6b62da439dc993d9b80940c78b0ca38438452f011ab9a25c752644"
                     },
                 },
-                "environment": {"platform": "linux/amd64"},
+                {
+                    "uri": "pkg:docker/python@3.12.12-slim-bookworm?platform=linux%2Famd64",
+                    "digest": {
+                        "sha256": "2986c55feb36e6cae00fa1fefb454283e4b33f35e75ff8bdd123b134130be301"
+                    },
+                },
+            ],
+        },
+        "runDetails": {
+            "builder": {"id": "https://github.com/actions/runner/github-hosted"},
+            "metadata": {
+                "invocationId": "https://github.com/b-mackenzie-alexander/golden_rose_project/actions/runs/123/attempts/1"
             },
         },
     }
 
 
 def image_sbom_predicate() -> dict[str, Any]:
+    repository = IMAGE.split("@", 1)[0]
+    platform_digest = "e" * 64
     return {
         "spdxVersion": "SPDX-2.3",
         "dataLicense": "CC0-1.0",
         "SPDXID": "SPDXRef-DOCUMENT",
-        "name": "sbom-staff-tracer",
-        "documentNamespace": "https://anchore.com/syft/image/staff-tracer",
-        "creationInfo": {"creators": ["Tool: syft-v1.20.0"]},
-        "documentDescribes": ["SPDXRef-Image-staff-tracer"],
-        "packages": [{"SPDXID": "SPDXRef-Image-staff-tracer", "name": "staff-tracer"}],
+        "name": repository,
+        "documentNamespace": "https://anchore.com/syft/image/staff-tracer-test",
+        "creationInfo": {
+            "creators": ["Organization: Anchore, Inc", "Tool: syft-1.37.0"],
+            "created": "2026-09-03T17:00:54Z",
+        },
+        "packages": [
+            {
+                "SPDXID": "SPDXRef-Image-staff-tracer",
+                "name": repository,
+                "versionInfo": DIGEST,
+                "downloadLocation": "NOASSERTION",
+                "filesAnalyzed": False,
+                "licenseConcluded": "NOASSERTION",
+                "licenseDeclared": "NOASSERTION",
+                "copyrightText": "NOASSERTION",
+                "primaryPackagePurpose": "CONTAINER",
+                "checksums": [{"algorithm": "SHA256", "checksumValue": platform_digest}],
+                "externalRefs": [
+                    {
+                        "referenceCategory": "PACKAGE-MANAGER",
+                        "referenceType": "purl",
+                        "referenceLocator": (
+                            f"pkg:oci/{repository}@sha256%3A{platform_digest}?arch=amd64"
+                        ),
+                    }
+                ],
+            }
+        ],
+        "relationships": [
+            {
+                "spdxElementId": "SPDXRef-DOCUMENT",
+                "relationshipType": "DESCRIBES",
+                "relatedSpdxElement": "SPDXRef-Image-staff-tracer",
+            }
+        ],
     }
 
 
 def application_sbom_predicate() -> dict[str, Any]:
+    backend_sbom = b'{"bomFormat":"CycloneDX","metadata":{"component":{"name":"golden-rose"}}}'
+    frontend_sbom = b'{"bomFormat":"CycloneDX","metadata":{"component":{"name":"web"}}}'
     return {
-        "backend_sbom_sha256": "c" * 64,
-        "frontend_sbom_sha256": "d" * 64,
+        "backend_sbom_sha256": hashlib.sha256(backend_sbom).hexdigest(),
+        "frontend_sbom_sha256": hashlib.sha256(frontend_sbom).hexdigest(),
+        "backend_sbom_base64": base64.b64encode(backend_sbom).decode(),
+        "frontend_sbom_base64": base64.b64encode(frontend_sbom).decode(),
         "image_digest": DIGEST,
     }
 
@@ -144,15 +191,90 @@ def test_deploy_authority_accepts_actual_shaped_cosign_v3_predicates(tmp_path: P
     assert verify(module, write_evidence(tmp_path, valid_attestations())) == DIGEST
 
 
+def test_publish_authority_binds_signed_checksums_to_exact_sbom_files(tmp_path: Path) -> None:
+    module = load_module()
+    attestations = valid_attestations()
+    backend_sbom_path = tmp_path / "backend-sbom.cdx.json"
+    frontend_sbom_path = tmp_path / "frontend-sbom.cdx.json"
+    backend_sbom_path.write_text(
+        '{"bomFormat":"CycloneDX","metadata":{"component":{"name":"golden-rose"}}}',
+        encoding="utf-8",
+    )
+    frontend_sbom_path.write_text(
+        '{"bomFormat":"CycloneDX","metadata":{"component":{"name":"web"}}}',
+        encoding="utf-8",
+    )
+    statement = json.loads(base64.b64decode(attestations["application"]["payload"]))
+    statement["predicate"]["backend_sbom_sha256"] = hashlib.sha256(
+        backend_sbom_path.read_bytes()
+    ).hexdigest()
+    statement["predicate"]["frontend_sbom_sha256"] = hashlib.sha256(
+        frontend_sbom_path.read_bytes()
+    ).hexdigest()
+    statement["predicate"]["backend_sbom_base64"] = base64.b64encode(
+        backend_sbom_path.read_bytes()
+    ).decode()
+    statement["predicate"]["frontend_sbom_base64"] = base64.b64encode(
+        frontend_sbom_path.read_bytes()
+    ).decode()
+    attestations["application"]["payload"] = base64.b64encode(
+        json.dumps(statement).encode()
+    ).decode()
+    files = write_evidence(tmp_path, attestations)
+
+    assert (
+        module.verify_deploy_image_authority(
+            image=IMAGE,
+            signature_path=files["signature"],
+            provenance_path=files["provenance"],
+            image_sbom_path=files["image"],
+            application_sbom_path=files["application"],
+            expected_identity=IDENTITY,
+            expected_source_commit=SOURCE_COMMIT,
+            backend_sbom_path=backend_sbom_path,
+            frontend_sbom_path=frontend_sbom_path,
+        )
+        == DIGEST
+    )
+
+    backend_sbom_path.write_text('{"bomFormat":"CycloneDX","changed":true}', encoding="utf-8")
+    with pytest.raises(module.DeployImageAuthorityError, match="backend checksum"):
+        module.verify_deploy_image_authority(
+            image=IMAGE,
+            signature_path=files["signature"],
+            provenance_path=files["provenance"],
+            image_sbom_path=files["image"],
+            application_sbom_path=files["application"],
+            expected_identity=IDENTITY,
+            expected_source_commit=SOURCE_COMMIT,
+            backend_sbom_path=backend_sbom_path,
+            frontend_sbom_path=frontend_sbom_path,
+        )
+
+
 @pytest.mark.parametrize(
     ("attestation_name", "mutate", "error"),
     [
         (
             "provenance",
-            lambda predicate: predicate["buildx.build.provenance"]["invocation"]["parameters"][
-                "root"
-            ]["request"]["args"].update({"vcs:revision": "e" * 40}),
+            lambda predicate: predicate["buildDefinition"]["resolvedDependencies"][0][
+                "digest"
+            ].update({"gitCommit": "e" * 40}),
             "source revision",
+        ),
+        (
+            "provenance",
+            lambda predicate: predicate["buildDefinition"]["externalParameters"].update(
+                {"platform": "linux/arm64"}
+            ),
+            "platform",
+        ),
+        (
+            "provenance",
+            lambda predicate: predicate["runDetails"]["builder"].update(
+                {"id": "https://example.invalid/builder"}
+            ),
+            "builder",
         ),
         (
             "image",
@@ -161,13 +283,47 @@ def test_deploy_authority_accepts_actual_shaped_cosign_v3_predicates(tmp_path: P
         ),
         (
             "image",
-            lambda predicate: predicate.update({"documentDescribes": []}),
+            lambda predicate: predicate.update({"relationships": []}),
             "component inventory subject",
+        ),
+        (
+            "image",
+            lambda predicate: predicate.update({"documentDescribes": "SPDXRef-Image-staff-tracer"}),
+            "pinned SPDX 2.3 schema",
+        ),
+        (
+            "image",
+            lambda predicate: predicate["packages"][0]["externalRefs"][0].update(
+                {"referenceLocator": "e" * 64 + "?arch=amd64"}
+            ),
+            "amd64 OCI purl",
+        ),
+        (
+            "image",
+            lambda predicate: predicate["creationInfo"].update({"created": "9999-99-99T99:99:99Z"}),
+            "creationInfo",
+        ),
+        (
+            "image",
+            lambda predicate: predicate["packages"][0].update({"licenseConcluded": ""}),
+            "schema-complete component inventory",
         ),
         (
             "application",
             lambda predicate: predicate.update({"image_digest": "sha256:" + "f" * 64}),
             "image digest",
+        ),
+        (
+            "application",
+            lambda predicate: predicate.pop("backend_sbom_base64"),
+            "embedded backend SBOM is missing",
+        ),
+        (
+            "application",
+            lambda predicate: predicate.update(
+                {"backend_sbom_base64": base64.b64encode(b'{"bomFormat":"CycloneDX"}').decode()}
+            ),
+            "embedded backend",
         ),
         (
             "application",

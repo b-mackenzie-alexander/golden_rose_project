@@ -316,7 +316,10 @@ def _assert_image_sbom_semantics(predicate: Any, *, repository: str, digest: str
             continue
         decoded = unquote(reference["referenceLocator"])
         purl_base, separator, purl_query = decoded.partition("?")
-        purl_digest = purl_base.removeprefix(f"pkg:oci/{repository}@sha256:")
+        expected_purl_prefix = f"pkg:oci/{repository}@sha256:"
+        if not purl_base.startswith(expected_purl_prefix):
+            continue
+        purl_digest = purl_base.removeprefix(expected_purl_prefix)
         query = parse_qs(purl_query)
         if (
             separator

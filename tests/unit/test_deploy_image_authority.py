@@ -292,6 +292,13 @@ def test_publish_authority_binds_signed_checksums_to_exact_sbom_files(tmp_path: 
             "pinned SPDX 2.3 schema",
         ),
         (
+            "image",
+            lambda predicate: predicate["packages"][0]["externalRefs"][0].update(
+                {"referenceLocator": "e" * 64 + "?arch=amd64"}
+            ),
+            "amd64 OCI purl",
+        ),
+        (
             "application",
             lambda predicate: predicate.update({"image_digest": "sha256:" + "f" * 64}),
             "image digest",

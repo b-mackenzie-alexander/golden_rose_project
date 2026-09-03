@@ -537,6 +537,12 @@ def test_pr_mode_accepts_actual_syft_spdx_inventory(tmp_path: Path) -> None:
             ),
             "amd64 OCI purl",
         ),
+        (
+            lambda payload: payload["packages"][0]["externalRefs"][0].update(
+                {"referenceLocator": "e" * 64 + "?arch=amd64&tag=workflow-pr"}
+            ),
+            "amd64 OCI purl",
+        ),
         (lambda payload: payload.update({"name": "other-image"}), "document name"),
         (
             lambda payload: payload.update({"documentDescribes": "SPDXRef-Image-staff-tracer"}),

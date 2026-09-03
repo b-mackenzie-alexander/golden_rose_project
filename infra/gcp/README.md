@@ -6,11 +6,11 @@ PR #29 merged semantic static-policy validation, deterministic `uv`, Cloud Run/p
 
 Terraform is executed from `infra/gcp` for the disposable workload root and from `infra/gcp/bootstrap` for the lifecycle-independent state bootstrap root. The workload root declares `module "develop"` in `develop.tf` and loads the intended resource scaffold from `infra/gcp/develop/`; nested files are not relied on through recursive file presence alone. The bootstrap root is separate from the disposable workload root and exists only to define the durable remote-state bucket plus its one-time operator ceremony. Local review must prove `terraform -chdir=infra/gcp graph` includes the expected `module.develop.google_*` resource nodes and must keep bootstrap resources out of the disposable workload graph.
 
-## Boundary
+## Original scaffold boundary and current authority
 
 - fictional synthetic-only data boundary
-- local state only for this slice
-- remote state must be approved before shared apply
+- the original validate-without-apply slice used local state only and granted no remote-state authority
+- separately approved E2/E3 operations later established and verified distinct remote bootstrap/workload state lineages; those completed operations do not authorize another backend/state action
 - `infra/gcp/backend.tf` is partial backend configuration only; operator-held values must be supplied out of band and are never committed in source.
 - Bootstrap state uses operator-supplied project, location, bucket, and principal values with no committed defaults.
 - Accepted remediation requires WIF trust to map direct-workflow `workflow_ref`: exact `build-image.yml@refs/heads/develop` may impersonate only the publisher, exact `deploy-develop.yml@refs/heads/develop` only the deploy executor, and the provisioner has no GitHub WIF binding until a separately accepted apply workflow exists. Pull-request subjects, wildcard claims, shared repository principal sets, unnecessary Token Creator bindings, and service-account keys are forbidden.

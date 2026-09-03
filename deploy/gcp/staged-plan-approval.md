@@ -1,6 +1,6 @@
 # Staged plan approval procedure
 
-This document defines the value-safe approval procedure for every future `foundation`, `migration`, and `service` Terraform transition after the post-PR33 remediation merges. It does not authorize any current cloud action from the unmerged remediation branch.
+This document defines the value-safe approval procedure for each separately approved `foundation`, `migration`, and `service` Terraform transition. The post-PR33 remediations and Gate F foundation transition are complete; this procedure grants no new cloud action and remains controlling guidance for later saved-plan transitions.
 
 ## Purpose
 

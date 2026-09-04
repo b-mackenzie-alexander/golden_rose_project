@@ -1,4 +1,6 @@
-# Gate P Cosign signature-subject remediation review handoff
+# Gate P Cosign v3 signature-subject review handoff
+
+> **Historical closeout:** This review returned CLEAN, PR #74 merged at `develop@92b104e`, and approved run `33882394981` subsequently completed Gate P end to end. The review-time boundary below is preserved as historical evidence and grants no retry or downstream authority.
 
 ## Objective
 

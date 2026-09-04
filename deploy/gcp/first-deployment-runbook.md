@@ -2,7 +2,7 @@
 
 This runbook defines the human/operator ceremony for the first private fictional-synthetic `develop` deployment after the separate cloud-read, Terraform-plan, and foundation-apply gates are complete. It is intentionally value-safe: project IDs, domains, tester identities, secret payloads, passwords, tokens, and exact private endpoints stay in operator-held records rather than tracked source.
 
-Current source status: foundation/state work and PR #74 are merged through protected `develop@92b104e`. Approved run `33882394981` completed the full Gate P immutable publication, signing, attestation, transparency, final semantic-admission, and approved immutable-reference chain. Gate P is complete and its one-use approval is consumed. This runbook remains future guidance for separately approved Gate S, migration, service, tester, and qualification ceremonies; it grants none of those actions by itself.
+Current source status: foundation/state work and PR #74 are merged through protected `develop@92b104e`. Approved run `33882394981` completed the full Gate P immutable publication, signing, attestation, transparency, final semantic-admission, and approved immutable-reference chain. Gate P is complete and its one-use approval is consumed. Gate S has one completed bounded action: `synthetic-staff-id` has exactly one enabled version with metadata-only readback and private custody. This runbook remains future guidance for deferred runtime/migration database-URL versions and the separately approved migration, service, tester, and qualification ceremonies; it grants none of those actions by itself.
 
 ## Scope
 
@@ -46,28 +46,29 @@ Record these items outside tracked source before any payload creation:
 
 Do not place that private record in Git, Terraform variables, CI variables, or repo review handoffs.
 
-## Minimum secret classes
+## Minimum Secret Manager payload classes
 
-The exact payload set must stay minimal and reviewed. For the current application/runtime contract, the operator-held deployment record must cover at least:
+The executable Secret Manager references are limited to:
 
-- runtime login connection material for `GOLDEN_ROSE_DATABASE_URL`
-- migration login connection material for the later approved migration execution path together with `GOLDEN_ROSE_MIGRATION_ASSUMED_ROLE=golden_rose_schema_owner`
-- synthetic staff actor UUID for `GOLDEN_ROSE_SYNTHETIC_STAFF_ID`
-- develop deployment-target marker for `GOLDEN_ROSE_DEPLOYMENT_TARGET`
-- develop public-environment label for `GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL`
-- deployed immutable digest marker for `GOLDEN_ROSE_DEPLOYED_IMAGE_DIGEST`
+- runtime login connection material for `GOLDEN_ROSE_DATABASE_URL` in `runtime-database-url`
+- migration login connection material for the later approved migration execution path in `migration-database-url`, together with the non-secret `GOLDEN_ROSE_MIGRATION_ASSUMED_ROLE=golden_rose_schema_owner` configuration
+- synthetic staff actor UUID for `GOLDEN_ROSE_SYNTHETIC_STAFF_ID` in `synthetic-staff-id`
 
-If later deployment wiring uses a different secret-to-environment mapping, update this runbook before deployment rather than improvising at the console.
+`GOLDEN_ROSE_DEPLOYMENT_TARGET`, `GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL`, and `GOLDEN_ROSE_DEPLOYED_IMAGE_DIGEST` are reviewed non-secret Terraform configuration, not Secret Manager payload classes. The metadata-only `deployment-posture` container has no current runtime or migration secret reference and receives no version merely to satisfy historical wording.
+
+If later deployment wiring uses a different secret-to-environment mapping, update and review the source contract before deployment rather than improvising at the console.
 
 ## Injection ceremony
 
-1. Confirm the reviewed secret metadata already exists and matches the intended secret classes.
-2. Generate the database password and any other payload-bearing values without pasting them into chat, shell history, Terraform files, or PR comments.
-3. Create new secret versions out of band for the approved payload-bearing secrets only.
-4. Verify version creation through value-safe identifiers only; do not print payloads back to confirm them.
-5. Update the private custody record with custodian, rotation, recovery, and revocation ownership plus the created version references.
-6. Inject only reviewed secret references into the runtime/migration deployment surface at the later approved deployment gate; never convert this into inline environment literals in source-controlled IaC.
-7. After rollout, validate the application through the bounded qualification tooling without emitting the injected values.
+1. Confirm the reviewed secret metadata already exists and matches the three executable Secret Manager references.
+2. Generate the synthetic staff UUID without display and create/read back only its metadata-bound version under the separately approved early Gate S action.
+3. Do not create runtime or migration database-URL versions until migration-stage Cloud SQL/database creation and the separately approved login-role ceremony provide real connection material; placeholders and guessed URLs are prohibited.
+4. Generate database passwords and other payload-bearing values without pasting them into chat, shell history, Terraform files, or PR comments.
+5. Create new database-URL Secret versions out of band for the approved payload-bearing secrets only, under the fresh post-database approval.
+6. Verify every version creation through value-safe identifiers only; do not print payloads back to confirm them.
+7. Update the private custody record with custodian, rotation, recovery, and revocation ownership plus the created version references.
+8. Inject only reviewed secret references into the runtime/migration deployment surface at the later approved deployment gate; never convert this into inline environment literals in source-controlled IaC.
+9. After rollout, validate the application through the bounded qualification tooling without emitting the injected values.
 
 ## Database password procedure
 

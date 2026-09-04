@@ -88,7 +88,7 @@
         "max_count": 6
       },
       "google_service_account_iam_member": {
-        "max_count": 3
+        "max_count": 4
       },
       "google_service_networking_connection": {
         "max_count": 1

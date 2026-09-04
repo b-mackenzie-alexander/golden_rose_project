@@ -55,6 +55,7 @@ APPROVED_BUDGET_NAME = "Develop private synthetic workload monthly cost guardrai
 APPROVED_BUDGET_THRESHOLDS = [0.5, 0.75, 1.0]
 BASIC_ROLES = {"roles/owner", "roles/editor", "roles/viewer"}
 NAMED_TESTER_PRINCIPAL_PATTERN = re.compile(r"^user:[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$")
+PROVISIONER_OPERATOR_PRINCIPAL_PATTERN = re.compile(r"^user:[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 APPROVED_LOGGING_EXCLUSION_NAME = "develop-exclude-uuid-bearing-staff-paths"
 APPROVED_LOGGING_EXCLUSION_FILTER_FRAGMENT = "/api/staff/v1/employers/[0-9a-fA-F-]{36}"
@@ -68,6 +69,11 @@ DEPLOY_DEVELOP_WORKFLOW_REF = (
     f"{GITHUB_REPOSITORY}/.github/workflows/deploy-develop.yml@{GITHUB_PROTECTED_REF}"
 )
 WIF_ROLE = "roles/iam.workloadIdentityUser"
+PROVISIONER_TOKEN_CREATOR_ROLE = "roles/iam.serviceAccountTokenCreator"
+FORBIDDEN_CONTROL_PLANE_PROJECT_IMPERSONATION_ROLES = {
+    WIF_ROLE,
+    PROVISIONER_TOKEN_CREATOR_ROLE,
+}
 
 
 class VerificationError(ValueError):
@@ -123,6 +129,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--state-authority-principal", required=True)
     parser.add_argument("--recovery-authority-principal", required=True)
     parser.add_argument("--bootstrap-operator-principal", required=True)
+    parser.add_argument("--provisioner-operator-principal", required=True)
     parser.add_argument(
         "--bootstrap-operator-status",
         choices=["bootstrap-active", "bootstrap-retired"],
@@ -445,6 +452,9 @@ def collect_foundation_snapshot(
         command_runner(("service-account-keys",)), label="service account keys"
     )
     project_iam = _mapping(command_runner(("project-iam",)), label="project iam")
+    control_plane_project_iam = _mapping(
+        command_runner(("control-plane-project-iam",)), label="control-plane project iam"
+    )
     service_account_iam = _mapping(
         command_runner(("service-account-iam",)), label="service account iam"
     )
@@ -484,6 +494,7 @@ def collect_foundation_snapshot(
         "cloud_sql": cloud_sql,
         "service_account_keys": service_account_keys,
         "project_iam": project_iam,
+        "control_plane_project_iam": control_plane_project_iam,
         "service_account_iam": service_account_iam,
         "artifact_registry_iam": artifact_registry_iam,
         "state_bucket": state_bucket,
@@ -644,8 +655,11 @@ def _expected_control_plane_service_account_iam(
     contract: dict[str, Any],
 ) -> dict[str, dict[str, str]]:
     control_plane_project_id = str(contract["control_plane_project_id"])
+    provisioner_operator_principal = str(contract["provisioner_operator_principal"])
     return {
-        f"golden-rose-provisioner@{control_plane_project_id}.iam.gserviceaccount.com": {},
+        f"golden-rose-provisioner@{control_plane_project_id}.iam.gserviceaccount.com": {
+            PROVISIONER_TOKEN_CREATOR_ROLE: provisioner_operator_principal
+        },
         f"golden-rose-image-publisher@{control_plane_project_id}.iam.gserviceaccount.com": {
             WIF_ROLE: f"/attribute.workflow_ref/{BUILD_IMAGE_WORKFLOW_REF}"
         },
@@ -909,6 +923,19 @@ def evaluate_foundation_snapshot(
                     f"got {sorted(actual_members)}"
                 )
 
+    if "control_plane_project_iam" not in snapshot:
+        violations.append("control-plane project IAM inventory missing")
+        control_plane_project_iam: dict[str, Any] = {}
+    else:
+        control_plane_project_iam = _mapping(
+            snapshot["control_plane_project_iam"], label="control-plane project iam"
+        )
+    for forbidden_role in sorted(FORBIDDEN_CONTROL_PLANE_PROJECT_IMPERSONATION_ROLES):
+        if _as_set(control_plane_project_iam.get(forbidden_role)):
+            violations.append(
+                f"control-plane project-wide impersonation authority detected: {forbidden_role}"
+            )
+
     service_account_iam = _mapping(
         snapshot.get("service_account_iam", {}), label="service account iam"
     )
@@ -919,19 +946,37 @@ def evaluate_foundation_snapshot(
         if actual:
             violations.append(f"service-account IAM drifted for {email}")
     expected_control_plane_iam = _expected_control_plane_service_account_iam(contract)
+    provisioner_email = (
+        f"golden-rose-provisioner@{contract['control_plane_project_id']}.iam.gserviceaccount.com"
+    )
     for email, expected_roles in expected_control_plane_iam.items():
         actual = _mapping(service_account_iam.get(email, {}), label=f"service account iam {email}")
         if set(actual) != set(expected_roles):
-            violations.append(f"WIF service-account IAM drifted for {email}")
+            label = "provisioner" if email == provisioner_email else "WIF"
+            violations.append(f"{label} service-account IAM drifted for {email}")
             continue
-        for role, expected_suffix in expected_roles.items():
+        for role, expected_member in expected_roles.items():
             members = _as_set(actual.get(role))
-            if len(members) != 1:
+            if email == provisioner_email:
+                if members != {expected_member}:
+                    violations.append(
+                        f"provisioner operator binding drifted for {email} role {role}"
+                    )
+                    continue
+                if (
+                    role != PROVISIONER_TOKEN_CREATOR_ROLE
+                    or not PROVISIONER_OPERATOR_PRINCIPAL_PATTERN.fullmatch(expected_member)
+                ):
+                    violations.append(
+                        f"provisioner operator binding drifted for {email} role {role}"
+                    )
+                continue
+            if len(members) != 1 or not expected_member.startswith("/attribute.workflow_ref/"):
                 violations.append(f"WIF principal binding drifted for {email} role {role}")
                 continue
             member = next(iter(members))
             if not member.startswith("principalSet://iam.googleapis.com/") or not member.endswith(
-                expected_suffix
+                expected_member
             ):
                 violations.append(f"WIF principal binding drifted for {email} role {role}")
 
@@ -1505,6 +1550,18 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                 context="project iam",
             )
             return _bindings_to_role_map(policy)
+        if key == ("control-plane-project-iam",):
+            policy = _run_json_command(
+                [
+                    "gcloud",
+                    "projects",
+                    "get-iam-policy",
+                    control_plane_project_id,
+                    "--format=json",
+                ],
+                context="control-plane project iam",
+            )
+            return _bindings_to_role_map(policy)
         if key == ("service-account-iam",):
             service_account_policies: dict[str, Any] = {}
             account_projects = {
@@ -1829,6 +1886,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "state_authority_principal": args.state_authority_principal,
         "recovery_authority_principal": args.recovery_authority_principal,
         "bootstrap_operator_principal": args.bootstrap_operator_principal,
+        "provisioner_operator_principal": args.provisioner_operator_principal,
         "bootstrap_operator_status": args.bootstrap_operator_status,
         "observability_viewer_principal": args.observability_viewer_principal,
         "recovery_policy_review_status": args.recovery_policy_review_status,

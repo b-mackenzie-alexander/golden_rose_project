@@ -32,6 +32,7 @@ def expected_contract() -> dict[str, Any]:
         "state_authority_principal": "serviceAccount:golden-rose-provisioner@state-project.iam.gserviceaccount.com",
         "recovery_authority_principal": "group:recovery@example.com",
         "bootstrap_operator_principal": "user:bootstrap@example.com",
+        "provisioner_operator_principal": "user:provisioner.operator@example.com",
         "bootstrap_operator_status": "bootstrap-retired",
         "observability_viewer_principal": "group:observability@example.com",
         "recovery_policy_review_status": "gate-2-evidence-required",
@@ -53,6 +54,8 @@ def verifier_common_args(*, mode: str | None = None) -> list[str]:
         "group:recovery@example.com",
         "--bootstrap-operator-principal",
         "user:bootstrap@example.com",
+        "--provisioner-operator-principal",
+        "user:provisioner.operator@example.com",
         "--bootstrap-operator-status",
         "bootstrap-retired",
         "--observability-viewer-principal",
@@ -200,10 +203,13 @@ def valid_snapshot() -> dict[str, Any]:
             "roles/logging.viewer": [contract["observability_viewer_principal"]],
             "roles/monitoring.viewer": [contract["observability_viewer_principal"]],
         },
+        "control_plane_project_iam": {},
         "service_account_iam": {
             "staff-tracer-runtime@example-project.iam.gserviceaccount.com": {},
             "staff-tracer-migration@example-project.iam.gserviceaccount.com": {},
-            "golden-rose-provisioner@state-project.iam.gserviceaccount.com": {},
+            "golden-rose-provisioner@state-project.iam.gserviceaccount.com": {
+                "roles/iam.serviceAccountTokenCreator": [contract["provisioner_operator_principal"]]
+            },
             "golden-rose-image-publisher@state-project.iam.gserviceaccount.com": {
                 "roles/iam.workloadIdentityUser": [
                     "principalSet://iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/golden-rose-github/attribute.workflow_ref/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop"
@@ -484,6 +490,7 @@ def test_foundation_mode_main_allows_absent_cloud_sql_during_collection() -> Non
                 ("migration-job-iam",): {},
                 ("service-account-keys",): valid_snapshot()["service_account_keys"],
                 ("project-iam",): valid_snapshot()["project_iam"],
+                ("control-plane-project-iam",): valid_snapshot()["control_plane_project_iam"],
                 ("service-account-iam",): valid_snapshot()["service_account_iam"],
                 ("artifact-registry-iam",): valid_snapshot()["artifact_registry_iam"],
                 ("state-bucket",): valid_snapshot()["state_bucket"],
@@ -533,6 +540,7 @@ def test_foundation_collection_allows_gcloud_absent_cloud_sql_instance_message()
         ("migration-job-iam",): {},
         ("service-account-keys",): valid_snapshot()["service_account_keys"],
         ("project-iam",): valid_snapshot()["project_iam"],
+        ("control-plane-project-iam",): valid_snapshot()["control_plane_project_iam"],
         ("service-account-iam",): valid_snapshot()["service_account_iam"],
         ("artifact-registry-iam",): valid_snapshot()["artifact_registry_iam"],
         ("state-bucket",): valid_snapshot()["state_bucket"],
@@ -806,6 +814,7 @@ def test_collect_foundation_snapshot_accepts_reviewed_fixture() -> None:
         ("cloud-sql",): valid_snapshot()["cloud_sql"],
         ("service-account-keys",): valid_snapshot()["service_account_keys"],
         ("project-iam",): valid_snapshot()["project_iam"],
+        ("control-plane-project-iam",): valid_snapshot()["control_plane_project_iam"],
         ("service-account-iam",): valid_snapshot()["service_account_iam"],
         ("artifact-registry-iam",): valid_snapshot()["artifact_registry_iam"],
         ("state-bucket",): valid_snapshot()["state_bucket"],
@@ -868,6 +877,43 @@ def test_live_runner_skips_key_and_iam_queries_for_absent_future_identity(
     assert keys[future_identity] == []
     assert iam[future_identity] == {}
     assert all(future_identity not in " ".join(command) for command in calls[2:])
+
+
+def test_live_runner_reads_control_plane_project_iam_from_control_plane_project(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    mutable_module = cast(Any, module)
+    calls: list[tuple[list[str], str]] = []
+
+    def fake_run_json_command(command: list[str], *, context: str) -> Any:
+        calls.append((command, context))
+        return {
+            "bindings": [
+                {
+                    "role": "roles/iam.serviceAccountTokenCreator",
+                    "members": ["user:unexpected@example.com"],
+                }
+            ]
+        }
+
+    monkeypatch.setattr(mutable_module, "_run_json_command", fake_run_json_command)
+
+    result = module._build_live_command_runner(expected_contract())(("control-plane-project-iam",))
+
+    assert result == {"roles/iam.serviceAccountTokenCreator": ["user:unexpected@example.com"]}
+    assert calls == [
+        (
+            [
+                "gcloud",
+                "projects",
+                "get-iam-policy",
+                "state-project",
+                "--format=json",
+            ],
+            "control-plane project iam",
+        )
+    ]
 
 
 def test_list_logging_exclusions_uses_token_header_and_pagination(
@@ -1035,6 +1081,7 @@ def test_collect_foundation_snapshot_rejects_duplicate_enabled_apis() -> None:
         ("cloud-sql",): {},
         ("service-account-keys",): {},
         ("project-iam",): {},
+        ("control-plane-project-iam",): {},
         ("service-account-iam",): {},
         ("artifact-registry-iam",): {},
         ("state-bucket",): {},
@@ -1055,6 +1102,115 @@ def test_evaluate_foundation_snapshot_accepts_expected_snapshot() -> None:
     module = load_module()
 
     assert module.evaluate_foundation_snapshot(valid_snapshot(), expected_contract()) == []
+
+
+def test_evaluate_foundation_snapshot_accepts_exact_provisioner_operator_token_creator() -> None:
+    module = load_module()
+    contract = expected_contract() | {
+        "provisioner_operator_principal": "user:provisioner.operator@example.com"
+    }
+    snapshot = valid_snapshot()
+    snapshot["service_account_iam"][
+        "golden-rose-provisioner@state-project.iam.gserviceaccount.com"
+    ] = {"roles/iam.serviceAccountTokenCreator": [contract["provisioner_operator_principal"]]}
+
+    assert module.evaluate_foundation_snapshot(snapshot, contract) == []
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "missing",
+        "wrong_user",
+        "extra_role",
+        "extra_member",
+        "wif_substitution",
+    ],
+)
+def test_evaluate_foundation_snapshot_rejects_provisioner_operator_authority_drift(
+    mutation: str,
+) -> None:
+    module = load_module()
+    contract = expected_contract()
+    snapshot = valid_snapshot()
+    email = "golden-rose-provisioner@state-project.iam.gserviceaccount.com"
+    expected_principal = contract["provisioner_operator_principal"]
+    authority = {"roles/iam.serviceAccountTokenCreator": [expected_principal]}
+    if mutation == "missing":
+        authority = {}
+    elif mutation == "wrong_user":
+        authority["roles/iam.serviceAccountTokenCreator"] = ["user:other@example.com"]
+    elif mutation == "extra_role":
+        authority["roles/iam.serviceAccountUser"] = [expected_principal]
+    elif mutation == "extra_member":
+        authority["roles/iam.serviceAccountTokenCreator"].append("user:other@example.com")
+    else:
+        authority["roles/iam.serviceAccountTokenCreator"] = [
+            "principalSet://iam.googleapis.com/projects/123/locations/global/"
+            "workloadIdentityPools/golden-rose-github/attribute.workflow_ref/example"
+        ]
+    snapshot["service_account_iam"][email] = authority
+
+    violations = module.evaluate_foundation_snapshot(snapshot, contract)
+
+    assert any("provisioner" in violation for violation in violations)
+
+
+@pytest.mark.parametrize(
+    "principal",
+    [
+        "group:operators@example.com",
+        "serviceAccount:operator@example.iam.gserviceaccount.com",
+        "user:not-an-email",
+        "user:name@host",
+    ],
+)
+def test_evaluate_foundation_snapshot_rejects_non_user_provisioner_operator_contract(
+    principal: str,
+) -> None:
+    module = load_module()
+    contract = expected_contract() | {"provisioner_operator_principal": principal}
+    snapshot = valid_snapshot()
+    snapshot["service_account_iam"][
+        "golden-rose-provisioner@state-project.iam.gserviceaccount.com"
+    ] = {"roles/iam.serviceAccountTokenCreator": [principal]}
+
+    violations = module.evaluate_foundation_snapshot(snapshot, contract)
+
+    assert any("provisioner operator binding drifted" in violation for violation in violations)
+
+
+@pytest.mark.parametrize(
+    "role",
+    [
+        "roles/iam.serviceAccountTokenCreator",
+        "roles/iam.workloadIdentityUser",
+    ],
+)
+def test_evaluate_foundation_snapshot_rejects_control_plane_project_wide_impersonation_role(
+    role: str,
+) -> None:
+    module = load_module()
+    contract = expected_contract()
+    snapshot = valid_snapshot()
+    snapshot["control_plane_project_iam"][role] = [contract["provisioner_operator_principal"]]
+
+    violations = module.evaluate_foundation_snapshot(snapshot, contract)
+
+    assert any(
+        f"control-plane project-wide impersonation authority detected: {role}" in violation
+        for violation in violations
+    )
+
+
+def test_evaluate_foundation_snapshot_rejects_missing_control_plane_project_iam() -> None:
+    module = load_module()
+    snapshot = valid_snapshot()
+    snapshot.pop("control_plane_project_iam")
+
+    violations = module.evaluate_foundation_snapshot(snapshot, expected_contract())
+
+    assert "control-plane project IAM inventory missing" in violations
 
 
 def test_evaluate_foundation_snapshot_allows_only_two_logging_to_logging_sinks() -> None:

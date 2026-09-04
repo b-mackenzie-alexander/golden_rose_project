@@ -3260,6 +3260,73 @@ def _collect_bootstrap_wif_violations(root: Path) -> list[str]:
     violations: list[str] = []
     wif_path = root / "infra" / "gcp" / "bootstrap" / "wif.tf"
     iam_path = root / "infra" / "gcp" / "bootstrap" / "iam.tf"
+    variables_path = root / "infra" / "gcp" / "bootstrap" / "variables.tf"
+
+    if variables_path.exists():
+        variables_text = variables_path.read_text(encoding="utf-8")
+        try:
+            parsed_variables = hcl2.loads(variables_text)
+        except Exception as exc:
+            violations.append(
+                f"{variables_path.relative_to(root)} contains invalid HCL variables configuration: {exc}"
+            )
+            parsed_variables = {}
+        operator_variables: list[object] = []
+        for variable in (
+            parsed_variables.get("variable", []) if isinstance(parsed_variables, dict) else []
+        ):
+            if not isinstance(variable, dict):
+                continue
+            operator = variable.get('"provisioner_operator_principal"')
+            if operator is not None:
+                operator_variables.append(operator)
+        if len(operator_variables) != 1 or not isinstance(operator_variables[0], dict):
+            violations.append(
+                f"{variables_path.relative_to(root)} must declare exactly one provisioner operator variable"
+            )
+        else:
+            operator_variable = operator_variables[0]
+            expected_variable_keys = {
+                "__is_block__",
+                "description",
+                "type",
+                "nullable",
+                "validation",
+            }
+            if set(operator_variable) != expected_variable_keys:
+                violations.append(
+                    f"{variables_path.relative_to(root)} provisioner operator variable fields drifted"
+                )
+            if (
+                operator_variable.get("type") != "string"
+                or operator_variable.get("nullable") is not False
+            ):
+                violations.append(
+                    f"{variables_path.relative_to(root)} provisioner operator variable type/nullability drifted"
+                )
+            validations = operator_variable.get("validation")
+            expected_condition = (
+                '${startswith(var.provisioner_operator_principal, "user:") && '
+                'can(regex("^user:[^@\\\\s]+@[^@\\\\s]+\\\\.[^@\\\\s]+$", '
+                "var.provisioner_operator_principal))}"
+            )
+            if (
+                not isinstance(validations, list)
+                or len(validations) != 1
+                or not isinstance(validations[0], dict)
+            ):
+                violations.append(
+                    f"{variables_path.relative_to(root)} provisioner operator validation drifted"
+                )
+            else:
+                validation = validations[0]
+                if (
+                    set(validation) != {"__is_block__", "condition", "error_message"}
+                    or validation.get("condition") != expected_condition
+                ):
+                    violations.append(
+                        f"{variables_path.relative_to(root)} provisioner operator validation drifted"
+                    )
 
     if wif_path.exists():
         wif_text = wif_path.read_text(encoding="utf-8")
@@ -3360,7 +3427,6 @@ def _collect_bootstrap_wif_violations(root: Path) -> list[str]:
             'resource "google_service_account_iam_member" "provisioner_token_creator"',
             'resource "google_service_account_iam_member" "image_publisher_token_creator"',
             'resource "google_service_account_iam_member" "deployer_token_creator"',
-            "roles/iam.serviceAccountTokenCreator",
             "local.github_principal_set",
         ]
         for fragment in forbidden_fragments:
@@ -3368,6 +3434,89 @@ def _collect_bootstrap_wif_violations(root: Path) -> list[str]:
                 violations.append(
                     f"{iam_path.relative_to(root)} contains forbidden bootstrap WIF fragment {fragment!r}"
                 )
+
+        try:
+            parsed_iam = hcl2.loads(iam_text)
+        except Exception as exc:
+            violations.append(
+                f"{iam_path.relative_to(root)} contains invalid HCL bootstrap IAM configuration: {exc}"
+            )
+            parsed_iam = {}
+        operator_resources: list[object] = []
+        token_creator_resources: list[tuple[str, object]] = []
+        for resource in parsed_iam.get("resource", []) if isinstance(parsed_iam, dict) else []:
+            if not isinstance(resource, dict):
+                continue
+            typed_resources = resource.get('"google_service_account_iam_member"')
+            if not isinstance(typed_resources, dict):
+                continue
+            for resource_name, resource_body in typed_resources.items():
+                if isinstance(resource_body, dict) and resource_body.get("role") == (
+                    '"roles/iam.serviceAccountTokenCreator"'
+                ):
+                    token_creator_resources.append((str(resource_name), resource_body))
+                if resource_name == '"provisioner_operator_token_creator"':
+                    operator_resources.append(resource_body)
+        if len(operator_resources) != 1 or not isinstance(operator_resources[0], dict):
+            violations.append(
+                f"{iam_path.relative_to(root)} must declare exactly one provisioner operator IAM member"
+            )
+        else:
+            operator_resource = operator_resources[0]
+            expected_operator_resource = {
+                "__is_block__": True,
+                "service_account_id": "${google_service_account.provisioner.name}",
+                "role": '"roles/iam.serviceAccountTokenCreator"',
+                "member": "${var.provisioner_operator_principal}",
+            }
+            if operator_resource != expected_operator_resource:
+                violations.append(
+                    f"{iam_path.relative_to(root)} provisioner operator authority drifted from exact resource-scoped contract"
+                )
+        if len(token_creator_resources) != 1 or token_creator_resources[0][0] != (
+            '"provisioner_operator_token_creator"'
+        ):
+            violations.append(
+                f"{iam_path.relative_to(root)} must contain exactly one resource-scoped provisioner operator Token Creator role"
+            )
+
+        expected_bootstrap_iam_members = {
+            '"provisioner_operator_token_creator"': {
+                "__is_block__": True,
+                "service_account_id": "${google_service_account.provisioner.name}",
+                "role": '"roles/iam.serviceAccountTokenCreator"',
+                "member": "${var.provisioner_operator_principal}",
+            },
+            '"image_publisher_wif"': {
+                "__is_block__": True,
+                "service_account_id": "${google_service_account.image_publisher.name}",
+                "role": '"roles/iam.workloadIdentityUser"',
+                "member": "${local.build_image_workflow_principal_set}",
+            },
+            '"artifact_verifier_wif"': {
+                "__is_block__": True,
+                "service_account_id": "${google_service_account.artifact_verifier.name}",
+                "role": '"roles/iam.workloadIdentityUser"',
+                "member": "${local.deploy_develop_workflow_principal_set}",
+            },
+            '"deployer_wif"': {
+                "__is_block__": True,
+                "service_account_id": "${google_service_account.deployer.name}",
+                "role": '"roles/iam.workloadIdentityUser"',
+                "member": "${local.deploy_develop_workflow_principal_set}",
+            },
+        }
+        actual_bootstrap_iam_members: dict[str, object] = {}
+        for resource in parsed_iam.get("resource", []) if isinstance(parsed_iam, dict) else []:
+            if not isinstance(resource, dict):
+                continue
+            typed_resources = resource.get('"google_service_account_iam_member"')
+            if isinstance(typed_resources, dict):
+                actual_bootstrap_iam_members.update(typed_resources)
+        if actual_bootstrap_iam_members != expected_bootstrap_iam_members:
+            violations.append(
+                f"{iam_path.relative_to(root)} bootstrap IAM member authority drifted from exact contract"
+            )
 
     return violations
 

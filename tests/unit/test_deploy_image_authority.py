@@ -300,6 +300,30 @@ def test_publish_authority_binds_signed_checksums_to_exact_sbom_files(tmp_path: 
         ),
         (
             "image",
+            lambda predicate: predicate["packages"][0]["externalRefs"][0].update(
+                {
+                    "referenceLocator": predicate["packages"][0]["externalRefs"][0][
+                        "referenceLocator"
+                    ]
+                    + "&tag=latest"
+                }
+            ),
+            "amd64 OCI purl",
+        ),
+        (
+            "image",
+            lambda predicate: predicate["packages"][0]["externalRefs"][0].update(
+                {
+                    "referenceLocator": predicate["packages"][0]["externalRefs"][0][
+                        "referenceLocator"
+                    ]
+                    + "&tag="
+                }
+            ),
+            "amd64 OCI purl",
+        ),
+        (
+            "image",
             lambda predicate: predicate["creationInfo"].update({"created": "9999-99-99T99:99:99Z"}),
             "creationInfo",
         ),

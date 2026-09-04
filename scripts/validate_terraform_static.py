@@ -1368,7 +1368,7 @@ Path("build/application-sbom-checksums-predicate.json").write_text(
 )
 PY
 uv run python scripts/generate_slsa_provenance.py --metadata build/image-metadata.json --output build/slsa-provenance-predicate.json --source-repository https://github.com/b-mackenzie-alexander/golden_rose_project --source-ref refs/heads/develop --source-commit "$SOURCE_COMMIT" --invocation-id "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}"
-uv run python scripts/verify_image_provenance.py --mode pr --dockerfile Dockerfile --metadata-path build/image-metadata.json --backend-sbom-path build/backend-sbom.cdx.json --frontend-sbom-path build/frontend-sbom.cdx.json --pr-image-sbom-path build/image-sbom.spdx.json
+uv run python scripts/verify_image_provenance.py --mode pr --dockerfile Dockerfile --metadata-path build/image-metadata.json --backend-sbom-path build/backend-sbom.cdx.json --frontend-sbom-path build/frontend-sbom.cdx.json --published-image-repository "$MANAGED_REPOSITORY" --pr-image-sbom-path build/image-sbom.spdx.json
 cosign sign --yes "$MANAGED_IMAGE"
 cosign attest --yes --type slsaprovenance1 --predicate build/slsa-provenance-predicate.json "$MANAGED_IMAGE"
 cosign attest --yes --type https://spdx.dev/Document --predicate build/image-sbom.spdx.json "$MANAGED_IMAGE"
@@ -1581,7 +1581,7 @@ test -f .gitignore
 
 EXACT_WORKFLOW_RUN_SHA256 = {
     ("build-image.yml", "publish-image", "name:Sign and verify published image attestation set"): (
-        "fdc7d2ea8815270133a467ace23852da56189783aacf4bb1d63db1502fed4aff"
+        "ea84c34dbca86e386e9e48a98b68ed26b21f2b621844ed07e0687465e6548124"
     ),
     ("deploy-develop.yml", "deploy", "name:Initialize failed deploy result"): (
         "931d39097ca97bc9a49f5227f4287d19f0709adfff40ca6f540f673703622b40"

@@ -35,14 +35,11 @@ automated hiring, matching, ranking, eligibility, or referral system.
 - Accepted ADR-0009 targets one private, fictional-synthetic-only Cloud Run +
   Cloud SQL testing environment. State establishment, ownership reconciliation,
   exact foundation apply, and workload-free post-apply verification are complete.
-  PR #73 merged the digest-scan binding correction at `develop@0da1aeb`.
-  Approved run `33878561528` completed immutable build/push/scan, keyless signing,
-  three attestations, and certificate/transparency verification, then failed final
-  repository admission because actual Cosign v3 signature identity is canonical
-  `repository@digest`. The bounded correction requires canonical subject/digest
-  and the exact observed signature type set; all seven run artifacts pass locally.
-  Gate P remains open pending review, protected merge, exact-tip rebind, fresh
-  retry approval, and one fully successful protected run.
+  PR #74 merged canonical Cosign v3 signature admission at `develop@92b104e`.
+  Approved run `33882394981` completed immutable build/push/scan, keyless signing,
+  all three attestations, certificate/transparency verification, final repository
+  semantic admission, and verifier-approved immutable-reference emission.
+  Gate P is complete; its one-use approval is consumed.
   No running shared application, public access, real identity, live/client data,
   or production claim is authorized.
 - Terraform/IaC follows the accepted private synthetic-only GCP `develop`
@@ -51,9 +48,9 @@ automated hiring, matching, ranking, eligibility, or referral system.
   Secret Manager metadata/IAM only; staged private Cloud SQL/VPC; named private
   Cloud Run invocation; value-safe observability; and intentional teardown.
   Gate F is complete with 41 managed addresses plus one expected data source and
-  no executable workload. Gate P and every later Secret, migration, service,
-  tester, qualification, real-identity, live-data, and production action remain
-  separately approved. Private identifiers and secret payloads stay outside
+  no executable workload. Gate P is complete; every later Secret, migration,
+  service, tester, qualification, real-identity, live-data, and production action
+  remains separately approved. Private identifiers and secret payloads stay outside
   tracked source and ordinary documentation.
 - Source-controlled Gate 2 read-only verification tooling now exists: `scripts/verify_gcp_foundation.py`
   evaluates live foundation/effective-authority posture against the reviewed
@@ -82,11 +79,9 @@ automated hiring, matching, ranking, eligibility, or referral system.
   closed A1; PR #62/PR #63/PR #64 closed the later state/evaluation source
   corrections. E2/E3 state establishment/readback, A5, ownership alignment, the
   replacement-free foundation plan/apply, and post-apply verification are now
-  complete. PR #73 merged at `0da1aeb`. Run `33878561528` completed
-  publication, signing, all attestations, and transparency verification but failed
-  final admission on Cosign v3 canonical signature identity. The bounded correction
-  passes all seven real run artifacts locally. Review, protected merge, exact-tip
-  rebind, fresh retry approval, and one successful protected run remain required.
+  complete. PR #74 merged at `92b104e`; successful run `33882394981` completed
+  publication, signing, all attestations, transparency verification, final semantic
+  admission, and verifier-approved immutable-reference emission. Gate P is complete.
 - Merged source also carries a reviewed local clean-room qualification
   harness that exercises the approved pre-deployment bundle against a disposable
   repo copy plus Docker-backed synthetic PostgreSQL, including Terraform/static

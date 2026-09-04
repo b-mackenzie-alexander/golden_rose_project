@@ -2,7 +2,7 @@
 
 This runbook defines the human/operator ceremony for the first private fictional-synthetic `develop` deployment after the separate cloud-read, Terraform-plan, and foundation-apply gates are complete. It is intentionally value-safe: project IDs, domains, tester identities, secret payloads, passwords, tokens, and exact private endpoints stay in operator-held records rather than tracked source.
 
-Current source status: foundation/state work and PR #73 are merged through protected `develop@0da1aeb`. Approved run `33878561528` completed immutable build/push/scan, keyless signing, all three attestations, and certificate/transparency verification, then failed final repository admission because actual Cosign v3 signature identity is canonical `repository@digest`. The active correction requires canonical subject/digest and the exact observed signature type set; all seven run artifacts pass locally. Gate P remains open pending review, protected merge, exact-tip rebind, fresh retry approval, and one successful protected run. This runbook remains future guidance for separately approved Gate S, migration, service, tester, and qualification ceremonies; it grants none of those actions by itself.
+Current source status: foundation/state work and PR #74 are merged through protected `develop@92b104e`. Approved run `33882394981` completed the full Gate P immutable publication, signing, attestation, transparency, final semantic-admission, and approved immutable-reference chain. Gate P is complete and its one-use approval is consumed. This runbook remains future guidance for separately approved Gate S, migration, service, tester, and qualification ceremonies; it grants none of those actions by itself.
 
 ## Scope
 

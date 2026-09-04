@@ -35,6 +35,7 @@ REQUIRED_PREDICATES = {
     "image SBOM": "https://spdx.dev/Document",
     "application SBOM": "https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1",
 }
+EXPECTED_SIGNATURE_TYPES = {"https://sigstore.dev/cosign/sign/v1", *REQUIRED_PREDICATES.values()}
 
 
 class DeployImageAuthorityError(ValueError):
@@ -62,6 +63,7 @@ def _assert_signature(payload: Any, *, repository: str, digest: str) -> None:
         or not all(isinstance(item, dict) for item in payload)
     ):
         raise DeployImageAuthorityError("signature Cosign output must be a non-empty JSON array")
+    observed_types: set[str] = set()
     for record in payload:
         critical = record.get("critical")
         if not isinstance(critical, dict):
@@ -70,13 +72,19 @@ def _assert_signature(payload: Any, *, repository: str, digest: str) -> None:
         image = critical.get("image")
         if not isinstance(identity, dict) or not isinstance(image, dict):
             raise DeployImageAuthorityError("signature lacks signed image subject")
+        signature_type = critical.get("type")
+        if not isinstance(signature_type, str) or signature_type not in EXPECTED_SIGNATURE_TYPES:
+            raise DeployImageAuthorityError("signature type is unexpected")
+        observed_types.add(signature_type)
         if (
-            identity.get("docker-reference") != repository
+            identity.get("docker-reference") != f"{repository}@{digest}"
             or image.get("docker-manifest-digest") != digest
         ):
             raise DeployImageAuthorityError(
                 "signature subject does not match the immutable OCI image"
             )
+    if observed_types != EXPECTED_SIGNATURE_TYPES:
+        raise DeployImageAuthorityError("signature type set is incomplete")
 
 
 def _decode_statement(path: Path, label: str) -> dict[str, Any]:

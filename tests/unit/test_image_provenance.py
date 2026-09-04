@@ -170,13 +170,20 @@ def valid_image_sbom_attestation(digest: str) -> dict[str, object]:
     }
 
 
-def valid_syft_spdx_image_sbom(digest: str) -> dict[str, Any]:
+def valid_syft_spdx_image_sbom(
+    digest: str,
+    *,
+    repository: str = "golden-rose",
+    version: str = "workflow-pr",
+    tag: str | None = "workflow-pr",
+) -> dict[str, Any]:
     platform_digest = "e" * 64
+    tag_query = f"&tag={tag}" if tag is not None else ""
     return {
         "spdxVersion": "SPDX-2.3",
         "dataLicense": "CC0-1.0",
         "SPDXID": "SPDXRef-DOCUMENT",
-        "name": "golden-rose",
+        "name": repository,
         "documentNamespace": "https://anchore.com/syft/image/golden-rose-test",
         "creationInfo": {
             "creators": ["Organization: Anchore, Inc", "Tool: syft-1.37.0"],
@@ -185,8 +192,8 @@ def valid_syft_spdx_image_sbom(digest: str) -> dict[str, Any]:
         "packages": [
             {
                 "SPDXID": "SPDXRef-Image-staff-tracer",
-                "name": "golden-rose",
-                "versionInfo": "workflow-pr",
+                "name": repository,
+                "versionInfo": version,
                 "downloadLocation": "NOASSERTION",
                 "filesAnalyzed": False,
                 "licenseConcluded": "NOASSERTION",
@@ -199,8 +206,7 @@ def valid_syft_spdx_image_sbom(digest: str) -> dict[str, Any]:
                         "referenceCategory": "PACKAGE-MANAGER",
                         "referenceType": "purl",
                         "referenceLocator": (
-                            f"pkg:oci/golden-rose@sha256%3A{platform_digest}"
-                            "?arch=amd64&tag=workflow-pr"
+                            f"pkg:oci/{repository}@sha256%3A{platform_digest}?arch=amd64{tag_query}"
                         ),
                     }
                 ],
@@ -520,6 +526,95 @@ def test_pr_mode_accepts_actual_syft_spdx_inventory(tmp_path: Path) -> None:
     )
 
     assert result.digest == digest
+
+
+def test_pr_mode_accepts_digest_scan_repository_override(tmp_path: Path) -> None:
+    module = load_module()
+    paths, digest, _ = _write_valid_publish_evidence(tmp_path)
+    repository = "us-east4-docker.pkg.dev/example-project/application-images/staff-tracer"
+    metadata = json.loads(paths["metadata"].read_text())
+    metadata["image.name"] = f"{repository}:{'b' * 40}"
+    write_json(paths["metadata"], metadata)
+    raw_image_sbom_path = tmp_path / "raw-image-sbom.spdx.json"
+    write_json(
+        raw_image_sbom_path,
+        valid_syft_spdx_image_sbom(
+            digest,
+            repository=repository,
+            version=digest,
+            tag=None,
+        ),
+    )
+
+    result = module.verify_image_provenance(
+        mode="pr",
+        dockerfile_path=ROOT / "Dockerfile",
+        metadata_path=paths["metadata"],
+        backend_sbom_path=paths["backend_sbom"],
+        frontend_sbom_path=paths["frontend_sbom"],
+        published_image_repository=repository,
+        pr_image_sbom_path=raw_image_sbom_path,
+    )
+
+    assert result.digest == digest
+
+
+def test_pr_mode_rejects_digest_scan_repository_not_bound_to_metadata(tmp_path: Path) -> None:
+    module = load_module()
+    paths, digest, _ = _write_valid_publish_evidence(tmp_path)
+    repository = "us-east4-docker.pkg.dev/example-project/application-images/staff-tracer"
+    raw_image_sbom_path = tmp_path / "raw-image-sbom.spdx.json"
+    write_json(
+        raw_image_sbom_path,
+        valid_syft_spdx_image_sbom(
+            digest,
+            repository=repository,
+            version=digest,
+            tag=None,
+        ),
+    )
+
+    with pytest.raises(ValueError, match="Buildx metadata repository"):
+        module.verify_image_provenance(
+            mode="pr",
+            dockerfile_path=ROOT / "Dockerfile",
+            metadata_path=paths["metadata"],
+            backend_sbom_path=paths["backend_sbom"],
+            frontend_sbom_path=paths["frontend_sbom"],
+            published_image_repository=repository,
+            pr_image_sbom_path=raw_image_sbom_path,
+        )
+
+
+@pytest.mark.parametrize("unexpected_tag", ["latest", ""])
+def test_pr_mode_rejects_digest_scan_purl_with_tag(tmp_path: Path, unexpected_tag: str) -> None:
+    module = load_module()
+    paths, digest, _ = _write_valid_publish_evidence(tmp_path)
+    repository = "us-east4-docker.pkg.dev/example-project/application-images/staff-tracer"
+    metadata = json.loads(paths["metadata"].read_text())
+    metadata["image.name"] = f"{repository}:{'b' * 40}"
+    write_json(paths["metadata"], metadata)
+    raw_image_sbom_path = tmp_path / "raw-image-sbom.spdx.json"
+    write_json(
+        raw_image_sbom_path,
+        valid_syft_spdx_image_sbom(
+            digest,
+            repository=repository,
+            version=digest,
+            tag=unexpected_tag,
+        ),
+    )
+
+    with pytest.raises(ValueError, match="amd64 OCI purl"):
+        module.verify_image_provenance(
+            mode="pr",
+            dockerfile_path=ROOT / "Dockerfile",
+            metadata_path=paths["metadata"],
+            backend_sbom_path=paths["backend_sbom"],
+            frontend_sbom_path=paths["frontend_sbom"],
+            published_image_repository=repository,
+            pr_image_sbom_path=raw_image_sbom_path,
+        )
 
 
 @pytest.mark.parametrize(

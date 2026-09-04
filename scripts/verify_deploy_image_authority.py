@@ -337,12 +337,12 @@ def _assert_image_sbom_semantics(predicate: Any, *, repository: str, digest: str
         if not purl_base.startswith(expected_purl_prefix):
             continue
         purl_digest = purl_base.removeprefix(expected_purl_prefix)
-        query = parse_qs(purl_query)
+        query = parse_qs(purl_query, keep_blank_values=True)
         if (
             separator
             and SHA256_HEX_PATTERN.fullmatch(purl_digest)
             and purl_digest in sha256_checksums
-            and query.get("arch") == ["amd64"]
+            and query == {"arch": ["amd64"]}
         ):
             valid_purl = True
             break

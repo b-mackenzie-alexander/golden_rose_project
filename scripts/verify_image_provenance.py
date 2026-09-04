@@ -344,13 +344,15 @@ def _validate_spdx_image_inventory(
         if not purl_base.startswith(expected_purl_prefix):
             continue
         purl_digest = purl_base.removeprefix(expected_purl_prefix)
-        query = parse_qs(purl_query)
+        query = parse_qs(purl_query, keep_blank_values=True)
+        expected_query = {"arch": ["amd64"]}
+        if expected_tag is not None:
+            expected_query["tag"] = [expected_tag]
         if (
             separator
             and re.fullmatch(r"[0-9a-f]{64}", purl_digest)
             and purl_digest in sha256_checksums
-            and query.get("arch") == ["amd64"]
-            and (expected_tag is None or query.get("tag") == [expected_tag])
+            and query == expected_query
         ):
             valid_purl = True
             break
@@ -358,15 +360,38 @@ def _validate_spdx_image_inventory(
         raise ValueError("image SBOM must bind the image package to the expected amd64 OCI purl")
 
 
-def _validate_raw_spdx_image_sbom(path: Path, *, image_name: str) -> None:
-    local_reference = image_name.rsplit("/", 1)[-1]
-    expected_name, separator, expected_tag = local_reference.rpartition(":")
-    if not separator or not expected_name or not expected_tag:
-        raise ValueError("PR image name must include a repository and tag")
+def _validate_raw_spdx_image_sbom(
+    path: Path,
+    *,
+    image_name: str,
+    image_repository: str | None = None,
+    digest: str | None = None,
+) -> None:
+    if image_repository is not None:
+        if digest is None:
+            raise ValueError("digest-scanned image SBOM binding requires an image digest")
+        metadata_repository, separator, metadata_tag = image_name.rpartition(":")
+        if (
+            not separator
+            or metadata_repository != image_repository
+            or not re.fullmatch(r"[0-9a-f]{40}", metadata_tag)
+        ):
+            raise ValueError(
+                "Buildx metadata repository and commit tag must match the digest-scanned image"
+            )
+        expected_name = image_repository
+        expected_version = digest
+        expected_tag = None
+    else:
+        local_reference = image_name.rsplit("/", 1)[-1]
+        expected_name, separator, expected_tag = local_reference.rpartition(":")
+        if not separator or not expected_name or not expected_tag:
+            raise ValueError("PR image name must include a repository and tag")
+        expected_version = expected_tag
     _validate_spdx_image_inventory(
         _load_json(path),
         expected_name=expected_name,
-        expected_version=expected_tag,
+        expected_version=expected_version,
         expected_tag=expected_tag,
     )
 
@@ -517,8 +542,11 @@ def verify_image_provenance(
     digest = _validate_metadata(metadata)
 
     if mode == "pr":
-        if published_image_repository is not None:
-            raise ValueError("published image repository is not allowed in pr mode")
+        image_repository = (
+            _validate_repository(published_image_repository)
+            if published_image_repository is not None
+            else None
+        )
         if any(
             path is not None
             for path in (
@@ -533,7 +561,12 @@ def verify_image_provenance(
             image_name = metadata.get("image.name")
             if not isinstance(image_name, str):
                 raise ValueError("Buildx metadata image.name is required for PR SBOM binding")
-            _validate_raw_spdx_image_sbom(pr_image_sbom_path, image_name=image_name)
+            _validate_raw_spdx_image_sbom(
+                pr_image_sbom_path,
+                image_name=image_name,
+                image_repository=image_repository,
+                digest=digest,
+            )
         return VerificationResult(digest=digest, canonical_image_ref=None)
 
     if pr_image_sbom_path is not None:

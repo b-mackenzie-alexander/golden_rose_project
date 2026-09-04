@@ -138,7 +138,7 @@ This amendment authorizes only the corresponding no-cloud source, test, and docu
 
 ### 10. Amendment B — separate private-OCI verification authority
 
-**Status:** Accepted by Beatrice on 2026-08-27 with the review-clean `.hermes/plans/2026-08-27_124046-private-develop-activation-human-feedback-plan.md`; unmerged and not implementable until protected publication.
+**Status:** Historical: accepted by Beatrice on 2026-08-27 and merged with the review-clean master plan through PR #49 at protected `develop@fa8334c`. Its source-authorized Amendment B was implemented and later verified through the Gate F/Gate P milestones; every remaining cloud, secret, database, migration, service, tester, qualification, data, and production action retains its separate approval boundary.
 
 Direct deploy-time Cosign verification against the private Artifact Registry repository requires authenticated OCI read authority. ADR-0013's deployer is intentionally restricted to exact Cloud Run job execution/view authority and must not receive Artifact Registry read/write access. The image publisher is restricted to the build workflow and must not become reachable from the deploy workflow.
 
@@ -153,7 +153,7 @@ The accepted narrow correction is a separate `golden-rose-artifact-verifier` con
 
 The same source tranche must close the currently modeled-but-unproduced migration-success authority: only a successful waited migration execution may produce a minimized separately signed receipt bound to the exact migration receipt hash, source SHA, immutable image digest, and execution reference. Failure, cancellation, or unknown outcome emits no success receipt. Service activation still requires separate database/schema/authority readback and explicit approval before that signed receipt may be accepted.
 
-If implementation or live evidence shows that this identity split cannot satisfy private OCI verification without broader standing authority, stop and replan; do not broaden in place. This accepted-but-unmerged amendment grants no cloud, WIF, IAM, registry, migration, or deployment action.
+If implementation or live evidence shows that this identity split cannot satisfy private OCI verification without broader standing authority, stop and replan; do not broaden in place. The merged amendment authorized only its reviewed source tranche; it did not and does not grant any cloud, WIF, IAM, registry, migration, deployment, Secret, or later-gate action.
 
 ## Consequences and constraints
 

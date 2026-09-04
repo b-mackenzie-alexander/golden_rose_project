@@ -2,10 +2,11 @@
 
 > **For Hermes:** Execute this plan through separate coding, operator, review, and PR lanes. Use small RED → GREEN nodes inside each implementation PR, but do not return to planning between predeclared PRs unless a material replanning trigger in this packet fires.
 
-- **Status:** Accepted by Beatrice on 2026-08-27 after review-clean final rereview; unmerged and not implementation or operational authority until protected publication
+- **Status:** Historical accepted master plan; PR #49 merged the packet through protected `develop@fa8334c`. Its predeclared source PRs and Gate F/Gate P milestones are complete; Gate S and each later operational gate remain separately approval-bound.
+- **Post-merge disposition candidate:** The 2026-09-04 working-tree changes to section 3's local-provisioner bootstrap exception, section 8/C2's staged Secret-version ordering, and section 9/D2's database-URL creation sequence were not part of PR #49. They record later observed Gate S/migration-preflight evidence and become source authority only if this package passes review and merges through protected `develop`.
 - **Date:** 2026-08-27
 - **Owner:** Beatrice Alexander
-- **Exact planning base:** `origin/develop@5f265d8d1c1044915638d1399d8ba62c159b70c9` (PR #48 merge)
+- **Exact planning base:** `origin/develop@5f265d8d1c1044915638d1399d8ba62c159b70c9` (PR #48 merge; historical)
 - **Controls:** ADR-0009, ADR-0012, ADR-0013, ADR-0014
 - **Prior detailed ceremony:** `.hermes/plans/2026-08-26_210433-gate3-source-live-adoption-ceremony-plan.md`
 
@@ -81,7 +82,7 @@ After protected merge into `develop`, this independently reviewed and explicitly
 
 Every operational gate still needs an exact approval bundle and readback. Passing one never grants the next.
 
-All Terraform plan/apply operations in this tranche are operator-run from the exact approved checkout using operator-held backend configuration and keyless, short-lived impersonation of the exact provisioner authority. No service-account key or GitHub Terraform-apply workflow is authorized. If the approved local impersonation path cannot execute the reviewed plan without broader authority, stop and replan rather than adding an ambient credential or silently creating a workflow.
+All workload-root Terraform plan/apply operations in this tranche are operator-run from the exact approved checkout using operator-held backend configuration and keyless, short-lived impersonation of the exact provisioner authority. To establish that path without a circular dependency, the exact existing bootstrap operator may run one separately reviewed and approved bootstrap-root plan/apply whose sole permitted create is the provisioner service-account-level operator binding described below; every other action must be no-op. The named human provisioner-operator principal is supplied out of band and may receive `roles/iam.serviceAccountTokenCreator` only on that exact provisioner service account through reviewed bootstrap desired state; project-level Token Creator, provisioner GitHub WIF, service-account keys, and ambient-user workload Terraform credentials remain forbidden. No service-account key or GitHub Terraform-apply workflow is authorized. If the approved local impersonation path cannot execute the reviewed workload plan after exact readback, stop and remediate the exact resource-level path rather than adding an ambient credential or silently creating a workflow.
 
 ---
 
@@ -468,15 +469,18 @@ Require Join J2, exact protected `develop` source, merged PR A, accepted compati
 - Independently verify signature, transparency inclusion, SLSA provenance, final-image SBOM, and backend/frontend SBOM checksum attestation.
 - Keep raw bundles and registry details in bounded private evidence.
 
-### C2 — secret-version preparation approval
+### C2 — Secret-version preparation approvals
 
 Follow `deploy/gcp/first-deployment-runbook.md`:
 
 - name custodians, rotation/revocation/recovery owners privately;
-- inject only approved secret versions through non-echoing channels;
+- create/read back the synthetic-staff-ID version through its bounded early Gate S approval;
+- keep the deployment target, public-environment label, and immutable image digest as reviewed non-secret Terraform configuration;
+- defer runtime/migration database-URL versions until migration-stage Cloud SQL/database creation and the separately approved login-role ceremony provide real connection material;
+- inject payloads only through non-echoing channels;
 - stop on payload exposure or authority drift.
 
-The migration-stage Cloud SQL instance does not exist yet. Do not create database login roles or claim database-authority verification in this gate. Publication does not grant secret preparation; secret preparation does not grant the migration plan/apply.
+The migration-stage Cloud SQL instance does not exist yet. Do not create database login roles, placeholder/guessed database URLs, or claim database-authority verification in this gate. Publication does not grant Secret preparation; the early synthetic-ID Secret action does not grant the migration plan/apply or later database-URL version creation.
 
 ---
 
@@ -494,7 +498,7 @@ The migration-stage Cloud SQL instance does not exist yet. Do not create databas
 
 - Explicitly approve and apply the exact migration saved plan.
 - Verify live job projection before execution.
-- After the migration-stage Cloud SQL/database exists, obtain the separately scoped database-login preparation approval; create runtime/migration login roles out of band, grant only the reviewed group-role chains, and run `scripts/verify_database_authority.py` through non-echoing connection-material handoffs.
+- After the migration-stage Cloud SQL/database exists, obtain the separately scoped database-login preparation approval; create runtime/migration login roles out of band, grant only the reviewed group-role chains, construct the real runtime/migration database URLs, create/read back those two Secret versions through a fresh bounded approval, and run `scripts/verify_database_authority.py` through non-echoing connection-material handoffs.
 - Stop before migration execution if database authority, secret references, connectivity, or schema-owner assumption differs from the reviewed contract.
 - Explicitly authorize one `.github/workflows/deploy-develop.yml` migration transition.
 - Capture advisory-lock, exit, schema revision, database authority, and compatibility evidence.
@@ -717,7 +721,7 @@ This plan never authorizes:
 
 ## 15. Planning packet acceptance checklist
 
-Before this plan is accepted and merged:
+**Historical closeout:** PR #49 merged this packet through protected `develop@fa8334c`; every predeclared source PR subsequently rebaselined from the protected tip. The checklist below preserves the planning evidence, not an active publication instruction.
 
 - [x] Verify every named file/symbol exists or is explicitly marked `Create`.
 - [x] Independently review and explicitly accept ADR-0013 Amendment B.
@@ -729,4 +733,4 @@ Before this plan is accepted and merged:
 - [x] Confirm all private evidence stays outside tracked source.
 - [x] Complete independent architecture/security/executability review and remediate all findings.
 - [x] Record Beatrice's explicit acceptance and perform an acceptance-delta audit.
-- [ ] Publish through protected `develop`; then rebaseline every implementation branch from the exact merged tip.
+- [x] Publish through protected `develop`; then rebaseline every implementation branch from the exact merged tip. PR #49 merged the packet at `develop@fa8334c`; later source branches rebased from protected integration tips.

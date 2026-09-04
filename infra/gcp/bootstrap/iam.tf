@@ -5,6 +5,12 @@ resource "google_service_account" "provisioner" {
   description  = "Provisioning identity that will later own reviewed infrastructure changes through exact GitHub OIDC trust."
 }
 
+resource "google_service_account_iam_member" "provisioner_operator_token_creator" {
+  service_account_id = google_service_account.provisioner.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = var.provisioner_operator_principal
+}
+
 resource "google_service_account" "image_publisher" {
   project      = var.state_project_id
   account_id   = "golden-rose-image-publisher"

@@ -5,7 +5,7 @@
 **PR base:** protected `develop`
 **Exact base:** `origin/develop@5f265d8d1c1044915638d1399d8ba62c159b70c9` (PR #48 merge)
 **Review surface:** accepted candidate prepared for closeout commit; review evidence was collected against the uncommitted working tree before final-head qualification
-**Plan status:** Accepted by Beatrice on 2026-08-27 after final CLEAN rereview; unmerged and not implementation or operational authority
+**Plan status:** Historical: Beatrice accepted the plan on 2026-08-27 after final CLEAN rereview, and PR #49 later merged the packet into protected `develop@fa8334c`. This handoff preserves planning-review evidence; current authority is `CURRENT_WORK.md`, `ROADMAP.md`, the accepted master plan, and separately approved operational-gate records.
 
 ## Objective
 
@@ -61,9 +61,9 @@ The first component reviews returned **CHANGES REQUIRED**. The current remediate
 - an explicit separately approved reverse/destroy/recovery gate;
 - an ADR-0007 planning-granularity clarification under ADR-0014.
 
-These remediations received fresh independent rereview. Beatrice subsequently accepted Amendment B and the master plan; the unmerged acceptance grants no identity/IAM/WIF action.
+These remediations received fresh independent rereview. Beatrice accepted Amendment B and the master plan, and PR #49 later merged the packet into protected `develop@fa8334c`. The merged source tranche did not grant identity/IAM/WIF operations; each such gate remained separately approval-bound.
 
-The first fresh rereview then found three remaining Medium consistency/executability issues: roadmap omission of source-readiness/bootstrap augmentation, ambiguity from the historical Gate 3 one-plan-per-action sentence, and insufficiently exact no-store/manual-matrix/four-status rules. After remediation, the final focused cross-lane rereview returned **CLEAN** with no remaining Medium-or-higher finding. Beatrice accepted Amendment B and the master plan on 2026-08-27. The acceptance delta changes status/governance only; no implementation or operational authority exists until protected merge.
+The first fresh rereview then found three remaining Medium consistency/executability issues: roadmap omission of source-readiness/bootstrap augmentation, ambiguity from the historical Gate 3 one-plan-per-action sentence, and insufficiently exact no-store/manual-matrix/four-status rules. After remediation, the final focused cross-lane rereview returned **CLEAN** with no remaining Medium-or-higher finding. Beatrice accepted Amendment B and the master plan on 2026-08-27, and PR #49 later merged the packet. The acceptance delta changed status/governance only; protected merge authorized the predeclared source work, never an implicit operational gate.
 
 ## Critical sequencing details
 

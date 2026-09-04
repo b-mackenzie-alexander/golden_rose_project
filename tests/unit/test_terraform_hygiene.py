@@ -662,9 +662,266 @@ def test_gcp_bootstrap_iam_separates_provisioner_image_publisher_artifact_verifi
     assert "google_service_account_key" not in iam
     assert "roles/owner" not in iam
     assert "roles/editor" not in iam
-    assert "roles/iam.serviceAccountTokenCreator" not in iam
+    assert iam.count("roles/iam.serviceAccountTokenCreator") == 1
     assert 'resource "google_service_account_iam_member" "provisioner_wif"' not in iam
     assert "local.github_principal_set" not in iam
+
+
+def test_gcp_bootstrap_provisioner_local_operator_impersonation_is_exact_and_resource_scoped() -> (
+    None
+):
+    iam = (ROOT / "infra/gcp/bootstrap/iam.tf").read_text(encoding="utf-8")
+    variables = (ROOT / "infra/gcp/bootstrap/variables.tf").read_text(encoding="utf-8")
+    runbook = (ROOT / "deploy/gcp/bootstrap-state-runbook.md").read_text(encoding="utf-8")
+    manifest = json.loads(
+        (ROOT / "infra/policy/predeployment-authority-manifest.json").read_text(encoding="utf-8")
+    )
+
+    assert 'variable "provisioner_operator_principal"' in variables
+    variable_section = variables.split('variable "provisioner_operator_principal"', 1)[1]
+    assert "nullable    = false" in variable_section
+    assert "default" not in variable_section
+    assert 'startswith(var.provisioner_operator_principal, "user:")' in variable_section
+    assert (
+        'resource "google_service_account_iam_member" "provisioner_operator_token_creator"' in iam
+    )
+    resource_section = iam.split(
+        'resource "google_service_account_iam_member" "provisioner_operator_token_creator"', 1
+    )[1].split("\n}", 1)[0]
+    assert "service_account_id = google_service_account.provisioner.name" in resource_section
+    assert 'role               = "roles/iam.serviceAccountTokenCreator"' in resource_section
+    assert "member             = var.provisioner_operator_principal" in resource_section
+    assert iam.count("roles/iam.serviceAccountTokenCreator") == 1
+    assert 'resource "google_service_account_iam_member" "provisioner_wif"' not in iam
+    assert 'resource "google_project_iam_member"' not in iam
+    assert (
+        'description  = "Provisioning identity that will later own reviewed infrastructure changes through exact GitHub OIDC trust."'
+        in iam
+    )
+    assert (
+        manifest["terraform"]["resource_types"]["google_service_account_iam_member"]["max_count"]
+        == 4
+    )
+    required_runbook_phrases = [
+        "existing bootstrap operator",
+        "sole allowed create",
+        "bootstrap-root saved plan",
+        "Ambient-user workload Terraform",
+        "short-lived provisioner impersonation",
+    ]
+    for phrase in required_runbook_phrases:
+        assert phrase in runbook
+
+
+def test_terraform_static_validation_rejects_provisioner_operator_wif_substitution(
+    tmp_path: Path,
+) -> None:
+    _write_current_terraform_scaffold(tmp_path)
+    (tmp_path / "infra" / "policy").mkdir(parents=True)
+    shutil.copy2(
+        ROOT / "infra" / "policy" / "predeployment-authority-manifest.json",
+        tmp_path / "infra" / "policy" / "predeployment-authority-manifest.json",
+    )
+    iam_path = tmp_path / "infra" / "gcp" / "bootstrap" / "iam.tf"
+    iam = iam_path.read_text(encoding="utf-8").replace(
+        "member             = var.provisioner_operator_principal",
+        "member             = local.deploy_develop_workflow_principal_set",
+    )
+    iam += "\n# member             = var.provisioner_operator_principal\n"
+    iam_path.write_text(iam, encoding="utf-8")
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode == 1
+    assert "provisioner operator authority" in result.stdout
+
+
+def test_terraform_static_validation_rejects_additional_token_creator_authority(
+    tmp_path: Path,
+) -> None:
+    _write_current_terraform_scaffold(tmp_path)
+    (tmp_path / "infra" / "policy").mkdir(parents=True)
+    shutil.copy2(
+        ROOT / "infra" / "policy" / "predeployment-authority-manifest.json",
+        tmp_path / "infra" / "policy" / "predeployment-authority-manifest.json",
+    )
+    iam_path = tmp_path / "infra" / "gcp" / "bootstrap" / "iam.tf"
+    iam_path.write_text(
+        iam_path.read_text(encoding="utf-8")
+        + '\nresource "google_service_account_iam_member" "unreviewed_token_creator" {\n'
+        + "  service_account_id = google_service_account.deployer.name\n"
+        + '  role               = "roles/iam.serviceAccountTokenCreator"\n'
+        + "  member             = var.provisioner_operator_principal\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode == 1
+    assert "exactly one resource-scoped provisioner operator Token Creator role" in result.stdout
+
+
+def test_terraform_static_validation_rejects_project_wide_provisioner_token_creator(
+    tmp_path: Path,
+) -> None:
+    _write_current_terraform_scaffold(tmp_path)
+    (tmp_path / "infra" / "policy").mkdir(parents=True)
+    shutil.copy2(
+        ROOT / "infra" / "policy" / "predeployment-authority-manifest.json",
+        tmp_path / "infra" / "policy" / "predeployment-authority-manifest.json",
+    )
+    iam_path = tmp_path / "infra" / "gcp" / "bootstrap" / "iam.tf"
+    iam = (
+        iam_path.read_text(encoding="utf-8")
+        .replace(
+            'resource "google_service_account_iam_member" "provisioner_operator_token_creator"',
+            'resource "google_project_iam_member" "provisioner_operator_token_creator"',
+            1,
+        )
+        .replace(
+            "service_account_id = google_service_account.provisioner.name",
+            "project            = var.state_project_id",
+            1,
+        )
+    )
+    iam += (
+        '\n# resource "google_service_account_iam_member" '
+        '"provisioner_operator_token_creator"\n'
+        "# service_account_id = google_service_account.provisioner.name\n"
+    )
+    iam_path.write_text(iam, encoding="utf-8")
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode == 1
+    assert "exactly one resource-scoped provisioner operator Token Creator role" in result.stdout
+
+
+def test_terraform_static_validation_rejects_additional_project_wide_token_creator(
+    tmp_path: Path,
+) -> None:
+    _write_current_terraform_scaffold(tmp_path)
+    (tmp_path / "infra" / "policy").mkdir(parents=True)
+    shutil.copy2(
+        ROOT / "infra" / "policy" / "predeployment-authority-manifest.json",
+        tmp_path / "infra" / "policy" / "predeployment-authority-manifest.json",
+    )
+    iam_path = tmp_path / "infra" / "gcp" / "bootstrap" / "iam.tf"
+    iam_path.write_text(
+        iam_path.read_text(encoding="utf-8")
+        + '\nresource "google_project_iam_member" "project_token_creator" {\n'
+        + "  project = var.state_project_id\n"
+        + '  role    = "roles/iam.serviceAccountTokenCreator"\n'
+        + "  member  = var.provisioner_operator_principal\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode == 1
+    assert "unbounded bootstrap authority 'google_project_iam_member'" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("approved", "replacement"),
+    [
+        (
+            'role               = "roles/iam.workloadIdentityUser"',
+            'role               = replace("roles/iam.XserviceAccountTokenCreator", "X", "")',
+        ),
+        (
+            "service_account_id = google_service_account.image_publisher.name",
+            'service_account_id = coalesce(google_service_account.image_publisher.name, "")',
+        ),
+        (
+            "member             = local.build_image_workflow_principal_set",
+            'member             = join("", [local.build_image_workflow_principal_set])',
+        ),
+    ],
+)
+def test_terraform_static_validation_rejects_computed_bootstrap_iam_member_fields(
+    tmp_path: Path,
+    approved: str,
+    replacement: str,
+) -> None:
+    _write_current_terraform_scaffold(tmp_path)
+    (tmp_path / "infra" / "policy").mkdir(parents=True)
+    shutil.copy2(
+        ROOT / "infra" / "policy" / "predeployment-authority-manifest.json",
+        tmp_path / "infra" / "policy" / "predeployment-authority-manifest.json",
+    )
+    iam_path = tmp_path / "infra" / "gcp" / "bootstrap" / "iam.tf"
+    iam_path.write_text(
+        iam_path.read_text(encoding="utf-8").replace(approved, replacement, 1),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode == 1
+    assert "bootstrap IAM member authority drifted from exact contract" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("approved", "replacement"),
+    [
+        (
+            "service_account_id = google_service_account.provisioner.name",
+            "service_account_id = google_service_account.deployer.name",
+        ),
+        (
+            'role               = "roles/iam.serviceAccountTokenCreator"',
+            'role               = "roles/iam.serviceAccountUser"',
+        ),
+    ],
+)
+def test_terraform_static_validation_rejects_commented_decoy_for_effective_provisioner_authority(
+    tmp_path: Path,
+    approved: str,
+    replacement: str,
+) -> None:
+    _write_current_terraform_scaffold(tmp_path)
+    (tmp_path / "infra" / "policy").mkdir(parents=True)
+    shutil.copy2(
+        ROOT / "infra" / "policy" / "predeployment-authority-manifest.json",
+        tmp_path / "infra" / "policy" / "predeployment-authority-manifest.json",
+    )
+    iam_path = tmp_path / "infra" / "gcp" / "bootstrap" / "iam.tf"
+    iam = iam_path.read_text(encoding="utf-8").replace(approved, replacement, 1)
+    iam += f"\n# {approved}\n"
+    iam_path.write_text(iam, encoding="utf-8")
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode == 1
+    assert "provisioner operator authority drifted" in result.stdout
+
+
+def test_terraform_static_validation_rejects_commented_decoy_for_operator_validation(
+    tmp_path: Path,
+) -> None:
+    _write_current_terraform_scaffold(tmp_path)
+    (tmp_path / "infra" / "policy").mkdir(parents=True)
+    shutil.copy2(
+        ROOT / "infra" / "policy" / "predeployment-authority-manifest.json",
+        tmp_path / "infra" / "policy" / "predeployment-authority-manifest.json",
+    )
+    variables_path = tmp_path / "infra" / "gcp" / "bootstrap" / "variables.tf"
+    approved = 'startswith(var.provisioner_operator_principal, "user:")'
+    variables = variables_path.read_text(encoding="utf-8").replace(
+        approved,
+        'startswith(var.provisioner_operator_principal, "serviceAccount:")',
+        1,
+    )
+    variables += f"\n# {approved}\n"
+    variables_path.write_text(variables, encoding="utf-8")
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode == 1
+    assert "provisioner operator validation drifted" in result.stdout
 
 
 def test_gcp_terraform_versions_pin_provider_without_backend_or_cloud_identifiers() -> None:
@@ -7886,6 +8143,7 @@ def test_foundation_verifier_mode_rejects_present_workload() -> None:
         "state_authority_principal": "serviceAccount:test@state.iam.gserviceaccount.com",
         "recovery_authority_principal": "group:test@example.com",
         "bootstrap_operator_principal": "user:test@example.com",
+        "provisioner_operator_principal": "user:provisioner.operator@example.com",
         "bootstrap_operator_status": "bootstrap-retired",
         "observability_viewer_principal": "group:obs@example.com",
         "recovery_policy_review_status": "gate-2-evidence-required",
@@ -7946,6 +8204,7 @@ def test_deployment_verifier_mode_requires_expected_job_and_service() -> None:
         "state_authority_principal": "serviceAccount:test@state.iam.gserviceaccount.com",
         "recovery_authority_principal": "group:test@example.com",
         "bootstrap_operator_principal": "user:test@example.com",
+        "provisioner_operator_principal": "user:provisioner.operator@example.com",
         "bootstrap_operator_status": "bootstrap-retired",
         "observability_viewer_principal": "group:obs@example.com",
         "recovery_policy_review_status": "gate-2-evidence-required",

@@ -48,10 +48,16 @@ automated hiring, matching, ranking, eligibility, or referral system.
   Secret Manager metadata/IAM only; staged private Cloud SQL/VPC; named private
   Cloud Run invocation; value-safe observability; and intentional teardown.
   Gate F is complete with 41 managed addresses plus one expected data source and
-  no executable workload. Gate P is complete; every later Secret, migration,
-  service, tester, qualification, real-identity, live-data, and production action
-  remains separately approved. Private identifiers and secret payloads stay outside
-  tracked source and ordinary documentation.
+  no executable workload. Gate P is complete; its one-use approval is consumed.
+  Gate S created and metadata-read back only the bounded `synthetic-staff-id`
+  version. Runtime/migration database-URL versions remain deferred until real
+  database/login material exists. The desired named-human local impersonation
+  bridge grants Token Creator only on the provisioner service account and remains
+  unapplied source pending protected merge and a separate bootstrap plan/apply/
+  readback; no provisioner GitHub WIF, key, project-wide grant, migration, service,
+  tester, qualification, real-identity, live-data, or production action is implied.
+  Private identifiers and secret payloads stay outside tracked source and ordinary
+  documentation.
 - Source-controlled Gate 2 read-only verification tooling now exists: `scripts/verify_gcp_foundation.py`
   evaluates live foundation/effective-authority posture against the reviewed
   contract without adding any mutation mode, and `deploy/gcp/evidence-template.md`

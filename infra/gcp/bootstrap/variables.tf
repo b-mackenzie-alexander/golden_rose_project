@@ -22,6 +22,17 @@ variable "bootstrap_operator_principal" {
   nullable    = false
 }
 
+variable "provisioner_operator_principal" {
+  description = "Operator-held named human principal permitted to mint short-lived provisioner tokens for separately approved local Terraform operations."
+  type        = string
+  nullable    = false
+
+  validation {
+    condition     = startswith(var.provisioner_operator_principal, "user:") && can(regex("^user:[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.provisioner_operator_principal))
+    error_message = "The provisioner operator principal must be one named user supplied out of band."
+  }
+}
+
 variable "bootstrap_operator_status" {
   description = "Reviewed transition marker: bootstrap-active permits the bootstrap operator on the state bucket; bootstrap-retired removes that temporary authority."
   type        = string

@@ -35,15 +35,14 @@ automated hiring, matching, ranking, eligibility, or referral system.
 - Accepted ADR-0009 targets one private, fictional-synthetic-only Cloud Run +
   Cloud SQL testing environment. State establishment, ownership reconciliation,
   exact foundation apply, and workload-free post-apply verification are complete.
-  PR #72 merged the comprehensive Gate P supply-chain remediation at
-  `develop@b54c4a4`. Its freshly approved publication dispatch built, pushed,
-  and Syft-scanned the exact immutable image, then stopped before signing when
-  pre-sign validation compared Syft's repository-only digest-scan document name
-  with Buildx's tagged metadata name. The bounded correction now binds the raw
-  scan to the reviewed repository plus metadata digest, and the exact current
-  image passes corrected local read-only validation. Gate P remains open pending
-  review, protected merge, exact-tip rebind, fresh retry approval, and complete
-  keyless/transparency verification.
+  PR #73 merged the digest-scan binding correction at `develop@0da1aeb`.
+  Approved run `33878561528` completed immutable build/push/scan, keyless signing,
+  three attestations, and certificate/transparency verification, then failed final
+  repository admission because actual Cosign v3 signature identity is canonical
+  `repository@digest`. The bounded correction requires canonical subject/digest
+  and the exact observed signature type set; all seven run artifacts pass locally.
+  Gate P remains open pending review, protected merge, exact-tip rebind, fresh
+  retry approval, and one fully successful protected run.
   No running shared application, public access, real identity, live/client data,
   or production claim is authorized.
 - Terraform/IaC follows the accepted private synthetic-only GCP `develop`
@@ -83,13 +82,11 @@ automated hiring, matching, ranking, eligibility, or referral system.
   closed A1; PR #62/PR #63/PR #64 closed the later state/evaluation source
   corrections. E2/E3 state establishment/readback, A5, ownership alignment, the
   replacement-free foundation plan/apply, and post-apply verification are now
-  complete. PR #72 merged the supply-chain remediation at `b54c4a4`. Its approved
-  Gate P dispatch built, pushed, and Syft-scanned an immutable image but stopped
-  before signing on a tagged-metadata versus repository-only digest-scan name
-  mismatch. The bounded correction binds raw SPDX to the reviewed repository and
-  metadata digest; the exact image passes corrected local read-only validation.
-  Review, protected merge, exact-tip rebind, fresh retry approval, and final
-  keyless/transparency proof remain required.
+  complete. PR #73 merged at `0da1aeb`. Run `33878561528` completed
+  publication, signing, all attestations, and transparency verification but failed
+  final admission on Cosign v3 canonical signature identity. The bounded correction
+  passes all seven real run artifacts locally. Review, protected merge, exact-tip
+  rebind, fresh retry approval, and one successful protected run remain required.
 - Merged source also carries a reviewed local clean-room qualification
   harness that exercises the approved pre-deployment bundle against a disposable
   repo copy plus Docker-backed synthetic PostgreSQL, including Terraform/static

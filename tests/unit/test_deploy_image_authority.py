@@ -16,6 +16,12 @@ DIGEST = "sha256:" + "a" * 64
 IMAGE = f"us-east4-docker.pkg.dev/example/staff-tracer-images/staff-tracer@{DIGEST}"
 IDENTITY = "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop"
 SOURCE_COMMIT = "b" * 40
+SIGNATURE_TYPES = (
+    "https://sigstore.dev/cosign/sign/v1",
+    "https://slsa.dev/provenance/v1",
+    "https://spdx.dev/Document",
+    "https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1",
+)
 
 
 def load_module() -> ModuleType:
@@ -29,12 +35,12 @@ def load_module() -> ModuleType:
 PredicateMutator = Callable[[dict[str, Any]], None]
 
 
-def signature() -> dict[str, Any]:
+def signature(signature_type: str = SIGNATURE_TYPES[0]) -> dict[str, Any]:
     return {
         "critical": {
-            "identity": {"docker-reference": IMAGE.split("@", 1)[0]},
+            "identity": {"docker-reference": IMAGE},
             "image": {"docker-manifest-digest": DIGEST},
-            "type": "cosign container image signature",
+            "type": signature_type,
         }
     }
 
@@ -165,7 +171,10 @@ def valid_attestations() -> dict[str, dict[str, Any]]:
 
 def write_evidence(tmp_path: Path, attestations: dict[str, dict[str, Any]]) -> dict[str, Path]:
     files = {name: tmp_path / f"{name}.json" for name in ("signature", *attestations)}
-    files["signature"].write_text(json.dumps([signature()]), encoding="utf-8")
+    files["signature"].write_text(
+        json.dumps([signature(signature_type) for signature_type in SIGNATURE_TYPES]),
+        encoding="utf-8",
+    )
     for name, payload in attestations.items():
         files[name].write_text(json.dumps(payload), encoding="utf-8")
     return files
@@ -189,6 +198,39 @@ def verify(module: ModuleType, files: dict[str, Path]) -> str:
 def test_deploy_authority_accepts_actual_shaped_cosign_v3_predicates(tmp_path: Path) -> None:
     module = load_module()
     assert verify(module, write_evidence(tmp_path, valid_attestations())) == DIGEST
+
+
+def test_deploy_authority_rejects_repository_only_signature_identity(tmp_path: Path) -> None:
+    module = load_module()
+    files = write_evidence(tmp_path, valid_attestations())
+    payload = json.loads(files["signature"].read_text())
+    payload[0]["critical"]["identity"]["docker-reference"] = IMAGE.split("@", 1)[0]
+    files["signature"].write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(module.DeployImageAuthorityError, match="signature subject"):
+        verify(module, files)
+
+
+def test_deploy_authority_rejects_wrong_signature_type(tmp_path: Path) -> None:
+    module = load_module()
+    files = write_evidence(tmp_path, valid_attestations())
+    payload = json.loads(files["signature"].read_text())
+    payload[0]["critical"]["type"] = "unreviewed signature type"
+    files["signature"].write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(module.DeployImageAuthorityError, match="signature type"):
+        verify(module, files)
+
+
+def test_deploy_authority_rejects_missing_primary_signature_type(tmp_path: Path) -> None:
+    module = load_module()
+    files = write_evidence(tmp_path, valid_attestations())
+    payload = json.loads(files["signature"].read_text())
+    payload[0]["critical"]["type"] = SIGNATURE_TYPES[1]
+    files["signature"].write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(module.DeployImageAuthorityError, match="signature type set"):
+        verify(module, files)
 
 
 def test_publish_authority_binds_signed_checksums_to_exact_sbom_files(tmp_path: Path) -> None:

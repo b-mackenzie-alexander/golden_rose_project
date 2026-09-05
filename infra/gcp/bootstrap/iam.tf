@@ -55,6 +55,7 @@ locals {
     [
       var.state_authority_principal,
       var.recovery_authority_principal,
+      "serviceAccount:${google_service_account.provisioner.email}",
     ],
     var.bootstrap_operator_status == "bootstrap-active" ? [var.bootstrap_operator_principal] : [],
   )

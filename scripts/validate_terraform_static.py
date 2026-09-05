@@ -2900,24 +2900,22 @@ def _approved_count_max(count_expr: str) -> int | None:
 
 
 def _has_reviewed_active_state_bucket_object_admin_principals(text: str) -> bool:
-    return bool(
-        re.search(
-            r"""
-            locals\s*\{\s*
-            active_state_bucket_object_admin_principals\s*=\s*concat\s*\(
-            \s*\[\s*
-            var\.state_authority_principal\s*,\s*
-            var\.recovery_authority_principal\s*,?\s*
-            \]\s*,\s*
-            var\.bootstrap_operator_status\s*==\s*"bootstrap-active"\s*\?\s*
-            \[\s*var\.bootstrap_operator_principal\s*\]\s*:\s*\[\s*\]\s*,?\s*
-            \)\s*
-            \}
-            """,
-            text,
-            re.DOTALL | re.VERBOSE,
-        )
+    try:
+        parsed = hcl2.loads(text)
+    except Exception:
+        return False
+    observed = [
+        block["active_state_bucket_object_admin_principals"]
+        for block in parsed.get("locals", [])
+        if isinstance(block, dict) and "active_state_bucket_object_admin_principals" in block
+    ]
+    expected = (
+        "${concat([var.state_authority_principal, var.recovery_authority_principal, "
+        '"serviceAccount:${google_service_account.provisioner.email}"], '
+        'var.bootstrap_operator_status == "bootstrap-active" ? '
+        "[var.bootstrap_operator_principal] : [])}"
     )
+    return len(observed) == 1 and " ".join(str(observed[0]).split()) == expected
 
 
 def _approved_for_each_max(for_each_expr: str, text: str) -> int | None:
@@ -2926,7 +2924,7 @@ def _approved_for_each_max(for_each_expr: str, text: str) -> int | None:
         r"toset\(\s*local\.active_state_bucket_object_admin_principals\s*\)", normalized
     ):
         if _has_reviewed_active_state_bucket_object_admin_principals(text):
-            return 3
+            return 4
         return None
     match = re.fullmatch(r"local\.([A-Za-z0-9_]+)", normalized)
     if match is None:

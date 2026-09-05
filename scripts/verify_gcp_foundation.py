@@ -534,6 +534,9 @@ def _expected_state_bucket_iam(contract: dict[str, Any]) -> dict[str, set[str]]:
     members = {
         str(contract["state_authority_principal"]),
         str(contract["recovery_authority_principal"]),
+        "serviceAccount:golden-rose-provisioner@{}.iam.gserviceaccount.com".format(
+            contract["control_plane_project_id"]
+        ),
     }
     if contract["bootstrap_operator_status"] == "bootstrap-active":
         members.add(str(contract["bootstrap_operator_principal"]))
@@ -935,6 +938,13 @@ def evaluate_foundation_snapshot(
             violations.append(
                 f"control-plane project-wide impersonation authority detected: {forbidden_role}"
             )
+    provisioner_project_member = (
+        "serviceAccount:golden-rose-provisioner@"
+        f"{contract['control_plane_project_id']}.iam.gserviceaccount.com"
+    )
+    for role, members in control_plane_project_iam.items():
+        if provisioner_project_member in _as_set(members):
+            violations.append(f"control-plane project-wide provisioner authority detected: {role}")
 
     service_account_iam = _mapping(
         snapshot.get("service_account_iam", {}), label="service account iam"

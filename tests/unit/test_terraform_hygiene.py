@@ -66,6 +66,22 @@ def _write_current_terraform_scaffold(root: Path) -> None:
     )
 
 
+def _replace_bootstrap_wif_condition(wif: str, old: str, new: str) -> str:
+    condition_match = re.search(
+        r'attribute_condition\s*=\s*(?P<condition>"(?:\\.|[^"\\])*")',
+        wif,
+    )
+    assert condition_match is not None
+    condition = json.loads(condition_match.group("condition"))
+    assert old in condition
+    updated_condition = condition.replace(old, new, 1)
+    return (
+        wif[: condition_match.start("condition")]
+        + json.dumps(updated_condition)
+        + wif[condition_match.end("condition") :]
+    )
+
+
 def _write_workflow_fixture(root: Path, name: str, content: str) -> None:
     workflow_dir = root / ".github" / "workflows"
     workflow_dir.mkdir(parents=True)
@@ -620,22 +636,51 @@ def test_gcp_bootstrap_wif_contract_requires_exact_github_claims() -> None:
 
     required_fragments = [
         'issuer_uri = "https://token.actions.githubusercontent.com"',
-        'attribute.repository == "b-mackenzie-alexander/golden_rose_project"',
-        'attribute.ref == "refs/heads/develop"',
-        'attribute.environment == "develop"',
-        'attribute.event_name == "workflow_dispatch"',
-        'attribute.repository_owner == "b-mackenzie-alexander"',
         '"attribute.workflow_ref"     = "assertion.workflow_ref"',
-        'attribute.workflow_ref == "b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop"',
-        'attribute.workflow_ref == "b-mackenzie-alexander/golden_rose_project/.github/workflows/deploy-develop.yml@refs/heads/develop"',
     ]
 
     for fragment in required_fragments:
         assert fragment in wif
 
-    assert "attribute.workflow_ref" in wif
-    assert "*" not in wif
-    assert 'attribute.event_name != "pull_request"' not in wif
+    condition_match = re.search(
+        r'attribute_condition\s*=\s*(?P<condition>"(?:\\.|[^"\\])*")',
+        wif,
+    )
+    assert condition_match is not None
+    condition = json.loads(condition_match.group("condition"))
+    required_condition_claims = [
+        'attribute.repository == "b-mackenzie-alexander/golden_rose_project"',
+        'attribute.ref == "refs/heads/develop"',
+        'attribute.environment == "develop"',
+        'attribute.event_name == "workflow_dispatch"',
+        'attribute.repository_owner == "b-mackenzie-alexander"',
+        'attribute.workflow_ref == "b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop"',
+        'attribute.workflow_ref == "b-mackenzie-alexander/golden_rose_project/.github/workflows/deploy-develop.yml@refs/heads/develop"',
+    ]
+    for claim in required_condition_claims:
+        assert claim in condition
+
+    assert "attribute.workflow_ref" in condition
+    assert "*" not in condition
+    assert 'attribute.event_name != "pull_request"' not in condition
+
+
+def test_gcp_bootstrap_source_preserves_provider_canonical_noop_fields() -> None:
+    wif = (ROOT / "infra/gcp/bootstrap/wif.tf").read_text(encoding="utf-8")
+    iam = (ROOT / "infra/gcp/bootstrap/iam.tf").read_text(encoding="utf-8")
+    expected_condition = 'attribute.repository == "b-mackenzie-alexander/golden_rose_project" && attribute.repository_owner == "b-mackenzie-alexander" && attribute.ref == "refs/heads/develop" && attribute.environment == "develop" && attribute.event_name == "workflow_dispatch" && ( attribute.workflow_ref == "b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" || attribute.workflow_ref == "b-mackenzie-alexander/golden_rose_project/.github/workflows/deploy-develop.yml@refs/heads/develop" )'
+    expected_artifact_verifier_description = (
+        "Artifact verification identity separate from image publication and deployment authority."
+    )
+
+    assert f"  attribute_condition = {json.dumps(expected_condition)}" in wif
+    artifact_verifier = iam.split('resource "google_service_account" "artifact_verifier"', 1)[
+        1
+    ].split("\n}", 1)[0]
+    assert (
+        f"  description  = {json.dumps(expected_artifact_verifier_description)}"
+        in artifact_verifier
+    )
 
 
 def test_gcp_bootstrap_iam_separates_provisioner_image_publisher_artifact_verifier_and_deployer() -> (
@@ -5399,7 +5444,8 @@ def test_terraform_static_validation_harness_rejects_bootstrap_wif_wildcard_repo
     _write_minimal_required_terraform_scaffold(tmp_path)
     bootstrap_root = tmp_path / "infra" / "gcp" / "bootstrap"
     wif = (ROOT / "infra" / "gcp" / "bootstrap" / "wif.tf").read_text(encoding="utf-8")
-    wif = wif.replace(
+    wif = _replace_bootstrap_wif_condition(
+        wif,
         'attribute.repository == "b-mackenzie-alexander/golden_rose_project"',
         'attribute.repository == "b-mackenzie-alexander/*"',
     )
@@ -5430,7 +5476,11 @@ def test_terraform_static_validation_harness_rejects_bootstrap_wif_missing_envir
     _write_minimal_required_terraform_scaffold(tmp_path)
     bootstrap_root = tmp_path / "infra" / "gcp" / "bootstrap"
     wif = (ROOT / "infra" / "gcp" / "bootstrap" / "wif.tf").read_text(encoding="utf-8")
-    wif = wif.replace('  attribute.environment == "develop" &&\n', "")
+    wif = _replace_bootstrap_wif_condition(
+        wif,
+        'attribute.environment == "develop" && ',
+        "",
+    )
     (bootstrap_root / "wif.tf").write_text(wif, encoding="utf-8")
     (bootstrap_root / "iam.tf").write_text(
         'resource "google_service_account_iam_member" "provisioner_wif" {\n'
@@ -5448,8 +5498,7 @@ def test_terraform_static_validation_harness_rejects_bootstrap_wif_missing_envir
     )
 
     assert result.returncode == 1
-    assert "missing exact GitHub claim" in result.stdout
-    assert "attribute.environment" in result.stdout
+    assert "attribute condition drifted" in result.stdout
 
 
 def test_terraform_static_validation_harness_rejects_bootstrap_wif_missing_workflow_ref_mapping(
@@ -5513,7 +5562,11 @@ def test_terraform_static_validation_harness_rejects_bootstrap_wif_tag_ref_claim
     _write_minimal_required_terraform_scaffold(tmp_path)
     bootstrap_root = tmp_path / "infra" / "gcp" / "bootstrap"
     wif = (ROOT / "infra" / "gcp" / "bootstrap" / "wif.tf").read_text(encoding="utf-8")
-    wif = wif.replace('attribute.ref == "refs/heads/develop"', 'attribute.ref == "refs/tags/v1"')
+    wif = _replace_bootstrap_wif_condition(
+        wif,
+        'attribute.ref == "refs/heads/develop"',
+        'attribute.ref == "refs/tags/v1"',
+    )
     (bootstrap_root / "wif.tf").write_text(wif, encoding="utf-8")
     (bootstrap_root / "iam.tf").write_text(
         (ROOT / "infra" / "gcp" / "bootstrap" / "iam.tf").read_text(encoding="utf-8"),
@@ -5529,8 +5582,7 @@ def test_terraform_static_validation_harness_rejects_bootstrap_wif_tag_ref_claim
     )
 
     assert result.returncode == 1
-    assert "missing exact GitHub claim" in result.stdout
-    assert 'attribute.ref == "refs/heads/develop"' in result.stdout
+    assert "attribute condition drifted" in result.stdout
 
 
 def test_terraform_static_validation_harness_rejects_bootstrap_wif_repository_only_impersonation_authority(
@@ -5573,7 +5625,8 @@ def test_terraform_static_validation_harness_rejects_bootstrap_wif_non_dispatch_
     _write_minimal_required_terraform_scaffold(tmp_path)
     bootstrap_root = tmp_path / "infra" / "gcp" / "bootstrap"
     wif = (ROOT / "infra" / "gcp" / "bootstrap" / "wif.tf").read_text(encoding="utf-8")
-    wif = wif.replace(
+    wif = _replace_bootstrap_wif_condition(
+        wif,
         'attribute.event_name == "workflow_dispatch"',
         'attribute.event_name == "push"',
     )
@@ -5592,8 +5645,7 @@ def test_terraform_static_validation_harness_rejects_bootstrap_wif_non_dispatch_
     )
 
     assert result.returncode == 1
-    assert "missing exact GitHub claim" in result.stdout
-    assert "workflow_dispatch" in result.stdout
+    assert "attribute condition drifted" in result.stdout
 
 
 @pytest.mark.parametrize(
@@ -5614,7 +5666,17 @@ def test_terraform_static_validation_harness_rejects_additive_bootstrap_wif_cond
     )
     bootstrap_root = tmp_path / "infra" / "gcp" / "bootstrap"
     wif = (ROOT / "infra" / "gcp" / "bootstrap" / "wif.tf").read_text(encoding="utf-8")
-    wif = wif.replace("  EOT\n", f"  {broadening}\n  EOT\n")
+    condition_match = re.search(
+        r'attribute_condition\s*=\s*(?P<condition>"(?:\\.|[^"\\])*")',
+        wif,
+    )
+    assert condition_match is not None
+    broadened_condition = json.loads(condition_match.group("condition")) + broadening
+    wif = (
+        wif[: condition_match.start("condition")]
+        + json.dumps(broadened_condition)
+        + wif[condition_match.end("condition") :]
+    )
     (bootstrap_root / "wif.tf").write_text(wif, encoding="utf-8")
     (bootstrap_root / "iam.tf").write_text(
         (ROOT / "infra" / "gcp" / "bootstrap" / "iam.tf").read_text(encoding="utf-8"),
@@ -5625,6 +5687,131 @@ def test_terraform_static_validation_harness_rejects_additive_bootstrap_wif_cond
 
     assert result.returncode == 1
     assert "attribute condition" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "effective_condition",
+    [
+        "local.unreviewed_condition",
+        "<<-EOT\n  true\n  EOT",
+    ],
+)
+def test_terraform_static_validation_rejects_decoy_comment_before_effective_wif_condition(
+    tmp_path: Path, effective_condition: str
+) -> None:
+    _write_current_terraform_scaffold(tmp_path)
+    (tmp_path / "infra" / "policy").mkdir(parents=True)
+    shutil.copy2(
+        ROOT / "infra" / "policy" / "predeployment-authority-manifest.json",
+        tmp_path / "infra" / "policy" / "predeployment-authority-manifest.json",
+    )
+    wif_path = tmp_path / "infra" / "gcp" / "bootstrap" / "wif.tf"
+    wif = wif_path.read_text(encoding="utf-8")
+    condition_match = re.search(
+        r'attribute_condition\s*=\s*(?P<condition>"(?:\\.|[^"\\])*")',
+        wif,
+    )
+    assert condition_match is not None
+    approved_assignment = condition_match.group(0)
+    wif = (
+        wif[: condition_match.start()]
+        + f"# {approved_assignment}\n  attribute_condition = {effective_condition}"
+        + wif[condition_match.end() :]
+    )
+    wif_path.write_text(wif, encoding="utf-8")
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode == 1
+    assert "attribute condition" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("approved_fragment", "effective_fragment"),
+    [
+        (
+            'issuer_uri = "https://token.actions.githubusercontent.com"',
+            'issuer_uri = "https://attacker.invalid"',
+        ),
+        (
+            '"attribute.workflow_ref"     = "assertion.workflow_ref"',
+            '"attribute.workflow_ref"     = "assertion.repository"',
+        ),
+    ],
+)
+def test_terraform_static_validation_rejects_decoy_comment_before_effective_wif_provider_fields(
+    tmp_path: Path, approved_fragment: str, effective_fragment: str
+) -> None:
+    _write_current_terraform_scaffold(tmp_path)
+    (tmp_path / "infra" / "policy").mkdir(parents=True)
+    shutil.copy2(
+        ROOT / "infra" / "policy" / "predeployment-authority-manifest.json",
+        tmp_path / "infra" / "policy" / "predeployment-authority-manifest.json",
+    )
+    wif_path = tmp_path / "infra" / "gcp" / "bootstrap" / "wif.tf"
+    wif = wif_path.read_text(encoding="utf-8")
+    assert approved_fragment in wif
+    wif_path.write_text(
+        wif.replace(
+            approved_fragment,
+            f"# {approved_fragment}\n    {effective_fragment}",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode == 1
+    assert "effective GitHub WIF provider" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("approved_fragment", "duplicate_fragment"),
+    [
+        (
+            "  attribute_condition = ",
+            '  attribute_condition = "true"\n',
+        ),
+        (
+            '    issuer_uri = "https://token.actions.githubusercontent.com"',
+            '    issuer_uri = "https://attacker.invalid"\n',
+        ),
+        (
+            '    "attribute.workflow_ref"     = "assertion.workflow_ref"',
+            '    "attribute.workflow_ref"     = "assertion.repository"\n',
+        ),
+        (
+            '    "attribute.workflow_ref"     = "assertion.workflow_ref"',
+            '    "attribute\\u002eworkflow_ref" = "assertion.repository"\n',
+        ),
+        (
+            '    "attribute.workflow_ref"     = "assertion.workflow_ref"',
+            '    (local.unreviewed_key) = "assertion.repository"\n',
+        ),
+    ],
+)
+def test_terraform_static_validation_rejects_duplicate_effective_wif_provider_fields(
+    tmp_path: Path, approved_fragment: str, duplicate_fragment: str
+) -> None:
+    _write_current_terraform_scaffold(tmp_path)
+    (tmp_path / "infra" / "policy").mkdir(parents=True)
+    shutil.copy2(
+        ROOT / "infra" / "policy" / "predeployment-authority-manifest.json",
+        tmp_path / "infra" / "policy" / "predeployment-authority-manifest.json",
+    )
+    wif_path = tmp_path / "infra" / "gcp" / "bootstrap" / "wif.tf"
+    wif = wif_path.read_text(encoding="utf-8")
+    assert approved_fragment in wif
+    wif_path.write_text(
+        wif.replace(approved_fragment, duplicate_fragment + approved_fragment, 1),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode == 1
+    assert "effective GitHub WIF provider contains duplicate fields" in result.stdout
 
 
 def test_terraform_static_validation_harness_rejects_bootstrap_provisioner_wif_path(

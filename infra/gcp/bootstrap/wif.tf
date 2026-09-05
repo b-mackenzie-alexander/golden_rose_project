@@ -38,15 +38,5 @@ resource "google_iam_workload_identity_pool_provider" "github" {
     issuer_uri = "https://token.actions.githubusercontent.com"
   }
 
-  attribute_condition = <<-EOT
-  attribute.repository == "b-mackenzie-alexander/golden_rose_project" &&
-  attribute.repository_owner == "b-mackenzie-alexander" &&
-  attribute.ref == "refs/heads/develop" &&
-  attribute.environment == "develop" &&
-  attribute.event_name == "workflow_dispatch" &&
-  (
-    attribute.workflow_ref == "b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" ||
-    attribute.workflow_ref == "b-mackenzie-alexander/golden_rose_project/.github/workflows/deploy-develop.yml@refs/heads/develop"
-  )
-  EOT
+  attribute_condition = "attribute.repository == \"b-mackenzie-alexander/golden_rose_project\" && attribute.repository_owner == \"b-mackenzie-alexander\" && attribute.ref == \"refs/heads/develop\" && attribute.environment == \"develop\" && attribute.event_name == \"workflow_dispatch\" && ( attribute.workflow_ref == \"b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop\" || attribute.workflow_ref == \"b-mackenzie-alexander/golden_rose_project/.github/workflows/deploy-develop.yml@refs/heads/develop\" )"
 }

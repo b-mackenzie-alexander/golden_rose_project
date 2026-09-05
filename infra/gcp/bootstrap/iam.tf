@@ -22,7 +22,7 @@ resource "google_service_account" "artifact_verifier" {
   project      = var.state_project_id
   account_id   = "golden-rose-artifact-verifier"
   display_name = "Golden Rose artifact verifier"
-  description  = "Artifact verification identity kept separate from image publication and Cloud Run deployment authority."
+  description  = "Artifact verification identity separate from image publication and deployment authority."
 }
 
 resource "google_service_account" "deployer" {

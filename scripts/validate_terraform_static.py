@@ -3331,14 +3331,8 @@ def _collect_bootstrap_wif_violations(root: Path) -> list[str]:
     if wif_path.exists():
         wif_text = wif_path.read_text(encoding="utf-8")
         required_claims = [
-            'attribute.repository == "b-mackenzie-alexander/golden_rose_project"',
-            'attribute.repository_owner == "b-mackenzie-alexander"',
-            'attribute.ref == "refs/heads/develop"',
-            'attribute.environment == "develop"',
-            'attribute.event_name == "workflow_dispatch"',
+            'issuer_uri = "https://token.actions.githubusercontent.com"',
             '"attribute.workflow_ref"     = "assertion.workflow_ref"',
-            'attribute.workflow_ref == "b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop"',
-            'attribute.workflow_ref == "b-mackenzie-alexander/golden_rose_project/.github/workflows/deploy-develop.yml@refs/heads/develop"',
         ]
         for claim in required_claims:
             if claim not in wif_text:
@@ -3359,19 +3353,185 @@ def _collect_bootstrap_wif_violations(root: Path) -> list[str]:
                 ")",
             ]
         )
-        condition_match = re.search(
-            r"attribute_condition\s*=\s*<<-?EOT\s*\n(?P<condition>.*?)\n\s*EOT",
-            wif_text,
-            re.DOTALL,
-        )
-        observed_attribute_condition = (
-            " ".join(condition_match.group("condition").split())
-            if condition_match is not None
-            else ""
-        )
+        provider_blocks: list[object] = []
+        try:
+            parsed_wif = hcl2.loads(wif_text)
+            parsed_wif_tree = hcl2.parses(wif_text)
+        except Exception as exc:
+            violations.append(
+                f"{wif_path.relative_to(root)} contains invalid HCL WIF configuration: {exc}"
+            )
+            parsed_wif = {}
+            parsed_wif_tree = None
+
+        duplicate_effective_fields = False
+        if parsed_wif_tree is not None:
+            nodes: list[object] = [parsed_wif_tree]
+            provider_rule_blocks: list[object] = []
+            while nodes:
+                node = nodes.pop()
+                children = getattr(node, "children", None)
+                if isinstance(children, list):
+                    nodes.extend(children)
+                if type(node).__name__ != "BlockRule":
+                    continue
+                serializer = getattr(node, "serialize", None)
+                serialized = serializer() if callable(serializer) else None
+                if isinstance(serialized, dict) and (
+                    '"google_iam_workload_identity_pool_provider"' in serialized
+                    or "google_iam_workload_identity_pool_provider" in serialized
+                ):
+                    provider_rule_blocks.append(node)
+            if len(provider_rule_blocks) == 1:
+                provider_rule_block = provider_rule_blocks[0]
+                descendants: list[object] = list(getattr(provider_rule_block, "children", []) or [])
+                attributes_by_block: dict[int, list[str]] = {}
+                object_keys_by_object: dict[int, list[str]] = {}
+                while descendants:
+                    node = descendants.pop()
+                    children = getattr(node, "children", None)
+                    if isinstance(children, list):
+                        descendants.extend(children)
+                    node_type = type(node).__name__
+                    if node_type not in {"AttributeRule", "ObjectElemRule"}:
+                        continue
+                    serializer = getattr(node, "serialize", None)
+                    serialized = serializer() if callable(serializer) else None
+                    if not isinstance(serialized, dict) or len(serialized) != 1:
+                        duplicate_effective_fields = True
+                        continue
+                    key = next(iter(serialized))
+                    if node_type == "ObjectElemRule":
+                        try:
+                            decoded_key = json.loads(key)
+                        except (json.JSONDecodeError, TypeError):
+                            duplicate_effective_fields = True
+                            continue
+                        if not isinstance(decoded_key, str):
+                            duplicate_effective_fields = True
+                            continue
+                        key = decoded_key
+                    ancestor = getattr(node, "parent", None)
+                    expected_ancestor_type = (
+                        "BlockRule" if node_type == "AttributeRule" else "ObjectRule"
+                    )
+                    while (
+                        ancestor is not None and type(ancestor).__name__ != expected_ancestor_type
+                    ):
+                        ancestor = getattr(ancestor, "parent", None)
+                    if ancestor is None:
+                        duplicate_effective_fields = True
+                        continue
+                    target = (
+                        attributes_by_block
+                        if node_type == "AttributeRule"
+                        else object_keys_by_object
+                    )
+                    target.setdefault(id(ancestor), []).append(key)
+                duplicate_effective_fields = duplicate_effective_fields or any(
+                    len(keys) != len(set(keys))
+                    for grouped in (attributes_by_block, object_keys_by_object)
+                    for keys in grouped.values()
+                )
+            elif provider_rule_blocks:
+                duplicate_effective_fields = True
+        if duplicate_effective_fields:
+            violations.append(
+                f"{wif_path.relative_to(root)} effective GitHub WIF provider contains duplicate fields"
+            )
+
+        for resource in parsed_wif.get("resource", []) if isinstance(parsed_wif, dict) else []:
+            if not isinstance(resource, dict):
+                continue
+            providers = resource.get('"google_iam_workload_identity_pool_provider"')
+            if providers is None:
+                providers = resource.get("google_iam_workload_identity_pool_provider")
+            if not isinstance(providers, dict):
+                continue
+            provider = providers.get('"github"')
+            if provider is None:
+                provider = providers.get("github")
+            if provider is not None:
+                provider_blocks.append(provider)
+        observed_attribute_condition = ""
+        if len(provider_blocks) != 1 or not isinstance(provider_blocks[0], dict):
+            violations.append(
+                f"{wif_path.relative_to(root)} must declare exactly one effective GitHub WIF provider resource"
+            )
+        else:
+            provider_block = provider_blocks[0]
+
+            def decode_literal(value: object) -> str | None:
+                if not isinstance(value, str):
+                    return None
+                try:
+                    decoded = json.loads(value)
+                except json.JSONDecodeError:
+                    return None
+                return decoded if isinstance(decoded, str) else None
+
+            expected_provider_fields = {
+                "__is_block__",
+                "project",
+                "workload_identity_pool_id",
+                "workload_identity_pool_provider_id",
+                "display_name",
+                "description",
+                "attribute_mapping",
+                "oidc",
+                "attribute_condition",
+            }
+            expected_mapping = {
+                "google.subject": "assertion.sub",
+                "attribute.repository": "assertion.repository",
+                "attribute.repository_owner": "assertion.repository_owner",
+                "attribute.ref": "assertion.ref",
+                "attribute.environment": "assertion.environment",
+                "attribute.event_name": "assertion.event_name",
+                "attribute.workflow_ref": "assertion.workflow_ref",
+            }
+            raw_mapping = provider_block.get("attribute_mapping")
+            observed_mapping: dict[str, str] = {}
+            if isinstance(raw_mapping, dict):
+                for raw_key, raw_value in raw_mapping.items():
+                    decoded_key = decode_literal(raw_key)
+                    decoded_value = decode_literal(raw_value)
+                    if decoded_key is not None and decoded_value is not None:
+                        observed_mapping[decoded_key] = decoded_value
+            oidc_blocks = provider_block.get("oidc")
+            exact_oidc = (
+                isinstance(oidc_blocks, list)
+                and len(oidc_blocks) == 1
+                and isinstance(oidc_blocks[0], dict)
+                and set(oidc_blocks[0]) == {"__is_block__", "issuer_uri"}
+                and decode_literal(oidc_blocks[0].get("issuer_uri"))
+                == "https://token.actions.githubusercontent.com"
+            )
+            exact_provider_fields = (
+                set(provider_block) == expected_provider_fields
+                and provider_block.get("project") == "${var.state_project_id}"
+                and provider_block.get("workload_identity_pool_id")
+                == "${google_iam_workload_identity_pool.github.workload_identity_pool_id}"
+                and decode_literal(provider_block.get("workload_identity_pool_provider_id"))
+                == "golden-rose-github-provider"
+                and decode_literal(provider_block.get("display_name"))
+                == "Golden Rose GitHub provider"
+                and decode_literal(provider_block.get("description"))
+                == "Rejects pull requests and requires exact repository, ref, and environment claims."
+                and observed_mapping == expected_mapping
+                and exact_oidc
+            )
+            if not exact_provider_fields:
+                violations.append(
+                    f"{wif_path.relative_to(root)} effective GitHub WIF provider fields drifted"
+                )
+            effective_condition = provider_block.get("attribute_condition")
+            decoded_condition = decode_literal(effective_condition)
+            if decoded_condition is not None:
+                observed_attribute_condition = decoded_condition
         if observed_attribute_condition != expected_attribute_condition:
             violations.append(
-                f"{wif_path.relative_to(root)} attribute condition drifted from reviewed trust"
+                f"{wif_path.relative_to(root)} attribute condition drifted from reviewed trust or provider-canonical representation"
             )
 
         wildcard_claim_patterns = [
@@ -3382,11 +3542,11 @@ def _collect_bootstrap_wif_violations(root: Path) -> list[str]:
             (r'attribute\.workflow_ref\s*==\s*"[^"]*\*[^"]*"', "attribute.workflow_ref"),
         ]
         for pattern, attribute_name in wildcard_claim_patterns:
-            if re.search(pattern, wif_text):
+            if re.search(pattern, observed_attribute_condition):
                 violations.append(
                     f"{wif_path.relative_to(root)} contains wildcard GitHub claim {attribute_name}"
                 )
-        if 'attribute.event_name != "pull_request"' in wif_text:
+        if 'attribute.event_name != "pull_request"' in observed_attribute_condition:
             violations.append(
                 f"{wif_path.relative_to(root)} must require workflow_dispatch rather than only rejecting pull_request"
             )

@@ -103,7 +103,7 @@
         "max_count": 1
       },
       "google_storage_bucket_iam_member": {
-        "max_count": 3
+        "max_count": 4
       }
     }
   },

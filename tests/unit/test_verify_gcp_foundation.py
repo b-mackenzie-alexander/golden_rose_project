@@ -1104,6 +1104,21 @@ def test_evaluate_foundation_snapshot_accepts_expected_snapshot() -> None:
     assert module.evaluate_foundation_snapshot(valid_snapshot(), expected_contract()) == []
 
 
+def test_evaluate_foundation_snapshot_requires_provisioner_state_bucket_authority() -> None:
+    module = load_module()
+    contract = expected_contract() | {
+        "state_authority_principal": "user:state.authority@example.com"
+    }
+    snapshot = valid_snapshot()
+    snapshot["state_bucket_iam"]["roles/storage.objectAdmin"] = [
+        contract["state_authority_principal"],
+        contract["recovery_authority_principal"],
+        "serviceAccount:golden-rose-provisioner@state-project.iam.gserviceaccount.com",
+    ]
+
+    assert module.evaluate_foundation_snapshot(snapshot, contract) == []
+
+
 def test_evaluate_foundation_snapshot_accepts_exact_provisioner_operator_token_creator() -> None:
     module = load_module()
     contract = expected_contract() | {
@@ -1199,6 +1214,36 @@ def test_evaluate_foundation_snapshot_rejects_control_plane_project_wide_imperso
 
     assert any(
         f"control-plane project-wide impersonation authority detected: {role}" in violation
+        for violation in violations
+    )
+
+
+@pytest.mark.parametrize(
+    "role",
+    [
+        "roles/storage.objectAdmin",
+        "roles/storage.admin",
+        "roles/storage.objectViewer",
+        "roles/owner",
+        "projects/state-project/roles/customProvisioner",
+    ],
+)
+def test_evaluate_foundation_snapshot_rejects_any_project_wide_provisioner_role(
+    role: str,
+) -> None:
+    module = load_module()
+    contract = expected_contract()
+    snapshot = valid_snapshot()
+    provisioner = (
+        "serviceAccount:golden-rose-provisioner@"
+        f"{contract['control_plane_project_id']}.iam.gserviceaccount.com"
+    )
+    snapshot["control_plane_project_iam"][role] = [provisioner]
+
+    violations = module.evaluate_foundation_snapshot(snapshot, contract)
+
+    assert any(
+        f"control-plane project-wide provisioner authority detected: {role}" in violation
         for violation in violations
     )
 

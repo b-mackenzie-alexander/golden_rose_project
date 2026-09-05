@@ -3011,6 +3011,11 @@ def test_terraform_static_validation_harness_rejects_workflow_step_not_listed_in
             'var.bootstrap_operator_status == "bootstrap-retired" ? [var.bootstrap_operator_principal] : [],',
             "active state-bucket object-admin principal collection",
         ),
+        (
+            '      "serviceAccount:${google_service_account.provisioner.email}",',
+            '      "serviceAccount:${google_service_account.image_publisher.email}",',
+            "active state-bucket object-admin principal collection",
+        ),
     ],
 )
 def test_terraform_static_validation_harness_rejects_state_bucket_iam_drift(
@@ -3038,6 +3043,38 @@ def test_terraform_static_validation_harness_rejects_state_bucket_iam_drift(
 
     assert result.returncode == 1
     assert expected_fragment in result.stdout
+
+
+def test_terraform_static_validation_rejects_commented_state_bucket_principal_decoy(
+    tmp_path: Path,
+) -> None:
+    _write_current_terraform_scaffold(tmp_path)
+    policy_dir = tmp_path / "infra" / "policy"
+    policy_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(ROOT / "infra" / "policy" / "predeployment-authority-manifest.json", policy_dir)
+    bootstrap_dir = tmp_path / "infra" / "gcp" / "bootstrap"
+    current = (ROOT / "infra/gcp/bootstrap/iam.tf").read_text(encoding="utf-8")
+    reviewed_local = current.split("locals {", 1)[1].split("\n}\n", 1)[0]
+    mutated = current.replace(
+        '"serviceAccount:${google_service_account.provisioner.email}"',
+        '"serviceAccount:${google_service_account.image_publisher.email}"',
+        1,
+    )
+    (bootstrap_dir / "iam.tf").write_text(
+        f"/*\nlocals {{{reviewed_local}\n}}\n*/\n{mutated}",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "active state-bucket object-admin principal collection" in result.stdout
 
 
 def test_terraform_static_validation_binds_bucket_iam_to_each_deduplicated_principal(
@@ -3079,6 +3116,7 @@ def test_bootstrap_bucket_iam_uses_one_deduplicated_address_per_principal() -> N
         iam,
     )
     assert re.search(r"member\s*=\s*each\.value", iam)
+    assert '"serviceAccount:${google_service_account.provisioner.email}"' in iam
     assert "state_authority_object_admin" not in iam
     assert "recovery_authority_object_admin" not in iam
     assert "bootstrap_operator_object_admin" not in iam

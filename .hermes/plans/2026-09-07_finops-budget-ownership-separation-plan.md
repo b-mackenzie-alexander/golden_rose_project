@@ -1,8 +1,8 @@
 # FinOps Budget Ownership Separation and Migration Resumption Plan
 
-> **Status:** Accepted by Beatrice on 2026-09-07; documentation-only publication pending. No implementation or operational authority is implied.
+> **Status:** Accepted and merged by PR #79 at `develop@e7bab14795a24ff69fcc3cd7f8bd28f2cbb9cd73`. This authorizes only the declared Implementation PR A source lane; every operational gate remains separate.
 
-> **For Hermes:** Use plan-driven TDD execution after this accepted plan is merged into protected `develop`. Keep every cloud/state/plan/apply gate separately approved.
+> **For Hermes:** Use plan-driven TDD execution for Implementation PR A only after exact merged-tip rebaseline. Keep every cloud/state/plan/apply gate separately approved.
 
 **Goal:** Move the existing develop Billing Budget out of the provisioner-operated workload root into a billing-authorized FinOps root without replacing the live budget, granting project-level provisioner authority, or weakening the staged deployment path; then return to a mechanically admitted migration plan.
 
@@ -10,7 +10,7 @@
 
 **Tech Stack:** Repository-pinned Terraform 1.15.8 for CI, separately exact-bound compatible Terraform for approved operator packets, checked-in per-root lockfiles, Google provider selected by each lock, Python 3.12, pytest, Ruff, mypy, Cosign/Sigstore, Gitleaks, and owner-held GCP evidence.
 
-**Boundary:** Accepted and unpublished; planning acceptance grants no implementation or cloud authority before protected merge.
+**Boundary:** Accepted and merged; only Implementation PR A source work is authorized. No cloud or operational authority is implied.
 
 ---
 
@@ -58,7 +58,7 @@ The normal ADR-0013 sequence may then continue under separate approvals without 
 - Modify: `SECURITY.md`
 - Modify: `TECHNICAL_REQUIREMENTS.md`
 
-**Acceptance:** Independent architecture/security, Terraform/state-transfer, and plan-executability reviews are CLEAN; Beatrice explicitly accepted the reviewed contract on 2026-09-07. The pre-acceptance reviewed hashes and the current accepted-publication hashes, plus the status-only reason for their difference, must be recorded in the handoff and the latter explicitly confirmed before branch publication.
+**Acceptance:** Independent architecture/security, Terraform/state-transfer, and plan-executability reviews were CLEAN; Beatrice explicitly accepted the reviewed contract, and PR #79 merged it into protected `develop`. The handoff retains the pre-acceptance and accepted-publication hashes; this post-merge status-only follow-up records the completed merge without altering the technical contract.
 
 **Hard stop:** No Terraform source behavior, backend file, provider configuration, test behavior, cloud call, or state action in this PR.
 

@@ -2422,5 +2422,16 @@ This is the concise, dated engineering and operational note log. It records obse
 - **Review:** Exact committed-head review found one Medium stale-status finding, now remediated by describing PR #79 as open and the local remediation as committed/ready to push. No product, Terraform, test, workflow, ADR/plan hash, or cloud authority changed.
 - **Boundary:** Push/PR readback/CI rerun remain under existing publication authority. Merge and all implementation/cloud/state actions remain unauthorized.
 
+## 2026-09-07 — PR #79 merged; separate status closeout started
+- **Validated remote result:** PR #79 required checks all passed on head `6ebf7828983df6a15becf706aeb630a798cb269c`: Terraform static validation run `34152922480`, application run `34152922498`, repository hygiene run `34152922482`, and branch policy run `34152922549`. PR #79 merged into protected `develop` as `e7bab14795a24ff69fcc3cd7f8bd28f2cbb9cd73`; its remote branch was deleted.
+- **Owner clarification:** Beatrice reported merging while believing review had completed and requested that the resulting document drift be handled in a separate PR.
+- **Fresh lane:** Rebaselined exactly from the merge and created `docs/pr79-post-merge-status-closeout`. The diff is status-only: replace open/pending claims with merged truth, preserve PR #79 evidence as historical, and name Implementation PR A as the next source lane without starting it.
+- **Boundary:** This follow-up authorizes documentation drift remediation only. No Terraform implementation, GCP authentication, IAM/state operation, plan/apply, migration, or downstream action is included.
+
+## 2026-09-07 — PR #79 post-merge status closeout independently cleared
+- **Review:** Independent governance/security and continuity/evidence reviews both returned CLEAN with zero findings on the exact 17-file status-only surface.
+- **Local check:** The retained bootstrap static-contract regression passed; tracked and untracked whitespace checks passed.
+- **Ready boundary:** Commit, exact-range verification/Gitleaks, push, and a separate PR are authorized. Implementation PR A and every operational action remain out of scope.
+
 ## Updating this file
 Add a short dated entry after a material planning, implementation, test, security, or release event. Link detailed evidence rather than duplicating it. Record commands and results only when they were actually run.

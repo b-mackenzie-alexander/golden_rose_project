@@ -2433,5 +2433,10 @@ This is the concise, dated engineering and operational note log. It records obse
 - **Local check:** The retained bootstrap static-contract regression passed; tracked and untracked whitespace checks passed.
 - **Ready boundary:** Commit, exact-range verification/Gitleaks, push, and a separate PR are authorized. Implementation PR A and every operational action remain out of scope.
 
+## 2026-09-07 — PR #79 status closeout committed-head finding remediated
+- **Substantive commit:** `e8be1128584d34bb3e0843bed014f05f079ca074` passed Terraform hygiene (`299 passed`), exact-range diff hygiene, and one-commit Gitleaks with no leaks.
+- **Exact-head review:** One Medium found that `CURRENT_WORK.md` and the new handoff still described commit/range work as future. The status is now corrected without changing architecture, implementation scope, or operational authority.
+- **Next:** Commit this status-only correction, verify the resulting complete range, and publish the separate PR. Record the final immutable head in the PR body because a commit cannot contain its own hash.
+
 ## Updating this file
 Add a short dated entry after a material planning, implementation, test, security, or release event. Link detailed evidence rather than duplicating it. Record commands and results only when they were actually run.

@@ -3,7 +3,7 @@
 **Updated:** 2026-09-07
 **Lane:** Post-merge PR #79 status closeout on fresh branch `docs/pr79-post-merge-status-closeout` from exact protected `develop@e7bab14795a24ff69fcc3cd7f8bd28f2cbb9cd73`. This lane repairs only merged-document status drift; it does not begin Implementation PR A.
 **Authority:** Documentation-only drift remediation and separate PR publication. ADR-0015's merge authorizes later Implementation PR A source work, but no Terraform implementation is included here and no GCP authentication, backend/state operation, import/removal, plan/apply, budget mutation, database/Secret action, migration execution, service/tester access, qualification, live data, or production action is authorized.
-**Verification:** PR #79 remediation head `6ebf7828983df6a15becf706aeb630a798cb269c` passed all required CI and merged as `e7bab14795a24ff69fcc3cd7f8bd28f2cbb9cd73`. This fresh branch is exact at that merge tip; independent governance/security and continuity/evidence reviews are CLEAN, and the retained bootstrap static-contract regression passes.
+**Verification:** The substantive closeout commit `e8be1128584d34bb3e0843bed014f05f079ca074` passed Terraform hygiene (`299 passed`), exact-range diff hygiene, and one-commit Gitleaks with no leaks. Exact committed-head review found only stale self-status in this handoff/current-work surface; that Medium is corrected here. The resulting full branch range must be rechecked before push and recorded in the follow-up PR body.
 
 The detailed Task 1-15 source summary below is historical PR #33/PR #37 source evidence. Where it conflicts with accepted ADR-0013 or the private operator-held live evidence, those sources control the current lane.
 **Overall status:** The tracer includes backend EmployerContact create, bounded parent query, exact read, typed receipt/audit authority, PR #22's local runtime/container contract, PR #29's remediated Terraform/static surface, and the merged ADR-0012/ADR-0013 source contracts. Separately approved state establishment, representation reconciliation, saved-plan review, exact foundation apply, and post-apply verification established the non-executable foundation with durable state controls, control-plane identities/WIF, required workload APIs/identities, registry, metadata-only Secrets/IAM, and budget/observability baseline. The same-repository-CI High remains open accepted residual risk; required checks and agent reviews are quality evidence, not independent authorization. Gate P immutable publication verification is complete. Private network, Cloud SQL, database access, executable workload, tester access, qualification, live/client data, and production remain incomplete and separately gated.
@@ -53,8 +53,8 @@ PR B completed from the exact PR #51 merge tip and merged as PR #52; its source-
 - Accepted correction/audit baseline: PostgreSQL domain rows hold current operational truth; append-only `AuditEvent` records preserve material history through atomic expected-version/idempotent commands; restricted prior/new values remain field-authorized; and derived projections are disposable rather than competing record stores. `docs/planning/phase-1-correction-audit-event-contract.md` is authoritative.
 
 ## Immediate next steps
-1. Commit the independently CLEAN exact 17-file post-merge status closeout.
-2. Run exact-range diff/Gitleaks and relevant static tests, then push and open a separate PR to `develop`.
+1. Commit this final status-only correction atop the independently reviewed substantive closeout.
+2. Re-run full branch-range diff/Gitleaks and Terraform hygiene, then push and open the separate PR to `develop`.
 3. Merge that closeout only with separate authority, then rebaseline before Implementation PR A.
 4. Preserve the continuous FinOps/workload plan/apply freeze and every separate cloud/state approval in the accepted sequence.
 

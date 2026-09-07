@@ -1,6 +1,6 @@
 # PR #79 Post-Merge Status Closeout Review Handoff
 
-**Status:** Independently CLEAN; uncommitted documentation-only closeout
+**Status:** Committed documentation-only closeout; final status correction ready to commit and publish
 **Base:** protected `develop@e7bab14795a24ff69fcc3cd7f8bd28f2cbb9cd73`
 **Branch:** `docs/pr79-post-merge-status-closeout`
 **Authority:** Status drift remediation only; no implementation or operational action
@@ -68,8 +68,8 @@ No technical architecture, trust boundary, TDD node, implementation order, or op
 
 ## Review result
 
-Independent governance/security and continuity/evidence reviews returned CLEAN with zero findings on the exact 17-file status-only surface.
+Independent governance/security and continuity/evidence reviews returned CLEAN with zero findings on the exact 17-file status-only surface. Substantive closeout commit `e8be1128584d34bb3e0843bed014f05f079ca074` then passed Terraform hygiene (`299 passed`), exact-range diff hygiene, and one-commit Gitleaks with no leaks. Its exact-head review found only the now-corrected Medium that this document and `CURRENT_WORK.md` still described commit/range work as future.
 
 ## Current stop
 
-The exact closeout may proceed through commit, committed-range verification, push, and separate PR publication. Do not begin Implementation PR A, authenticate to GCP, initialize a backend, read/mutate state, generate/apply a plan, or execute migration/downstream work. Merge of the follow-up remains separately controlled.
+Commit this final status-only correction, rerun the full resulting branch range, then publish the separate PR. Do not begin Implementation PR A, authenticate to GCP, initialize a backend, read/mutate state, generate/apply a plan, or execute migration/downstream work. Merge of the follow-up remains separately controlled.

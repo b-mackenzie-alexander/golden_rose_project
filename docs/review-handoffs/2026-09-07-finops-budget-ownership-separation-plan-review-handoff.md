@@ -1,6 +1,6 @@
 # FinOps Budget Ownership Separation Planning Review Handoff
 
-**Status:** Accepted planning packet; uncommitted and unpublished
+**Status:** Accepted planning packet published in open PR #79; CI remediation reviewed CLEAN and locally green
 **Base:** protected `develop@f41e2756c820abc736c52739c6a67390107afb7f`
 **Authority:** Documentation/planning only; no implementation or cloud/state authority
 
@@ -71,6 +71,16 @@ The accepted-publication artifacts differ only because their status/approval pro
 
 The first focused status-delta review found stale Proposed wording and this missing hash transition; those Medium findings were remediated. Final focused review `deleg_c3a0cbd0` returned CLEAN. Beatrice explicitly confirmed the current accepted-publication hashes and authorized only the exact 16-file documentation branch/commit/push/PR publication; merge and every implementation/operational action remain unauthorized.
 
+## PR #79 CI remediation
+
+The first pushed head `94afcb33f94d981c853a8390834be7ee86a53284` failed two jobs at one shared assertion:
+
+- Terraform static validation run `34149726459`
+- Application quality run `34149726411`
+- exact failing node: `tests/unit/test_terraform_hygiene.py::test_gcp_bootstrap_provisioner_local_operator_impersonation_is_exact_and_resource_scoped`
+
+The accepted runbook rewrite changed the provisioner transition from future tense to completed PR #78 history but removed five literal phrases retained as a static contract. The narrow correction restores those phrases in a truthful completed-history paragraph. No Terraform/product source, test, workflow, accepted ADR/plan hash, or cloud authority changed. Local RED reproduced the exact assertion; local GREEN is `1 passed`, followed by `299 passed` for the complete Terraform hygiene file.
+
 ## Current stop
 
-Documentation publication may proceed through the authorized branch/commit/push/PR sequence. Do not merge, edit Terraform implementation, authenticate to GCP, initialize a backend, read/mutate state, generate/apply a plan, or run migration/downstream work without later separate authority.
+The remediation received CLEAN technical and governance rereviews and may be committed/pushed under the existing exact PR-publication authority. Do not merge, edit Terraform implementation, authenticate to GCP, initialize a backend, read/mutate state, generate/apply a plan, or run migration/downstream work without later separate authority.

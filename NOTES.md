@@ -2404,5 +2404,16 @@ This is the concise, dated engineering and operational note log. It records obse
 - **Authorized publication:** Create one valid documentation branch, commit only the exact 16-file planning candidate, run committed-range qualification and Gitleaks, push, and open/read back a PR to `develop`.
 - **Boundary:** Merge, implementation, GCP authentication, IAM/state, Terraform plan/apply, migration, and downstream work remain unauthorized.
 
+## 2026-09-07 — PR #79 CI failure reproduced and remediated locally
+- **Observed CI:** Both `Terraform static validation` run `34149726459` and `Application quality` run `34149726411` failed at the same assertion in `tests/unit/test_terraform_hygiene.py::test_gcp_bootstrap_provisioner_local_operator_impersonation_is_exact_and_resource_scoped`. The application job's missing backend-SBOM upload was secondary because the main quality command stopped before SBOM generation.
+- **Root cause:** The accepted planning packet truthfully changed the bootstrap runbook from future correction to completed PR #78 history, but removed five literal phrases enforced by the existing static contract test. No Terraform source, IAM contract, product behavior, or cloud action failed.
+- **Narrow remediation:** Restored all five phrases in one truthful completed-history paragraph without reviving any approval or changing the ADR-0015 contract.
+- **Local evidence:** Exact regression `1 passed`; full `tests/unit/test_terraform_hygiene.py` `299 passed`.
+- **Boundary:** Follow-up commit/review/range scan/push and CI rerun remain; merge and all implementation/cloud/state actions remain unauthorized.
+
+## 2026-09-07 — PR #79 CI remediation independently cleared
+- **Review:** Focused technical rereview and replacement governance/evidence rereview both returned CLEAN with zero findings after the handoff status was aligned to the open PR.
+- **Ready boundary:** Commit the four-file documentation-only remediation, rerun exact final-head Terraform hygiene/diff/Gitleaks, push, update/read back PR #79, and inspect CI. Merge and all implementation/cloud/state actions remain unauthorized.
+
 ## Updating this file
 Add a short dated entry after a material planning, implementation, test, security, or release event. Link detailed evidence rather than duplicating it. Record commands and results only when they were actually run.

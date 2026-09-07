@@ -1,9 +1,9 @@
 # Current Work — Golden Rose Operations Platform
 
 **Updated:** 2026-09-07
-**Lane:** Accepted material replanning after the post-PR78 migration saved-plan gate exposed an identity/quota conflict. ADR-0015 separates Billing Budget ownership into a billing-authorized FinOps root rather than granting project-level authority to the workload provisioner; documentation-only publication is pending.
+**Lane:** PR #79 CI remediation for the accepted ADR-0015 documentation-only planning packet. Both failed jobs reduced to one stale runbook-contract assertion after the completed PR #78 status rewrite; no product, Terraform, or cloud behavior failed.
 **Authority:** Beatrice confirmed the exact accepted ADR/plan hashes and authorized only the 16-file documentation branch/commit/push/PR publication. No merge, Terraform implementation, cloud authentication, backend/state operation, import/removal, plan/apply, budget mutation, database/Secret action, migration execution, service/tester access, qualification, live data, or production authority exists.
-**Verification:** PR #78 apply/readback and provisioner workload-backend proof are complete. The quota-attributed migration plan attempt stopped before state read/plan. Five substantive review rounds ended CLEAN in all three lanes; focused acceptance-status/hash-transition review `deleg_c3a0cbd0` also returned CLEAN. The accepted ADR/plan hashes were explicitly confirmed before publication authority.
+**Verification:** PR #79 failed `Terraform static validation` and `application` only at `test_gcp_bootstrap_provisioner_local_operator_impersonation_is_exact_and_resource_scoped`: the accepted runbook rewrite removed five legacy contract phrases while preserving their semantics. The runbook now records those phrases truthfully as completed PR #78 history. Exact regression is GREEN (`1 passed`), the complete Terraform hygiene file is GREEN (`299 passed`), and independent technical plus governance rereviews are CLEAN. Follow-up committed-range and remote CI evidence must be recorded on PR #79 rather than preclaimed here.
 
 The detailed Task 1-15 source summary below is historical PR #33/PR #37 source evidence. Where it conflicts with accepted ADR-0013 or the private operator-held live evidence, those sources control the current lane.
 **Overall status:** The tracer includes backend EmployerContact create, bounded parent query, exact read, typed receipt/audit authority, PR #22's local runtime/container contract, PR #29's remediated Terraform/static surface, and the merged ADR-0012/ADR-0013 source contracts. Separately approved state establishment, representation reconciliation, saved-plan review, exact foundation apply, and post-apply verification established the non-executable foundation with durable state controls, control-plane identities/WIF, required workload APIs/identities, registry, metadata-only Secrets/IAM, and budget/observability baseline. The same-repository-CI High remains open accepted residual risk; required checks and agent reviews are quality evidence, not independent authorization. Gate P immutable publication verification is complete. Private network, Cloud SQL, database access, executable workload, tester access, qualification, live/client data, and production remain incomplete and separately gated.
@@ -53,9 +53,9 @@ PR B completed from the exact PR #51 merge tip and merged as PR #52; its source-
 - Accepted correction/audit baseline: PostgreSQL domain rows hold current operational truth; append-only `AuditEvent` records preserve material history through atomic expected-version/idempotent commands; restricted prior/new values remain field-authorized; and derived projections are disposable rather than competing record stores. `docs/planning/phase-1-correction-audit-event-contract.md` is authoritative.
 
 ## Immediate next steps
-1. Create the approved documentation branch, stage/commit the exact 16-file candidate, and qualify the committed range.
-2. Run exact-range Gitleaks, push, open the PR to `develop`, read back the remote PR, and inspect required checks once.
-3. Merge only with separate authority through protected `develop`, then rebaseline before Implementation PR A; do not mix implementation into the planning PR.
+1. Record and independently review the narrow runbook compatibility remediation.
+2. Commit the exact remediation, rerun committed-range diff/Gitleaks and relevant local gates, then push under the existing publication authority.
+3. Update/read back PR #79 and inspect required CI; merge remains separately unauthorized.
 4. Preserve the continuous FinOps/workload plan/apply freeze and every separate cloud/state approval in the accepted sequence.
 
 ## Gate classification

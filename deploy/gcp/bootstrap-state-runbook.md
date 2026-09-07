@@ -30,7 +30,7 @@ Before any bootstrap-state establishment/reconciliation request, prove privately
 
 ### Provisioner operator bootstrap exception — completed
 
-The bounded named-human bootstrap operator executed the separately approved Token Creator and bucket Object Admin transitions. Exact policy/state readback, non-echoing token mint, and provisioner-owned workload-backend proof passed; both approvals are consumed. Ambient-user workload Terraform, provisioner GitHub WIF, keys, and every project-level provisioner role remain forbidden.
+The bounded named-human bootstrap operator executed the separately approved Token Creator and bucket Object Admin transitions. The existing bootstrap operator remained the bounded executor for each exact bootstrap-root saved plan. In the final PR #78 transition, the sole allowed create was the exact provisioner bucket member; exact policy/state readback and short-lived provisioner impersonation backend proof passed, and both approvals are consumed. Ambient-user workload Terraform, provisioner GitHub WIF, keys, and every project-level provisioner role remain forbidden.
 
 Accepted ADR-0015 (publication pending) would add a different bootstrap-owned resource: one dedicated FinOps state bucket and one exact authoritative bucket policy for two named-human custodians. That source, plan, apply, and readback do not yet exist and each remains separately gated; they may not reuse either completed provisioner transition.
 

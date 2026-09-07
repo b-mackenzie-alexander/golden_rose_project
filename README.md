@@ -51,13 +51,13 @@ automated hiring, matching, ranking, eligibility, or referral system.
   no executable workload. Gate P is complete; its one-use approval is consumed.
   Gate S created and metadata-read back only the bounded `synthetic-staff-id`
   version. Runtime/migration database-URL versions remain deferred until real
-  database/login material exists. The desired named-human local impersonation
-  bridge grants Token Creator only on the provisioner service account and remains
-  unapplied source pending protected merge and a separate bootstrap plan/apply/
-  readback; no provisioner GitHub WIF, key, project-wide grant, migration, service,
-  tester, qualification, real-identity, live-data, or production action is implied.
-  Private identifiers and secret payloads stay outside tracked source and ordinary
-  documentation.
+  database/login material exists. Both named-human bootstrap authority transitions,
+  exact apply/readback, and provisioner-owned workload-backend proof are complete.
+  Fresh migration planning stopped on the quota-authority conflict now governed by
+  accepted ADR-0015, published in open PR #79 with protected merge pending, which grants no implementation, IAM/state,
+  plan/apply, migration, service, tester, qualification, real-identity, live-data,
+  or production authority before protected merge. Private identifiers and secret payloads stay outside
+  tracked source and ordinary documentation.
 - Source-controlled Gate 2 read-only verification tooling now exists: `scripts/verify_gcp_foundation.py`
   evaluates live foundation/effective-authority posture against the reviewed
   contract without adding any mutation mode, and `deploy/gcp/evidence-template.md`

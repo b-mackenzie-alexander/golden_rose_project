@@ -2358,5 +2358,69 @@ This is the concise, dated engineering and operational note log. It records obse
 - **Final independent rereview:** Bounded security/IAM rereview returned APPROVE with both prior Highs closed and 13 focused reviewer tests passing. It confirmed semantic HCL defeats comment decoys, the exact provisioner receives only deduplicated bucket-level Object Admin, every control-plane project role for that provisioner is rejected, duplicate IAM roles are aggregated, and WIF/key/service-account/bucket-policy boundaries remain strict. Final documentation/evidence rereview returned PASS across every active status surface with no finding. Reviewers made no edits and performed no cloud or real-backend action.
 - **Boundary:** Source-only remediation. No GCP authentication, real-backend initialization/state read, Terraform plan/apply, IAM mutation, database/Secret action, migration execution, service/tester access, qualification, live/client data, or production action occurred in this coding lane.
 
+## 2026-09-07 — FinOps budget-ownership separation proposed
+- **Observed operational stop:** The fresh post-PR78 migration plan packet passed independent review and one-use approval. Named-human identity and non-echoing provisioner token mint passed; Terraform initialization then stopped before state read or plan generation because explicit quota attribution requires `serviceusage.services.use` for the provisioner. No Terraform/cloud mutation occurred, the approval is consumed, and the packet is sealed non-reusable.
+- **Validated material conflict:** Independent architecture/security disposition found no packet-only retry that preserves provisioner-only execution, explicit quota attribution, normal Billing Budget refresh, and the prohibition on project-level provisioner authority. Init-only quota scoping merely moves the failure to planning; targeting, refresh suppression, ambient user fallback, WIF/keys, global quota configuration, and approval reuse remain prohibited.
+- **Owner-selected direction:** Beatrice selected separation of the existing develop Billing Budget into a billing-authorized control-plane/FinOps Terraform root rather than granting project-level provisioner authority.
+- **Proposed planning packet:** Added proposed ADR-0015, the outcome-scale FinOps ownership/state-transfer/migration-resumption plan, planning review handoff, and aligned living-document status. The plan uses import-before-remove state transfer, a temporary no-plan/no-apply duplicate-ownership freeze, one final owner, a private FinOps readback receipt, and quota-free workload migration planning.
+- **Boundary:** The packet is unaccepted, unmerged, and planning-only. No Terraform implementation, cloud authentication, backend/state operation, import/remove, plan/apply, budget mutation, database/Secret work, migration execution, service/tester access, qualification, live/client data, or production is authorized.
+
+## 2026-09-07 — ADR-0015 first independent review remediated
+- **Observed review result:** All three review lanes returned `NOT_CLEAN` with overlapping High/Medium findings and one Low inventory finding. No implementation or cloud action occurred.
+- **Validated remediation:** The proposal now creates a separately IAM-isolated FinOps state bucket; defines exact billing, quota, backend, token, denial, and credential-context contracts; splits source into PR A and PR B around import/remove gates; freezes both roots continuously; includes provider lock and CI validation; binds the exact full budget resource name and complete posture; classifies ambiguous state outcomes by reading both backends; removes the nonexistent labels input; and defines a dedicated collector plus signed, expiring, one-use receipt envelope and offline verifier.
+- **Validated continuity:** `CURRENT_WORK.md`, `ROADMAP.md`, the decision/ADR indexes, `AGENTS.md`, `ARCHITECTURE.md`, `SECURITY.md`, `TECHNICAL_REQUIREMENTS.md`, root `README.md`, and `infra/gcp/README.md` now reflect completed PR #78/backend proof and the quota-authority stop. The review handoff enumerates the exact full candidate surface.
+- **Governance:** ADR-0015 remains Proposed. Fresh independent rereview and Beatrice's explicit planning acceptance remain required before a documentation-only branch/PR; implementation, IAM/state, Terraform plan/apply, and migration are still unauthorized.
+
+## 2026-09-07 — ADR-0015 second independent review remediated
+- **Observed review result:** The three rereview lanes returned `NOT_CLEAN`: two High receipt/credential-enforcement findings, two overlapping Medium IAM/notification-authority findings, and one Low untracked-whitespace finding. No implementation or cloud action occurred.
+- **Validated remediation:** ADR-0015 and the plan now require one authoritative bucket policy containing exactly one `roles/storage.objectAdmin` binding and two distinct named-human members; complete inherited-IAM admission and prohibited-identity permission probes; one manifest-constrained operator runner for every billing collector and FinOps Terraform command; no Monitoring API or workload Monitoring role for the FinOps identity; independently joined budget-routing/workload-state evidence; owner-only path validation; atomic receipt/envelope directory publication; ready-marker recovery; and `flock` plus atomic permanent nonce claiming.
+- **Validated hygiene:** The untracked handoff's trailing whitespace was removed and its acceptance questions now cover IAM cardinality, executable credential enforcement, filesystem custody, and replay atomicity.
+- **Governance:** Fresh exact rereview remains required. ADR-0015 is still Proposed and grants no branch publication, implementation, IAM/state, plan/apply, or migration authority.
+
+## 2026-09-07 — ADR-0015 third independent review remediated
+- **Observed review result:** Terraform/state-transfer rereview was clean. Architecture/security found one Medium parent-path identity race. Governance found one High cross-gate runner-authority gap and two Medium billing-role/runbook-continuity gaps. No implementation or cloud action occurred.
+- **Validated remediation:** Receipt operations now use held directory descriptors plus original-path `O_NOFOLLOW` reopen and device/inode equality immediately before every publication and nonce claim, preserving temporary artifacts on mismatch. The shared runner now consumes one immutable gate-specific operation/cwd/argv/environment/source/input/backend/output/expiry/approval/nonce tuple and adversarially rejects cross-gate substitution. Billing authority is exactly the pre-existing `roles/billing.admin` binding with complete policy/etag admission. Bootstrap and staged-plan runbooks now reflect the completed provisioner transitions and current FinOps proposal.
+- **Governance:** Fresh exact rereview remains required; ADR-0015 is Proposed and every implementation or operational gate remains unauthorized.
+
+## 2026-09-07 — ADR-0015 fourth independent review remediated
+- **Observed review result:** Architecture/security was clean. Terraform/state-transfer found one High missing F2 workload-removal authority path. Governance found two High transaction/unknown-output defects and one Medium replay-lock ownership contradiction.
+- **Validated remediation:** The proposal now defines two non-interchangeable runners: billing-human FinOps transactions and provisioner-only workload readback/exact state removal. B1 remains on the existing bootstrap boundary; receipt consumption is credential-free; M1 uses a fresh provisioner migration packet. Gate approvals bind explicit multi-step transaction graphs with pre-authorized `finally` readbacks and one nonce per trust-domain transaction. Manifests bind absent output destinations/schema constraints before execution and seal actual digests afterward. The verifier alone owns the receipt replay lock.
+- **Governance:** Fresh exact rereview remains required. No implementation, state, plan/apply, or migration authority exists.
+
+## 2026-09-07 — ADR-0015 planning direction accepted
+- **Validated final review:** Architecture/security, Terraform/state-transfer, and plan-executability/governance all returned CLEAN on the substantive 16-file planning candidate after five iterative rounds.
+- **Owner decision:** Beatrice explicitly accepted ADR-0015 and its outcome-scale FinOps ownership/state-transfer/migration-resumption plan.
+- **Boundary:** Acceptance authorizes only documentation publication. Implementation begins only after protected merge/rebaseline; every IAM/state/import/remove/plan/apply/migration/downstream action still requires its own reviewed approval.
+- **Current stop:** Focused acceptance-status delta verification must pass before branch/stage/commit/push/PR publication authority is requested.
+
+## 2026-09-07 — ADR-0015 acceptance-status delta remediated
+- **Observed focused review:** Two Medium findings identified stale Proposed wording and missing durable pre/post-acceptance hash binding.
+- **Validated remediation:** All active status surfaces now describe an accepted, unpublished planning boundary. The handoff records the three CLEAN substantive lanes, exact pre-acceptance ADR/plan hashes, exact current accepted-publication hashes, and the status-only reason for the transition.
+- **Current stop:** Final focused delta review and explicit owner confirmation of the accepted-publication hashes remain required before publication actions.
+
+## 2026-09-07 — ADR-0015 publication authorized
+- **Validated delta review:** Focused acceptance-status/hash-transition review `deleg_c3a0cbd0` returned CLEAN with zero findings.
+- **Owner confirmation:** Beatrice explicitly confirmed ADR hash `764b2e4b295b9685f1f966b4841faf0d062a487734a3b94674376c1971b03e91` and plan hash `65850c60eb7088df437b56138ba0334712562abe968600f4dc02aa0db393c34a`.
+- **Authorized publication:** Create one valid documentation branch, commit only the exact 16-file planning candidate, run committed-range qualification and Gitleaks, push, and open/read back a PR to `develop`.
+- **Boundary:** Merge, implementation, GCP authentication, IAM/state, Terraform plan/apply, migration, and downstream work remain unauthorized.
+
+## 2026-09-07 — PR #79 CI failure reproduced and remediated locally
+- **Observed CI:** Both `Terraform static validation` run `34149726459` and `Application quality` run `34149726411` failed at the same assertion in `tests/unit/test_terraform_hygiene.py::test_gcp_bootstrap_provisioner_local_operator_impersonation_is_exact_and_resource_scoped`. The application job's missing backend-SBOM upload was secondary because the main quality command stopped before SBOM generation.
+- **Root cause:** The accepted planning packet truthfully changed the bootstrap runbook from future correction to completed PR #78 history, but removed five literal phrases enforced by the existing static contract test. No Terraform source, IAM contract, product behavior, or cloud action failed.
+- **Narrow remediation:** Restored all five phrases in one truthful completed-history paragraph without reviving any approval or changing the ADR-0015 contract.
+- **Local evidence:** Exact regression `1 passed`; full `tests/unit/test_terraform_hygiene.py` `299 passed`.
+- **Boundary:** Follow-up commit/review/range scan/push and CI rerun remain; merge and all implementation/cloud/state actions remain unauthorized.
+
+## 2026-09-07 — PR #79 CI remediation independently cleared
+- **Review:** Focused technical rereview and replacement governance/evidence rereview both returned CLEAN with zero findings after the handoff status was aligned to the open PR.
+- **Ready boundary:** Commit the four-file documentation-only remediation, rerun exact final-head Terraform hygiene/diff/Gitleaks, push, update/read back PR #79, and inspect CI. Merge and all implementation/cloud/state actions remain unauthorized.
+
+## 2026-09-07 — PR #79 remediation commit and final-range evidence
+- **Committed remediation:** `1ca2041966a705b290683e29501a4b8d2c06ca15` preserves the completed bootstrap contract and records the CI investigation across four documentation files.
+- **Final-head verification on that commit:** Terraform hygiene `299 passed`; `git diff --check` passed; ADR/plan hashes remained exact; Gitleaks 8.30.1 scanned the full two-commit range from `f41e2756c820abc736c52739c6a67390107afb7f` with no leaks.
+- **Local environment retry:** One unchanged-head run hit `ENOSPC` after pytest temporary copies consumed space. Only the run-owned 3.3 GiB pytest temp tree was removed; available space recovered and the unchanged commit passed all 299 tests.
+- **Review:** Exact committed-head review found one Medium stale-status finding, now remediated by describing PR #79 as open and the local remediation as committed/ready to push. No product, Terraform, test, workflow, ADR/plan hash, or cloud authority changed.
+- **Boundary:** Push/PR readback/CI rerun remain under existing publication authority. Merge and all implementation/cloud/state actions remain unauthorized.
+
 ## Updating this file
 Add a short dated entry after a material planning, implementation, test, security, or release event. Link detailed evidence rather than duplicating it. Record commands and results only when they were actually run.

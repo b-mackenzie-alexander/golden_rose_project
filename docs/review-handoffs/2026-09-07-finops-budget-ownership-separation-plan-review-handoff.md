@@ -83,4 +83,4 @@ The accepted runbook rewrite changed the provisioner transition from future tens
 
 ## Current stop
 
-The remediation received CLEAN technical and governance rereviews and may be committed/pushed under the existing exact PR-publication authority. Do not merge, edit Terraform implementation, authenticate to GCP, initialize a backend, read/mutate state, generate/apply a plan, or run migration/downstream work without later separate authority.
+The remediation is committed at `1ca2041966a705b290683e29501a4b8d2c06ca15`, received CLEAN technical/governance and exact-head rereview except for this status-only Medium, and passed final-head Terraform hygiene (`299 passed`), range diff hygiene, unchanged ADR/plan hashes, and two-commit Gitleaks with no leaks. It may be pushed under the existing exact PR-publication authority. Do not merge, edit Terraform implementation, authenticate to GCP, initialize a backend, read/mutate state, generate/apply a plan, or run migration/downstream work without later separate authority.

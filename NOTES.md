@@ -2415,5 +2415,12 @@ This is the concise, dated engineering and operational note log. It records obse
 - **Review:** Focused technical rereview and replacement governance/evidence rereview both returned CLEAN with zero findings after the handoff status was aligned to the open PR.
 - **Ready boundary:** Commit the four-file documentation-only remediation, rerun exact final-head Terraform hygiene/diff/Gitleaks, push, update/read back PR #79, and inspect CI. Merge and all implementation/cloud/state actions remain unauthorized.
 
+## 2026-09-07 — PR #79 remediation commit and final-range evidence
+- **Committed remediation:** `1ca2041966a705b290683e29501a4b8d2c06ca15` preserves the completed bootstrap contract and records the CI investigation across four documentation files.
+- **Final-head verification on that commit:** Terraform hygiene `299 passed`; `git diff --check` passed; ADR/plan hashes remained exact; Gitleaks 8.30.1 scanned the full two-commit range from `f41e2756c820abc736c52739c6a67390107afb7f` with no leaks.
+- **Local environment retry:** One unchanged-head run hit `ENOSPC` after pytest temporary copies consumed space. Only the run-owned 3.3 GiB pytest temp tree was removed; available space recovered and the unchanged commit passed all 299 tests.
+- **Review:** Exact committed-head review found one Medium stale-status finding, now remediated by describing PR #79 as open and the local remediation as committed/ready to push. No product, Terraform, test, workflow, ADR/plan hash, or cloud authority changed.
+- **Boundary:** Push/PR readback/CI rerun remain under existing publication authority. Merge and all implementation/cloud/state actions remain unauthorized.
+
 ## Updating this file
 Add a short dated entry after a material planning, implementation, test, security, or release event. Link detailed evidence rather than duplicating it. Record commands and results only when they were actually run.

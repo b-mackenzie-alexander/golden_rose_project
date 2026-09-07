@@ -1,7 +1,7 @@
 # Current Work — Golden Rose Operations Platform
 
 **Updated:** 2026-09-07
-**Lane:** PR #79 CI remediation for the accepted ADR-0015 documentation-only planning packet. Both failed jobs reduced to one stale runbook-contract assertion after the completed PR #78 status rewrite; no product, Terraform, or cloud behavior failed.
+**Lane:** PR #79 CI remediation committed at `1ca2041966a705b290683e29501a4b8d2c06ca15`, independently reviewed, and locally qualified; ready to push. Both failed jobs reduced to one stale runbook-contract assertion after the completed PR #78 status rewrite; no product, Terraform, or cloud behavior failed.
 **Authority:** Beatrice confirmed the exact accepted ADR/plan hashes and authorized only the 16-file documentation branch/commit/push/PR publication. No merge, Terraform implementation, cloud authentication, backend/state operation, import/removal, plan/apply, budget mutation, database/Secret action, migration execution, service/tester access, qualification, live data, or production authority exists.
 **Verification:** PR #79 failed `Terraform static validation` and `application` only at `test_gcp_bootstrap_provisioner_local_operator_impersonation_is_exact_and_resource_scoped`: the accepted runbook rewrite removed five legacy contract phrases while preserving their semantics. The runbook now records those phrases truthfully as completed PR #78 history. Exact regression is GREEN (`1 passed`), the complete Terraform hygiene file is GREEN (`299 passed`), and independent technical plus governance rereviews are CLEAN. Follow-up committed-range and remote CI evidence must be recorded on PR #79 rather than preclaimed here.
 
@@ -24,7 +24,7 @@ Historical Task 14 source record: `deploy/gcp/rollback-forward-recovery-runbook.
 
 Historical Task 15 source record: the clean-room local pre-deployment qualification passed from disposable repo copy `/tmp/golden-rose-task15.TJ7qop` with Docker-backed `postgres-test`, CI-parity `uv==0.12.5` and Node/npm `22.22.3`/`10.9.8`, full quality/security/service-backed checks, Terraform validation/hygiene, image-build provenance verification, and local secret-scanning evidence. The qualification hardening also made Terraform contract checks whitespace-tolerant after `terraform fmt`, accepted current BuildKit provenance metadata in `scripts/verify_image_provenance.py`, and kept git/Gitleaks evidence anchored to the source repo rather than the `.git`-less temp copy.
 
-Historical post-PR #33 remediation remains complete for deployment, artifact, database, qualification, evidence-writer, and bootstrap-retirement controls. PR #78's bucket-level provisioner authority was applied and read back exactly; the broad foundation verifier and provisioner-owned workload-backend proof passed under separate consumed approvals. Fresh migration planning then stopped before state read because process-wide quota attribution required forbidden project-level provisioner authority. Accepted ADR-0015 (publication pending) is now the sole active direction and no historical packet or approval is reusable.
+Historical post-PR #33 remediation remains complete for deployment, artifact, database, qualification, evidence-writer, and bootstrap-retirement controls. PR #78's bucket-level provisioner authority was applied and read back exactly; the broad foundation verifier and provisioner-owned workload-backend proof passed under separate consumed approvals. Fresh migration planning then stopped before state read because process-wide quota attribution required forbidden project-level provisioner authority. Accepted ADR-0015 is published in open PR #79 with protected merge pending; no historical packet or approval is reusable.
 
 ## Active objective
 Publish the independently CLEAN, accepted ADR-0015 / FinOps budget-ownership separation plan through a documentation-only branch/PR and protected merge. After exact merged-tip rebaseline, the accepted outcome authorizes Implementation PR A source work—but still does not authorize any cloud/state operation. Every B1/F0/F1/F2/F3/M1 and downstream action remains separately reviewed and approved.
@@ -53,9 +53,9 @@ PR B completed from the exact PR #51 merge tip and merged as PR #52; its source-
 - Accepted correction/audit baseline: PostgreSQL domain rows hold current operational truth; append-only `AuditEvent` records preserve material history through atomic expected-version/idempotent commands; restricted prior/new values remain field-authorized; and derived projections are disposable rather than competing record stores. `docs/planning/phase-1-correction-audit-event-contract.md` is authoritative.
 
 ## Immediate next steps
-1. Record and independently review the narrow runbook compatibility remediation.
-2. Commit the exact remediation, rerun committed-range diff/Gitleaks and relevant local gates, then push under the existing publication authority.
-3. Update/read back PR #79 and inspect required CI; merge remains separately unauthorized.
+1. Commit the CLEAN status-alignment delta and push the complete reviewed PR #79 remediation under the existing publication authority.
+2. Update/read back PR #79 with the full updated range evidence and inspect required CI to completion.
+3. Merge only with separate authority through protected `develop`, then rebaseline before Implementation PR A; do not mix implementation into the planning PR.
 4. Preserve the continuous FinOps/workload plan/apply freeze and every separate cloud/state approval in the accepted sequence.
 
 ## Gate classification

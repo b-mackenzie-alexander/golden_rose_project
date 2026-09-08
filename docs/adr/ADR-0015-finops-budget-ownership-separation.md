@@ -4,7 +4,7 @@
 - **Date:** 2026-09-07
 - **Owner:** Beatrice Alexander (engagement owner and sole repository maintainer)
 - **Amends:** ADR-0013 for cost-guardrail ownership, Terraform state topology, and migration-plan identity
-- **Related:** ADR-0012, ADR-0014, `.hermes/plans/2026-09-07_finops-budget-ownership-separation-plan.md`
+- **Related:** ADR-0012, ADR-0014, accepted ADR-0016 awaiting protected publication, `.hermes/plans/2026-09-07_finops-budget-ownership-separation-plan.md`
 
 ## Context and evidence posture
 
@@ -20,6 +20,12 @@ Evidence is classified as follows:
 - **Validated:** provisioner-owned workload-backend access works without the process-wide quota override; explicit quota-project use requires the authenticated principal to hold `serviceusage.services.use`; the current workload root owns the Billing Budget and directly depends on it from migration/service resources.
 - **Accepted owner direction:** separate Billing Budget ownership into a billing-authorized control-plane/FinOps Terraform root rather than granting project-level authority to the workload provisioner.
 - **Not yet validated:** exact FinOps backend identity, imported budget state, provider behavior after the split, workload plan behavior without a quota override, and cross-root operational receipt/readback.
+
+### Post-merge implementation finding
+
+Implementation PR A review later proved that this ADR's local approval-digest contract is incomplete: a caller able to supply both a policy or approval artifact and its matching digest can create a self-consistent packet without proving a separate protected approval ceremony occurred. Beatrice therefore paused the uncommitted PR A candidate and selected a separately protected, cryptographically signed, one-use approval envelope. Accepted ADR-0016 and `.hermes/plans/2026-09-07_signed-finops-approval-authority-amendment-plan.md` define that material correction and await protected publication.
+
+Until that amendment merges through protected `develop`, is used as the exact rebaseline, and receives separate implementation authorization, ADR-0015's Implementation PR A authority is suspended. The original ownership-separation decision remains accepted; no current source branch, unsigned policy/digest pair, or local test result authorizes implementation publication or an operational action.
 
 ## Decision
 
@@ -158,6 +164,6 @@ Rejected as the selected delivery direction. Preserving the current contracts re
 
 ## Approval and revisit triggers
 
-This ADR and its outcome-scale plan merged through protected `develop` in PR #79 at `e7bab14795a24ff69fcc3cd7f8bd28f2cbb9cd73`. That merge authorizes only the declared Implementation PR A source lane; every bootstrap, IAM, backend, state-transfer, plan/apply, migration, and downstream operation remains separately reviewed and approved.
+This ADR and its outcome-scale plan merged through protected `develop` in PR #79 at `e7bab14795a24ff69fcc3cd7f8bd28f2cbb9cd73`. That original source authorization is now historical and suspended by the implementation-review finding recorded above. Revised PR A may begin only after ADR-0016 is accepted, merged through protected `develop`, rebaselined from the exact tip, and separately authorized. Every bootstrap, IAM, backend, state-transfer, plan/apply, migration, and downstream operation remains separately reviewed and approved.
 
 Revisit if the provider cannot preserve the existing budget through import-before-remove transfer, workload planning still requires project-level provisioner quota authority after extraction, a billing-authorized non-human identity becomes required, cross-root receipt verification is infeasible, billing custody changes, or production/multi-environment FinOps becomes active.

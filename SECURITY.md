@@ -1,6 +1,6 @@
 # Security — Golden Rose Operations Platform
 
-**Status:** Merged planning baseline. PR #79 merged ADR-0015 at `develop@e7bab147`; only Implementation PR A source work is authorized next. Gate P, bounded Gate S, both bootstrap authority transitions, exact apply/readback, and provisioner-owned workload-backend proof are complete. Every FinOps IAM/state/plan/apply, migration, service, tester, qualification, live-data, and production action remains separately gated. This document does not claim production compliance or completed cloud qualification.
+**Status:** Merged ADR-0015 ownership baseline with accepted ADR-0016 trust amendment awaiting protected publication. PR A review proved caller-supplied policy/approval artifacts plus matching digests were self-asserted, so the uncommitted implementation is paused. Revised source work requires a separately protected signed one-use transaction-approval envelope before credentials or commands. Gate P, bounded Gate S, both bootstrap authority transitions, exact apply/readback, and provisioner-owned workload-backend proof remain complete. Every implementation, signer/environment action, IAM/state/plan/apply, migration, service, tester, qualification, live-data, and production action remains separately gated.
 
 ## Security objectives
 - Protect worker, employer, household/worksite, document, and operational data using least privilege and data minimization.

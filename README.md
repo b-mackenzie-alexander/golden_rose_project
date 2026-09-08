@@ -53,9 +53,11 @@ automated hiring, matching, ranking, eligibility, or referral system.
   version. Runtime/migration database-URL versions remain deferred until real
   database/login material exists. Both named-human bootstrap authority transitions,
   exact apply/readback, and provisioner-owned workload-backend proof are complete.
-  Fresh migration planning stopped on the quota-authority conflict now governed by
-  ADR-0015 merged through PR #79 at protected `develop@e7bab147`; it authorizes
-  only Implementation PR A source work and grants no IAM/state, plan/apply,
+  Fresh migration planning stopped on the quota-authority conflict governed by
+  ADR-0015. PR A review then proved its local policy/approval digest could be
+  self-asserted, so source work is paused under accepted ADR-0016 pending protected
+  publication, exact-tip rebaseline, and separate implementation authorization. No
+  signer/environment action, IAM/state, plan/apply,
   migration, service, tester, qualification, real-identity, live-data, or
   production operational authority. Private identifiers and secret payloads stay outside
   tracked source and ordinary documentation.

@@ -1,6 +1,6 @@
 # FinOps Budget Ownership Separation and Migration Resumption Plan
 
-> **Status:** Accepted and merged by PR #79 at `develop@e7bab14795a24ff69fcc3cd7f8bd28f2cbb9cd73`. This authorizes only the declared Implementation PR A source lane; every operational gate remains separate.
+> **Status:** Accepted baseline merged by PR #79 at `develop@e7bab14795a24ff69fcc3cd7f8bd28f2cbb9cd73`; Implementation PR A authority is suspended under accepted ADR-0016 and `.hermes/plans/2026-09-07_signed-finops-approval-authority-amendment-plan.md` pending protected publication, exact-tip rebaseline, and separate implementation authorization. Every operational gate remains separate.
 
 > **For Hermes:** Use plan-driven TDD execution for Implementation PR A only after exact merged-tip rebaseline. Keep every cloud/state/plan/apply gate separately approved.
 
@@ -10,9 +10,15 @@
 
 **Tech Stack:** Repository-pinned Terraform 1.15.8 for CI, separately exact-bound compatible Terraform for approved operator packets, checked-in per-root lockfiles, Google provider selected by each lock, Python 3.12, pytest, Ruff, mypy, Cosign/Sigstore, Gitleaks, and owner-held GCP evidence.
 
-**Boundary:** Accepted and merged; only Implementation PR A source work is authorized. No cloud or operational authority is implied.
+**Boundary:** The ownership-separation outcome remains accepted, but its original local approval-digest execution contract failed implementation review. No Implementation PR A continuation, cloud action, or operational authority is currently implied.
 
 ---
+
+## Amendment hold
+
+The first uncommitted PR A candidate showed that a runner receiving both a policy or approval artifact and the caller's matching digest cannot distinguish protected approval from a newly self-authored packet. Beatrice selected a separate protected no-GCP signer for a value-safe, cryptographically signed, one-use transaction-approval envelope. ADR-0016 and its paired amendment plan control the revised trust anchor, exact signer/verifier schema, replay claim, command/artifact binding, and fresh-branch restart.
+
+The candidate remains unpublished evidence only. Do not execute or publish the original Implementation PR A sequence below until the amendment is accepted and merged. After that merge, the revised plan's R1-R6 nodes supplement and override A3/A4 wherever approval authority, command binding, output descriptors, or signer separation differ.
 
 ## Outcome and definition of done
 

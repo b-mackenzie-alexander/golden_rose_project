@@ -1,0 +1,217 @@
+name: sign-finops-approval
+
+on:
+  workflow_dispatch:
+    inputs:
+      approval_envelope_base64:
+        description: Base64-encoded value-safe FinOps transaction approval envelope
+        required: true
+        type: string
+      approval_envelope_sha256:
+        description: Exact SHA-256 of the decoded approval envelope
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  sign-approval:
+    name: Sign value-safe FinOps transaction approval
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: sign-finops-approval-${{ github.ref }}
+      cancel-in-progress: false
+    environment: finops-approval
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22
+        with:
+          cosign-release: "v3.0.6"
+
+      - name: Validate and sign exact transaction approval envelope
+        shell: bash
+        env:
+          APPROVAL_ENVELOPE_BASE64: ${{ inputs.approval_envelope_base64 }}
+          EXPECTED_APPROVAL_ENVELOPE_SHA256: ${{ inputs.approval_envelope_sha256 }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/develop"
+          umask 077
+          install -d -m 0700 build/finops-approval
+          python - <<'PY'
+          import base64
+          import binascii
+          import hashlib
+          import json
+          import os
+          import re
+          import stat
+          import uuid
+          from datetime import UTC, datetime, timedelta
+          from pathlib import Path
+
+          EXPECTED_FIELDS = {
+              "schema",
+              "approval_nonce",
+              "issued_at",
+              "expires_at",
+              "source_sha",
+              "domain",
+              "operation",
+              "transaction_manifest_sha256",
+              "policy_sha256",
+              "source_artifact_sha256",
+              "operation_input_sha256",
+              "backend_artifact_sha256",
+              "private_approval_record_sha256",
+              "claim_root_fingerprint",
+          }
+          OPERATIONS = {
+              "finops": {"collect", "readback", "init_import", "plan", "apply"},
+              "workload-state": {"readback", "state_remove"},
+              "bootstrap": {"plan", "apply", "readback"},
+              "workload-plan": {"migration_plan"},
+          }
+          SHA256_FIELDS = {
+              "transaction_manifest_sha256",
+              "policy_sha256",
+              "source_artifact_sha256",
+              "operation_input_sha256",
+              "backend_artifact_sha256",
+              "private_approval_record_sha256",
+              "claim_root_fingerprint",
+          }
+
+          def reject_duplicates(pairs):
+              value = {}
+              for key, item in pairs:
+                  if key in value:
+                      raise ValueError("duplicate JSON key")
+                  value[key] = item
+              return value
+
+          def reject_constant(value):
+              raise ValueError(f"invalid JSON constant: {value}")
+
+          encoded = os.environ.get("APPROVAL_ENVELOPE_BASE64", "")
+          if (
+              not encoded
+              or len(encoded) > 10924
+              or re.fullmatch(r"[A-Za-z0-9+/]*={0,2}", encoded) is None
+          ):
+              raise SystemExit("approval envelope is not bounded canonical base64")
+          try:
+              raw = base64.b64decode(encoded, validate=True)
+          except (binascii.Error, ValueError) as exc:
+              raise SystemExit("approval envelope is not canonical base64") from exc
+          if base64.b64encode(raw).decode("ascii") != encoded or not 1 <= len(raw) <= 8192:
+              raise SystemExit("approval envelope base64 or decoded size drifted")
+          expected_digest = os.environ.get("EXPECTED_APPROVAL_ENVELOPE_SHA256", "")
+          if re.fullmatch(r"[0-9a-f]{64}", expected_digest) is None:
+              raise SystemExit("approval envelope digest is invalid")
+          if hashlib.sha256(raw).hexdigest() != expected_digest:
+              raise SystemExit("approval envelope digest drifted")
+          try:
+              payload = json.loads(
+                  raw,
+                  object_pairs_hook=reject_duplicates,
+                  parse_constant=reject_constant,
+              )
+          except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+              raise SystemExit("approval envelope JSON is invalid") from exc
+          if (
+              not isinstance(payload, dict)
+              or set(payload) != EXPECTED_FIELDS
+              or not all(isinstance(value, str) for value in payload.values())
+          ):
+              raise SystemExit("approval envelope schema or field types drifted")
+          if payload["schema"] != "golden-rose.finops-transaction-approval-envelope/v1":
+              raise SystemExit("approval envelope version drifted")
+          if re.fullmatch(r"[0-9a-f]{40}", payload["source_sha"]) is None:
+              raise SystemExit("approval envelope source SHA is invalid")
+          if payload["source_sha"] != os.environ["GITHUB_SHA"]:
+              raise SystemExit("approval envelope source revision drifted")
+          if any(re.fullmatch(r"[0-9a-f]{64}", payload[field]) is None for field in SHA256_FIELDS):
+              raise SystemExit("approval envelope artifact digest is invalid")
+          if payload["domain"] not in OPERATIONS or payload["operation"] not in OPERATIONS[
+              payload["domain"]
+          ]:
+              raise SystemExit("approval envelope domain or operation drifted")
+          try:
+              nonce = uuid.UUID(payload["approval_nonce"])
+          except ValueError as exc:
+              raise SystemExit("approval envelope nonce is invalid") from exc
+          if nonce.version != 4 or str(nonce) != payload["approval_nonce"]:
+              raise SystemExit("approval envelope nonce is not canonical UUIDv4")
+          try:
+              timestamp_pattern = r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"
+              if any(
+                  re.fullmatch(timestamp_pattern, payload[field]) is None
+                  for field in ("issued_at", "expires_at")
+              ):
+                  raise ValueError("timestamp is not canonical UTC RFC 3339")
+              issued_at = datetime.strptime(
+                  payload["issued_at"], "%Y-%m-%dT%H:%M:%SZ"
+              ).replace(tzinfo=UTC)
+              expires_at = datetime.strptime(
+                  payload["expires_at"], "%Y-%m-%dT%H:%M:%SZ"
+              ).replace(tzinfo=UTC)
+              if issued_at.strftime("%Y-%m-%dT%H:%M:%SZ") != payload[
+                  "issued_at"
+              ] or expires_at.strftime("%Y-%m-%dT%H:%M:%SZ") != payload["expires_at"]:
+                  raise ValueError("timestamp does not round-trip canonically")
+          except ValueError as exc:
+              raise SystemExit("approval envelope timestamp is invalid") from exc
+          now = datetime.now(UTC)
+          if issued_at > now + timedelta(seconds=60) or now - issued_at > timedelta(minutes=5):
+              raise SystemExit("approval envelope issue time is outside the reviewed boundary")
+          if expires_at <= now or not timedelta(0) < expires_at - issued_at <= timedelta(minutes=30):
+              raise SystemExit("approval envelope expiry is outside the reviewed boundary")
+          path = Path("build/finops-approval/approval-envelope.json")
+          descriptor = os.open(
+              path,
+              os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+              0o600,
+          )
+          with os.fdopen(descriptor, "wb") as handle:
+              handle.write(raw)
+              handle.flush()
+              os.fsync(handle.fileno())
+          info = os.lstat(path)
+          if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or stat.S_IMODE(info.st_mode) != 0o600:
+              raise SystemExit("approval envelope output is unsafe")
+          PY
+          cosign sign-blob --yes \
+            --bundle build/finops-approval/approval-envelope.sigstore.json \
+            build/finops-approval/approval-envelope.json
+          chmod 0600 build/finops-approval/approval-envelope.sigstore.json
+          python - <<'PY'
+          import os
+          import stat
+          from pathlib import Path
+
+          directory = Path("build/finops-approval")
+          files = sorted(path.name for path in directory.iterdir())
+          if files != ["approval-envelope.json", "approval-envelope.sigstore.json"]:
+              raise SystemExit("signed approval artifact inventory drifted")
+          for path in directory.iterdir():
+              info = os.lstat(path)
+              if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or stat.S_IMODE(info.st_mode) != 0o600:
+                  raise SystemExit("signed approval artifact is unsafe")
+          PY
+
+      - name: Upload signed transaction approval
+        if: ${{ success() }}
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: signed-finops-approval-${{ github.run_id }}
+          path: |
+            build/finops-approval/approval-envelope.json
+            build/finops-approval/approval-envelope.sigstore.json
+          if-no-files-found: error
+          retention-days: 7

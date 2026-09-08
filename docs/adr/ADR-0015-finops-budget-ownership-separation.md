@@ -1,6 +1,6 @@
 # ADR-0015: Separate Billing Budget ownership from workload provisioning
 
-- **Status:** Accepted; publication pending
+- **Status:** Accepted and merged by PR #79
 - **Date:** 2026-09-07
 - **Owner:** Beatrice Alexander (engagement owner and sole repository maintainer)
 - **Amends:** ADR-0013 for cost-guardrail ownership, Terraform state topology, and migration-plan identity
@@ -158,6 +158,6 @@ Rejected as the selected delivery direction. Preserving the current contracts re
 
 ## Approval and revisit triggers
 
-This ADR was accepted by Beatrice on 2026-09-07 after CLEAN architecture/security, Terraform/state-transfer, and plan-executability reviews. Acceptance authorizes only the paired planning packet's documentation publication. Implementation begins only after this ADR and its outcome-scale plan merge into protected `develop`; every operational gate remains separately approved.
+This ADR and its outcome-scale plan merged through protected `develop` in PR #79 at `e7bab14795a24ff69fcc3cd7f8bd28f2cbb9cd73`. That merge authorizes only the declared Implementation PR A source lane; every bootstrap, IAM, backend, state-transfer, plan/apply, migration, and downstream operation remains separately reviewed and approved.
 
 Revisit if the provider cannot preserve the existing budget through import-before-remove transfer, workload planning still requires project-level provisioner quota authority after extraction, a billing-authorized non-human identity becomes required, cross-root receipt verification is infeasible, billing custody changes, or production/multi-environment FinOps becomes active.

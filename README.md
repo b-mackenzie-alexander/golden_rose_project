@@ -54,9 +54,10 @@ automated hiring, matching, ranking, eligibility, or referral system.
   database/login material exists. Both named-human bootstrap authority transitions,
   exact apply/readback, and provisioner-owned workload-backend proof are complete.
   Fresh migration planning stopped on the quota-authority conflict now governed by
-  accepted ADR-0015, published in open PR #79 with protected merge pending, which grants no implementation, IAM/state,
-  plan/apply, migration, service, tester, qualification, real-identity, live-data,
-  or production authority before protected merge. Private identifiers and secret payloads stay outside
+  ADR-0015 merged through PR #79 at protected `develop@e7bab147`; it authorizes
+  only Implementation PR A source work and grants no IAM/state, plan/apply,
+  migration, service, tester, qualification, real-identity, live-data, or
+  production operational authority. Private identifiers and secret payloads stay outside
   tracked source and ordinary documentation.
 - Source-controlled Gate 2 read-only verification tooling now exists: `scripts/verify_gcp_foundation.py`
   evaluates live foundation/effective-authority posture against the reviewed

@@ -1,6 +1,6 @@
 # FinOps Budget Ownership Separation Planning Review Handoff
 
-**Status:** Accepted planning packet published in open PR #79; CI remediation reviewed CLEAN and locally green
+**Status:** Historical planning/CI handoff for merged PR #79; post-merge status drift moves to a separate closeout PR
 **Base:** protected `develop@f41e2756c820abc736c52739c6a67390107afb7f`
 **Authority:** Documentation/planning only; no implementation or cloud/state authority
 
@@ -83,4 +83,4 @@ The accepted runbook rewrite changed the provisioner transition from future tens
 
 ## Current stop
 
-The remediation is committed at `1ca2041966a705b290683e29501a4b8d2c06ca15`, received CLEAN technical/governance and exact-head rereview except for this status-only Medium, and passed final-head Terraform hygiene (`299 passed`), range diff hygiene, unchanged ADR/plan hashes, and two-commit Gitleaks with no leaks. It may be pushed under the existing exact PR-publication authority. Do not merge, edit Terraform implementation, authenticate to GCP, initialize a backend, read/mutate state, generate/apply a plan, or run migration/downstream work without later separate authority.
+PR #79 merged at `develop@e7bab14795a24ff69fcc3cd7f8bd28f2cbb9cd73` after all required checks passed. This handoff is historical. The separate post-merge status-only closeout may update current surfaces; it must not rewrite the accepted review evidence above or begin Implementation PR A. Do not perform Terraform implementation, authenticate to GCP, initialize a backend, read/mutate state, generate/apply a plan, or run migration/downstream work in that closeout.

@@ -1,10 +1,10 @@
 # ADR-0016: Require signed one-use authority for FinOps transactions
 
-- **Status:** Accepted; protected publication pending
+- **Status:** Accepted and merged by PR #81 at `3dca8101141e31e3d5b22739dabeaa4bc61dd15f`; human-visible `develop` acceleration addendum accepted for publication on 2026-09-09
 - **Date:** 2026-09-07
 - **Owner:** Beatrice Alexander (engagement owner and sole repository maintainer)
 - **Amends:** ADR-0015 transaction-approval authority and Implementation PR A
-- **Related:** ADR-0011, ADR-0012, ADR-0014, `.hermes/plans/2026-09-07_signed-finops-approval-authority-amendment-plan.md`
+- **Related:** ADR-0011, ADR-0012, ADR-0014, `.hermes/plans/2026-09-07_signed-finops-approval-authority-amendment-plan.md`, `.hermes/plans/2026-09-09_005924-finops-post-execution-result-authority-amendment-plan.md`, `docs/planning/finops-result-authority-replay-disposition.md`
 
 ## Context and evidence posture
 
@@ -20,7 +20,7 @@ Evidence is classified as follows:
 - **Validated:** unsigned local policy-plus-digest input is self-asserted; exact byte recomputation alone cannot prove that the protected approval ceremony authorized those bytes.
 - **Validated:** a detached Sigstore bundle with an exact protected workflow identity can authenticate a value-safe approval envelope without exposing private identifiers or granting the signer GCP authority.
 - **Accepted prerequisite:** ADR-0011/ADR-0012 retain the same-repository, sole-maintainer CI/approval concentration as a High/open residual risk. This amendment must not describe a protected workflow as an independent second human.
-- **Not yet validated:** exact signed-approval schema, workflow/static contract, offline verifier, replay claim, runner integration, and clean reimplementation after amendment merge.
+- **Historical pre-implementation state:** at acceptance, the exact signed-approval schema, workflow/static contract, offline verifier, replay claim, runner integration, and clean reimplementation were not yet validated. Revised PR A later implemented and tested those boundaries before the post-execution result-authority finding below suspended it again.
 
 ## Decision
 
@@ -171,6 +171,38 @@ Rejected. Per-operation approvals and private artifact relationships do not belo
 
 ## Approval and revisit triggers
 
-This ADR is accepted after independent architecture/security, workflow/static-policy, plan-executability, and final acceptance-transition review. It still requires protected merge, exact-tip rebaseline, and separate implementation authorization before revised PR A implementation authority resumes.
+PR #81 merged this ADR and its first amendment plan into protected `develop` at `3dca8101141e31e3d5b22739dabeaa4bc61dd15f`; a fresh revised PR A lane was separately authorized and remained local/uncommitted. The 2026-09-09 addendum below now narrows post-execution evidence to proportionate same-operator readback and redirects delivery toward the private fictional-synthetic human-test target.
 
 Revisit if the protected signer cannot remain value-safe and no-GCP, the exact approval envelope cannot bind all private artifacts without exposing them, descriptor-backed Sigstore verification is not portable across the approved runners, the replay-root fingerprint cannot be made stable and non-copyable, environment protection cannot enforce the intended ceremony, or a non-human/multi-party approval authority becomes required.
+
+## 2026-09-09 proposed addendum — human-visible develop acceleration
+
+### Trigger and status
+
+Golden Rose spent roughly two weeks extending production-grade authority and gate machinery before delivering a GCP environment a human could use. That sequencing no longer meets the engagement need. Beatrice is the sole independent developer, human visibility is now mandatory, and ordinary gate processing may not consume multiple days.
+
+This addendum is **Accepted for publication** and controls the paired acceleration plan. It amends ADR-0015's immediate FinOps split and ADR-0013's named-IAM-only tester boundary for fictional-synthetic `develop`; it does not weaken live-data or production gates.
+
+### Decision amendment
+
+1. Keep the existing governed `develop` project and production-shaped Cloud Run/Cloud SQL/Terraform architecture so the environment can continue evolving toward production.
+2. Defer the ADR-0015 FinOps state split. Keep the existing budget in workload state and grant the workload provisioner one custom workload-project role containing exactly `serviceusage.services.use`. No other project permission is added.
+3. Deliver one source PR that adds the quota role/binding, temporary shared access middleware, public invoker service-stage contract, Secret metadata/access, one-instance cost bound, verification, qualification, and living-doc updates.
+4. Replace named-IAM-only tester ingress temporarily with `allUsers` Cloud Run invocation plus a high-entropy HTTP Basic gate enforced by the application on every route except minimized `/health` and `/readiness`.
+5. The shared password is at least 32 random bytes, held only in Secret Manager and an owner-only local file, never committed/logged/chatted, and expires within seven days. Wrong/missing credentials fail with fixed no-store responses.
+6. Cloud Run uses `min_instance_count=0` and `max_instance_count=1`; Cloud SQL remains private; all records remain fictional synthetic; the database is disposable and must have a tested teardown/rebuild path.
+7. Public invocation, shared access, synthetic auth, and the quota exception must be removed or formally revisited before live/client data or production.
+8. Human visibility is a completion requirement: Beatrice must be able to open the URL, authenticate, exercise the real Cloud SQL-backed workflow, and record browser/accessibility/usability evidence.
+9. One explicit time-bounded approval packet may cover read-only precheck, exact Terraform plans/applies, image publication, secret preparation, migration, service activation, access, readbacks, qualification, and bounded unchanged retries. Deletes, replacements, public database exposure, broad IAM, budget mutation, secret leakage, or out-of-scope actions stop the packet.
+10. Agent reviews remain quality checks, not human authorization. The accepted solo-maintainer High remains explicit and does not block this environment.
+11. For this fictional-synthetic `develop` tranche, this addendum explicitly suspends ADR-0016 §§1–6 Gate E0 and the per-domain signer/envelope/runner requirement. The single owner-approved eight-hour packet is the sole pre-execution authority until completion or a named stop condition. Existing signer artifacts remain historical and grant no competing gate authority.
+
+### Promotion boundary
+
+Before live/client data or production: remove `allUsers`, retire the Basic credential, implement real staff identity/MFA/session authorization, revisit the quota-role/FinOps ownership design, qualify backup/restore and production recovery/support, and complete production privacy/legal/accessibility/language acceptance.
+
+These are promotion gates. They do not block the human-visible fictional-synthetic `develop` environment.
+
+### Acceptance and sequencing
+
+After one proportional architecture/security review and one Terraform/deployment review clear concrete Blocker/High defects, the packet may be accepted, committed, and merged. The next work is the single source PR followed by one separately approved bundled deployment transaction—not another gate-planning cycle.

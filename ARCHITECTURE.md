@@ -1,6 +1,6 @@
 # Architecture — Golden Rose Operations Platform
 
-**Status:** PR #84 merged the PR #83 continuity closeout into protected `develop@63ac29b20314f03381d4a71e901a68ee51e913aa`. Offline packet derivation then found concrete provider/database bootstrap and private-verification blockers. The active bounded source remediation separates backend/provider credentials, introduces one private no-ingress database-authority job with a dedicated identity, and preserves the exact temporary public service invocation, Basic gate, one-instance cap, private Cloud SQL, and single approval-pending eight-hour packet. No cloud operation has occurred.
+**Status:** PR #85 merged the bounded provider/database-bootstrap/private-verification remediation from source head `043f15121612985065c80e1c1c78ca3106a28453` into protected `develop@7a9e7c00de82842040f34080f6c529e688a6d445`. Required CI and final architecture/security plus Terraform/deployment agent rereviews passed. The merged contract separates backend/provider credentials, introduces one private no-ingress database-authority job with a dedicated identity, and preserves the exact temporary public service invocation, Basic gate, one-instance cap, private Cloud SQL, and single approval-pending eight-hour packet. No cloud operation occurred.
 
 ## Architectural posture
 Start with one modular product and a relational operational core. Preserve explicit trust boundaries and auditability without prematurely splitting into microservices.

@@ -2,7 +2,7 @@
 
 This procedure governs Beatrice's temporary browser access to the first human-visible fictional-synthetic GCP `develop` deployment while application authentication remains synthetic. Cloud Run invocation is temporarily public, but every business/static route is protected by the expiring shared HTTP Basic gate.
 
-Current source status: PR #84 merged the PR #83 continuity closeout into protected `develop@63ac29b20314f03381d4a71e901a68ee51e913aa`. Offline packet derivation found concrete provider/database-bootstrap/private-verification blockers; bounded no-cloud source remediation is active. This procedure performs no access grant or secret write. Eight-hour packet approval is pending, and this procedure has not been executed.
+Current source status: PR #85 merged the bounded provider/database-bootstrap/private-verification remediation from source head `043f15121612985065c80e1c1c78ca3106a28453` into protected `develop@7a9e7c00de82842040f34080f6c529e688a6d445`; required CI and final agent rereviews passed. This procedure performs no access grant or secret write. Eight-hour packet approval is pending until the final protected tip is bound, and this procedure has not been executed.
 
 ## Scope
 

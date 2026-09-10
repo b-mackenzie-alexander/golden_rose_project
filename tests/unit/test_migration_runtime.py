@@ -4,20 +4,32 @@ from golden_rose.migration_runtime import EX_TEMPFAIL, main
 
 
 class _FakeResult:
-    def __init__(self, value: bool) -> None:
+    def __init__(self, value: bool | int) -> None:
         self._value = value
 
-    def scalar_one(self) -> bool:
+    def scalar_one(self) -> bool | int:
         return self._value
 
 
 class _FakeConnection:
-    def __init__(self, lock_acquired: bool = True) -> None:
+    def __init__(
+        self,
+        lock_acquired: bool = True,
+        role_count: int = 0,
+        authority_valid: bool = True,
+    ) -> None:
         self.lock_acquired = lock_acquired
+        self.role_count = role_count
+        self.authority_valid = authority_valid
         self.executed: list[str] = []
 
     def execute(self, statement, params=None):  # noqa: ANN001
-        self.executed.append(str(statement))
+        rendered = str(statement)
+        self.executed.append(rendered)
+        if "golden_rose_database_authority_role_count" in rendered:
+            return _FakeResult(self.role_count)
+        if "golden_rose_database_authority_initialized" in rendered:
+            return _FakeResult(self.authority_valid)
         return _FakeResult(self.lock_acquired)
 
 
@@ -104,6 +116,78 @@ def test_migration_runtime_holds_advisory_lock_for_alembic_upgrade(monkeypatch) 
         for statement in connection.executed
     )
     assert any("pg_advisory_unlock" in statement for statement in connection.executed)
+    assert engine.disposed is True
+
+
+def test_migration_runtime_skips_privileged_bootstrap_for_initialized_database(
+    monkeypatch,
+) -> None:  # noqa: ANN001
+    _set_minimal_migration_env(monkeypatch)
+
+    connection = _FakeConnection(lock_acquired=True, role_count=3)
+    engine = _FakeEngine(connection)
+    observed: dict[str, object] = {}
+    monkeypatch.setattr("golden_rose.migration_runtime.create_database_engine", lambda: engine)
+    monkeypatch.setattr(
+        "golden_rose.migration_runtime.Config",
+        lambda path: SimpleNamespace(path=path, attributes={}),
+    )
+
+    def fake_upgrade(config, revision):  # noqa: ANN001
+        observed["revision"] = revision
+
+    monkeypatch.setattr("golden_rose.migration_runtime.command.upgrade", fake_upgrade)
+
+    assert main() == 0
+    assert observed == {"revision": "head"}
+    assert any("golden_rose_database_authority_role_count" in item for item in connection.executed)
+    assert not any(
+        "GRANT golden_rose_migrator TO CURRENT_USER" in item for item in connection.executed
+    )
+    assert any("SET ROLE golden_rose_schema_owner" in item for item in connection.executed)
+
+
+def test_migration_runtime_rejects_malformed_initialized_database_authority(
+    monkeypatch,
+) -> None:  # noqa: ANN001
+    _set_minimal_migration_env(monkeypatch)
+    connection = _FakeConnection(lock_acquired=True, role_count=3, authority_valid=False)
+    engine = _FakeEngine(connection)
+    called = False
+    monkeypatch.setattr("golden_rose.migration_runtime.create_database_engine", lambda: engine)
+
+    def fake_upgrade(config, revision):  # noqa: ANN001
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr("golden_rose.migration_runtime.command.upgrade", fake_upgrade)
+
+    assert main() == 78
+    assert called is False
+    assert any("golden_rose_database_authority_initialized" in item for item in connection.executed)
+    assert not any("SET ROLE golden_rose_schema_owner" in item for item in connection.executed)
+    assert engine.disposed is True
+
+
+def test_migration_runtime_fails_closed_on_partial_database_authority_roles(
+    monkeypatch,
+) -> None:  # noqa: ANN001
+    _set_minimal_migration_env(monkeypatch)
+    connection = _FakeConnection(lock_acquired=True, role_count=2)
+    engine = _FakeEngine(connection)
+    called = False
+    monkeypatch.setattr("golden_rose.migration_runtime.create_database_engine", lambda: engine)
+
+    def fake_upgrade(config, revision):  # noqa: ANN001
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr("golden_rose.migration_runtime.command.upgrade", fake_upgrade)
+
+    assert main() == 78
+    assert called is False
+    assert not any("CREATE ROLE golden_rose_schema_owner" in item for item in connection.executed)
+    assert not any("SET ROLE golden_rose_schema_owner" in item for item in connection.executed)
     assert engine.disposed is True
 
 

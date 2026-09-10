@@ -9,6 +9,7 @@ on:
         type: choice
         options:
         - migration
+        - database-verification
         - service
 
 permissions:
@@ -175,20 +176,24 @@ jobs:
               raise SystemExit("migration job retry or timeout posture drifted")
           if containers[0].get("command") != ["golden-rose-migrate"]:
               raise SystemExit("migration job command drifted")
+          if containers[0].get("args") not in (None, []):
+              raise SystemExit("migration job arguments drifted")
           vpc_access = task_template.get("vpcAccess")
           interfaces = vpc_access.get("networkInterfaces") if isinstance(vpc_access, dict) else None
           if not isinstance(interfaces, list) or len(interfaces) != 1 or not isinstance(interfaces[0], dict):
               raise SystemExit("migration job VPC interface drifted")
           if vpc_access.get("egress") != "PRIVATE_RANGES_ONLY":
               raise SystemExit("migration job VPC egress drifted")
-          if not str(interfaces[0].get("network", "")).endswith("/networks/develop-vpc"):
+          if interfaces[0].get("network") != f"projects/{os.environ['GCP_PROJECT_ID']}/global/networks/develop-vpc":
               raise SystemExit("migration job VPC network drifted")
-          if not str(interfaces[0].get("subnetwork", "")).endswith("/regions/us-east4/subnetworks/develop-direct-vpc"):
+          if interfaces[0].get("subnetwork") != f"projects/{os.environ['GCP_PROJECT_ID']}/regions/us-east4/subnetworks/develop-direct-vpc":
               raise SystemExit("migration job VPC subnetwork drifted")
           environment = {}
           for item in containers[0].get("env", []):
               if not isinstance(item, dict) or not isinstance(item.get("name"), str):
                   raise SystemExit("migration job environment is malformed")
+              if item["name"] in environment:
+                  raise SystemExit("migration job environment contains duplicate names")
               if "value" in item:
                   environment[item["name"]] = {"value": item.get("value")}
               else:
@@ -219,10 +224,11 @@ jobs:
               "managed_by": "terraform",
               "service": "staff-tracer",
               "cost_center": "develop",
+              "owner": "technical-owner",
               "teardown": "intentional-runbook-only",
           }
           labels = job.get("labels")
-          if not isinstance(labels, dict) or any(labels.get(key) != value for key, value in required_labels.items()):
+          if labels != required_labels:
               raise SystemExit("migration job synthetic label posture drifted")
           PY
           gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --wait --format=json > build/transition-authority/migration-execution.json
@@ -234,6 +240,90 @@ jobs:
           path = Path("build/deploy-result.json")
           payload = json.loads(path.read_text(encoding="utf-8"))
           payload.update({"result": "success", "current_stage": "migration_execution", "image_digest": os.environ["IMAGE_DIGEST"]})
+          path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+          PY
+
+
+      - name: Execute database authority verification
+        if: inputs.deployment_stage == 'database-verification'
+        env:
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p build/transition-authority
+          JOB_JSON=$(gcloud run jobs describe verify-database-authority --project "$GCP_PROJECT_ID" --region us-east4 --format=json)
+          export JOB_JSON
+          python - <<'PY'
+          import json
+          import os
+
+          job = json.loads(os.environ["JOB_JSON"])
+          template = job.get("template", {})
+          task_template = template.get("template", {})
+          containers = task_template.get("containers")
+          if not isinstance(containers, list) or len(containers) != 1 or not isinstance(containers[0], dict):
+              raise SystemExit("database authority job must contain exactly one reviewed container")
+          if containers[0].get("image") != os.environ["MANAGED_IMAGE"]:
+              raise SystemExit("database authority job image must match the direct Cosign-verified image")
+          if containers[0].get("command") != ["python", "/app/scripts/verify_database_authority.py"]:
+              raise SystemExit("database authority job command drifted")
+          if containers[0].get("args") not in (None, []):
+              raise SystemExit("database authority job arguments drifted")
+          expected_labels = {
+              "environment": "develop",
+              "data_boundary": "fictional-synthetic-only",
+              "managed_by": "terraform",
+              "service": "staff-tracer",
+              "cost_center": "develop",
+              "owner": "technical-owner",
+              "teardown": "intentional-runbook-only",
+          }
+          if job.get("labels") != expected_labels:
+              raise SystemExit("database authority job labels drifted")
+          if task_template.get("serviceAccount") != f"staff-tracer-database-verifier@{os.environ['GCP_PROJECT_ID']}.iam.gserviceaccount.com":
+              raise SystemExit("database authority job service account drifted")
+          if template.get("parallelism") != 1 or template.get("taskCount") != 1:
+              raise SystemExit("database authority job execution cardinality drifted")
+          if task_template.get("maxRetries") != 0 or task_template.get("timeout") != "600s":
+              raise SystemExit("database authority job retry or timeout posture drifted")
+          vpc_access = task_template.get("vpcAccess")
+          interfaces = vpc_access.get("networkInterfaces") if isinstance(vpc_access, dict) else None
+          if not isinstance(interfaces, list) or len(interfaces) != 1 or not isinstance(interfaces[0], dict):
+              raise SystemExit("database authority job VPC interface drifted")
+          if vpc_access.get("egress") != "PRIVATE_RANGES_ONLY":
+              raise SystemExit("database authority job VPC egress drifted")
+          if interfaces[0].get("network") != f"projects/{os.environ['GCP_PROJECT_ID']}/global/networks/develop-vpc":
+              raise SystemExit("database authority job VPC network drifted")
+          if interfaces[0].get("subnetwork") != f"projects/{os.environ['GCP_PROJECT_ID']}/regions/us-east4/subnetworks/develop-direct-vpc":
+              raise SystemExit("database authority job VPC subnetwork drifted")
+          environment = {}
+          for item in containers[0].get("env", []):
+              if not isinstance(item, dict) or not isinstance(item.get("name"), str):
+                  raise SystemExit("database authority job environment is malformed")
+              if item["name"] in environment:
+                  raise SystemExit("database authority job environment contains duplicate names")
+              secret_ref = item.get("valueSource", {}).get("secretKeyRef", {})
+              environment[item["name"]] = {
+                  "secret": secret_ref.get("secret"),
+                  "version": secret_ref.get("version"),
+              }
+          expected_environment = {
+              "GOLDEN_ROSE_DATABASE_URL": {"secret": "migration-database-url", "version": "latest"},
+              "GOLDEN_ROSE_MIGRATION_DATABASE_URL": {"secret": "migration-database-url", "version": "latest"},
+              "GOLDEN_ROSE_RUNTIME_DATABASE_URL": {"secret": "runtime-database-url", "version": "latest"},
+          }
+          if environment != expected_environment:
+              raise SystemExit("database authority job environment drifted")
+          PY
+          gcloud run jobs execute verify-database-authority --project "$GCP_PROJECT_ID" --region us-east4 --wait --format=json > build/transition-authority/database-authority-execution.json
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path("build/deploy-result.json")
+          payload = json.loads(path.read_text(encoding="utf-8"))
+          payload.update({"result": "success", "current_stage": "database_verification", "image_digest": os.environ["IMAGE_DIGEST"]})
           path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
           PY
 

@@ -54,7 +54,7 @@ For each packet-authorized stage transition, preserve these artifacts outside tr
 ## Minimum stage-specific requirements
 
 ### Foundation
-- saved plan proves no Cloud Run service or migration job will be created
+- saved plan proves no Cloud Run service, migration job, or database-authority job will be created
 - JSON inventory shows only approved foundation resources
 - approval record explicitly states no executable workload is authorized
 - post-apply verification uses foundation mode and confirms no executable workload exists
@@ -63,13 +63,13 @@ For each packet-authorized stage transition, preserve these artifacts outside tr
 
 ### Migration
 - saved plan binds the reviewed workload image digest
-- JSON inventory proves the migration job exists and the service does not
+- JSON inventory proves the migration and database-authority jobs exist and the service does not
 - packet authority record includes the migration stage
 - migration execution proceeds later in the same packet only after migration plan/apply/readback and exact live job-image verification succeed; it is not separately approved
 
 ### Service
 - saved plan binds the reviewed workload image digest
-- JSON inventory proves both migration job and service exist
+- JSON inventory proves both bounded jobs and the service exist
 - packet authority record distinguishes deploy-readiness from qualification
 - access and bounded qualification proceed as later ordered stages of the same packet only after service apply/readback succeeds
 
@@ -103,7 +103,7 @@ Before any reverse transition:
 - identify whether the target is disposable workload only or control-plane adjacent
 - review state/control-plane survival explicitly
 - review secret custody consequences
-- review named tester and alert-route consequences
+- review shared Basic-gate access and alert-route consequences
 - record why forward recovery is insufficient or unsafe
 
 ## Value-safety rules
@@ -140,12 +140,12 @@ Stop immediately if any of the following is true:
 
 - use `deploy/gcp/bootstrap-state-runbook.md` for bootstrap/state ceremony
 - use `deploy/gcp/first-deployment-runbook.md` for first deployment operator steps
-- use `deploy/gcp/private-tester-access.md` for named tester access
+- use `deploy/gcp/private-tester-access.md` for the expiring shared browser-access boundary
 - use `deploy/gcp/rollback-forward-recovery-runbook.md` for recovery-path choice
 - use `deploy/gcp/teardown-rebuild-runbook.md` for disposable workload teardown/rebuild
 
 ## Current status
 
-This procedure remains source-controlled guidance for saved-plan operations inside the one future explicitly approved fictional-synthetic `develop` deployment packet. PR #37/42/46/48 closed the ADR-0013 source/verifier blockers; PR #57 closed A1; PR #58/59 plus WP-2/WP-3 completed workload binding; A2 selected new lineage; and state establishment, ownership alignment, exact foundation apply/verification, Gate P, bounded Gate S, both bootstrap provisioner-authority transitions, and workload-backend proof are complete. PR #83 merged the replacement 52-path source contract into protected `develop@9a04b274d9e0132e5a0b409314ba53170b43e303`; no deployment operation occurred and no historical plan or approval is reusable.
+This procedure remains source-controlled guidance for saved-plan operations inside one future explicitly approved fictional-synthetic `develop` deployment packet. PR #84 merged the PR #83 continuity closeout into protected `develop@63ac29b20314f03381d4a71e901a68ee51e913aa`. Offline packet derivation then found concrete provider/database-bootstrap/private-verification blockers; bounded source remediation is active. No deployment operation occurred, and no historical plan or approval is reusable.
 
 ADR-0016's human-visible addendum suspends separate Gate E0, signer/envelope/runner, signed FinOps receipt, and per-command approval requirements for this fictional-synthetic `develop` target. One explicit eight-hour packet may cover its ordered precheck, plans/applies, image, secrets, migration, service, access, readbacks, and qualification while retaining the runbook's stop conditions. Saved plan and backend bytes remain held through descriptors and are passed to Terraform only through `/dev/fd` with explicit inherited FDs; pathname re-open is forbidden. Live data, production, destructive recovery/state editing, and out-of-packet authority remain separate.

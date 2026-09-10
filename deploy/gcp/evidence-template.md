@@ -19,7 +19,7 @@ Region: us-east4
 ## Read-only command posture
 - No mutation mode is approved in this task.
 - No cloud apply, deploy, image push, secret injection, or IAM write occurs here.
-- Any future mutation path requires separate approval and a separately reviewed tool/runbook.
+- Any future mutation must fall inside the exact explicitly approved eight-hour packet or a separately reviewed and approved later authority boundary.
 
 ## Qualification posture
 - Qualification must prove the temporary shared Basic boundary before synthetic writes.

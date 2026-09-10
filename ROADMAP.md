@@ -21,7 +21,9 @@
 - [x] Review, accept, and merge the ADR-0015 FinOps budget-ownership separation planning tranche. PR #79 merged the planning packet into protected `develop` at `e7bab147`; it authorizes only Implementation PR A source work. The budget transfer, state bucket, IAM, plan/apply, and every downstream operation remain separately gated.
 - [x] Publish and merge the accepted human-visible `develop` acceleration addendum through protected `develop`. PR #82 merged at `349a80b98b0b7637754befd9d2fe726d614d0e19`; its planning branch is retired.
 - [x] Implement, review, and merge its single source PR. PR #83 merged source head `cc48b9ffe74eaa7abd90488ba37baf8502eac4af` into protected `develop` at `9a04b274d9e0132e5a0b409314ba53170b43e303`; the complete 52-path local gates, both final agent review perspectives, and all required CI passed with no current-target Blocker/High. No deployment operation occurred.
-- [ ] Under one separately approved packet, publish/apply/migrate/activate/qualify the environment and deliver the access-gated URL to Beatrice.
+- [x] Merge the PR #83 post-merge continuity closeout. PR #84 merged into protected `develop@63ac29b20314f03381d4a71e901a68ee51e913aa`; all required CI passed, and stale local branches/worktrees were subsequently retired.
+- [ ] Remediate the concrete provider/database-bootstrap/private-verification blockers found during offline eight-hour-packet derivation. The bounded 35-path source implementation and final architecture/security plus Terraform/deployment rereviews are complete with no current-target Blocker/High/Medium; publication through protected `develop` remains pending and grants no cloud authority.
+- [ ] Under one explicitly approved packet, publish/apply/migrate/activate/qualify the environment and deliver the access-gated URL to Beatrice.
 - [ ] Defer ADR-0015 FinOps state separation until production/handoff or a concrete billing-ownership trigger; retain the current workload budget and exact temporary quota-use exception.
 
 ## Phase 0 — Discovery and planning baseline

@@ -495,6 +495,21 @@ def test_gcp_first_deployment_runbook_documents_exact_quota_bootstrap_and_import
         assert phrase in runbook
 
 
+def test_gcp_first_deployment_runbook_separates_backend_and_provider_authority() -> None:
+    runbook = (ROOT / "deploy/gcp/first-deployment-runbook.md").read_text(encoding="utf-8")
+
+    required_phrases = [
+        "provisioner impersonation is limited to the GCS backend",
+        "named human supplies Google provider authority",
+        "provider authority precheck",
+        "no project provisioning role is granted to the provisioner",
+    ]
+    for phrase in required_phrases:
+        assert phrase in runbook
+
+    assert "GOOGLE_OAUTH_ACCESS_TOKEN=provisioner" not in runbook
+
+
 def test_gcp_first_deployment_runbook_documents_single_packet_and_shared_access() -> None:
     runbook = (ROOT / "deploy/gcp/first-deployment-runbook.md").read_text(encoding="utf-8")
 
@@ -510,6 +525,47 @@ def test_gcp_first_deployment_runbook_documents_single_packet_and_shared_access(
 
     for phrase in required_phrases:
         assert phrase in runbook
+
+
+def test_gcp_first_deployment_runbook_defines_non_argv_database_bootstrap_transition() -> None:
+    runbook = (ROOT / "deploy/gcp/first-deployment-runbook.md").read_text(encoding="utf-8")
+
+    required_phrases = [
+        "temporary bootstrap built-in user",
+        "owner-only `--flags-file`",
+        "never a command-line password",
+        "--database-roles=golden_rose_migrator",
+        "--database-roles=golden_rose_runtime",
+        "disable the temporary bootstrap Secret version",
+        "delete the temporary bootstrap user",
+        "restricted migration-login rerun",
+        "database-verification",
+    ]
+    for phrase in required_phrases:
+        assert phrase in runbook
+
+    database_boundary = runbook.split(
+        "## Database bootstrap and authority verification boundary", 1
+    )[1].split("## Quota bootstrap and import boundary", 1)[0]
+    retirement_step = database_boundary.index("5. Before any restricted migration-login rerun")
+    rerun_step = database_boundary.index("6. Perform one restricted migration-login rerun")
+    secret_disable = database_boundary.index("disable the temporary bootstrap Secret version")
+    bootstrap_delete = database_boundary.index("delete the temporary bootstrap user")
+    retirement_readback = database_boundary.index(
+        "Read back that the restricted URL versions remain enabled"
+    )
+    assert retirement_step < secret_disable < rerun_step
+    assert retirement_step < bootstrap_delete < rerun_step
+    assert retirement_step < retirement_readback < rerun_step
+    assert "Secret version remains disabled" in database_boundary
+    assert "Secret version, and role membership remain absent" not in database_boundary
+
+    one_packet = runbook.split("## One-packet execution order", 1)[1].split(
+        "## Human access boundary", 1
+    )[0]
+    assert one_packet.index(
+        "temporary bootstrap Secret/user/membership retirement with exact readback"
+    ) < one_packet.index("restricted migration-login rerun")
 
 
 def test_gcp_recovery_and_teardown_runbooks_document_failure_handling_boundaries() -> None:
@@ -1369,15 +1425,15 @@ def test_foundation_stage_omits_deferred_network_cloud_sql_and_demo_expiry_input
         },
         "cloud_sql_schema_owner_role": {
             "next": 'variable "cloud_sql_migrator_role"',
-            "migration_service_guard": "var.cloud_sql_schema_owner_role != null && can(regex(",
+            "migration_service_guard": 'var.cloud_sql_schema_owner_role == "golden_rose_schema_owner"',
         },
         "cloud_sql_migrator_role": {
             "next": 'variable "cloud_sql_runtime_role"',
-            "migration_service_guard": "var.cloud_sql_migrator_role != null && can(regex(",
+            "migration_service_guard": 'var.cloud_sql_migrator_role == "golden_rose_migrator"',
         },
         "cloud_sql_runtime_role": {
             "next": 'variable "cloud_sql_recovery_policy_review_status"',
-            "migration_service_guard": "var.cloud_sql_runtime_role != null && can(regex(",
+            "migration_service_guard": 'var.cloud_sql_runtime_role == "golden_rose_runtime"',
         },
         "cloud_sql_recovery_policy_review_status": {
             "next": 'variable "golden_rose_public_environment_label"',
@@ -1988,6 +2044,73 @@ def test_gcp_develop_migration_job_is_one_task_private_and_uses_exact_digest() -
     ]
     for fragment in forbidden_fragments:
         assert fragment not in migration_job
+
+
+def test_gcp_develop_database_authority_job_is_private_bounded_and_executable() -> None:
+    job = (ROOT / "infra/gcp/develop/database_authority_job.tf").read_text(encoding="utf-8")
+    iam = (ROOT / "infra/gcp/develop/iam.tf").read_text(encoding="utf-8")
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+
+    required_job_fragments = [
+        'resource "google_cloud_run_v2_job" "database_authority"',
+        'name     = "verify-database-authority"',
+        "service_account = google_service_account.database_verifier.email",
+        'command = ["python", "/app/scripts/verify_database_authority.py"]',
+        'secret  = "migration-database-url"',
+        'secret  = "runtime-database-url"',
+        "max_retries = 0",
+        "task_count  = 1",
+        "parallelism = 1",
+        "PRIVATE_RANGES_ONLY",
+    ]
+    for fragment in required_job_fragments:
+        assert _contains_normalized_fragment(job, fragment)
+
+    assert "ingress" not in job.lower()
+    assert "COPY scripts/verify_database_authority.py ./scripts/" in dockerfile
+    assert 'resource "google_service_account" "database_verifier"' in (
+        ROOT / "infra/gcp/develop/identities.tf"
+    ).read_text(encoding="utf-8")
+    assert 'resource "google_project_iam_member" "database_verifier_cloudsql_client"' in iam
+    assert 'resource "google_project_iam_member" "database_verifier_log_writer"' not in iam
+    assert 'resource "google_project_iam_member" "database_verifier_metric_writer"' not in iam
+    assert (
+        'resource "google_secret_manager_secret_iam_member" "database_verifier_migration_secret_access"'
+        in iam
+    )
+    assert (
+        'resource "google_secret_manager_secret_iam_member" "database_verifier_runtime_secret_access"'
+        in iam
+    )
+    assert (
+        'resource "google_cloud_run_v2_job_iam_member" "deployer_database_authority_job_executor"'
+        in iam
+    )
+    assert (
+        'resource "google_cloud_run_v2_job_iam_member" "deployer_database_authority_job_viewer"'
+        in iam
+    )
+    manifest = json.loads(
+        (ROOT / "infra/policy/predeployment-authority-manifest.json").read_text(encoding="utf-8")
+    )
+    resource_types = manifest["terraform"]["resource_types"]
+    assert resource_types["google_project_iam_member"]["max_count"] == 10
+    assert resource_types["google_secret_manager_secret_iam_member"]["max_count"] == 7
+
+
+def test_cloud_sql_database_role_inputs_are_exact_application_contracts() -> None:
+    root_variables = (ROOT / "infra/gcp/variables.tf").read_text(encoding="utf-8")
+    module_variables = (ROOT / "infra/gcp/develop/variables.tf").read_text(encoding="utf-8")
+
+    expected = {
+        "cloud_sql_schema_owner_role": "golden_rose_schema_owner",
+        "cloud_sql_migrator_role": "golden_rose_migrator",
+        "cloud_sql_runtime_role": "golden_rose_runtime",
+    }
+    for variables in (root_variables, module_variables):
+        for variable_name, role_name in expected.items():
+            block = variables.split(f'variable "{variable_name}"', 1)[1].split("\n}\n", 1)[0]
+            assert f'var.{variable_name} == "{role_name}"' in block
 
 
 def test_gcp_develop_service_does_not_run_migrations_on_web_startup() -> None:
@@ -8838,7 +8961,49 @@ def test_deploy_workflow_uses_one_packet_stages_and_direct_oci_authority() -> No
         "- name: Record deploy result", 1
     )[0]
     assert 'payload.update({"result": "success"' in migration_step
+    assert 'containers[0].get("args") not in (None, [])' in migration_step
+    assert 'item["name"] in environment' in migration_step
+    assert (
+        "f\"projects/{os.environ['GCP_PROJECT_ID']}/global/networks/develop-vpc\"" in migration_step
+    )
+    assert (
+        "f\"projects/{os.environ['GCP_PROJECT_ID']}/regions/us-east4/"
+        'subnetworks/develop-direct-vpc"' in migration_step
+    )
+    assert "labels != required_labels" in migration_step
     assert 'payload.update({"result": "success"' in service_step
+
+
+def test_deploy_workflow_executes_bounded_database_authority_job() -> None:
+    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
+
+    required = [
+        "- database-verification",
+        "Execute database authority verification",
+        "if: inputs.deployment_stage == 'database-verification'",
+        "gcloud run jobs describe verify-database-authority",
+        "database authority job image must match the direct Cosign-verified image",
+        "gcloud run jobs execute verify-database-authority",
+        '"current_stage": "database_verification"',
+    ]
+    for fragment in required:
+        assert fragment in workflow
+
+    step = workflow.split("- name: Execute database authority verification", 1)[1].split(
+        "- name: Verify service readiness transition", 1
+    )[0]
+    assert step.index("gcloud run jobs describe") < step.index("gcloud run jobs execute")
+    assert "--update-env-vars" not in step
+    assert "--args" not in step
+    assert "--command" not in step
+    assert 'containers[0].get("args") not in (None, [])' in step
+    assert 'item["name"] in environment' in step
+    assert "f\"projects/{os.environ['GCP_PROJECT_ID']}/global/networks/develop-vpc\"" in step
+    assert (
+        "f\"projects/{os.environ['GCP_PROJECT_ID']}/regions/us-east4/"
+        'subnetworks/develop-direct-vpc"' in step
+    )
+    assert 'job.get("labels") != expected_labels' in step
 
 
 def test_deploy_workflow_separates_artifact_verifier_credentials_from_deployer_credentials() -> (

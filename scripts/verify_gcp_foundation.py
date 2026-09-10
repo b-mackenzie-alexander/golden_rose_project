@@ -393,12 +393,23 @@ def collect_foundation_snapshot(
         service_accounts = _dedupe_strings(service_account_payload, label="service accounts")
         control_plane_service_accounts = []
     project_number = str(command_runner(("project-number",)))
+    cloud_run_jobs = _dedupe_strings(command_runner(("cloud-run-jobs",)), label="cloud run jobs")
     cloud_run_service = _mapping(command_runner(("cloud-run-service",)), label="cloud run service")
     cloud_run_service_iam = _mapping(
         command_runner(("cloud-run-service-iam",)), label="cloud run service iam"
     )
     migration_job = _mapping(command_runner(("migration-job",)), label="migration job")
     migration_job_iam = _mapping(command_runner(("migration-job-iam",)), label="migration job iam")
+    database_authority_job = _mapping(
+        command_runner(("database-authority-job",)), label="database authority job"
+    )
+    database_authority_job_iam = _mapping(
+        command_runner(("database-authority-job-iam",)), label="database authority job iam"
+    )
+    database_authority_secret_iam = _mapping(
+        command_runner(("database-authority-secret-iam",)),
+        label="database authority secret iam",
+    )
     try:
         cloud_sql = _mapping(command_runner(("cloud-sql",)), label="cloud sql")
     except VerificationError as exc:
@@ -448,7 +459,9 @@ def collect_foundation_snapshot(
             "service_accounts": service_accounts,
             "control_plane_service_accounts": control_plane_service_accounts,
             "cloud_run_service": str(cloud_run_service.get("name", "")),
+            "cloud_run_jobs": cloud_run_jobs,
             "cloud_run_job": str(migration_job.get("name", "")),
+            "database_authority_job": str(database_authority_job.get("name", "")),
             "cloud_sql_instance": str(cloud_sql.get("name", "")),
             "state_bucket": str(state_bucket.get("name", "")),
         },
@@ -456,6 +469,9 @@ def collect_foundation_snapshot(
         "cloud_run_service_iam": cloud_run_service_iam,
         "migration_job": migration_job,
         "migration_job_iam": migration_job_iam,
+        "database_authority_job": database_authority_job,
+        "database_authority_job_iam": database_authority_job_iam,
+        "database_authority_secret_iam": database_authority_secret_iam,
         "cloud_sql": cloud_sql,
         "service_account_keys": service_account_keys,
         "provisioner_quota_role": provisioner_quota_role,
@@ -475,8 +491,13 @@ def collect_foundation_snapshot(
     }
 
 
+def _service_account_member(account_id: str, project_id: object) -> str:
+    return f"serviceAccount:{account_id}@{project_id}.iam.gserviceaccount.com"
+
+
 def _expected_service_accounts(project_id: str) -> set[str]:
     return {
+        f"staff-tracer-database-verifier@{project_id}.iam.gserviceaccount.com",
         f"staff-tracer-migration@{project_id}.iam.gserviceaccount.com",
         f"staff-tracer-runtime@{project_id}.iam.gserviceaccount.com",
     }
@@ -518,6 +539,7 @@ def _expected_project_iam(contract: dict[str, Any]) -> dict[str, set[str]]:
         "roles/cloudsql.client": {
             f"serviceAccount:staff-tracer-runtime@{project_id}.iam.gserviceaccount.com",
             f"serviceAccount:staff-tracer-migration@{project_id}.iam.gserviceaccount.com",
+            f"serviceAccount:staff-tracer-database-verifier@{project_id}.iam.gserviceaccount.com",
         },
         "roles/logging.logWriter": {
             f"serviceAccount:staff-tracer-runtime@{project_id}.iam.gserviceaccount.com",
@@ -759,8 +781,18 @@ def evaluate_foundation_snapshot(
         str(contract["control_plane_project_id"])
     ):
         violations.append("control-plane service-account inventory drifted")
+    expected_cloud_run_jobs = (
+        set() if mode == "foundation" else {"run-migrations", "verify-database-authority"}
+    )
+    if _as_set(resource_inventory.get("cloud_run_jobs")) != expected_cloud_run_jobs:
+        violations.append("database authority and migration job inventory drifted")
     if mode != "foundation" and resource_inventory.get("cloud_run_job") != "run-migrations":
         violations.append("migration job inventory drifted from run-migrations")
+    if (
+        mode != "foundation"
+        and resource_inventory.get("database_authority_job") != "verify-database-authority"
+    ):
+        violations.append("database authority job inventory drifted")
     if mode == "service" and resource_inventory.get("cloud_run_service") != "staff-tracer":
         violations.append("cloud run service inventory drifted from staff-tracer")
     cloud_sql_inventory_name = str(resource_inventory.get("cloud_sql_instance", ""))
@@ -776,20 +808,27 @@ def evaluate_foundation_snapshot(
     # job but no service, service must have both job and service.
     cloud_run_service_name = resource_inventory.get("cloud_run_service", "")
     cloud_run_job_name = resource_inventory.get("cloud_run_job", "")
+    database_authority_job_name = resource_inventory.get("database_authority_job", "")
 
     if mode == "foundation":
         if cloud_run_service_name:
             violations.append("foundation verifier mode rejects present cloud_run_service workload")
         if cloud_run_job_name:
             violations.append("foundation verifier mode rejects present cloud_run_job workload")
+        if database_authority_job_name:
+            violations.append("foundation verifier mode rejects present database authority job")
     elif mode == "migration":
         if not cloud_run_job_name:
             violations.append("migration verifier mode requires cloud_run_job to be present")
+        if not database_authority_job_name:
+            violations.append("migration verifier mode requires database authority job")
         if cloud_run_service_name:
             violations.append("migration verifier mode rejects present cloud_run_service workload")
     elif mode == "service":
         if not cloud_run_job_name:
             violations.append("service verifier mode requires cloud_run_job to be present")
+        if not database_authority_job_name:
+            violations.append("service verifier mode requires database authority job")
         if not cloud_run_service_name:
             violations.append("service verifier mode requires cloud_run_service to be present")
 
@@ -918,20 +957,29 @@ def evaluate_foundation_snapshot(
             != f"staff-tracer-migration@{contract['project_id']}.iam.gserviceaccount.com"
         ):
             violations.append("migration job identity drifted from staff-tracer-migration")
+        if migration_job.get("container_count") != 1:
+            violations.append("migration job container inventory drifted")
         if migration_job.get("parallelism") != 1 or migration_job.get("task_count") != 1:
             violations.append("migration job lost serialized execution posture")
         if migration_job.get("max_retries") != 0 or migration_job.get("timeout") != "1800s":
             violations.append("migration job retry or timeout posture drifted")
         if migration_job.get("vpc_egress") != "PRIVATE_RANGES_ONLY":
             violations.append("migration job private VPC egress posture drifted")
-        if not str(migration_job.get("vpc_network", "")).endswith("/networks/develop-vpc"):
+        expected_migration_network = (
+            f"projects/{contract['project_id']}/global/networks/develop-vpc"
+        )
+        expected_migration_subnetwork = (
+            f"projects/{contract['project_id']}/regions/{expected_region}/"
+            "subnetworks/develop-direct-vpc"
+        )
+        if migration_job.get("vpc_network") != expected_migration_network:
             violations.append("migration job VPC network drifted")
-        if not expected_region or not str(migration_job.get("vpc_subnetwork", "")).endswith(
-            f"/regions/{expected_region}/subnetworks/develop-direct-vpc"
-        ):
+        if migration_job.get("vpc_subnetwork") != expected_migration_subnetwork:
             violations.append("migration job VPC subnetwork drifted")
         if migration_job.get("command") != ["golden-rose-migrate"]:
             violations.append("migration job command drifted")
+        if migration_job.get("args") not in (None, []):
+            violations.append("migration job arguments drifted")
         image = str(migration_job.get("image", ""))
         if not re.search(r"@sha256:[0-9a-f]{64}$", image):
             violations.append("migration verifier modes require digest-bound migration job image")
@@ -960,8 +1008,8 @@ def evaluate_foundation_snapshot(
             "GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL",
         }:
             violations.append("migration job environment inventory drifted")
-        for name, expected_value in expected_migration_environment.items():
-            if migration_environment.get(name) != expected_value:
+        for name, expected_job_value in expected_migration_environment.items():
+            if migration_environment.get(name) != expected_job_value:
                 violations.append(f"migration job environment drifted for {name}")
         migration_public_label = _mapping(
             migration_environment.get("GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL", {}),
@@ -990,6 +1038,129 @@ def evaluate_foundation_snapshot(
         violations.append("foundation verifier mode rejects migration job configuration presence")
     elif _mapping(snapshot.get("migration_job_iam", {}), label="migration job iam"):
         violations.append("foundation verifier mode rejects migration job IAM presence")
+
+    database_authority_job = _mapping(
+        snapshot.get("database_authority_job", {}), label="database authority job"
+    )
+    database_authority_job_iam = _mapping(
+        snapshot.get("database_authority_job_iam", {}),
+        label="database authority job iam",
+    )
+    database_authority_secret_iam = _mapping(
+        snapshot.get("database_authority_secret_iam", {}),
+        label="database authority secret iam",
+    )
+    if mode in {"migration", "service"}:
+        if database_authority_job.get("name") != "verify-database-authority":
+            violations.append("database authority job name drifted")
+        if database_authority_job.get("labels") != APPROVED_PROJECT_LABELS:
+            violations.append("database authority job labels drifted")
+        if (
+            database_authority_job.get("service_account")
+            != f"staff-tracer-database-verifier@{contract['project_id']}.iam.gserviceaccount.com"
+        ):
+            violations.append("database authority job identity drifted")
+        if database_authority_job.get("container_count") != 1:
+            violations.append("database authority job container inventory drifted")
+        if (
+            database_authority_job.get("parallelism") != 1
+            or database_authority_job.get("task_count") != 1
+        ):
+            violations.append("database authority job execution cardinality drifted")
+        if (
+            database_authority_job.get("max_retries") != 0
+            or database_authority_job.get("timeout") != "600s"
+        ):
+            violations.append("database authority job retry or timeout posture drifted")
+        if database_authority_job.get("vpc_egress") != "PRIVATE_RANGES_ONLY":
+            violations.append("database authority job private VPC egress posture drifted")
+        expected_network = f"projects/{contract['project_id']}/global/networks/develop-vpc"
+        expected_subnetwork = (
+            f"projects/{contract['project_id']}/regions/{expected_region}/"
+            "subnetworks/develop-direct-vpc"
+        )
+        if database_authority_job.get("vpc_network") != expected_network:
+            violations.append("database authority job VPC network drifted")
+        if database_authority_job.get("vpc_subnetwork") != expected_subnetwork:
+            violations.append("database authority job VPC subnetwork drifted")
+        if database_authority_job.get("command") != [
+            "python",
+            "/app/scripts/verify_database_authority.py",
+        ]:
+            violations.append("database authority job command drifted")
+        if database_authority_job.get("args") not in (None, []):
+            violations.append("database authority job arguments drifted")
+        database_authority_image = str(database_authority_job.get("image", ""))
+        if not re.search(r"@sha256:[0-9a-f]{64}$", database_authority_image):
+            violations.append("database authority job image is not digest-bound")
+        elif database_authority_image.rsplit("@", maxsplit=1)[-1] != expected_image_digest:
+            violations.append("database authority job does not match expected image digest")
+        expected_database_authority_environment = {
+            "GOLDEN_ROSE_DATABASE_URL": {
+                "secret": "migration-database-url",
+                "version": "latest",
+            },
+            "GOLDEN_ROSE_MIGRATION_DATABASE_URL": {
+                "secret": "migration-database-url",
+                "version": "latest",
+            },
+            "GOLDEN_ROSE_RUNTIME_DATABASE_URL": {
+                "secret": "runtime-database-url",
+                "version": "latest",
+            },
+        }
+        if database_authority_job.get("environment") != expected_database_authority_environment:
+            violations.append("database authority job environment drifted")
+
+        expected_database_authority_job_iam = _expected_migration_job_iam(contract)
+        if set(database_authority_job_iam) != set(expected_database_authority_job_iam):
+            violations.append("database authority job IAM roles drifted")
+        for role, expected_members in expected_database_authority_job_iam.items():
+            if _as_set(database_authority_job_iam.get(role)) != expected_members:
+                violations.append(f"database authority job IAM drifted for {role}")
+
+        verifier_member = (
+            f"serviceAccount:staff-tracer-database-verifier@"
+            f"{contract['project_id']}.iam.gserviceaccount.com"
+        )
+        expected_database_authority_secret_iam = {
+            "migration-database-url": {
+                "roles/secretmanager.secretAccessor": {
+                    f"serviceAccount:staff-tracer-migration@{contract['project_id']}.iam.gserviceaccount.com",
+                    verifier_member,
+                }
+            },
+            "runtime-database-url": {
+                "roles/secretmanager.secretAccessor": {
+                    f"serviceAccount:staff-tracer-runtime@{contract['project_id']}.iam.gserviceaccount.com",
+                    verifier_member,
+                }
+            },
+        }
+        if set(database_authority_secret_iam) != set(expected_database_authority_secret_iam):
+            violations.append("database authority secret IAM inventory drifted")
+        for secret_name, expected_secret_roles in expected_database_authority_secret_iam.items():
+            actual_roles = _mapping(
+                database_authority_secret_iam.get(secret_name, {}),
+                label=f"database authority secret IAM for {secret_name}",
+            )
+            if set(actual_roles) != set(expected_secret_roles):
+                violations.append(f"database authority secret IAM roles drifted for {secret_name}")
+            for role, expected_secret_members in expected_secret_roles.items():
+                if _as_set(actual_roles.get(role)) != expected_secret_members:
+                    violations.append(
+                        f"database authority secret IAM drifted for {secret_name} {role}"
+                    )
+    else:
+        if database_authority_job:
+            violations.append("foundation verifier mode rejects database authority job")
+        if database_authority_job_iam:
+            violations.append("foundation verifier mode rejects database authority job IAM")
+        if any(
+            _mapping(policy, label="database authority secret IAM policy")
+            for policy in database_authority_secret_iam.values()
+        ):
+            violations.append("foundation verifier mode rejects database authority secret IAM")
 
     cloud_sql = _mapping(snapshot.get("cloud_sql", {}), label="cloud sql")
     if mode == "foundation":
@@ -1045,6 +1216,18 @@ def evaluate_foundation_snapshot(
             "serviceAccount:golden-rose-provisioner@"
             f"{contract['control_plane_project_id']}.iam.gserviceaccount.com"
         )
+        workload_project_id = contract["project_id"]
+        inherited_workload_members = {
+            _service_account_member("staff-tracer-runtime", workload_project_id): (
+                "runtime service account"
+            ),
+            _service_account_member("staff-tracer-migration", workload_project_id): (
+                "migration service account"
+            ),
+            _service_account_member("staff-tracer-database-verifier", workload_project_id): (
+                "database verifier"
+            ),
+        }
         inherited_expansion_members = {
             provisioner_member,
             "allUsers",
@@ -1065,6 +1248,12 @@ def evaluate_foundation_snapshot(
                     violations.append("provisioner inherited quota authority evidence is malformed")
                     continue
                 actual_members = _as_set(members)
+                for workload_member, workload_label in inherited_workload_members.items():
+                    if workload_member in actual_members:
+                        violations.append(
+                            f"{workload_label} inherited authority detected at "
+                            f"{ancestor} through {role}"
+                        )
                 unresolved_group_membership = any(
                     member.startswith("group:") for member in actual_members
                 )
@@ -1146,7 +1335,10 @@ def evaluate_foundation_snapshot(
     )
     runtime_email = f"staff-tracer-runtime@{contract['project_id']}.iam.gserviceaccount.com"
     migration_email = f"staff-tracer-migration@{contract['project_id']}.iam.gserviceaccount.com"
-    for email in (runtime_email, migration_email):
+    database_verifier_email = (
+        f"staff-tracer-database-verifier@{contract['project_id']}.iam.gserviceaccount.com"
+    )
+    for email in (runtime_email, migration_email, database_verifier_email):
         actual = _mapping(service_account_iam.get(email, {}), label=f"service account iam {email}")
         if actual:
             violations.append(f"service-account IAM drifted for {email}")
@@ -1579,6 +1771,31 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                 "workload": workload_accounts,
                 "control_plane": control_plane_account_emails,
             }
+        if key == ("cloud-run-jobs",):
+            jobs = _run_json_command(
+                [
+                    "gcloud",
+                    "run",
+                    "jobs",
+                    "list",
+                    "--project",
+                    project_id,
+                    "--region",
+                    region,
+                    "--format=json",
+                ],
+                context="cloud run jobs",
+            )
+            if not isinstance(jobs, list):
+                raise VerificationError("cloud run jobs must be a list")
+            names: list[str] = []
+            for job in jobs:
+                job_mapping = _mapping(job, label="cloud run job inventory item")
+                name = job_mapping.get("name")
+                if not isinstance(name, str) or not name:
+                    raise VerificationError("cloud run job inventory contains malformed names")
+                names.append(name.rsplit("/", maxsplit=1)[-1])
+            return names
         if key == ("cloud-run-service",):
             try:
                 service = _run_json_command(
@@ -1678,7 +1895,8 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
             template = _mapping(job, label="job").get("template", {})
             task_template = _mapping(template, label="job template").get("template", {})
             containers = _mapping(task_template, label="job task template").get("containers", [])
-            container = containers[0] if isinstance(containers, list) and containers else {}
+            container_count = len(containers) if isinstance(containers, list) else 0
+            container = containers[0] if container_count == 1 else {}
             container_mapping = _mapping(container, label="migration job container")
             vpc_access = _mapping(task_template, label="job task template").get("vpcAccess", {})
             network_interfaces = _mapping(vpc_access, label="job vpc access").get(
@@ -1693,6 +1911,7 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                 "name": job.get("name"),
                 "labels": _mapping(job, label="job").get("labels", {}),
                 "service_account": task_template.get("serviceAccount"),
+                "container_count": container_count,
                 "parallelism": template.get("parallelism"),
                 "task_count": template.get("taskCount"),
                 "max_retries": task_template.get("maxRetries"),
@@ -1706,6 +1925,7 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                 ),
                 "image": container_mapping.get("image"),
                 "command": container_mapping.get("command"),
+                "args": container_mapping.get("args"),
                 "environment": _normalize_service_environment(container_mapping.get("env", [])),
             }
         if key == ("migration-job-iam",):
@@ -1730,6 +1950,122 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
                     return {}
                 raise
             return _bindings_to_role_map(policy)
+        if key == ("database-authority-job",):
+            try:
+                job = _run_json_command(
+                    [
+                        "gcloud",
+                        "run",
+                        "jobs",
+                        "describe",
+                        "verify-database-authority",
+                        "--project",
+                        project_id,
+                        "--region",
+                        region,
+                        "--format=json",
+                    ],
+                    context="database authority job",
+                )
+            except VerificationError as exc:
+                if _is_absent_workload_resource_error(exc):
+                    return {}
+                raise
+            template = _mapping(job, label="database authority job").get("template", {})
+            task_template = _mapping(template, label="database authority job template").get(
+                "template", {}
+            )
+            containers = _mapping(task_template, label="database authority job task template").get(
+                "containers", []
+            )
+            container_count = len(containers) if isinstance(containers, list) else 0
+            container = containers[0] if container_count == 1 else {}
+            container_mapping = _mapping(container, label="database authority job container")
+            vpc_access = _mapping(task_template, label="database authority job task template").get(
+                "vpcAccess", {}
+            )
+            network_interfaces = _mapping(
+                vpc_access, label="database authority job vpc access"
+            ).get("networkInterfaces", [])
+            network_interface = (
+                network_interfaces[0]
+                if isinstance(network_interfaces, list) and len(network_interfaces) == 1
+                else {}
+            )
+            return {
+                "name": job.get("name"),
+                "labels": _mapping(job, label="database authority job").get("labels", {}),
+                "service_account": _mapping(
+                    task_template, label="database authority job task template"
+                ).get("serviceAccount"),
+                "container_count": container_count,
+                "parallelism": template.get("parallelism"),
+                "task_count": template.get("taskCount"),
+                "max_retries": _mapping(
+                    task_template, label="database authority job task template"
+                ).get("maxRetries"),
+                "timeout": _mapping(
+                    task_template, label="database authority job task template"
+                ).get("timeout"),
+                "vpc_egress": _mapping(vpc_access, label="database authority job vpc access").get(
+                    "egress"
+                ),
+                "vpc_network": _mapping(
+                    network_interface, label="database authority job network interface"
+                ).get("network"),
+                "vpc_subnetwork": _mapping(
+                    network_interface, label="database authority job network interface"
+                ).get("subnetwork"),
+                "image": container_mapping.get("image"),
+                "command": container_mapping.get("command"),
+                "args": container_mapping.get("args"),
+                "environment": _normalize_service_environment(container_mapping.get("env", [])),
+            }
+        if key == ("database-authority-job-iam",):
+            try:
+                policy = _run_json_command(
+                    [
+                        "gcloud",
+                        "run",
+                        "jobs",
+                        "get-iam-policy",
+                        "verify-database-authority",
+                        "--project",
+                        project_id,
+                        "--region",
+                        region,
+                        "--format=json",
+                    ],
+                    context="database authority job iam",
+                )
+            except VerificationError as exc:
+                if _is_absent_workload_resource_error(exc):
+                    return {}
+                raise
+            return _bindings_to_role_map(policy)
+        if key == ("database-authority-secret-iam",):
+            secret_policies: dict[str, dict[str, list[str]]] = {}
+            for secret_name in ("migration-database-url", "runtime-database-url"):
+                try:
+                    policy = _run_json_command(
+                        [
+                            "gcloud",
+                            "secrets",
+                            "get-iam-policy",
+                            secret_name,
+                            "--project",
+                            project_id,
+                            "--format=json",
+                        ],
+                        context=f"database authority secret iam for {secret_name}",
+                    )
+                except VerificationError as exc:
+                    if _is_absent_workload_resource_error(exc):
+                        secret_policies[secret_name] = {}
+                        continue
+                    raise
+                secret_policies[secret_name] = _bindings_to_role_map(policy)
+            return secret_policies
         if key == ("cloud-sql",):
             instance = _run_json_command(
                 [

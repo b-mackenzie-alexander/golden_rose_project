@@ -1,6 +1,6 @@
 # Technical Requirements — Golden Rose Operations Platform
 
-**Status:** PR #82 merged the accepted human-visible `develop` plan. PR #83 then merged its reviewed 52-path source implementation into protected `develop@9a04b274d9e0132e5a0b409314ba53170b43e303`; all required CI passed. No cloud operation has occurred. Eight-hour deployment-packet approval is pending, and execution has not begun.
+**Status:** PR #84 merged the PR #83 status closeout into protected `develop@63ac29b20314f03381d4a71e901a68ee51e913aa`. Offline packet derivation found concrete provider/database-bootstrap/private-verification defects; bounded source remediation is active under the existing outcome plan. No cloud operation has occurred. Eight-hour packet approval remains pending.
 
 ## Product outcome
 Provide agency staff a reliable browser-based operations workspace that replaces fragmented paper/form/spreadsheet employer-demand handling, supports governed operational reporting, and later supports transparent staff review of worker-to-employer/job compatibility.

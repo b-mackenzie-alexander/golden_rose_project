@@ -183,6 +183,7 @@ EXACT_SEMANTIC_FORBIDDEN_CONSTRUCTS = {
 
 # Task 1: Staged authority model — approved deployment stage values.
 APPROVED_STAGE_VALUES = ["foundation", "migration", "service"]
+WORKFLOW_DEPLOYMENT_STAGE_VALUES = ["migration", "database-verification", "service"]
 
 # Task 3: Reviewed env names allowed in Cloud Run service/job containers.
 APPROVED_ENV_NAMES = {
@@ -195,6 +196,8 @@ APPROVED_ENV_NAMES = {
     "GOLDEN_ROSE_DEMO_ACCESS_EXPIRES_AT",
     "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD",
     "GOLDEN_ROSE_DATABASE_URL",
+    "GOLDEN_ROSE_MIGRATION_DATABASE_URL",
+    "GOLDEN_ROSE_RUNTIME_DATABASE_URL",
     "GOLDEN_ROSE_SYNTHETIC_STAFF_ID",
     "GOLDEN_ROSE_MIGRATION_ASSUMED_ROLE",
 }
@@ -203,6 +206,8 @@ APPROVED_ENV_NAMES = {
 SECRET_ENV_NAMES = {
     "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD",
     "GOLDEN_ROSE_DATABASE_URL",
+    "GOLDEN_ROSE_MIGRATION_DATABASE_URL",
+    "GOLDEN_ROSE_RUNTIME_DATABASE_URL",
     "GOLDEN_ROSE_SYNTHETIC_STAFF_ID",
 }
 
@@ -218,6 +223,8 @@ APPROVED_SECRET_REFS: dict[str, set[str]] = {
         "runtime-database-url",  # service only
         "migration-database-url",  # migration only
     },
+    "GOLDEN_ROSE_MIGRATION_DATABASE_URL": {"migration-database-url"},
+    "GOLDEN_ROSE_RUNTIME_DATABASE_URL": {"runtime-database-url"},
     "GOLDEN_ROSE_SYNTHETIC_STAFF_ID": {
         "synthetic-staff-id",
     },
@@ -253,6 +260,7 @@ REQUIRED_FILES = [
     TERRAFORM_ROOT / "develop" / "identities.tf",
     TERRAFORM_ROOT / "develop" / "iam.tf",
     TERRAFORM_ROOT / "develop" / "migration_job.tf",
+    TERRAFORM_ROOT / "develop" / "database_authority_job.tf",
     TERRAFORM_ROOT / "develop" / "budgets.tf",
     TERRAFORM_ROOT / "develop" / "observability.tf",
 ]
@@ -1884,6 +1892,7 @@ DEPLOY_WORKFLOW_STEPS = [
     "name:Authenticate deployer to Google Cloud",
     "name:Set up gcloud",
     "name:Execute migration transition",
+    "name:Execute database authority verification",
     "name:Verify service readiness transition",
     "name:Record deploy result",
     "name:Upload deploy result evidence",
@@ -1899,6 +1908,9 @@ for _identifier in DEPLOY_WORKFLOW_STEPS:
 ALLOWED_WORKFLOW_STEP_IF[("deploy-develop.yml", "deploy", "name:Execute migration transition")] = (
     "inputs.deployment_stage == 'migration'"
 )
+ALLOWED_WORKFLOW_STEP_IF[
+    ("deploy-develop.yml", "deploy", "name:Execute database authority verification")
+] = "inputs.deployment_stage == 'database-verification'"
 ALLOWED_WORKFLOW_STEP_IF[
     ("deploy-develop.yml", "deploy", "name:Write migration success receipt")
 ] = "inputs.deployment_stage == 'migration'"
@@ -1948,6 +1960,9 @@ ALLOWED_WORKFLOW_STEP_ENV[
 ALLOWED_WORKFLOW_STEP_ENV[("deploy-develop.yml", "deploy", "name:Execute migration transition")] = {
     "GCP_PROJECT_ID": "${{ vars.GCP_PROJECT_ID }}"
 }
+ALLOWED_WORKFLOW_STEP_ENV[
+    ("deploy-develop.yml", "deploy", "name:Execute database authority verification")
+] = {"GCP_PROJECT_ID": "${{ vars.GCP_PROJECT_ID }}"}
 ALLOWED_WORKFLOW_STEP_ENV[
     ("deploy-develop.yml", "deploy", "name:Validate signed stage receipt after image digest")
 ] = {
@@ -2016,7 +2031,12 @@ EXACT_WORKFLOW_RUN_SHA256.update(
             "deploy-develop.yml",
             "deploy",
             "name:Execute migration transition",
-        ): "51dc9e97ffb06edb88d2c0119a4cc4ed084a4d0fea4f8c6f23ebf36e80a9767c",
+        ): "bde269efb6efb89e60ec5d7faf384abeee036f69275f062beca9eef42bac7427",
+        (
+            "deploy-develop.yml",
+            "deploy",
+            "name:Execute database authority verification",
+        ): "6fa7f5a86d4c57bbcc620be8361dab3ee8a1f62670ac7268456d69bbf0c2cc98",
         (
             "deploy-develop.yml",
             "deploy",
@@ -3929,7 +3949,50 @@ def _collect_develop_iam_violations(root: Path, terraform_config_paths: list[Pat
 
 def _collect_migration_job_violations(root: Path, terraform_config_paths: list[Path]) -> list[str]:
     violations: list[str] = []
-    allowed_job_path = Path("infra/gcp/develop/migration_job.tf")
+    job_contracts = {
+        Path("infra/gcp/develop/migration_job.tf"): {
+            "label": "migration",
+            "required": [
+                'resource "google_cloud_run_v2_job" "migration"',
+                'name     = "run-migrations"',
+                "service_account = google_service_account.migration.email",
+                "image = local.managed_container_image",
+                'command = ["golden-rose-migrate"]',
+                "max_retries = 0",
+                "task_count  = 1",
+                "parallelism = 1",
+                "subnetwork = google_compute_subnetwork.direct_vpc[0].id",
+                'egress = "PRIVATE_RANGES_ONLY"',
+            ],
+            "forbidden": [
+                "google_service_account.runtime.email",
+                "INGRESS_TRAFFIC_ALL",
+                ":latest",
+            ],
+        },
+        Path("infra/gcp/develop/database_authority_job.tf"): {
+            "label": "database authority",
+            "required": [
+                'resource "google_cloud_run_v2_job" "database_authority"',
+                'name     = "verify-database-authority"',
+                "service_account = google_service_account.database_verifier.email",
+                "image = local.managed_container_image",
+                'command = ["python", "/app/scripts/verify_database_authority.py"]',
+                "max_retries = 0",
+                "task_count  = 1",
+                "parallelism = 1",
+                "subnetwork = google_compute_subnetwork.direct_vpc[0].id",
+                'egress = "PRIVATE_RANGES_ONLY"',
+                'secret  = "migration-database-url"',
+                'secret  = "runtime-database-url"',
+            ],
+            "forbidden": [
+                "google_service_account.runtime.email",
+                "INGRESS_TRAFFIC_ALL",
+                ":latest",
+            ],
+        },
+    }
 
     for path in sorted(terraform_config_paths):
         relative_path = path.relative_to(root)
@@ -3944,39 +4007,24 @@ def _collect_migration_job_violations(root: Path, terraform_config_paths: list[P
         if "google_cloud_run_v2_job" not in resource_types:
             continue
 
-        if relative_path != allowed_job_path:
+        contract = job_contracts.get(relative_path)
+        if contract is None:
             violations.append(
-                f"{relative_path} contains forbidden 'google_cloud_run_v2_job' outside the approved migration job path"
+                f"{relative_path} contains forbidden 'google_cloud_run_v2_job' outside the approved job paths"
             )
             continue
 
-        required_fragments = [
-            'resource "google_cloud_run_v2_job" "migration"',
-            'name     = "run-migrations"',
-            "service_account = google_service_account.migration.email",
-            "image = local.managed_container_image",
-            'command = ["golden-rose-migrate"]',
-            "max_retries = 0",
-            "task_count  = 1",
-            "parallelism = 1",
-            "subnetwork = google_compute_subnetwork.direct_vpc[0].id",
-            'egress = "PRIVATE_RANGES_ONLY"',
-        ]
-        for fragment in required_fragments:
-            if not _contains_normalized_fragment(text, fragment):
+        label = str(contract["label"])
+        for fragment in contract["required"]:
+            if not _contains_normalized_fragment(text, str(fragment)):
                 violations.append(
-                    f"{relative_path} missing required migration job fragment {fragment!r}"
+                    f"{relative_path} missing required {label} job fragment {fragment!r}"
                 )
 
-        forbidden_fragments = [
-            "google_service_account.runtime.email",
-            "INGRESS_TRAFFIC_ALL",
-            ":latest",
-        ]
-        for fragment in forbidden_fragments:
-            if fragment in text:
+        for fragment in contract["forbidden"]:
+            if str(fragment) in text:
                 violations.append(
-                    f"{relative_path} contains forbidden migration job fragment {fragment!r}"
+                    f"{relative_path} contains forbidden {label} job fragment {fragment!r}"
                 )
 
     return violations

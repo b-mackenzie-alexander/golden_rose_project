@@ -103,6 +103,7 @@ def valid_snapshot() -> dict[str, Any]:
         ],
         "resource_inventory": {
             "service_accounts": [
+                "staff-tracer-database-verifier@example-project.iam.gserviceaccount.com",
                 "staff-tracer-migration@example-project.iam.gserviceaccount.com",
                 "staff-tracer-runtime@example-project.iam.gserviceaccount.com",
             ],
@@ -114,6 +115,8 @@ def valid_snapshot() -> dict[str, Any]:
             ],
             "cloud_run_service": "staff-tracer",
             "cloud_run_job": "run-migrations",
+            "database_authority_job": "verify-database-authority",
+            "cloud_run_jobs": ["run-migrations", "verify-database-authority"],
             "cloud_sql_instance": "develop-postgres",
             "state_bucket": contract["state_bucket_name"],
         },
@@ -179,6 +182,14 @@ def valid_snapshot() -> dict[str, Any]:
                 "serviceAccount:golden-rose-deployer@state-project.iam.gserviceaccount.com"
             ],
         },
+        "database_authority_job_iam": {
+            "roles/run.jobsExecutor": [
+                "serviceAccount:golden-rose-deployer@state-project.iam.gserviceaccount.com"
+            ],
+            "roles/run.viewer": [
+                "serviceAccount:golden-rose-deployer@state-project.iam.gserviceaccount.com"
+            ],
+        },
         "migration_job": {
             "name": "run-migrations",
             "labels": {
@@ -191,6 +202,7 @@ def valid_snapshot() -> dict[str, Any]:
                 "teardown": "intentional-runbook-only",
             },
             "service_account": "staff-tracer-migration@example-project.iam.gserviceaccount.com",
+            "container_count": 1,
             "parallelism": 1,
             "task_count": 1,
             "max_retries": 0,
@@ -200,6 +212,7 @@ def valid_snapshot() -> dict[str, Any]:
             "vpc_subnetwork": "projects/example-project/regions/us-east4/subnetworks/develop-direct-vpc",
             "image": "us-east4-docker.pkg.dev/example-project/staff-tracer-images/staff-tracer@sha256:1111111111111111111111111111111111111111111111111111111111111111",
             "command": ["golden-rose-migrate"],
+            "args": None,
             "environment": {
                 "GOLDEN_ROSE_ENVIRONMENT": {"value": "develop"},
                 "GOLDEN_ROSE_AUTH_MODE": {"value": "synthetic"},
@@ -217,6 +230,58 @@ def valid_snapshot() -> dict[str, Any]:
                     "secret": "synthetic-staff-id",
                     "version": "latest",
                 },
+            },
+        },
+        "database_authority_job": {
+            "name": "verify-database-authority",
+            "labels": {
+                "environment": "develop",
+                "data_boundary": "fictional-synthetic-only",
+                "managed_by": "terraform",
+                "service": "staff-tracer",
+                "cost_center": "develop",
+                "owner": "technical-owner",
+                "teardown": "intentional-runbook-only",
+            },
+            "service_account": "staff-tracer-database-verifier@example-project.iam.gserviceaccount.com",
+            "container_count": 1,
+            "parallelism": 1,
+            "task_count": 1,
+            "max_retries": 0,
+            "timeout": "600s",
+            "vpc_egress": "PRIVATE_RANGES_ONLY",
+            "vpc_network": "projects/example-project/global/networks/develop-vpc",
+            "vpc_subnetwork": "projects/example-project/regions/us-east4/subnetworks/develop-direct-vpc",
+            "image": "us-east4-docker.pkg.dev/example-project/staff-tracer-images/staff-tracer@sha256:1111111111111111111111111111111111111111111111111111111111111111",
+            "command": ["python", "/app/scripts/verify_database_authority.py"],
+            "args": None,
+            "environment": {
+                "GOLDEN_ROSE_DATABASE_URL": {
+                    "secret": "migration-database-url",
+                    "version": "latest",
+                },
+                "GOLDEN_ROSE_MIGRATION_DATABASE_URL": {
+                    "secret": "migration-database-url",
+                    "version": "latest",
+                },
+                "GOLDEN_ROSE_RUNTIME_DATABASE_URL": {
+                    "secret": "runtime-database-url",
+                    "version": "latest",
+                },
+            },
+        },
+        "database_authority_secret_iam": {
+            "migration-database-url": {
+                "roles/secretmanager.secretAccessor": [
+                    "serviceAccount:staff-tracer-migration@example-project.iam.gserviceaccount.com",
+                    "serviceAccount:staff-tracer-database-verifier@example-project.iam.gserviceaccount.com",
+                ]
+            },
+            "runtime-database-url": {
+                "roles/secretmanager.secretAccessor": [
+                    "serviceAccount:staff-tracer-runtime@example-project.iam.gserviceaccount.com",
+                    "serviceAccount:staff-tracer-database-verifier@example-project.iam.gserviceaccount.com",
+                ]
             },
         },
         "cloud_sql": {
@@ -241,6 +306,7 @@ def valid_snapshot() -> dict[str, Any]:
             "golden-rose-deployer@state-project.iam.gserviceaccount.com": [],
             "golden-rose-image-publisher@state-project.iam.gserviceaccount.com": [],
             "golden-rose-provisioner@state-project.iam.gserviceaccount.com": [],
+            "staff-tracer-database-verifier@example-project.iam.gserviceaccount.com": [],
             "staff-tracer-migration@example-project.iam.gserviceaccount.com": [],
             "staff-tracer-runtime@example-project.iam.gserviceaccount.com": [],
         },
@@ -248,6 +314,7 @@ def valid_snapshot() -> dict[str, Any]:
             "roles/cloudsql.client": [
                 "serviceAccount:staff-tracer-runtime@example-project.iam.gserviceaccount.com",
                 "serviceAccount:staff-tracer-migration@example-project.iam.gserviceaccount.com",
+                "serviceAccount:staff-tracer-database-verifier@example-project.iam.gserviceaccount.com",
             ],
             "roles/logging.logWriter": [
                 "serviceAccount:staff-tracer-runtime@example-project.iam.gserviceaccount.com",
@@ -445,6 +512,47 @@ def test_service_verifier_accepts_only_exact_expiring_public_basic_boundary() ->
     assert module.evaluate_foundation_snapshot(snapshot, expected_contract(), mode="service") == []
 
 
+def test_live_verifier_requires_exact_database_authority_job_and_secret_iam() -> None:
+    module = load_module()
+
+    missing_job = valid_snapshot()
+    missing_job.pop("database_authority_job")
+    extra_job_member = valid_snapshot()
+    extra_job_member["database_authority_job_iam"]["roles/run.viewer"].append(
+        "user:unexpected@example.com"
+    )
+    wrong_network = valid_snapshot()
+    wrong_network["database_authority_job"]["vpc_network"] = (
+        "projects/other-project/global/networks/develop-vpc"
+    )
+    unexpected_args = valid_snapshot()
+    unexpected_args["database_authority_job"]["args"] = ["--unsafe"]
+    extra_job = valid_snapshot()
+    extra_job["resource_inventory"]["cloud_run_jobs"].append("unexpected-job")
+    missing_secret_policy = valid_snapshot()
+    missing_secret_policy["database_authority_secret_iam"].pop("runtime-database-url")
+    extra_secret_member = valid_snapshot()
+    extra_secret_member["database_authority_secret_iam"]["migration-database-url"][
+        "roles/secretmanager.secretAccessor"
+    ].append("user:unexpected@example.com")
+
+    for snapshot in [
+        missing_job,
+        extra_job_member,
+        wrong_network,
+        unexpected_args,
+        extra_job,
+        missing_secret_policy,
+        extra_secret_member,
+    ]:
+        violations = module.evaluate_foundation_snapshot(
+            snapshot,
+            expected_contract(),
+            mode="service",
+        )
+        assert any("database authority" in violation.lower() for violation in violations)
+
+
 def test_service_verifier_rejects_quota_role_binding_and_inherited_authority_expansion() -> None:
     module = load_module()
 
@@ -496,6 +604,24 @@ def test_service_verifier_rejects_quota_role_binding_and_inherited_authority_exp
             "quota" in violation.lower() or "project iam" in violation.lower()
             for violation in violations
         )
+
+
+def test_service_verifier_rejects_database_verifier_ancestor_authority() -> None:
+    module = load_module()
+    snapshot = valid_snapshot()
+    snapshot["provisioner_ancestor_iam"]["organizations/987654321"] = {
+        "roles/secretmanager.secretAccessor": [
+            "serviceAccount:staff-tracer-database-verifier@example-project.iam.gserviceaccount.com"
+        ]
+    }
+
+    violations = module.evaluate_foundation_snapshot(
+        snapshot,
+        expected_contract(),
+        mode="service",
+    )
+
+    assert any("database verifier inherited authority" in violation for violation in violations)
 
 
 def test_service_verifier_rejects_weakened_basic_expiry_scale_or_secret_reference() -> None:
@@ -557,6 +683,28 @@ def test_migration_and_service_verifier_require_exact_packet_image_digest() -> N
 
     assert any("expected image digest" in violation for violation in migration_violations)
     assert any("expected image digest" in violation for violation in service_violations)
+
+
+def test_migration_live_verifier_rejects_arguments_and_foreign_project_vpc() -> None:
+    module = load_module()
+    unexpected_args = valid_snapshot()
+    unexpected_args["migration_job"]["args"] = ["--unsafe"]
+    foreign_network = valid_snapshot()
+    foreign_network["migration_job"]["vpc_network"] = (
+        "projects/other-project/global/networks/develop-vpc"
+    )
+    foreign_subnetwork = valid_snapshot()
+    foreign_subnetwork["migration_job"]["vpc_subnetwork"] = (
+        "projects/other-project/regions/us-east4/subnetworks/develop-direct-vpc"
+    )
+
+    for snapshot in [unexpected_args, foreign_network, foreign_subnetwork]:
+        violations = module.evaluate_foundation_snapshot(
+            snapshot,
+            expected_contract(),
+            mode="migration",
+        )
+        assert any("migration job" in violation.lower() for violation in violations)
 
 
 def test_verify_gcp_foundation_script_exists_and_template_is_value_safe() -> None:
@@ -656,10 +804,17 @@ def test_foundation_mode_main_allows_absent_cloud_sql_during_collection() -> Non
                     ],
                 },
                 ("project-number",): expected_contract()["project_number"],
+                ("cloud-run-jobs",): [],
                 ("cloud-run-service",): {},
                 ("cloud-run-service-iam",): {},
                 ("migration-job",): {},
                 ("migration-job-iam",): {},
+                ("database-authority-job",): {},
+                ("database-authority-job-iam",): {},
+                ("database-authority-secret-iam",): {
+                    "migration-database-url": {},
+                    "runtime-database-url": {},
+                },
                 ("service-account-keys",): valid_snapshot()["service_account_keys"],
                 ("provisioner-quota-role",): valid_snapshot()["provisioner_quota_role"],
                 ("provisioner-ancestor-iam",): valid_snapshot()["provisioner_ancestor_iam"],
@@ -708,10 +863,17 @@ def test_foundation_collection_allows_gcloud_absent_cloud_sql_instance_message()
             ],
         },
         ("project-number",): expected_contract()["project_number"],
+        ("cloud-run-jobs",): [],
         ("cloud-run-service",): {},
         ("cloud-run-service-iam",): {},
         ("migration-job",): {},
         ("migration-job-iam",): {},
+        ("database-authority-job",): {},
+        ("database-authority-job-iam",): {},
+        ("database-authority-secret-iam",): {
+            "migration-database-url": {},
+            "runtime-database-url": {},
+        },
         ("service-account-keys",): valid_snapshot()["service_account_keys"],
         ("provisioner-quota-role",): valid_snapshot()["provisioner_quota_role"],
         ("provisioner-ancestor-iam",): valid_snapshot()["provisioner_ancestor_iam"],
@@ -789,6 +951,105 @@ def test_workload_absence_matcher_rejects_cloud_sql_not_found_forms(message: str
     module = load_module()
 
     assert module._is_absent_workload_resource_error(module.VerificationError(message)) is False
+
+
+def test_live_runner_collects_database_authority_job_inventory_and_exact_policies(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    calls: list[tuple[str, tuple[str, ...]]] = []
+
+    def fake_run_json_command(command: list[str], *, context: str) -> Any:
+        calls.append((context, tuple(command)))
+        if context == "cloud run jobs":
+            return [
+                {"name": "projects/example-project/locations/us-east4/jobs/run-migrations"},
+                {
+                    "name": "projects/example-project/locations/us-east4/jobs/verify-database-authority"
+                },
+            ]
+        if context == "database authority job":
+            return {
+                "name": "verify-database-authority",
+                "labels": valid_snapshot()["database_authority_job"]["labels"],
+                "template": {
+                    "parallelism": 1,
+                    "taskCount": 1,
+                    "template": {
+                        "serviceAccount": "staff-tracer-database-verifier@example-project.iam.gserviceaccount.com",
+                        "maxRetries": 0,
+                        "timeout": "600s",
+                        "vpcAccess": {
+                            "egress": "PRIVATE_RANGES_ONLY",
+                            "networkInterfaces": [
+                                {
+                                    "network": "projects/example-project/global/networks/develop-vpc",
+                                    "subnetwork": "projects/example-project/regions/us-east4/subnetworks/develop-direct-vpc",
+                                }
+                            ],
+                        },
+                        "containers": [
+                            {
+                                "image": valid_snapshot()["database_authority_job"]["image"],
+                                "command": [
+                                    "python",
+                                    "/app/scripts/verify_database_authority.py",
+                                ],
+                                "env": [
+                                    {
+                                        "name": name,
+                                        "valueSource": {
+                                            "secretKeyRef": {
+                                                "secret": value["secret"],
+                                                "version": value["version"],
+                                            }
+                                        },
+                                    }
+                                    for name, value in valid_snapshot()["database_authority_job"][
+                                        "environment"
+                                    ].items()
+                                ],
+                            }
+                        ],
+                    },
+                },
+            }
+        if context == "database authority job iam":
+            return {
+                "bindings": [
+                    {"role": role, "members": members}
+                    for role, members in valid_snapshot()["database_authority_job_iam"].items()
+                ]
+            }
+        if context.startswith("database authority secret iam for "):
+            secret_name = context.rsplit(" ", maxsplit=1)[-1]
+            return {
+                "bindings": [
+                    {"role": role, "members": members}
+                    for role, members in valid_snapshot()["database_authority_secret_iam"][
+                        secret_name
+                    ].items()
+                ]
+            }
+        raise AssertionError(f"unexpected context: {context}")
+
+    monkeypatch.setattr(module, "_run_json_command", fake_run_json_command)
+    runner = module._build_live_command_runner(expected_contract())
+
+    assert runner(("cloud-run-jobs",)) == ["run-migrations", "verify-database-authority"]
+    assert runner(("database-authority-job",)) == valid_snapshot()["database_authority_job"]
+    assert runner(("database-authority-job-iam",)) == valid_snapshot()["database_authority_job_iam"]
+    assert (
+        runner(("database-authority-secret-iam",))
+        == valid_snapshot()["database_authority_secret_iam"]
+    )
+    assert {context for context, _command in calls} == {
+        "cloud run jobs",
+        "database authority job",
+        "database authority job iam",
+        "database authority secret iam for migration-database-url",
+        "database authority secret iam for runtime-database-url",
+    }
 
 
 def test_live_runner_treats_gcloud_cannot_find_service_as_absent() -> None:
@@ -1067,10 +1328,14 @@ def test_collect_foundation_snapshot_accepts_reviewed_fixture() -> None:
             ],
         },
         ("project-number",): expected_contract()["project_number"],
+        ("cloud-run-jobs",): ["run-migrations", "verify-database-authority"],
         ("cloud-run-service",): valid_snapshot()["cloud_run_service"],
         ("cloud-run-service-iam",): valid_snapshot()["cloud_run_service_iam"],
         ("migration-job",): valid_snapshot()["migration_job"],
         ("migration-job-iam",): valid_snapshot()["migration_job_iam"],
+        ("database-authority-job",): valid_snapshot()["database_authority_job"],
+        ("database-authority-job-iam",): valid_snapshot()["database_authority_job_iam"],
+        ("database-authority-secret-iam",): valid_snapshot()["database_authority_secret_iam"],
         ("cloud-sql",): valid_snapshot()["cloud_sql"],
         ("service-account-keys",): valid_snapshot()["service_account_keys"],
         ("provisioner-quota-role",): valid_snapshot()["provisioner_quota_role"],
@@ -1336,10 +1601,17 @@ def test_collect_foundation_snapshot_rejects_duplicate_enabled_apis() -> None:
         ("enabled-apis",): ["run.googleapis.com", "run.googleapis.com"],
         ("service-accounts",): [],
         ("project-number",): "123456789",
+        ("cloud-run-jobs",): [],
         ("cloud-run-service",): {},
         ("cloud-run-service-iam",): {},
         ("migration-job",): {},
         ("migration-job-iam",): {},
+        ("database-authority-job",): {},
+        ("database-authority-job-iam",): {},
+        ("database-authority-secret-iam",): {
+            "migration-database-url": {},
+            "runtime-database-url": {},
+        },
         ("cloud-sql",): {},
         ("service-account-keys",): {},
         ("project-iam",): {},

@@ -624,7 +624,7 @@ def test_qualify_develop_deployment_records_controlled_error_no_store_matrix() -
         ("file:///tmp/not-allowed", "https"),
         ("ssh://staff-tracer-abc123.a.run.app", "https"),
         ("https://user:pass@staff-tracer-abc123.a.run.app", "userinfo"),
-        ("https://evil.example.com", "approved IAM-private Cloud Run authority"),
+        ("https://evil.example.com", "approved Cloud Run service authority"),
         ("https://staff-tracer-abc123.a.run.app?token=leak", "query string"),
         ("https://staff-tracer-abc123.a.run.app/#frag", "fragment"),
         ("https://staff-tracer-abc123.a.run.app/path", "must not include a path"),
@@ -638,6 +638,13 @@ def test_qualify_develop_deployment_rejects_unapproved_base_urls(
 
     with pytest.raises(ValueError, match=expected_message):
         module._validate_base_url(bad_url, "https://staff-tracer-abc123.a.run.app")
+
+
+def test_qualify_develop_deployment_accepts_deterministic_cloud_run_service_url() -> None:
+    module = load_module()
+    url = "https://staff-tracer-123456789012.us-east4.run.app"
+
+    assert module._validate_base_url(url, url) == url
 
 
 def test_qualify_develop_deployment_rejects_other_valid_cloud_run_service() -> None:

@@ -18,6 +18,7 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
 COPY migrations/ ./migrations/
+COPY scripts/verify_database_authority.py ./scripts/
 COPY alembic.ini ./
 COPY --from=web-build /app/apps/web/dist/ ./static/
 

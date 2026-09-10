@@ -26,7 +26,10 @@ class _NoRedirectHandler(request.HTTPRedirectHandler):
 
 
 Requester = Callable[[str, str, dict[str, str], dict[str, Any] | None], Any]
-APPROVED_CLOUD_RUN_HOST_PATTERN = re.compile(r"^staff-tracer-[a-z0-9-]+\.a\.run\.app$")
+APPROVED_CLOUD_RUN_HOST_PATTERN = re.compile(
+    r"^(?:staff-tracer-[a-z0-9-]+\.a\.run\.app|"
+    r"staff-tracer-[0-9]{6,20}\.us-east4\.run\.app)$"
+)
 DIGEST_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 EVIDENCE_NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 PROJECT_ID_PATTERN = re.compile(r"^[a-z][a-z0-9-]{4,28}[a-z0-9]$")
@@ -92,9 +95,7 @@ def _normalize_cloud_run_url(base_url: str) -> str:
     if parsed.port not in (None, 443):
         raise QualificationError("base URL must use the approved https authority only")
     if parsed.hostname is None or not APPROVED_CLOUD_RUN_HOST_PATTERN.fullmatch(parsed.hostname):
-        raise QualificationError(
-            "base URL host must be an approved IAM-private Cloud Run authority"
-        )
+        raise QualificationError("base URL host must be an approved Cloud Run service authority")
     return f"https://{parsed.hostname}"
 
 

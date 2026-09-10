@@ -194,8 +194,8 @@ variable "cloud_sql_schema_owner_role" {
   default     = null
 
   validation {
-    condition     = var.deployment_stage == "foundation" ? var.cloud_sql_schema_owner_role == null : var.cloud_sql_schema_owner_role != null && can(regex("^[a-z][a-z0-9_]{2,62}$", var.cloud_sql_schema_owner_role))
-    error_message = "The Cloud SQL schema-owner role must be a lowercase PostgreSQL-safe identifier supplied out of band."
+    condition     = var.deployment_stage == "foundation" ? var.cloud_sql_schema_owner_role == null : var.cloud_sql_schema_owner_role == "golden_rose_schema_owner"
+    error_message = "Migration and service stages require the exact golden_rose_schema_owner role."
   }
 }
 
@@ -206,8 +206,8 @@ variable "cloud_sql_migrator_role" {
   default     = null
 
   validation {
-    condition     = var.deployment_stage == "foundation" ? var.cloud_sql_migrator_role == null : var.cloud_sql_migrator_role != null && can(regex("^[a-z][a-z0-9_]{2,62}$", var.cloud_sql_migrator_role))
-    error_message = "The Cloud SQL migrator role must be a lowercase PostgreSQL-safe identifier supplied out of band."
+    condition     = var.deployment_stage == "foundation" ? var.cloud_sql_migrator_role == null : var.cloud_sql_migrator_role == "golden_rose_migrator"
+    error_message = "Migration and service stages require the exact golden_rose_migrator role."
   }
 }
 
@@ -218,8 +218,8 @@ variable "cloud_sql_runtime_role" {
   default     = null
 
   validation {
-    condition     = var.deployment_stage == "foundation" ? var.cloud_sql_runtime_role == null : var.cloud_sql_runtime_role != null && can(regex("^[a-z][a-z0-9_]{2,62}$", var.cloud_sql_runtime_role))
-    error_message = "The Cloud SQL runtime role must be a lowercase PostgreSQL-safe identifier supplied out of band."
+    condition     = var.deployment_stage == "foundation" ? var.cloud_sql_runtime_role == null : var.cloud_sql_runtime_role == "golden_rose_runtime"
+    error_message = "Migration and service stages require the exact golden_rose_runtime role."
   }
 }
 

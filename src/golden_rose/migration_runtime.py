@@ -15,6 +15,96 @@ MIGRATION_ADVISORY_LOCK_KEY = 4_021_005
 MIGRATION_ASSUMED_ROLE = "golden_rose_schema_owner"
 ROOT = Path(__file__).resolve().parents[2]
 
+DATABASE_AUTHORITY_ROLE_COUNT_QUERY = """
+SELECT count(*) AS golden_rose_database_authority_role_count
+FROM pg_roles
+WHERE rolname IN (
+    'golden_rose_schema_owner',
+    'golden_rose_migrator',
+    'golden_rose_runtime'
+)
+"""
+
+DATABASE_AUTHORITY_INITIALIZED_QUERY = """
+WITH application_roles AS (
+    SELECT oid, rolname, rolcanlogin, rolinherit, rolsuper, rolcreatedb,
+           rolcreaterole, rolreplication, rolbypassrls
+    FROM pg_roles
+    WHERE rolname IN (
+        'golden_rose_schema_owner',
+        'golden_rose_migrator',
+        'golden_rose_runtime'
+    )
+),
+schema_owner_membership AS (
+    SELECT member_role.rolname AS member_name, membership.admin_option,
+           membership.inherit_option, membership.set_option
+    FROM pg_auth_members AS membership
+    JOIN pg_roles AS granted_role ON granted_role.oid = membership.roleid
+    JOIN pg_roles AS member_role ON member_role.oid = membership.member
+    WHERE granted_role.rolname = 'golden_rose_schema_owner'
+),
+migrator_membership AS (
+    SELECT member_role.rolname AS member_name, member_role.rolcanlogin,
+           member_role.rolsuper, member_role.rolcreatedb, member_role.rolcreaterole,
+           member_role.rolreplication, member_role.rolbypassrls,
+           membership.admin_option, membership.inherit_option, membership.set_option
+    FROM pg_auth_members AS membership
+    JOIN pg_roles AS granted_role ON granted_role.oid = membership.roleid
+    JOIN pg_roles AS member_role ON member_role.oid = membership.member
+    WHERE granted_role.rolname = 'golden_rose_migrator'
+),
+governed_outgoing_memberships AS (
+    SELECT granted_role.rolname AS granted_name,
+           member_role.rolname AS member_name,
+           membership.admin_option, membership.inherit_option, membership.set_option
+    FROM pg_auth_members AS membership
+    JOIN pg_roles AS granted_role ON granted_role.oid = membership.roleid
+    JOIN pg_roles AS member_role ON member_role.oid = membership.member
+    WHERE member_role.rolname IN (
+        'golden_rose_schema_owner',
+        'golden_rose_migrator',
+        'golden_rose_runtime',
+        current_user
+    )
+)
+SELECT (
+    (SELECT count(*) = 3
+       AND bool_and(NOT rolcanlogin AND rolinherit AND NOT rolsuper
+                    AND NOT rolcreatedb AND NOT rolcreaterole
+                    AND NOT rolreplication AND NOT rolbypassrls)
+     FROM application_roles)
+    AND
+    (SELECT count(*) = 1
+       AND bool_and(member_name = 'golden_rose_migrator' AND NOT admin_option
+                    AND inherit_option AND set_option)
+     FROM schema_owner_membership)
+    AND
+    (SELECT count(*) = 1
+       AND bool_and(member_name = current_user AND rolcanlogin
+                    AND NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole
+                    AND NOT rolreplication AND NOT rolbypassrls
+                    AND NOT admin_option AND inherit_option AND set_option)
+     FROM migrator_membership)
+    AND
+    (SELECT count(*) = 2
+       AND bool_and(
+           (
+               granted_name = 'golden_rose_schema_owner'
+               AND member_name = 'golden_rose_migrator'
+               AND NOT admin_option AND inherit_option AND set_option
+           )
+           OR
+           (
+               granted_name = 'golden_rose_migrator'
+               AND member_name = current_user
+               AND NOT admin_option AND inherit_option AND set_option
+           )
+       )
+     FROM governed_outgoing_memberships)
+) AS golden_rose_database_authority_initialized
+"""
+
 INITIAL_DATABASE_AUTHORITY_BOOTSTRAP = """
 DO $$
 BEGIN
@@ -30,7 +120,7 @@ BEGIN
 END
 $$;
 ALTER SCHEMA public OWNER TO golden_rose_schema_owner;
-GRANT golden_rose_schema_owner TO golden_rose_migrator WITH ADMIN OPTION;
+GRANT golden_rose_schema_owner TO golden_rose_migrator;
 GRANT golden_rose_migrator TO CURRENT_USER;
 """
 
@@ -51,7 +141,16 @@ def main() -> int:
             if not lock_acquired:
                 return EX_TEMPFAIL
 
-            connection.execute(text(INITIAL_DATABASE_AUTHORITY_BOOTSTRAP))
+            role_count = int(
+                connection.execute(text(DATABASE_AUTHORITY_ROLE_COUNT_QUERY)).scalar_one()
+            )
+            if role_count == 0:
+                connection.execute(text(INITIAL_DATABASE_AUTHORITY_BOOTSTRAP))
+            elif (
+                role_count != 3
+                or not connection.execute(text(DATABASE_AUTHORITY_INITIALIZED_QUERY)).scalar_one()
+            ):
+                return EX_CONFIG
             assume_database_role(connection, MIGRATION_ASSUMED_ROLE)
             config = Config(str(ROOT / "alembic.ini"))
             config.attributes["connection"] = connection

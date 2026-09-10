@@ -49,6 +49,12 @@ resource "google_project_iam_member" "migration_metric_writer" {
   member  = "serviceAccount:${google_service_account.migration.email}"
 }
 
+resource "google_project_iam_member" "database_verifier_cloudsql_client" {
+  project = var.project_id
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.database_verifier.email}"
+}
+
 resource "google_cloud_run_v2_job_iam_member" "deployer_jobs_executor" {
   count    = var.deployment_stage == "migration" || var.deployment_stage == "service" ? 1 : 0
   project  = var.project_id
@@ -63,6 +69,24 @@ resource "google_cloud_run_v2_job_iam_member" "deployer_migration_job_viewer" {
   project  = var.project_id
   location = var.region
   name     = google_cloud_run_v2_job.migration[0].name
+  role     = "roles/run.viewer"
+  member   = "serviceAccount:golden-rose-deployer@${var.control_plane_project_id}.iam.gserviceaccount.com"
+}
+
+resource "google_cloud_run_v2_job_iam_member" "deployer_database_authority_job_executor" {
+  count    = var.deployment_stage == "migration" || var.deployment_stage == "service" ? 1 : 0
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_job.database_authority[0].name
+  role     = "roles/run.jobsExecutor"
+  member   = "serviceAccount:golden-rose-deployer@${var.control_plane_project_id}.iam.gserviceaccount.com"
+}
+
+resource "google_cloud_run_v2_job_iam_member" "deployer_database_authority_job_viewer" {
+  count    = var.deployment_stage == "migration" || var.deployment_stage == "service" ? 1 : 0
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_job.database_authority[0].name
   role     = "roles/run.viewer"
   member   = "serviceAccount:golden-rose-deployer@${var.control_plane_project_id}.iam.gserviceaccount.com"
 }
@@ -88,6 +112,20 @@ resource "google_secret_manager_secret_iam_member" "migration_database_secret_ac
   secret_id = "migration-database-url"
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.migration.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "database_verifier_migration_secret_access" {
+  project   = var.project_id
+  secret_id = "migration-database-url"
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.database_verifier.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "database_verifier_runtime_secret_access" {
+  project   = var.project_id
+  secret_id = "runtime-database-url"
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.database_verifier.email}"
 }
 
 resource "google_secret_manager_secret_iam_member" "runtime_synthetic_staff_secret_access" {

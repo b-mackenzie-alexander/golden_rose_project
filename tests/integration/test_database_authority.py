@@ -101,6 +101,18 @@ def _drop_authenticated_login_roles(connection) -> None:
     connection.commit()
 
 
+def _retire_test_bootstrap_membership(connection) -> str:
+    session_user = str(connection.execute(text("SELECT SESSION_USER")).scalar_one())
+    connection.execute(text(f"REVOKE golden_rose_migrator FROM {_quoted_ident(session_user)}"))
+    connection.commit()
+    return session_user
+
+
+def _restore_test_bootstrap_membership(connection, session_user: str) -> None:
+    connection.execute(text(f"GRANT golden_rose_migrator TO {_quoted_ident(session_user)}"))
+    connection.commit()
+
+
 def _drop_database_authority_roles(connection) -> None:
     connection.execute(
         text(
@@ -187,6 +199,107 @@ def authenticated_login_roles(database_url: str) -> dict[str, str]:
 def _assert_sql_denied(engine: Engine, statement: str) -> None:
     with engine.connect() as connection, pytest.raises(SQLAlchemyError):
         connection.execute(text(statement))
+
+
+def test_migration_runtime_requires_bootstrap_retirement_before_restricted_login_reuse(
+    engine: Engine,
+    database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GOLDEN_ROSE_ENVIRONMENT", "test")
+    monkeypatch.setenv("GOLDEN_ROSE_AUTH_MODE", "synthetic")
+    monkeypatch.setenv("GOLDEN_ROSE_DATABASE_URL", database_url)
+    monkeypatch.setenv("GOLDEN_ROSE_SYNTHETIC_STAFF_ID", "22222222-2222-4222-8222-222222222222")
+    with engine.begin() as connection:
+        connection.execute(text("DROP SCHEMA public CASCADE"))
+        connection.execute(text("CREATE SCHEMA public"))
+    with engine.connect() as connection:
+        _drop_authenticated_login_roles(connection)
+        _drop_database_authority_roles(connection)
+    assert migration_runtime_main() == 0
+
+    with engine.connect() as connection:
+        _create_authenticated_login_roles(connection)
+
+    restricted_url = _login_database_url(
+        database_url,
+        MIGRATION_LOGIN_ROLE,
+        MIGRATION_LOGIN_PASSWORD,
+    )
+    monkeypatch.setenv("GOLDEN_ROSE_DATABASE_URL", restricted_url)
+    bootstrap_user: str | None = None
+    try:
+        assert migration_runtime_main() == 78
+        with engine.connect() as connection:
+            bootstrap_user = _retire_test_bootstrap_membership(connection)
+        assert migration_runtime_main() == 0
+    finally:
+        with engine.connect() as connection:
+            if bootstrap_user is not None:
+                _restore_test_bootstrap_membership(connection, bootstrap_user)
+            _drop_authenticated_login_roles(connection)
+
+
+@pytest.mark.parametrize(
+    ("drift_sql", "repair_sql"),
+    [
+        (
+            "ALTER ROLE golden_rose_runtime CREATEROLE",
+            "ALTER ROLE golden_rose_runtime NOCREATEROLE",
+        ),
+        (
+            "GRANT golden_rose_migrator TO golden_rose_runtime",
+            "REVOKE golden_rose_migrator FROM golden_rose_runtime",
+        ),
+        (
+            "GRANT pg_read_all_data TO golden_rose_schema_owner",
+            "REVOKE pg_read_all_data FROM golden_rose_schema_owner",
+        ),
+        (
+            "GRANT pg_read_all_data TO golden_rose_runtime",
+            "REVOKE pg_read_all_data FROM golden_rose_runtime",
+        ),
+        (
+            "GRANT pg_read_all_data TO golden_rose_migration_login",
+            "REVOKE pg_read_all_data FROM golden_rose_migration_login",
+        ),
+    ],
+)
+def test_migration_runtime_rejects_malformed_initialized_authority_before_upgrade(
+    engine: Engine,
+    database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+    drift_sql: str,
+    repair_sql: str,
+) -> None:
+    monkeypatch.setenv("GOLDEN_ROSE_ENVIRONMENT", "test")
+    monkeypatch.setenv("GOLDEN_ROSE_AUTH_MODE", "synthetic")
+    monkeypatch.setenv("GOLDEN_ROSE_DATABASE_URL", database_url)
+    monkeypatch.setenv("GOLDEN_ROSE_SYNTHETIC_STAFF_ID", "22222222-2222-4222-8222-222222222222")
+    command.upgrade(_alembic_config(), "head")
+
+    with engine.connect() as connection:
+        _create_authenticated_login_roles(connection)
+        bootstrap_user = _retire_test_bootstrap_membership(connection)
+        connection.execute(text(drift_sql))
+        connection.commit()
+
+    try:
+        monkeypatch.setenv(
+            "GOLDEN_ROSE_DATABASE_URL",
+            _login_database_url(
+                database_url,
+                MIGRATION_LOGIN_ROLE,
+                MIGRATION_LOGIN_PASSWORD,
+            ),
+        )
+        assert migration_runtime_main() == 78
+    finally:
+        with engine.connect() as connection:
+            connection.execute(text(repair_sql))
+            connection.commit()
+            _restore_test_bootstrap_membership(connection, bootstrap_user)
+            _drop_authenticated_login_roles(connection)
 
 
 def test_database_authority_live_verifier_accepts_upgraded_schema(

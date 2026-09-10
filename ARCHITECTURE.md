@@ -1,6 +1,6 @@
 # Architecture — Golden Rose Operations Platform
 
-**Status:** ADR-0016 and its human-visible acceleration plan merged through PR #82. PR #83 then merged the reviewed 52-path source contract into protected `develop@9a04b274d9e0132e5a0b409314ba53170b43e303`: an expiring application Basic boundary, exact temporary public service invocation, one-instance cap, private Cloud SQL, exact quota-use custom role, post-request log qualification, and one eight-hour deployment packet. No cloud operation has occurred; packet approval is pending and deployment is unexecuted.
+**Status:** PR #84 merged the PR #83 continuity closeout into protected `develop@63ac29b20314f03381d4a71e901a68ee51e913aa`. Offline packet derivation then found concrete provider/database bootstrap and private-verification blockers. The active bounded source remediation separates backend/provider credentials, introduces one private no-ingress database-authority job with a dedicated identity, and preserves the exact temporary public service invocation, Basic gate, one-instance cap, private Cloud SQL, and single approval-pending eight-hour packet. No cloud operation has occurred.
 
 ## Architectural posture
 Start with one modular product and a relational operational core. Preserve explicit trust boundaries and auditability without prematurely splitting into microservices.

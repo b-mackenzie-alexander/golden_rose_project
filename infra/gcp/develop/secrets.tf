@@ -3,6 +3,7 @@ locals {
     "runtime-database-url",
     "migration-database-url",
     "synthetic-staff-id",
+    "demo-access-password",
     "deployment-posture",
   ])
 }

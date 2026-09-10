@@ -196,7 +196,7 @@ def test_gcp_evidence_template_documents_stage_modes_and_budget_channel_identity
     assert "display names" in template
 
 
-def test_develop_qualification_evidence_and_tester_docs_preserve_pr_b_gate_contracts() -> None:
+def test_develop_qualification_evidence_and_access_docs_preserve_human_visible_contracts() -> None:
     evidence_template = (ROOT / "deploy/gcp/evidence-template.md").read_text(encoding="utf-8")
     tester_access = (ROOT / "deploy/gcp/private-tester-access.md").read_text(encoding="utf-8")
     combined = f"{evidence_template}\n{tester_access}"
@@ -205,10 +205,12 @@ def test_develop_qualification_evidence_and_tester_docs_preserve_pr_b_gate_contr
         "qualification-status-contract.md",
         "human-qualification-checklist.md",
         "human-feedback-template.md",
-        "approved and unapproved tokens use separate non-argv handoffs",
-        "authenticated-but-unapproved",
-        "valid Google identity token",
-        "no direct, inherited, group/domain, public, or broad invocation path",
+        "temporary shared Basic boundary",
+        "Missing credentials",
+        "wrong Basic credentials",
+        "non-argv private handoff",
+        "allUsers",
+        "one-instance cap",
         "Cache-Control: no-store",
         "controlled error outcomes",
         "source-controlled static contract",
@@ -362,7 +364,8 @@ def test_human_qualification_checklist_requires_manual_matrix_without_tracked_va
         "cursors",
         "tester identities",
         "endpoints",
-        "tokens",
+        "credentials",
+        "Authorization headers",
         "screenshots containing sensitive values",
         "raw bodies",
     ]
@@ -465,7 +468,7 @@ def test_gcp_first_deployment_runbook_documents_recovery_and_secret_boundaries()
 
     required_phrases = [
         "out-of-band secret payload custody and injection",
-        "rollback-versus-forward-recovery decision",
+        "single eight-hour operator packet",
         "Database passwords must be generated without terminal display",
         "Stop immediately",
         "Revoke and replace every affected secret value",
@@ -476,49 +479,33 @@ def test_gcp_first_deployment_runbook_documents_recovery_and_secret_boundaries()
         assert phrase in runbook
 
 
-def test_gcp_first_deployment_runbook_documents_migration_success_service_approval_boundary() -> (
-    None
-):
+def test_gcp_first_deployment_runbook_documents_exact_quota_bootstrap_and_import() -> None:
     runbook = (ROOT / "deploy/gcp/first-deployment-runbook.md").read_text(encoding="utf-8")
 
     required_phrases = [
-        "migration-success receipt",
-        "detached Sigstore bundle",
-        "database/schema/authority readback",
-        "before service approval",
-        "before cloud authentication",
+        "goldenRoseProvisionerQuotaUser",
+        "serviceusage.services.use",
+        "sole binding",
+        "module.develop.google_project_iam_custom_role.provisioner_quota_user",
+        "module.develop.google_project_iam_member.provisioner_quota_user",
+        "first full migration plan must show zero actions",
     ]
 
     for phrase in required_phrases:
         assert phrase in runbook
 
 
-def test_gcp_first_deployment_runbook_documents_reviewed_identity_for_migration_success_verification() -> (
-    None
-):
+def test_gcp_first_deployment_runbook_documents_single_packet_and_shared_access() -> None:
     runbook = (ROOT / "deploy/gcp/first-deployment-runbook.md").read_text(encoding="utf-8")
 
     required_phrases = [
-        "reviewed GitHub Actions certificate identity",
-        "OIDC issuer",
-        "migration-success receipt",
-        "detached Sigstore bundle",
-    ]
-
-    for phrase in required_phrases:
-        assert phrase in runbook
-
-
-def test_gcp_first_deployment_runbook_documents_migration_receipt_as_separate_service_gate_input() -> (
-    None
-):
-    runbook = (ROOT / "deploy/gcp/first-deployment-runbook.md").read_text(encoding="utf-8")
-
-    required_phrases = [
-        "migration receipt",
-        "separate service gate",
-        "migration-success receipt",
-        "reviewed GitHub Actions certificate identity",
+        "One-packet execution order",
+        "no more than eight hours",
+        "designated packet output",
+        "allUsers",
+        "expiring Basic gate",
+        "zero-to-one instances",
+        "non-mutating teardown/rebuild readiness inspection",
     ]
 
     for phrase in required_phrases:
@@ -1192,6 +1179,7 @@ def test_gcp_develop_secrets_manage_metadata_only_without_payloads_or_broad_iam(
         "runtime-database-url",
         "migration-database-url",
         "synthetic-staff-id",
+        "demo-access-password",
         "deployment-posture",
     ]
 
@@ -1199,7 +1187,6 @@ def test_gcp_develop_secrets_manage_metadata_only_without_payloads_or_broad_iam(
     assert "google_secret_manager_secret_version" not in secrets
     assert "secret_data" not in secrets
     assert "payload" not in secrets.lower()
-    assert "password" not in secrets.lower()
     assert "token" not in secrets.lower()
     assert "replication" in secrets
     assert "auto" in secrets
@@ -1328,7 +1315,7 @@ def test_gcp_develop_cloud_sql_is_private_minimal_postgresql_without_public_ip()
         )
 
 
-def test_foundation_stage_omits_deferred_network_cloud_sql_and_tester_inputs() -> None:
+def test_foundation_stage_omits_deferred_network_cloud_sql_and_demo_expiry_inputs() -> None:
     network = (ROOT / "infra/gcp/develop/network.tf").read_text(encoding="utf-8")
     cloud_sql = (ROOT / "infra/gcp/develop/cloud_sql.tf").read_text(encoding="utf-8")
     develop_variables = (ROOT / "infra/gcp/develop/variables.tf").read_text(encoding="utf-8")
@@ -1347,23 +1334,14 @@ def test_foundation_stage_omits_deferred_network_cloud_sql_and_tester_inputs() -
             "migration_service_guard": "var.container_image_digest != null && can(regex(",
         },
         "direct_vpc_subnet_cidr": {
-            "next": 'variable "tester_authority_receipt_path"',
+            "next": 'variable "demo_access_expires_at"',
             "migration_service_guard": "var.direct_vpc_subnet_cidr != null && can(cidrnetmask(",
         },
-        "tester_authority_receipt_path": {
-            "next": 'variable "tester_authority_bundle_path"',
-            "root_guard": None,
-            "develop_guard": 'var.deployment_stage != "service" || var.tester_authority_receipt_path != null',
-        },
-        "tester_authority_bundle_path": {
-            "next": 'variable "tester_authority_certificate_identity"',
-            "root_guard": None,
-            "develop_guard": 'var.deployment_stage != "service" || var.tester_authority_bundle_path != null',
-        },
-        "tester_authority_certificate_identity": {
+        "demo_access_expires_at": {
             "next": 'variable "billing_account_id"',
-            "root_guard": None,
-            "develop_guard": 'var.deployment_stage != "service" || var.tester_authority_certificate_identity != null',
+            "root_guard": 'var.deployment_stage == "service" ? var.demo_access_expires_at != null && can(regex(',
+            "develop_guard": 'var.deployment_stage == "service" ? var.demo_access_expires_at != null && can(regex(',
+            "migration_service_guard": ": var.demo_access_expires_at == null",
         },
         "cloud_sql_backup_enabled": {
             "next": 'variable "cloud_sql_backup_start_time"',
@@ -1569,7 +1547,6 @@ def test_gcp_develop_observability_models_private_alerting_bounded_retention_and
     required_fragments = [
         'resource "google_monitoring_notification_channel" "alerts"',
         'resource "google_logging_project_exclusion" "uuid_bearing_staff_paths"',
-        'resource "google_cloud_run_v2_service_iam_member" "monitoring_readiness_invoker"',
         'resource "google_monitoring_uptime_check_config" "readiness"',
         'resource "google_monitoring_alert_policy" "health_failures"',
         'resource "google_monitoring_alert_policy" "readiness_failures"',
@@ -1582,9 +1559,8 @@ def test_gcp_develop_observability_models_private_alerting_bounded_retention_and
         "member  = var.observability_viewer_principal",
         "retention_days = var.log_retention_days",
         "var.cloud_run_request_log_posture",
-        "service-${data.google_project.current.number}@gcp-sa-monitoring-notification.iam.gserviceaccount.com",
         'path         = "/readiness"',
-        'type = "OIDC_TOKEN"',
+        'display_name = "Develop private synthetic public readiness"',
         "google_monitoring_uptime_check_config.readiness[0].uptime_check_id",
         'google_project_service.approved["logging.googleapis.com"]',
         'google_project_service.approved["monitoring.googleapis.com"]',
@@ -1607,6 +1583,7 @@ def test_gcp_develop_observability_models_private_alerting_bounded_retention_and
         "requestBody",
         "jsonPayload",
         "textPayload",
+        "service_agent_authentication",
         "allUsers",
         "allAuthenticatedUsers",
         "untested RTO",
@@ -1650,28 +1627,24 @@ def test_uuid_bearing_staff_paths_are_not_retained_in_routine_request_logs() -> 
     assert "jsonPayload" not in observability
 
 
-def test_authenticated_readiness_uptime_check_targets_exact_cloud_run_service() -> None:
+def test_public_readiness_uptime_check_targets_exact_cloud_run_service() -> None:
     observability = (ROOT / "infra/gcp/develop/observability.tf").read_text(encoding="utf-8")
 
     assert 'resource "google_monitoring_uptime_check_config" "readiness"' in observability
-    assert 'display_name = "Develop private synthetic authenticated readiness"' in observability
+    assert 'display_name = "Develop private synthetic public readiness"' in observability
     assert 'request_method = "GET"' in observability
     assert 'path           = "/readiness"' in observability
     assert 'type = "uptime_url"' in observability
     assert "host       = local.readiness_uptime_host" in observability
-    assert 'type = "OIDC_TOKEN"' in observability
+    assert "service_agent_authentication" not in observability
 
 
-def test_monitoring_service_agent_has_only_exact_service_invocation() -> None:
+def test_public_readiness_has_no_redundant_monitoring_invoker() -> None:
     observability = (ROOT / "infra/gcp/develop/observability.tf").read_text(encoding="utf-8")
     iam = (ROOT / "infra/gcp/develop/iam.tf").read_text(encoding="utf-8")
 
-    assert (
-        'resource "google_cloud_run_v2_service_iam_member" "monitoring_readiness_invoker"'
-        in observability
-    )
-    assert 'role     = "roles/run.invoker"' in observability
-    assert "gcp-sa-monitoring-notification.iam.gserviceaccount.com" in observability
+    assert 'resource "google_cloud_run_v2_service_iam_member"' not in observability
+    assert "gcp-sa-monitoring-notification.iam.gserviceaccount.com" not in observability
     assert "gcp-sa-monitoring-notification.iam.gserviceaccount.com" not in iam
     assert "roles/run.servicesInvoker" not in iam
 
@@ -1785,9 +1758,7 @@ def test_gcp_develop_iam_models_least_privilege_runtime_migration_deployer_and_i
 
     required_variable_names = [
         "control_plane_project_id",
-        "tester_authority_receipt_path",
-        "tester_authority_bundle_path",
-        "tester_authority_certificate_identity",
+        "demo_access_expires_at",
     ]
     for variable_name in required_variable_names:
         assert f'variable "{variable_name}"' in variables
@@ -1806,9 +1777,12 @@ def test_gcp_develop_iam_models_least_privilege_runtime_migration_deployer_and_i
         'resource "google_secret_manager_secret_iam_member" "migration_database_secret_access"',
         'resource "google_secret_manager_secret_iam_member" "runtime_synthetic_staff_secret_access"',
         'resource "google_secret_manager_secret_iam_member" "migration_synthetic_staff_secret_access"',
+        'resource "google_secret_manager_secret_iam_member" "runtime_demo_access_secret_access"',
         'resource "google_artifact_registry_repository_iam_member" "image_publisher_writer"',
         'resource "google_artifact_registry_repository_iam_member" "artifact_verifier_reader"',
-        'resource "google_cloud_run_v2_service_iam_member" "private_invoker"',
+        'resource "google_cloud_run_v2_service_iam_member" "public_invoker"',
+        'resource "google_project_iam_custom_role" "provisioner_quota_user"',
+        'resource "google_project_iam_member" "provisioner_quota_user"',
         "roles/cloudsql.client",
         "roles/logging.logWriter",
         "roles/monitoring.metricWriter",
@@ -1823,7 +1797,8 @@ def test_gcp_develop_iam_models_least_privilege_runtime_migration_deployer_and_i
         "golden-rose-image-publisher@${var.control_plane_project_id}.iam.gserviceaccount.com",
         "golden-rose-artifact-verifier@${var.control_plane_project_id}.iam.gserviceaccount.com",
         "golden-rose-deployer@${var.control_plane_project_id}.iam.gserviceaccount.com",
-        "data.external.tester_authority[0].result.private_invoker_principal",
+        'member   = "allUsers"',
+        'permissions = ["serviceusage.services.use"]',
     ]
     for fragment in required_fragments:
         assert fragment in iam
@@ -1840,8 +1815,9 @@ def test_gcp_develop_iam_models_least_privilege_runtime_migration_deployer_and_i
         "roles/iam.serviceAccountUser",
         "roles/iam.serviceAccountTokenCreator",
         "google_service_account_key",
-        "allUsers",
         "allAuthenticatedUsers",
+        "tester_authority",
+        "verify_tester_authority_receipt.py",
         'resource "google_artifact_registry_repository_iam_member" "deployer_reader"',
         'resource "google_artifact_registry_repository_iam_member" "image_publisher_reader"',
         "var.deployer_principal",
@@ -1935,49 +1911,55 @@ resource "terraform_data" "deployer_migration_job_viewer" {
     assert "Success!" in result.stdout
 
 
-def test_named_invoker_is_required_and_public_invokers_remain_forbidden() -> None:
+def test_temporary_public_invoker_replaces_named_tester_authority() -> None:
     variables = (ROOT / "infra/gcp/variables.tf").read_text(encoding="utf-8")
     develop_variables = (ROOT / "infra/gcp/develop/variables.tf").read_text(encoding="utf-8")
     iam = (ROOT / "infra/gcp/develop/iam.tf").read_text(encoding="utf-8")
 
     for text in [variables, develop_variables]:
-        assert 'variable "tester_authority_receipt_path"' in text
-        assert 'variable "tester_authority_bundle_path"' in text
-        assert 'variable "tester_authority_certificate_identity"' in text
+        assert 'variable "demo_access_expires_at"' in text
+        assert "sensitive = true" in text
+        assert 'variable "tester_authority_receipt_path"' not in text
+        assert 'variable "tester_authority_bundle_path"' not in text
+        assert 'variable "tester_authority_certificate_identity"' not in text
         assert 'variable "private_invoker_principal"' not in text
 
-    assert 'resource "google_cloud_run_v2_service_iam_member" "private_invoker"' in iam
+    assert 'resource "google_cloud_run_v2_service_iam_member" "public_invoker"' in iam
     assert 'role     = "roles/run.invoker"' in iam
-    assert "member   = data.external.tester_authority[0].result.private_invoker_principal" in iam
-    assert "allUsers" not in iam
+    assert 'member   = "allUsers"' in iam
+    assert "private_invoker" not in iam
+    assert "tester_authority" not in iam
     assert "allAuthenticatedUsers" not in iam
 
 
-def test_tester_iam_input_is_derived_by_the_receipt_verifier_not_a_tfvars_principal() -> None:
+def test_demo_expiry_is_the_only_service_access_tfvars_input() -> None:
     root_variables = (ROOT / "infra/gcp/variables.tf").read_text(encoding="utf-8")
     module_variables = (ROOT / "infra/gcp/develop/variables.tf").read_text(encoding="utf-8")
     iam = (ROOT / "infra/gcp/develop/iam.tf").read_text(encoding="utf-8")
 
     for variables in [root_variables, module_variables]:
-        assert 'variable "tester_authority_receipt_path"' in variables
-        assert 'variable "tester_authority_bundle_path"' in variables
-        assert 'variable "tester_authority_certificate_identity"' in variables
+        assert 'variable "demo_access_expires_at"' in variables
+        assert 'variable "tester_authority_receipt_path"' not in variables
+        assert 'variable "tester_authority_bundle_path"' not in variables
+        assert 'variable "tester_authority_certificate_identity"' not in variables
         assert 'variable "private_invoker_principal"' not in variables
         assert 'variable "tester_authority_receipt_sha256"' not in variables
 
-    assert 'data "external" "tester_authority"' in iam
-    assert "verify_tester_authority_receipt.py" in iam
-    assert "data.external.tester_authority[0].result" in iam
+    assert 'data "external" "tester_authority"' not in iam
+    assert "verify_tester_authority_receipt.py" not in iam
     assert "member   = var.private_invoker_principal" not in iam
 
 
-def test_private_tester_runbook_does_not_claim_internal_network_privacy() -> None:
+def test_shared_access_runbook_states_exact_public_transport_boundary() -> None:
     runbook = (ROOT / "deploy/gcp/private-tester-access.md").read_text(encoding="utf-8")
     first_deploy = (ROOT / "deploy/gcp/first-deployment-runbook.md").read_text(encoding="utf-8")
 
     assert "named tester group" not in runbook
     assert "named tester group" not in first_deploy
-    assert "internet-reachable ingress posture" in first_deploy
+    assert "internet-reachable" in runbook
+    assert "allUsers" in runbook
+    assert "application Basic middleware is the shared browser boundary" in first_deploy
+    assert "allAuthenticatedUsers" in first_deploy
     assert "service-level" in runbook
 
 
@@ -2044,7 +2026,11 @@ def test_gcp_container_image_digest_is_digest_only_and_not_arbitrary_reference(
         assert "latest" not in variables.lower()
 
     graph_root = tmp_path / "graph-probe"
-    shutil.copytree(ROOT / "infra" / "gcp", graph_root)
+    shutil.copytree(
+        ROOT / "infra" / "gcp",
+        graph_root,
+        ignore=shutil.ignore_patterns(".terraform"),
+    )
     (graph_root / "backend.tf").write_text(
         "# graph probe omits the partial backend ceremony\n",
         encoding="utf-8",
@@ -8149,7 +8135,11 @@ def _copy_terraform_for_graph_probe(tmp_path: Path, stage: str = "service") -> P
     import shutil
 
     graph_root = tmp_path / f"graph-probe-{stage}"
-    shutil.copytree(ROOT / "infra" / "gcp", graph_root)
+    shutil.copytree(
+        ROOT / "infra" / "gcp",
+        graph_root,
+        ignore=shutil.ignore_patterns(".terraform"),
+    )
     (graph_root / "backend.tf").write_text(
         "# graph probe omits the partial backend ceremony\n",
         encoding="utf-8",
@@ -8269,14 +8259,14 @@ def test_migration_graph_contains_job_without_service_or_invoker_binding(
 
     # Service invoker IAM must have count gated to service stage only
     assert "count" in iam
-    iam_invoker_section = iam.split("private_invoker")[1] if "private_invoker" in iam else ""
+    iam_invoker_section = iam.split("public_invoker")[1] if "public_invoker" in iam else ""
     assert 'var.deployment_stage == "service"' in iam_invoker_section
 
 
-def test_service_graph_contains_job_service_and_named_invoker_binding(
+def test_service_graph_contains_job_service_and_public_invoker_binding(
     tmp_path: Path,
 ) -> None:
-    """Service stage graph must contain job, service, and the named invoker IAM."""
+    """Service stage graph must contain job, service, and the public invoker IAM."""
     graph_root = _copy_terraform_for_graph_probe(tmp_path, stage="service")
     (graph_root / "service.tfvars").write_text(
         'deployment_stage = "service"\n',
@@ -8291,7 +8281,7 @@ def test_service_graph_contains_job_service_and_named_invoker_binding(
         "Service stage graph must contain the Cloud Run service"
     )
     assert "google_cloud_run_v2_service_iam_member" in graph_output, (
-        "Service stage graph must contain the named invoker IAM binding"
+        "Service stage graph must contain the public invoker IAM binding"
     )
 
 
@@ -8804,24 +8794,22 @@ def test_runtime_and_migration_secret_iam_is_per_secret_and_rejects_collection_w
         )
 
 
-def test_deploy_workflow_uses_operator_receipts_and_direct_oci_authority() -> None:
+def test_deploy_workflow_uses_one_packet_stages_and_direct_oci_authority() -> None:
     workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
     required = [
         "deployment_stage:",
+        "eight-hour deployment packet",
         "- migration",
         "- service",
-        "stage_receipt_base64:",
-        "migration_success_receipt_base64:",
-        "cosign verify-blob",
         "Verify direct OCI image authority",
         "cosign verify --certificate-identity",
         "cosign verify-attestation --type slsaprovenance1",
         "https://spdx.dev/Document",
         "scripts/verify_deploy_image_authority.py",
         '--source-commit "$GITHUB_SHA"',
-        "Validate signed stage receipt after image digest",
-        "scripts/verify_stage_receipt.py",
         "Execute migration transition",
+        "gcloud run jobs describe run-migrations",
+        "job image must match the direct Cosign-verified image",
         "Verify service readiness transition",
     ]
     for fragment in required:
@@ -8829,19 +8817,28 @@ def test_deploy_workflow_uses_operator_receipts_and_direct_oci_authority() -> No
     assert "publish_run_id:" not in workflow
     assert "reviewed-stage-plan-receipt" not in workflow
     assert "Download reviewed publish artifacts" not in workflow
+    assert "stage_receipt" not in workflow
+    assert "migration_success_receipt" not in workflow
+    assert "cosign sign-blob" not in workflow
+    assert "cosign verify-blob" not in workflow
     assert (
         workflow.index("Authenticate artifact verifier to Google Cloud")
         < workflow.index("Verify direct OCI image authority")
         < workflow.index("Clear artifact verifier credential context")
-        < workflow.index("Validate signed stage receipt after image digest")
         < workflow.index("Authenticate deployer to Google Cloud")
         < workflow.index("Set up gcloud")
     )
-    assert (
-        workflow.index("Verify direct OCI image authority")
-        < workflow.index("Validate signed stage receipt after image digest")
-        < workflow.index("Authenticate deployer to Google Cloud")
+    migration_step = workflow.split("- name: Execute migration transition", 1)[1].split(
+        "- name: Verify service readiness transition", 1
+    )[0]
+    assert migration_step.index("gcloud run jobs describe") < migration_step.index(
+        "gcloud run jobs execute"
     )
+    service_step = workflow.split("- name: Verify service readiness transition", 1)[1].split(
+        "- name: Record deploy result", 1
+    )[0]
+    assert 'payload.update({"result": "success"' in migration_step
+    assert 'payload.update({"result": "success"' in service_step
 
 
 def test_deploy_workflow_separates_artifact_verifier_credentials_from_deployer_credentials() -> (
@@ -8876,103 +8873,6 @@ def test_deploy_workflow_separates_artifact_verifier_credentials_from_deployer_c
     )
 
 
-def test_deploy_workflow_writes_and_uploads_migration_success_receipt_only_for_migration_stage() -> (
-    None
-):
-    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
-
-    required = [
-        "Write migration success receipt",
-        "scripts/write_migration_success_receipt.py",
-        "migration-success-receipt.json",
-        "migration-execution.json",
-        "Upload migration success receipt",
-        "migration-success-receipt",
-        "if: inputs.deployment_stage == 'migration'",
-    ]
-    for fragment in required:
-        assert fragment in workflow
-
-    assert (
-        workflow.index("Execute migration transition")
-        < workflow.index("Write migration success receipt")
-        < workflow.index("Upload migration success receipt")
-    )
-    execution_step = workflow.split("- name: Execute migration transition\n", 1)[1].split(
-        "\n      - name: Write migration success receipt\n", 1
-    )[0]
-    assert '"image_digest": os.environ["IMAGE_DIGEST"]' in execution_step
-
-
-def test_deploy_workflow_signs_and_uploads_migration_success_bundle_only_for_migration_stage() -> (
-    None
-):
-    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
-
-    required = [
-        "cosign sign-blob",
-        "migration-success-receipt.sigstore.json",
-        "MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY",
-        "Upload migration success receipt bundle",
-        "migration-success-receipt-bundle",
-        "if: inputs.deployment_stage == 'migration'",
-    ]
-    for fragment in required:
-        assert fragment in workflow
-
-    assert (
-        workflow.index("Write migration success receipt")
-        < workflow.index("cosign sign-blob")
-        < workflow.index("Upload migration success receipt bundle")
-    )
-
-
-def test_service_gate_requires_migration_success_bundle_and_certificate_identity_before_cloud_auth() -> (
-    None
-):
-    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
-    verification_step = workflow.split(
-        "- name: Verify signed stage receipt before cloud authentication\n", 1
-    )[1].split("\n      - name: Initialize failed deploy result\n", 1)[0]
-
-    required = [
-        'test -n "$MIGRATION_SUCCESS_RECEIPT_BUNDLE_BASE64"',
-        'test -n "$MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY"',
-        "printf '%s' \"$MIGRATION_SUCCESS_RECEIPT_BUNDLE_BASE64\" | base64 --decode > build/transition-authority/migration-success-receipt.sigstore.json",
-        'cosign verify-blob build/transition-authority/migration-success-receipt.json --bundle build/transition-authority/migration-success-receipt.sigstore.json --certificate-identity "$MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY"',
-    ]
-    for fragment in required:
-        assert fragment in verification_step
-
-    assert verification_step.index(
-        'test -n "$MIGRATION_SUCCESS_RECEIPT_BUNDLE_BASE64"'
-    ) < verification_step.index(
-        "cosign verify-blob build/transition-authority/migration-success-receipt.json"
-    )
-
-
-def test_service_gate_requires_signed_post_migration_database_authority_readback_before_cloud_auth() -> (
-    None
-):
-    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
-
-    required = [
-        "migration_readback_receipt_base64:",
-        "migration_readback_receipt_bundle_base64:",
-        'test -n "$MIGRATION_READBACK_RECEIPT_BASE64"',
-        'test -n "$MIGRATION_READBACK_RECEIPT_BUNDLE_BASE64"',
-        'test -n "$MIGRATION_READBACK_RECEIPT_CERTIFICATE_IDENTITY"',
-        "migration-database-authority-readback.json",
-        "migration-database-authority-readback.sigstore.json",
-        "scripts/verify_migration_database_readback.py",
-    ]
-    for fragment in required:
-        assert fragment in workflow
-    assert workflow.index(
-        "Verify signed stage receipt before cloud authentication"
-    ) < workflow.index("Authenticate artifact verifier to Google Cloud")
-
-
 def test_static_validator_binds_artifact_verifier_reader_resource_fields_not_comments(
     tmp_path: Path,
 ) -> None:
@@ -8980,7 +8880,18 @@ def test_static_validator_binds_artifact_verifier_reader_resource_fields_not_com
         ROOT,
         tmp_path,
         dirs_exist_ok=True,
-        ignore=shutil.ignore_patterns(".git", ".venv", ".ruff_cache", "__pycache__"),
+        ignore=shutil.ignore_patterns(
+            ".git",
+            ".venv",
+            ".terraform",
+            ".ruff_cache",
+            ".mypy_cache",
+            ".pytest_cache",
+            "__pycache__",
+            "node_modules",
+            "build",
+            "dist",
+        ),
     )
     iam_path = tmp_path / "infra" / "gcp" / "develop" / "iam.tf"
     iam = iam_path.read_text(encoding="utf-8")
@@ -9005,123 +8916,6 @@ def test_static_validator_binds_artifact_verifier_reader_resource_fields_not_com
 
     assert result.returncode == 1
     assert "artifact verifier reader" in result.stdout.lower()
-
-
-def test_service_gate_requires_migration_receipt_and_bundle_inputs_before_decode() -> None:
-    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
-    verification_step = workflow.split(
-        "- name: Verify signed stage receipt before cloud authentication\n", 1
-    )[1].split("\n      - name: Initialize failed deploy result\n", 1)[0]
-
-    assert 'test -n "$MIGRATION_RECEIPT_BASE64"' in verification_step
-    assert 'test -n "$MIGRATION_RECEIPT_BUNDLE_BASE64"' in verification_step
-    assert verification_step.index('test -n "$MIGRATION_RECEIPT_BASE64"') < verification_step.index(
-        "printf '%s' \"$MIGRATION_RECEIPT_BASE64\" | base64 --decode > build/transition-authority/migration-receipt.json"
-    )
-    assert verification_step.index(
-        'test -n "$MIGRATION_RECEIPT_BUNDLE_BASE64"'
-    ) < verification_step.index(
-        "printf '%s' \"$MIGRATION_RECEIPT_BUNDLE_BASE64\" | base64 --decode > build/transition-authority/migration-receipt.sigstore.json"
-    )
-
-
-def test_pre_auth_stage_receipt_verification_requires_certificate_identity_before_any_cosign_call() -> (
-    None
-):
-    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
-    verification_step = workflow.split(
-        "- name: Verify signed stage receipt before cloud authentication\n", 1
-    )[1].split("\n      - name: Initialize failed deploy result\n", 1)[0]
-
-    assert 'test -n "$STAGE_RECEIPT_CERTIFICATE_IDENTITY"' in verification_step
-    assert verification_step.index(
-        'test -n "$STAGE_RECEIPT_CERTIFICATE_IDENTITY"'
-    ) < verification_step.index("cosign verify-blob build/transition-authority/stage-receipt.json")
-
-
-def test_pre_auth_stage_receipt_verification_requires_receipt_and_bundle_inputs_before_decode() -> (
-    None
-):
-    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
-    verification_step = workflow.split(
-        "- name: Verify signed stage receipt before cloud authentication\n", 1
-    )[1].split("\n      - name: Initialize failed deploy result\n", 1)[0]
-
-    assert 'test -n "$STAGE_RECEIPT_BASE64"' in verification_step
-    assert 'test -n "$STAGE_RECEIPT_BUNDLE_BASE64"' in verification_step
-    assert verification_step.index('test -n "$STAGE_RECEIPT_BASE64"') < verification_step.index(
-        "printf '%s' \"$STAGE_RECEIPT_BASE64\" | base64 --decode > build/transition-authority/stage-receipt.json"
-    )
-    assert verification_step.index(
-        'test -n "$STAGE_RECEIPT_BUNDLE_BASE64"'
-    ) < verification_step.index(
-        "printf '%s' \"$STAGE_RECEIPT_BUNDLE_BASE64\" | base64 --decode > build/transition-authority/stage-receipt.sigstore.json"
-    )
-
-
-def test_deploy_workflow_validates_full_live_configuration_projection_before_transition() -> None:
-    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
-
-    assert "Extract and validate selected live configuration projection" in workflow
-    assert "--live-configuration-projection" in workflow
-    assert "gcloud run jobs describe run-migrations" in workflow
-    assert "gcloud run services describe staff-tracer" in workflow
-    assert "gcloud run services get-iam-policy staff-tracer" in workflow
-    assert "live-service-iam-policy.json" in workflow
-    assert "iam_policy=iam_policy" in workflow
-    assert 'service.get("template", {}).get("containers")' in workflow
-    assert workflow.index(
-        "Extract and validate selected live configuration projection"
-    ) < workflow.index("Execute migration transition")
-    assert workflow.index(
-        "Extract and validate selected live configuration projection"
-    ) < workflow.index("Verify service readiness transition")
-
-
-def test_static_policy_rejects_deploy_workflow_without_live_projection_comparison(
-    tmp_path: Path,
-) -> None:
-    _write_current_terraform_scaffold(tmp_path)
-    policy_dir = tmp_path / "infra" / "policy"
-    policy_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy(ROOT / "infra" / "policy" / "predeployment-authority-manifest.json", policy_dir)
-    workflow = _current_workflow_text("deploy-develop.yml").replace(
-        "--live-configuration-projection build/transition-authority/live-configuration-projection.json",
-        "",
-        1,
-    )
-    _write_workflow_fixture(tmp_path, "deploy-develop.yml", workflow)
-
-    result = subprocess.run(
-        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
-        cwd=ROOT,
-        check=False,
-        text=True,
-        capture_output=True,
-    )
-
-    assert result.returncode == 1
-    assert "must match reviewed executable script exactly" in result.stdout
-
-
-def test_static_policy_rejects_deploy_workflow_without_service_iam_projection(
-    tmp_path: Path,
-) -> None:
-    _write_current_terraform_scaffold(tmp_path)
-    policy_dir = tmp_path / "infra" / "policy"
-    policy_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy(ROOT / "infra" / "policy" / "predeployment-authority-manifest.json", policy_dir)
-    workflow = _current_workflow_text("deploy-develop.yml").replace(
-        '            gcloud run services get-iam-policy staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --format=json > build/transition-authority/live-service-iam-policy.json\n',
-        "",
-        1,
-    )
-    _write_workflow_fixture(tmp_path, "deploy-develop.yml", workflow)
-
-    result = _run_validator(tmp_path)
-
-    assert result.returncode == 1
-    assert "must match reviewed executable script exactly" in result.stdout
 
 
 def test_static_policy_rejects_appended_deploy_environment_mutation(tmp_path: Path) -> None:
@@ -9188,3 +8982,166 @@ def test_static_policy_rejects_every_unreviewed_deploy_run_command(
         "name:Execute migration transition must match reviewed executable script exactly"
         in result.stdout
     )
+
+
+def test_quota_bootstrap_role_and_binding_are_exactly_one_permission_and_member() -> None:
+    iam = (ROOT / "infra" / "gcp" / "develop" / "iam.tf").read_text(encoding="utf-8")
+
+    assert 'resource "google_project_iam_custom_role" "provisioner_quota_user"' in iam
+    assert 'role_id     = "goldenRoseProvisionerQuotaUser"' in iam
+    assert 'permissions = ["serviceusage.services.use"]' in iam
+    assert 'resource "google_project_iam_member" "provisioner_quota_user"' in iam
+    assert (
+        'member  = "serviceAccount:golden-rose-provisioner@${var.control_plane_project_id}.iam.gserviceaccount.com"'
+        in iam
+    )
+    assert "roles/serviceusage.serviceUsageConsumer" not in iam
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        (
+            'permissions = ["serviceusage.services.use"]',
+            'permissions = ["serviceusage.services.use", "resourcemanager.projects.get"]',
+        ),
+        (
+            'member  = "serviceAccount:golden-rose-provisioner@${var.control_plane_project_id}.iam.gserviceaccount.com"',
+            'member  = "serviceAccount:other@${var.control_plane_project_id}.iam.gserviceaccount.com"',
+        ),
+        (
+            "role    = google_project_iam_custom_role.provisioner_quota_user.name",
+            'role    = "roles/editor"',
+        ),
+    ],
+)
+def test_static_validation_rejects_quota_role_or_binding_expansion(
+    tmp_path: Path,
+    old: str,
+    new: str,
+) -> None:
+    _write_current_terraform_scaffold(tmp_path)
+    policy_dir = tmp_path / "infra" / "policy"
+    policy_dir.mkdir(parents=True)
+    shutil.copy(ROOT / "infra" / "policy" / "predeployment-authority-manifest.json", policy_dir)
+    iam_path = tmp_path / "infra" / "gcp" / "develop" / "iam.tf"
+    iam = iam_path.read_text(encoding="utf-8")
+    assert old in iam
+    iam_path.write_text(iam.replace(old, new, 1), encoding="utf-8")
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode == 1
+    assert "provisioner quota" in result.stdout.lower()
+
+
+def test_service_stage_has_exact_temporary_public_access_and_one_instance_contract() -> None:
+    cloud_run = (ROOT / "infra" / "gcp" / "develop" / "cloud_run.tf").read_text(encoding="utf-8")
+    iam = (ROOT / "infra" / "gcp" / "develop" / "iam.tf").read_text(encoding="utf-8")
+    secrets = (ROOT / "infra" / "gcp" / "develop" / "secrets.tf").read_text(encoding="utf-8")
+    observability = (ROOT / "infra" / "gcp" / "develop" / "observability.tf").read_text(
+        encoding="utf-8"
+    )
+
+    for fragment in [
+        'ingress             = "INGRESS_TRAFFIC_ALL"',
+        "min_instance_count = 0",
+        "max_instance_count = 1",
+        "max_instance_request_concurrency = 10",
+        'timeout                          = "60s"',
+        'cpu    = "1"',
+        'memory = "512Mi"',
+        'name  = "GOLDEN_ROSE_DEMO_ACCESS_ENABLED"',
+        'value = "true"',
+        'name  = "GOLDEN_ROSE_DEMO_ACCESS_EXPIRES_AT"',
+        "value = var.demo_access_expires_at",
+        'name = "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD"',
+        'secret  = "demo-access-password"',
+    ]:
+        assert fragment in cloud_run
+
+    assert 'resource "google_cloud_run_v2_service_iam_member" "public_invoker"' in iam
+    assert 'member   = "allUsers"' in iam
+    assert 'role     = "roles/run.invoker"' in iam
+    assert 'resource "google_cloud_run_v2_service_iam_member" "private_invoker"' not in iam
+    assert 'data "external" "tester_authority"' not in iam
+    assert (
+        'resource "google_cloud_run_v2_service_iam_member" "monitoring_readiness_invoker"'
+        not in (observability)
+    )
+    assert "service_agent_authentication" not in observability
+    assert '"demo-access-password"' in secrets
+    assert (
+        'resource "google_secret_manager_secret_iam_member" "runtime_demo_access_secret_access"'
+        in iam
+    )
+    assert "migration_demo_access_secret_access" not in iam
+
+
+def test_outputs_expose_only_value_safe_temporary_access_markers() -> None:
+    module_outputs = (ROOT / "infra" / "gcp" / "develop" / "outputs.tf").read_text(encoding="utf-8")
+    root_outputs = (ROOT / "infra" / "gcp" / "outputs.tf").read_text(encoding="utf-8")
+
+    assert 'output "human_visible_develop_contract"' in module_outputs
+    for fragment in [
+        'access_mode = "expiring-http-basic"',
+        "public_invoker = true",
+        "min_instances = 0",
+        "max_instances = 1",
+        'data_boundary = "fictional-synthetic-only"',
+    ]:
+        assert _contains_normalized_fragment(module_outputs, fragment)
+    assert "demo_access_expires_at" not in module_outputs
+    assert 'output "human_visible_develop_contract"' in root_outputs
+    assert "module.develop.human_visible_develop_contract" in root_outputs
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "old", "new", "expected"),
+    [
+        (
+            Path("infra/gcp/develop/iam.tf"),
+            'member   = "allUsers"',
+            'member   = "allAuthenticatedUsers"',
+            "public invoker",
+        ),
+        (
+            Path("infra/gcp/develop/cloud_run.tf"),
+            "max_instance_count = 1",
+            "max_instance_count = 2",
+            "cloud run contract",
+        ),
+        (
+            Path("infra/gcp/develop/cloud_run.tf"),
+            'name  = "GOLDEN_ROSE_DEMO_ACCESS_ENABLED"\n        value = "true"',
+            'name  = "GOLDEN_ROSE_DEMO_ACCESS_ENABLED"\n        value = "false"',
+            "cloud run contract",
+        ),
+        (
+            Path("infra/gcp/develop/cloud_run.tf"),
+            'name = "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD"\n        value_source {',
+            'name  = "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD"\n        value = "forbidden-literal"\n        value_source {',
+            "cloud run contract",
+        ),
+    ],
+)
+def test_static_validation_rejects_weakened_temporary_public_access_contract(
+    tmp_path: Path,
+    relative_path: Path,
+    old: str,
+    new: str,
+    expected: str,
+) -> None:
+    _write_current_terraform_scaffold(tmp_path)
+    policy_dir = tmp_path / "infra" / "policy"
+    policy_dir.mkdir(parents=True)
+    shutil.copy(ROOT / "infra" / "policy" / "predeployment-authority-manifest.json", policy_dir)
+    path = tmp_path / relative_path
+    text = path.read_text(encoding="utf-8")
+    assert old in text
+    path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode == 1
+    assert expected in result.stdout.lower()

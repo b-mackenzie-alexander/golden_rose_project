@@ -3,7 +3,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 from typing import Any
 
 import pytest
@@ -13,9 +13,15 @@ MODULE_PATH = ROOT / "scripts" / "qualify_develop_deployment.py"
 EVIDENCE_TEMPLATE_PATH = ROOT / "deploy" / "gcp" / "evidence-template.md"
 MANIFEST_PATH = ROOT / "infra" / "policy" / "predeployment-authority-manifest.json"
 EXPECTED_IMAGE_DIGEST = "sha256:" + "a" * 64
-EXPECTED_SERVICE_RESOURCE = (
-    "//run.googleapis.com/projects/golden-rose-develop/locations/us-east4/services/staff-tracer"
-)
+DEMO_PASSWORD = "top-secret-token"
+SAFE_LOG_EXPORT = '[{"severity":"INFO","message":"request completed"}]'
+DEMO_AUTHORIZATION = "Basic " + base64.b64encode(
+    f"golden-rose-demo:{DEMO_PASSWORD}".encode()
+).decode("ascii")
+WRONG_DEMO_AUTHORIZATION = "Basic " + base64.b64encode(
+    b"golden-rose-demo:intentionally-wrong-demo-password"
+).decode("ascii")
+DEMO_CHALLENGE = 'Basic realm="Golden Rose synthetic develop", charset="UTF-8"'
 
 
 class FakeResponse:
@@ -45,22 +51,21 @@ class FakeRequester:
         body: dict[str, Any] | None,
     ) -> FakeResponse:
         self.calls.append({"method": method, "path": path, "headers": headers, "body": body})
-        if path == "/readiness" and "Authorization" not in headers:
-            return FakeResponse(401, {"status": "denied"})
-        if path == "/readiness" and headers.get("Authorization") == "Bearer unapproved-token":
-            return FakeResponse(403, {"status": "denied"})
         if path == "/health":
             return FakeResponse(200, {"status": "ok"})
         if path == "/readiness":
-            return FakeResponse(
-                200,
-                {
-                    "status": "ready",
-                    "schema_revision": "0005_database_authority",
-                    "deployment_target": "gcp-develop-private-synthetic",
-                    "deployed_image_digest": EXPECTED_IMAGE_DIGEST,
-                },
-            )
+            return FakeResponse(200, {"status": "ready"})
+        if path == "/api/staff/v1/environment":
+            if headers.get("Authorization") == DEMO_AUTHORIZATION:
+                return FakeResponse(
+                    200,
+                    {
+                        "environment": "develop",
+                        "label": "Non-production fictional synthetic develop",
+                        "data_boundary": "fictional-synthetic-only",
+                    },
+                )
+            return FakeResponse(401, {}, {"WWW-Authenticate": DEMO_CHALLENGE})
         if path == "/api/staff/v1/employers" and method == "POST":
             assert body is not None
             if len([call for call in self.calls if call["path"] == path]) == 1:
@@ -183,19 +188,6 @@ def load_module() -> ModuleType:
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    setattr(  # noqa: B010
-        module, "_verify_google_identity_token", lambda token, audience, subject: subject
-    )
-    setattr(module, "_verify_effective_iam_absence", lambda subject, resource: None)  # noqa: B010
-    return module
-
-
-def load_real_module() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("qualify_develop_deployment_real", MODULE_PATH)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
     return module
 
 
@@ -213,18 +205,160 @@ def test_manifest_lists_qualification_script_entrypoint() -> None:
     assert "scripts/qualify_develop_deployment.py" in manifest["scripts"]["entrypoints"]
 
 
+@pytest.mark.parametrize(
+    "log_export",
+    [
+        'authorization: "Basic redacted"',
+        f"credential={DEMO_PASSWORD}",
+        'request body contained "Generated Employer"',
+    ],
+)
+def test_log_export_scan_rejects_authorization_credentials_and_fictional_values(
+    log_export: str,
+) -> None:
+    module = load_module()
+
+    with pytest.raises(module.QualificationError, match="log export contains prohibited values"):
+        module._verify_log_export_is_safe(
+            log_export,
+            prohibited_values=[DEMO_PASSWORD, "Generated Employer"],
+        )
+
+
+def test_private_file_reader_rejects_permissive_or_symlinked_handoffs(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    permissive = tmp_path / "permissive.txt"
+    permissive.write_text("private", encoding="utf-8")
+    permissive.chmod(0o644)
+    linked = tmp_path / "linked.txt"
+    linked.symlink_to(permissive)
+
+    with pytest.raises(module.QualificationError, match="private file boundary failed"):
+        module._read_private_text_file(permissive, label="log export")
+    with pytest.raises(module.QualificationError, match="private file boundary failed"):
+        module._read_private_text_file(linked, label="demo password")
+
+
+def test_cloud_log_reader_runs_exact_post_qualification_bounded_query() -> None:
+    module = load_module()
+    calls: list[dict[str, Any]] = []
+
+    def runner(command: list[str], **kwargs: Any) -> Any:
+        calls.append({"command": command, "kwargs": kwargs})
+        return SimpleNamespace(returncode=0, stdout=SAFE_LOG_EXPORT, stderr="")
+
+    result = module._collect_cloud_run_logs(
+        "golden-rose-develop-123",
+        runner=runner,
+    )
+
+    assert result == SAFE_LOG_EXPORT
+    assert calls == [
+        {
+            "command": [
+                "gcloud",
+                "logging",
+                "read",
+                (
+                    'resource.type="cloud_run_revision" '
+                    'AND resource.labels.service_name="staff-tracer"'
+                ),
+                "--project=golden-rose-develop-123",
+                "--freshness=15m",
+                "--limit=1000",
+                "--format=json",
+            ],
+            "kwargs": {
+                "capture_output": True,
+                "check": False,
+                "text": True,
+                "timeout": 120,
+            },
+        }
+    ]
+
+
+def test_qualification_uses_public_probes_then_fixed_basic_denials_and_private_password() -> None:
+    module = load_module()
+    calls: list[dict[str, Any]] = []
+    correct_authorization = "Basic " + base64.b64encode(
+        b"golden-rose-demo:private-demo-password"
+    ).decode("ascii")
+
+    def requester(
+        method: str,
+        path: str,
+        headers: dict[str, str],
+        body: dict[str, Any] | None,
+    ) -> FakeResponse:
+        calls.append({"method": method, "path": path, "headers": headers, "body": body})
+        if path == "/health":
+            return FakeResponse(200, {"status": "ok"})
+        if path == "/readiness":
+            return FakeResponse(200, {"status": "ready"})
+        if path == "/api/staff/v1/environment":
+            if headers.get("Authorization") == correct_authorization:
+                return FakeResponse(
+                    200,
+                    {
+                        "environment": "develop",
+                        "label": "Non-production fictional synthetic develop",
+                        "data_boundary": "fictional-synthetic-only",
+                    },
+                )
+            return FakeResponse(
+                401,
+                {},
+                {
+                    "WWW-Authenticate": (
+                        'Basic realm="Golden Rose synthetic develop", charset="UTF-8"'
+                    )
+                },
+            )
+        raise module.QualificationError("explicit live-write acknowledgement is required")
+
+    with pytest.raises(module.QualificationError, match="live-write acknowledgement"):
+        module.qualify_develop_deployment(
+            base_url="https://staff-tracer-abc123.a.run.app",
+            expected_service_url="https://staff-tracer-abc123.a.run.app",
+            demo_password="private-demo-password",
+            log_export_reader=lambda: SAFE_LOG_EXPORT,
+            expected_image_digest=EXPECTED_IMAGE_DIGEST,
+            allow_synthetic_writes=False,
+            requester=requester,
+        )
+
+    assert [call["path"] for call in calls] == [
+        "/health",
+        "/readiness",
+        "/api/staff/v1/environment",
+        "/api/staff/v1/environment",
+        "/api/staff/v1/environment",
+    ]
+    assert "Authorization" not in calls[0]["headers"]
+    assert "Authorization" not in calls[1]["headers"]
+    assert "Authorization" not in calls[2]["headers"]
+    assert calls[3]["headers"]["Authorization"].startswith("Basic ")
+    assert calls[3]["headers"]["Authorization"] != correct_authorization
+    assert calls[4]["headers"]["Authorization"] == correct_authorization
+
+
 def test_qualify_develop_deployment_accepts_reviewed_private_synthetic_flow() -> None:
     module = load_module()
     requester = FakeRequester()
+    log_reader_call_counts: list[int] = []
+
+    def log_export_reader() -> str:
+        log_reader_call_counts.append(len(requester.calls))
+        return SAFE_LOG_EXPORT
 
     result = module.qualify_develop_deployment(
         base_url="https://staff-tracer-abc123.a.run.app",
         expected_service_url="https://staff-tracer-abc123.a.run.app",
-        expected_service_resource=EXPECTED_SERVICE_RESOURCE,
-        expected_unapproved_subject="unapproved-subject",
-        access_token="top-secret-token",
-        unapproved_access_token="unapproved-token",
-        expected_schema_revision="0005_database_authority",
+        demo_password=DEMO_PASSWORD,
+        log_export_reader=log_export_reader,
         expected_image_digest=EXPECTED_IMAGE_DIGEST,
         allow_synthetic_writes=True,
         requester=requester,
@@ -233,8 +367,12 @@ def test_qualify_develop_deployment_accepts_reviewed_private_synthetic_flow() ->
     assert result["qualification_status"] == "passed"
     assert result["health_status"] == "ok"
     assert result["readiness_status"] == "ready"
-    assert result["readiness_posture"]["deployment_target"] == "gcp-develop-private-synthetic"
-    assert result["readiness_posture"]["deployed_image_digest"] == EXPECTED_IMAGE_DIGEST
+    assert result["log_scan"] == "passed_no_prohibited_values"
+    assert log_reader_call_counts == [len(requester.calls)]
+    assert log_reader_call_counts[0] > 6
+    assert result["platform_posture"]["immutable_image"] == (
+        "verified_by_prior_foundation_readback"
+    )
     assert result["employer_flow"]["create"] == "fresh"
     assert result["employer_flow"]["replay"] == "confirmed"
     assert result["employer_flow"]["revision_replay"] == "confirmed"
@@ -244,141 +382,19 @@ def test_qualify_develop_deployment_accepts_reviewed_private_synthetic_flow() ->
         == "no delete semantics exercised; use teardown/rebuild runbook"
     )
 
-    assert requester.calls[0]["headers"] == {"Accept": "application/json"}
-    assert requester.calls[0]["body"] is None
-    assert requester.calls[1]["headers"]["Authorization"] == "Bearer unapproved-token"
-    assert requester.calls[1]["body"] is None
-    health_call = requester.calls[2]
-    readiness_call = requester.calls[3]
+    health_call = requester.calls[0]
+    readiness_call = requester.calls[1]
     assert health_call["method"] == "GET"
     assert readiness_call["method"] == "GET"
+    assert health_call["headers"] == {"Accept": "application/json"}
+    assert readiness_call["headers"] == {"Accept": "application/json"}
     assert "Idempotency-Key" not in health_call["headers"]
     assert "Idempotency-Key" not in readiness_call["headers"]
+    assert "Authorization" not in requester.calls[2]["headers"]
+    assert requester.calls[3]["headers"]["Authorization"] == WRONG_DEMO_AUTHORIZATION
     assert all(
-        call["headers"]["Authorization"] == "Bearer top-secret-token"
-        for call in requester.calls[2:]
+        call["headers"]["Authorization"] == DEMO_AUTHORIZATION for call in requester.calls[4:]
     )
-
-
-def test_qualify_develop_deployment_runs_minimized_denial_probes_before_approved_flow() -> None:
-    module = load_module()
-    requester = FakeRequester()
-
-    def probing_requester(
-        method: str,
-        path: str,
-        headers: dict[str, str],
-        body: dict[str, Any] | None,
-    ) -> FakeResponse:
-        if len(requester.calls) == 0:
-            requester.calls.append(
-                {"method": method, "path": path, "headers": headers, "body": body}
-            )
-            assert "Authorization" not in headers
-            assert body is None
-            return FakeResponse(401, {"status": "denied"})
-        if len(requester.calls) == 1:
-            requester.calls.append(
-                {"method": method, "path": path, "headers": headers, "body": body}
-            )
-            assert headers["Authorization"] == "Bearer unapproved-token"
-            assert body is None
-            return FakeResponse(403, {"status": "denied"})
-        return requester(method, path, headers, body)
-
-    result = module.qualify_develop_deployment(
-        base_url="https://staff-tracer-abc123.a.run.app",
-        expected_service_url="https://staff-tracer-abc123.a.run.app",
-        expected_service_resource=EXPECTED_SERVICE_RESOURCE,
-        expected_unapproved_subject="unapproved-subject",
-        access_token="top-secret-token",
-        unapproved_access_token="unapproved-token",
-        expected_schema_revision="0005_database_authority",
-        expected_image_digest=EXPECTED_IMAGE_DIGEST,
-        allow_synthetic_writes=True,
-        requester=probing_requester,
-    )
-
-    assert requester.calls[0] == {
-        "method": "GET",
-        "path": "/readiness",
-        "headers": {"Accept": "application/json"},
-        "body": None,
-    }
-    assert requester.calls[1] == {
-        "method": "GET",
-        "path": "/readiness",
-        "headers": {
-            "Accept": "application/json",
-            "Authorization": "Bearer unapproved-token",
-        },
-        "body": None,
-    }
-    assert requester.calls[2]["headers"]["Authorization"] == "Bearer top-secret-token"
-    assert result["access_denial_probes"] == {
-        "unauthenticated": "denied_without_business_body",
-        "authenticated_unapproved": "denied_after_verified_token_and_iam_absence",
-    }
-    rendered = module.render_qualification_evidence(result)
-    assert "top-secret-token" not in rendered
-    assert "unapproved-token" not in rendered
-    assert "accounts.google.com" not in rendered
-
-
-def test_qualify_develop_deployment_rejects_substituted_unapproved_token() -> None:
-    module = load_module()
-
-    with pytest.raises(ValueError, match="separate authenticated access tokens"):
-        module.qualify_develop_deployment(
-            base_url="https://staff-tracer-abc123.a.run.app",
-            expected_service_url="https://staff-tracer-abc123.a.run.app",
-            expected_service_resource=EXPECTED_SERVICE_RESOURCE,
-            expected_unapproved_subject="unapproved-subject",
-            access_token="same-token",
-            unapproved_access_token="same-token",
-            expected_schema_revision="0005_database_authority",
-            expected_image_digest=EXPECTED_IMAGE_DIGEST,
-            allow_synthetic_writes=True,
-            requester=FakeRequester(),
-        )
-
-
-def test_qualify_develop_deployment_rejects_malformed_unapproved_token_before_probe() -> None:
-    module = load_module()
-    requester = FakeRequester()
-    with pytest.raises(ValueError, match="unapproved token verification boundary failed"):
-        module._decode_jwt_claims("not-a-google-identity-token")
-
-    assert requester.calls == []
-
-
-def test_google_identity_verifier_binds_verified_issuer_audience_temporal_claims_and_subject() -> (
-    None
-):
-    module = load_real_module()
-    claims = {
-        "iss": "https://accounts.google.com",
-        "aud": "https://staff-tracer-abc123.a.run.app",
-        "sub": "unapproved-subject",
-        "iat": 1,
-        "exp": 4_102_444_800,
-        "nbf": 1,
-    }
-    encoded_claims = base64.urlsafe_b64encode(json.dumps(claims).encode("utf-8")).decode("ascii")
-    token = f"header.{encoded_claims.rstrip('=')}.signature"
-    setattr(  # noqa: B010
-        module, "_google_verify_oauth2_token", lambda actual_token, audience: claims
-    )
-
-    assert (
-        module._verify_google_identity_token(token, claims["aud"], "unapproved-subject")
-        == "unapproved-subject"
-    )
-
-    with pytest.raises(ValueError, match="unapproved token verification boundary failed"):
-        module._verify_google_identity_token(token, claims["aud"], "different-valid-subject")
-    with pytest.raises(ValueError, match="unapproved token verification boundary failed"):
-        module._verify_google_identity_token(token, claims["aud"], "")
 
 
 @pytest.mark.parametrize("call_index", [7, 9, 12, 13, 16, 17, 19])
@@ -398,11 +414,8 @@ def test_safe_live_error_probes_fail_closed_without_no_store(call_index: int) ->
         module.qualify_develop_deployment(
             base_url="https://staff-tracer-abc123.a.run.app",
             expected_service_url="https://staff-tracer-abc123.a.run.app",
-            expected_service_resource=EXPECTED_SERVICE_RESOURCE,
-            expected_unapproved_subject="unapproved-subject",
-            access_token="top-secret-token",
-            unapproved_access_token="unapproved-token",
-            expected_schema_revision="0005_database_authority",
+            demo_password=DEMO_PASSWORD,
+            log_export_reader=lambda: SAFE_LOG_EXPORT,
             expected_image_digest=EXPECTED_IMAGE_DIGEST,
             allow_synthetic_writes=True,
             requester=missing_no_store_requester,
@@ -415,11 +428,8 @@ def test_qualify_develop_deployment_result_marks_unperformed_manual_evidence_not
     result = module.qualify_develop_deployment(
         base_url="https://staff-tracer-abc123.a.run.app",
         expected_service_url="https://staff-tracer-abc123.a.run.app",
-        expected_service_resource=EXPECTED_SERVICE_RESOURCE,
-        expected_unapproved_subject="unapproved-subject",
-        access_token="top-secret-token",
-        unapproved_access_token="unapproved-token",
-        expected_schema_revision="0005_database_authority",
+        demo_password=DEMO_PASSWORD,
+        log_export_reader=lambda: SAFE_LOG_EXPORT,
         expected_image_digest=EXPECTED_IMAGE_DIGEST,
         allow_synthetic_writes=True,
         requester=FakeRequester(),
@@ -450,11 +460,8 @@ def test_qualify_develop_deployment_result_includes_structured_feedback_triage_f
     result = module.qualify_develop_deployment(
         base_url="https://staff-tracer-abc123.a.run.app",
         expected_service_url="https://staff-tracer-abc123.a.run.app",
-        expected_service_resource=EXPECTED_SERVICE_RESOURCE,
-        expected_unapproved_subject="unapproved-subject",
-        access_token="top-secret-token",
-        unapproved_access_token="unapproved-token",
-        expected_schema_revision="0005_database_authority",
+        demo_password=DEMO_PASSWORD,
+        log_export_reader=lambda: SAFE_LOG_EXPORT,
         expected_image_digest=EXPECTED_IMAGE_DIGEST,
         allow_synthetic_writes=True,
         requester=FakeRequester(),
@@ -493,11 +500,8 @@ def test_qualify_develop_deployment_rejects_cache_permissive_success_response() 
         module.qualify_develop_deployment(
             base_url="https://staff-tracer-abc123.a.run.app",
             expected_service_url="https://staff-tracer-abc123.a.run.app",
-            expected_service_resource=EXPECTED_SERVICE_RESOURCE,
-            expected_unapproved_subject="unapproved-subject",
-            access_token="top-secret-token",
-            unapproved_access_token="unapproved-token",
-            expected_schema_revision="0005_database_authority",
+            demo_password=DEMO_PASSWORD,
+            log_export_reader=lambda: SAFE_LOG_EXPORT,
             expected_image_digest=EXPECTED_IMAGE_DIGEST,
             allow_synthetic_writes=True,
             requester=cache_permissive_requester,
@@ -525,11 +529,8 @@ def test_qualify_develop_deployment_rejects_success_response_missing_no_store() 
         module.qualify_develop_deployment(
             base_url="https://staff-tracer-abc123.a.run.app",
             expected_service_url="https://staff-tracer-abc123.a.run.app",
-            expected_service_resource=EXPECTED_SERVICE_RESOURCE,
-            expected_unapproved_subject="unapproved-subject",
-            access_token="top-secret-token",
-            unapproved_access_token="unapproved-token",
-            expected_schema_revision="0005_database_authority",
+            demo_password=DEMO_PASSWORD,
+            log_export_reader=lambda: SAFE_LOG_EXPORT,
             expected_image_digest=EXPECTED_IMAGE_DIGEST,
             allow_synthetic_writes=True,
             requester=missing_no_store_requester,
@@ -542,11 +543,8 @@ def test_qualify_develop_deployment_records_no_store_evidence_matrix() -> None:
     result = module.qualify_develop_deployment(
         base_url="https://staff-tracer-abc123.a.run.app",
         expected_service_url="https://staff-tracer-abc123.a.run.app",
-        expected_service_resource=EXPECTED_SERVICE_RESOURCE,
-        expected_unapproved_subject="unapproved-subject",
-        access_token="top-secret-token",
-        unapproved_access_token="unapproved-token",
-        expected_schema_revision="0005_database_authority",
+        demo_password=DEMO_PASSWORD,
+        log_export_reader=lambda: SAFE_LOG_EXPORT,
         expected_image_digest=EXPECTED_IMAGE_DIGEST,
         allow_synthetic_writes=True,
         requester=FakeRequester(),
@@ -596,11 +594,8 @@ def test_qualify_develop_deployment_records_controlled_error_no_store_matrix() -
     result = module.qualify_develop_deployment(
         base_url="https://staff-tracer-abc123.a.run.app",
         expected_service_url="https://staff-tracer-abc123.a.run.app",
-        expected_service_resource=EXPECTED_SERVICE_RESOURCE,
-        expected_unapproved_subject="unapproved-subject",
-        access_token="top-secret-token",
-        unapproved_access_token="unapproved-token",
-        expected_schema_revision="0005_database_authority",
+        demo_password=DEMO_PASSWORD,
+        log_export_reader=lambda: SAFE_LOG_EXPORT,
         expected_image_digest=EXPECTED_IMAGE_DIGEST,
         allow_synthetic_writes=True,
         requester=FakeRequester(),
@@ -655,25 +650,22 @@ def test_qualify_develop_deployment_rejects_other_valid_cloud_run_service() -> N
         )
 
 
-def test_qualify_develop_deployment_fails_closed_on_non_private_auth_gap() -> None:
+def test_qualify_develop_deployment_fails_closed_on_missing_demo_password() -> None:
     module = load_module()
 
-    with pytest.raises(ValueError, match="private authenticated access token is required"):
+    with pytest.raises(ValueError, match="private demo password is required"):
         module.qualify_develop_deployment(
             base_url="https://staff-tracer-abc123.a.run.app",
             expected_service_url="https://staff-tracer-abc123.a.run.app",
-            expected_service_resource=EXPECTED_SERVICE_RESOURCE,
-            expected_unapproved_subject="unapproved-subject",
-            access_token="",
-            unapproved_access_token="unapproved-token",
-            expected_schema_revision="0005_database_authority",
+            demo_password="",
+            log_export_reader=lambda: SAFE_LOG_EXPORT,
             expected_image_digest=EXPECTED_IMAGE_DIGEST,
             allow_synthetic_writes=True,
             requester=FakeRequester(),
         )
 
 
-def test_qualification_contract_requires_reviewed_authenticated_proxy_or_token_path() -> None:
+def test_qualification_contract_requires_non_argv_demo_password_handoff() -> None:
     module = load_module()
     args = module._parse_args(
         [
@@ -681,23 +673,18 @@ def test_qualification_contract_requires_reviewed_authenticated_proxy_or_token_p
             "https://staff-tracer-abc123.a.run.app",
             "--expected-service-url",
             "https://staff-tracer-abc123.a.run.app",
-            "--expected-service-resource",
-            EXPECTED_SERVICE_RESOURCE,
             "--expected-image-digest",
             EXPECTED_IMAGE_DIGEST,
-            "--access-token-stdin",
-            "--unapproved-access-token-env",
-            "UNAPPROVED_QUAL_TOKEN",
-            "--expected-unapproved-subject-env",
-            "EXPECTED_UNAPPROVED_SUBJECT",
+            "--log-export-file",
+            "/private/log-export.json",
+            "--demo-password-stdin",
         ]
     )
 
-    assert args.access_token_stdin is True
-    assert args.access_token_env is None
-    assert args.access_token_file is None
-    assert args.unapproved_access_token_env == "UNAPPROVED_QUAL_TOKEN"
-    assert args.expected_service_resource == EXPECTED_SERVICE_RESOURCE
+    assert args.demo_password_stdin is True
+    assert args.demo_password_env is None
+    assert args.demo_password_file is None
+    assert not hasattr(args, "demo_password")
 
 
 def test_qualify_develop_deployment_requires_explicit_live_write_acknowledgement() -> None:
@@ -707,20 +694,16 @@ def test_qualify_develop_deployment_requires_explicit_live_write_acknowledgement
         module.qualify_develop_deployment(
             base_url="https://staff-tracer-abc123.a.run.app",
             expected_service_url="https://staff-tracer-abc123.a.run.app",
-            expected_service_resource=EXPECTED_SERVICE_RESOURCE,
-            expected_unapproved_subject="unapproved-subject",
-            access_token="top-secret-token",
-            unapproved_access_token="unapproved-token",
-            expected_schema_revision="0005_database_authority",
+            demo_password=DEMO_PASSWORD,
+            log_export_reader=lambda: SAFE_LOG_EXPORT,
             expected_image_digest=EXPECTED_IMAGE_DIGEST,
             allow_synthetic_writes=False,
             requester=FakeRequester(),
         )
 
 
-def test_qualify_develop_deployment_fails_closed_on_readiness_posture_mismatch() -> None:
+def test_qualify_develop_deployment_fails_closed_on_non_minimized_readiness() -> None:
     module = load_module()
-    call_count = 0
 
     def failing_requester(
         method: str,
@@ -728,39 +711,21 @@ def test_qualify_develop_deployment_fails_closed_on_readiness_posture_mismatch()
         headers: dict[str, str],
         body: dict[str, Any] | None,
     ) -> FakeResponse:
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            assert "Authorization" not in headers
-            assert body is None
-            return FakeResponse(401, {"status": "denied"})
-        if call_count == 2:
-            assert headers["Authorization"] == "Bearer unapproved-token"
-            assert body is None
-            return FakeResponse(403, {"status": "denied"})
         if path == "/health":
             return FakeResponse(200, {"status": "ok"})
         if path == "/readiness":
             return FakeResponse(
                 200,
-                {
-                    "status": "ready",
-                    "schema_revision": "0004_employer_contact_authority",
-                    "deployment_target": "gcp-develop-private-synthetic",
-                    "deployed_image_digest": EXPECTED_IMAGE_DIGEST,
-                },
+                {"status": "ready", "schema_revision": "must-not-be-public"},
             )
         raise AssertionError("later requests must not run after readiness failure")
 
-    with pytest.raises(ValueError, match="schema revision"):
+    with pytest.raises(ValueError, match="probe minimization"):
         module.qualify_develop_deployment(
             base_url="https://staff-tracer-abc123.a.run.app",
             expected_service_url="https://staff-tracer-abc123.a.run.app",
-            expected_service_resource=EXPECTED_SERVICE_RESOURCE,
-            expected_unapproved_subject="unapproved-subject",
-            access_token="top-secret-token",
-            unapproved_access_token="unapproved-token",
-            expected_schema_revision="0005_database_authority",
+            demo_password=DEMO_PASSWORD,
+            log_export_reader=lambda: SAFE_LOG_EXPORT,
             expected_image_digest=EXPECTED_IMAGE_DIGEST,
             allow_synthetic_writes=True,
             requester=failing_requester,
@@ -774,10 +739,8 @@ def test_render_qualification_evidence_redacts_sensitive_values() -> None:
             "qualification_status": "passed",
             "health_status": "ok",
             "readiness_status": "ready",
-            "readiness_posture": {
-                "deployment_target": "gcp-develop-private-synthetic",
-                "schema_revision": "0005_database_authority",
-                "deployed_image_digest": EXPECTED_IMAGE_DIGEST,
+            "platform_posture": {
+                "immutable_image": "verified_by_prior_foundation_readback",
             },
             "employer_flow": {
                 "create": "fresh",
@@ -809,7 +772,7 @@ def test_render_qualification_evidence_redacts_sensitive_values() -> None:
     assert "qualification_status: passed" in evidence
 
 
-def test_parse_args_preserves_token_free_argv_surface() -> None:
+def test_parse_args_preserves_password_free_argv_surface() -> None:
     module = load_module()
     args = module._parse_args(
         [
@@ -817,31 +780,27 @@ def test_parse_args_preserves_token_free_argv_surface() -> None:
             "https://staff-tracer-abc123.a.run.app",
             "--expected-service-url",
             "https://staff-tracer-abc123.a.run.app",
-            "--expected-service-resource",
-            EXPECTED_SERVICE_RESOURCE,
             "--expected-image-digest",
             EXPECTED_IMAGE_DIGEST,
-            "--access-token-env",
-            "QUAL_TOKEN",
-            "--unapproved-access-token-env",
-            "UNAPPROVED_QUAL_TOKEN",
-            "--expected-unapproved-subject-env",
-            "EXPECTED_UNAPPROVED_SUBJECT",
+            "--demo-password-env",
+            "QUAL_DEMO_PASSWORD",
+            "--log-export-file",
+            "/private/log-export.json",
         ]
     )
 
-    assert not hasattr(args, "access_token")
-    assert not hasattr(args, "unapproved_access_token")
-    assert args.access_token_env == "QUAL_TOKEN"
-    assert args.unapproved_access_token_env == "UNAPPROVED_QUAL_TOKEN"
+    assert not hasattr(args, "demo_password")
+    assert args.demo_password_env == "QUAL_DEMO_PASSWORD"
+    assert args.log_export_file == "/private/log-export.json"
 
 
-def test_main_reads_token_from_environment_and_writes_bounded_evidence(tmp_path: Path) -> None:
+def test_main_reads_password_from_environment_and_writes_bounded_evidence(tmp_path: Path) -> None:
     module = load_module()
     requester = FakeRequester()
-    os.environ["QUAL_TOKEN"] = "top-secret-token"
-    os.environ["UNAPPROVED_QUAL_TOKEN"] = "unapproved-token"
-    os.environ["EXPECTED_UNAPPROVED_SUBJECT"] = "unapproved-subject"
+    os.environ["QUAL_DEMO_PASSWORD"] = DEMO_PASSWORD
+    log_export = tmp_path / "log-export.json"
+    log_export.write_text(SAFE_LOG_EXPORT, encoding="utf-8")
+    log_export.chmod(0o600)
     qualification_function_name = "qualify_develop_deployment"
     original = getattr(module, qualification_function_name)
 
@@ -860,16 +819,12 @@ def test_main_reads_token_from_environment_and_writes_bounded_evidence(tmp_path:
                 "https://staff-tracer-abc123.a.run.app",
                 "--expected-service-url",
                 "https://staff-tracer-abc123.a.run.app",
-                "--expected-service-resource",
-                EXPECTED_SERVICE_RESOURCE,
                 "--expected-image-digest",
                 EXPECTED_IMAGE_DIGEST,
-                "--access-token-env",
-                "QUAL_TOKEN",
-                "--unapproved-access-token-env",
-                "UNAPPROVED_QUAL_TOKEN",
-                "--expected-unapproved-subject-env",
-                "EXPECTED_UNAPPROVED_SUBJECT",
+                "--demo-password-env",
+                "QUAL_DEMO_PASSWORD",
+                "--log-export-file",
+                str(log_export),
                 "--allow-synthetic-writes",
                 "--artifact-root",
                 str(tmp_path),
@@ -879,8 +834,7 @@ def test_main_reads_token_from_environment_and_writes_bounded_evidence(tmp_path:
         )
     finally:
         setattr(module, qualification_function_name, original)
-        os.environ.pop("QUAL_TOKEN", None)
-        os.environ.pop("UNAPPROVED_QUAL_TOKEN", None)
+        os.environ.pop("QUAL_DEMO_PASSWORD", None)
 
     assert exit_code == 0
     evidence_path = tmp_path / "qualification-evidence.md"
@@ -890,10 +844,10 @@ def test_main_reads_token_from_environment_and_writes_bounded_evidence(tmp_path:
 
 def test_qualification_failure_writes_minimized_atomic_failure_evidence(tmp_path: Path) -> None:
     module = load_module()
-    os.environ["QUAL_TOKEN"] = "top-secret-token"
-    os.environ["UNAPPROVED_QUAL_TOKEN"] = "unapproved-token"
-    os.environ["EXPECTED_UNAPPROVED_SUBJECT"] = "unapproved-subject"
-    call_count = 0
+    os.environ["QUAL_DEMO_PASSWORD"] = DEMO_PASSWORD
+    log_export = tmp_path / "log-export.json"
+    log_export.write_text(SAFE_LOG_EXPORT, encoding="utf-8")
+    log_export.chmod(0o600)
 
     def failing_requester(
         method: str,
@@ -901,16 +855,6 @@ def test_qualification_failure_writes_minimized_atomic_failure_evidence(tmp_path
         headers: dict[str, str],
         body: dict[str, Any] | None,
     ) -> FakeResponse:
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            assert "Authorization" not in headers
-            assert body is None
-            return FakeResponse(401, {"status": "denied"})
-        if call_count == 2:
-            assert headers["Authorization"] == "Bearer unapproved-token"
-            assert body is None
-            return FakeResponse(403, {"status": "denied"})
         if path == "/health":
             return FakeResponse(200, {"status": "ok"})
         if path == "/readiness":
@@ -931,16 +875,12 @@ def test_qualification_failure_writes_minimized_atomic_failure_evidence(tmp_path
                 "https://staff-tracer-abc123.a.run.app",
                 "--expected-service-url",
                 "https://staff-tracer-abc123.a.run.app",
-                "--expected-service-resource",
-                EXPECTED_SERVICE_RESOURCE,
                 "--expected-image-digest",
                 EXPECTED_IMAGE_DIGEST,
-                "--access-token-env",
-                "QUAL_TOKEN",
-                "--unapproved-access-token-env",
-                "UNAPPROVED_QUAL_TOKEN",
-                "--expected-unapproved-subject-env",
-                "EXPECTED_UNAPPROVED_SUBJECT",
+                "--demo-password-env",
+                "QUAL_DEMO_PASSWORD",
+                "--log-export-file",
+                str(log_export),
                 "--allow-synthetic-writes",
                 "--artifact-root",
                 str(tmp_path),
@@ -950,8 +890,7 @@ def test_qualification_failure_writes_minimized_atomic_failure_evidence(tmp_path
         )
     finally:
         setattr(module, qualification_function_name, original)
-        os.environ.pop("QUAL_TOKEN", None)
-        os.environ.pop("UNAPPROVED_QUAL_TOKEN", None)
+        os.environ.pop("QUAL_DEMO_PASSWORD", None)
 
     assert exit_code == 1
     evidence_path = tmp_path / "qualification-failure.md"

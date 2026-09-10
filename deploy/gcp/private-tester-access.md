@@ -1,61 +1,58 @@
-# Private tester access procedure
+# Temporary shared browser-access procedure
 
-This procedure governs named tester access to the first private fictional-synthetic GCP `develop` deployment while application authentication remains synthetic. It exists because Terraform and CI must not infer human access rosters or create broad convenience access.
+This procedure governs Beatrice's temporary browser access to the first human-visible fictional-synthetic GCP `develop` deployment while application authentication remains synthetic. Cloud Run invocation is temporarily public, but every business/static route is protected by the expiring shared HTTP Basic gate.
 
-Current source status: PR #37 merged the exact named-tester contract at `caf96a7`, PR #42 made its verifier receipt inputs service-stage-only at `b2d79b5`, and PR #48 completed the separate foundation-stage verifier alignment at `5f265d8`. Private records show separately approved partial foundation work; this procedure remains future operator guidance until the later explicitly approved tester-access gate.
+Current source status: PR #82 merged the accepted acceleration packet at protected `develop@349a80b98b0b7637754befd9d2fe726d614d0e19`. This source procedure performs no access grant or secret write. It is executed only inside the later separately approved eight-hour deployment packet.
 
 ## Scope
 
-- named private testers only
-- IAM-authenticated internet-reachable Cloud Run access for the staff tracer only
+- Beatrice's browser and bounded API qualification only
+- exact service-stage `allUsers` → `roles/run.invoker`
 - synthetic application auth remains in place
-- no public access and no broad authenticated-user shortcut
+- expiring high-entropy HTTP Basic gate before every non-probe route
 
 ## Required posture
 
-- every tester is individually attributable and bound as one reviewed named user principal
-- every tester identity is recorded in an operator-held private record
-- every access grant is service-level and bounded to the reviewed Cloud Run service
-- `allUsers` and `allAuthenticatedUsers` are forbidden
-- project-wide editor/owner/viewer or Secret Manager access is forbidden for testers
-- tester access is temporary and reviewable
+- `/health` and `/readiness` are public, no-store, and minimized to status only
+- `/`, static assets, `/api/staff/v1/environment`, and every staff API require the fixed username `golden-rose-demo` plus the shared password
+- the password is at least 32 random bytes encoded as canonical unpadded base64url, stored only in Secret Manager and an owner-held `0600` file
+- expiry is strict UTC RFC 3339, unexpired, and no later than seven days after revision creation
+- Cloud Run is capped at zero-to-one instances and Cloud SQL remains private
+- `allAuthenticatedUsers`, named tester invokers, extra public members, project-wide tester roles, sessions, and cookies are absent
 
 ## Operator-held record
 
 Before granting access, record outside tracked source:
 
-- tester name
-- tester principal identifier
-- approving owner
-- start time and expected end/review time
-- reason for access
-- granted service/resource scope
-- removal owner
+- credential file location and `0600` mode
+- secret version reference without payload
+- revision creation and credential-expiry evidence
+- approving owner and packet expiry
+- service-level public-invoker readback
+- rotation/removal owner
 - any incident or exception notes
 
 Do not place tester identities or emails into repo docs, Terraform vars, or PR comments.
 
-## Grant procedure
+## Enablement procedure
 
-1. Confirm the target deployment is still private, synthetic-only, and qualified for a named tester window.
-2. Verify the detached Sigstore bundle for the operator-held tester-authority receipt before reading it. Derive exactly one `user:` principal and retain only the receipt SHA-256 for Terraform input; a typed principal or caller-supplied digest is not authority.
-3. Confirm the derived tester has explicit owner approval and appears in the operator-held record.
-4. Confirm the reviewed private access path is available for that identity.
-5. Grant only the reviewed service-level Cloud Run invoker access to the exact receipt-derived named tester user principal, with its immutable tester-authority receipt SHA-256.
-6. Verify no project-wide convenience role, no `allUsers`, and no `allAuthenticatedUsers` binding was introduced.
-7. Deliver the private access instructions out of band. Do not paste private endpoints, receipt contents, or identity details into chat or repo artifacts.
-8. Run the bounded qualification checks needed to prove access works without widening the service boundary.
+1. Verify exact source/image, private Cloud SQL, one-instance cap, synthetic labels, budget alerts, and runtime-only access to `demo-access-password`.
+2. Generate the password directly into Secret Manager stdin and the owner-held file; do not display or pass it in argv.
+3. Configure the strict bounded expiry and apply the exact service plan only after migration success.
+4. Read back exactly one `roles/run.invoker` member: `allUsers`. Stop on any other invoker or broad project role.
+5. Prove unauthenticated and wrong-Basic business requests return the same fixed no-store `401`, while public probes remain minimized.
+6. Run the synthetic workflow qualification with the correct password through a non-argv handoff.
+7. Let the qualification command collect the exact service's last 15 minutes of Cloud Run revision logs after every synthetic request with `--log-project-id <workload-project>`; the fixed no-shell query scans in memory for Authorization, Basic credentials, password material, submitted fictional values, UUIDs, cursors, DSNs, and raw bodies. `--log-export-file` is reserved for a separately synchronized `0600` post-request export.
+8. Deliver the URL and credential-file location privately; never return the password in chat.
+
+For manual browser mutations, use only server-admitted generated fictional shapes: `Synthetic Demo Employer <8 lowercase hex>` with optional ` Revised`, and `Synthetic Demo Contact <8 lowercase hex>`. Ordinary plausible names are intentionally rejected before persistence. Never disguise real/client-derived data by adding a synthetic prefix.
 
 ## Qualification invocation boundary
 
-- `scripts/qualify_develop_deployment.py` must not receive the private bearer token on the command line.
-- The approved and unapproved tokens use separate non-argv handoffs; raw token substitution is a stop condition before any approved synthetic flow runs.
-- Provide the token only through one of the reviewed non-echoing handoffs:
-  - `--access-token-stdin` with the token piped from a protected source
-  - `--access-token-env <ENV_NAME>` where the environment variable is populated outside shell history and cleared immediately after use
-  - `--access-token-file <path>` where the file has restrictive local permissions and is deleted immediately after use
-- Provide the authenticated-but-unapproved probe token through the matching unapproved-token handoff. The harness cryptographically verifies the actual Google token's issuer, exact service audience, subject, and temporal claims, then requires IAM Policy Troubleshooter to return `NOT_GRANTED` for that verified subject, exact service resource, and `run.routes.invoke`; no operator-authored assertion file can substitute for either proof.
-- Use only the reviewed IAM-authenticated Cloud Run `https://...a.run.app` authority for `--base-url`; do not add userinfo, query strings, fragments, alternate ports, or paths.
+- `scripts/qualify_develop_deployment.py` must not receive the password on the command line.
+- Use exactly one non-argv handoff: `--demo-password-stdin`, `--demo-password-env <ENV_NAME>`, or `--demo-password-file <path>`.
+- Use `--log-project-id <workload-project>` so the fixed log query runs only after every HTTP qualification request. Do not substitute a pre-request export as post-qualification evidence.
+- Use only the reviewed Cloud Run `https://...a.run.app` authority for `--base-url`; do not add userinfo, query strings, fragments, alternate ports, or paths.
 - Pass `--allow-synthetic-writes` only when the operator explicitly intends to run the synthetic create/revision/contact qualification flow.
 - The tracked output must preserve the schema-stable `manual_browser`, `accessibility`, `fluent_language`, `tester_access`, `monitoring`, `recovery`, and `feedback` fields as `not_run`, `not_evidenced`, or `not_triaged` until those separate gates run.
 - The automated evidence must require `Cache-Control: no-store` for exercised responses, including safe generated not-found/cursor/stale/idempotency controls; it may use source-controlled static contract evidence only for unavailable, authorization, and other unsafe-to-induce outcomes.
@@ -65,27 +62,26 @@ Do not place tester identities or emails into repo docs, Terraform vars, or PR c
 
 The operator performing the later approved access ceremony must verify:
 
-- the service ingress remains internet-reachable but IAM-authenticated and non-public
-- invoker access remains limited to reviewed named user principals
-- no public or convenience binding exists
-- tester identities remain synthetic-workflow users only; they do not gain admin, database, or secret authority
+- the service ingress remains internet-reachable and has exactly the accepted temporary `allUsers` invoker
+- the Basic gate and expiry protect every non-probe route
+- no second invoker model or convenience binding exists
+- only the runtime service account can access the demo-password secret
 - alerting and incident contacts for the tester window are known
 
 ## Removal procedure
 
-Remove access when the tester window closes, the roster changes, or any exposure concern appears:
+Remove access when the credential expires, the synthetic feedback window closes, or any exposure concern appears:
 
-1. remove the tester principal binding from the exact Cloud Run service
-2. verify the removed principal no longer has invoker access through inherited or broad bindings
-3. update the private operator-held record with removal time and actor
-4. if the tester handled any leaked or suspect secret material, rotate those secrets before reopening access
+1. remove `allUsers` from the exact Cloud Run service
+2. disable/destroy the demo-password version and remove the Basic configuration
+3. verify no inherited or broad invocation remains
+4. update the private operator-held record with removal time and actor
 
 ## Forbidden shortcuts
 
-- `allUsers`
 - `allAuthenticatedUsers`
 - project-level basic roles for testers
-- shared unnamed tester accounts
+- any additional or named invoker retained beside `allUsers`
 - direct secret disclosure to testers through chat, PRs, or screenshots
 - using tester access as a substitute for application authorization design
 

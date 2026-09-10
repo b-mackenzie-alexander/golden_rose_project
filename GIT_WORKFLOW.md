@@ -79,6 +79,8 @@ The actual policy remains zero required approvals, no CODEOWNER review, and no l
 
 `Terraform static validation` is required quality evidence after PR #29's qualified producer merged. It must never be described as immutable or independent. The open solo-maintainer High remains accepted residual risk. ADR-0016's 2026-09-09 addendum supersedes the older per-transaction Gate E0/signing sequence for fictional-synthetic `develop`: Beatrice authorizes one exact eight-hour deployment packet, and internal plans/applies/publication/migration/service/qualification do not silently authorize anything outside that packet. No unavailable second-human approval is required.
 
+PR #82 merged that plan at `develop@349a80b98b0b7637754befd9d2fe726d614d0e19`. Its single source PR is implemented from that exact tip on `feat/human-visible-develop`; it receives two fresh agent reviews as architecture/security and Terraform/deployment quality evidence, then ordinary protected CI. Commit, push, PR creation, merge, and the later eight-hour cloud packet remain distinct actions and are not implied by local source completion.
+
 PR #37 merged the `fix/post-pr33-deployment-path-remediation` source-controlled no-cloud remediation into protected `develop` at `caf96a72df87cd98114025627ad9f467f846f3a9`; its feature branch is retired. That merge cleared only the source-controlled remediation and opened the separate request for Gate 2 read-only qualification. It did not authorize cloud execution, plan/apply, publication, migration, activation, or qualification.
 
 ## Required checks (target state)

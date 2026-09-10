@@ -6,7 +6,6 @@ locals {
   canonical_workload_project_name   = "projects/${data.google_project.current.project_id}"
   canonical_workload_project_number = data.google_project.current.number
   request_log_posture               = var.cloud_run_request_log_posture
-  monitoring_service_agent_member   = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-monitoring-notification.iam.gserviceaccount.com"
   readiness_uptime_host             = var.deployment_stage == "service" ? replace(google_cloud_run_v2_service.staff_tracer[0].uri, "https://", "") : null
 }
 
@@ -53,19 +52,10 @@ resource "google_project_iam_member" "observability_monitoring_viewer" {
   member  = var.observability_viewer_principal
 }
 
-resource "google_cloud_run_v2_service_iam_member" "monitoring_readiness_invoker" {
-  count    = var.deployment_stage == "service" ? 1 : 0
-  project  = var.project_id
-  location = var.region
-  name     = google_cloud_run_v2_service.staff_tracer[0].name
-  role     = "roles/run.invoker"
-  member   = local.monitoring_service_agent_member
-}
-
 resource "google_monitoring_uptime_check_config" "readiness" {
   count        = var.deployment_stage == "service" ? 1 : 0
   project      = var.project_id
-  display_name = "Develop private synthetic authenticated readiness"
+  display_name = "Develop private synthetic public readiness"
   period       = "300s"
   timeout      = "10s"
 
@@ -86,9 +76,7 @@ resource "google_monitoring_uptime_check_config" "readiness" {
     use_ssl        = true
     validate_ssl   = true
 
-    service_agent_authentication {
-      type = "OIDC_TOKEN"
-    }
+
   }
 
   depends_on = [
@@ -152,12 +140,12 @@ resource "google_monitoring_alert_policy" "readiness_failures" {
   notification_channels = [google_monitoring_notification_channel.alerts.name]
 
   documentation {
-    content   = "Authenticated readiness uptime failures for the private synthetic develop service. Alerts route to the reviewed operator-held notification channel and remain provisional develop review triggers rather than service-level objective or recovery-time commitments."
+    content   = "Public minimized readiness uptime failures for the private synthetic develop service. Alerts route to the reviewed operator-held notification channel and remain provisional develop review triggers rather than service-level objective or recovery-time commitments."
     mime_type = "text/markdown"
   }
 
   conditions {
-    display_name = "Authenticated readiness uptime failure"
+    display_name = "Public readiness uptime failure"
 
     condition_threshold {
       filter          = "metric.type=\"monitoring.googleapis.com/uptime_check/check_passed\" AND resource.type=\"uptime_url\" AND metric.label.check_id=\"${google_monitoring_uptime_check_config.readiness[0].uptime_check_id}\""

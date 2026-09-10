@@ -30,7 +30,6 @@ FORBIDDEN_SUBSTRINGS = [
     "credentials =",
     '"credentials"',
     "impersonate_service_account",
-    "allUsers",
     "allAuthenticatedUsers",
     "auto_create_subnetworks = true",
     "roles/owner",
@@ -124,7 +123,6 @@ WORKFLOW_SCRIPT_PATH_PATTERN = re.compile(
 JSON_SEMANTIC_FORBIDDEN_SUBSTRINGS = [
     "credentials",
     "impersonate_service_account",
-    "allUsers",
     "allAuthenticatedUsers",
     "roles/owner",
     "roles/editor",
@@ -193,6 +191,9 @@ APPROVED_ENV_NAMES = {
     "GOLDEN_ROSE_DEPLOYMENT_TARGET",
     "GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL",
     "GOLDEN_ROSE_DEPLOYED_IMAGE_DIGEST",
+    "GOLDEN_ROSE_DEMO_ACCESS_ENABLED",
+    "GOLDEN_ROSE_DEMO_ACCESS_EXPIRES_AT",
+    "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD",
     "GOLDEN_ROSE_DATABASE_URL",
     "GOLDEN_ROSE_SYNTHETIC_STAFF_ID",
     "GOLDEN_ROSE_MIGRATION_ASSUMED_ROLE",
@@ -200,6 +201,7 @@ APPROVED_ENV_NAMES = {
 
 # Env names that must use value_source/secret_ref (not literal value).
 SECRET_ENV_NAMES = {
+    "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD",
     "GOLDEN_ROSE_DATABASE_URL",
     "GOLDEN_ROSE_SYNTHETIC_STAFF_ID",
 }
@@ -211,6 +213,7 @@ MIGRATION_ONLY_ENV_NAMES = {
 
 # Approved secret reference names for each env name.
 APPROVED_SECRET_REFS: dict[str, set[str]] = {
+    "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD": {"demo-access-password"},
     "GOLDEN_ROSE_DATABASE_URL": {
         "runtime-database-url",  # service only
         "migration-database-url",  # migration only
@@ -1249,6 +1252,7 @@ uv run ruff check .
 uv run mypy src tests
 uv run bandit -q -r src
 uv run alembic upgrade head
+uv run pytest tests/unit/test_config.py tests/unit/test_demo_access.py tests/unit/application/test_synthetic_data_admission.py tests/unit/api/test_health.py -q
 uv run pytest --cov=golden_rose --cov-report=term-missing --cov-fail-under=95
 if uv run alembic downgrade base 2> build/alembic-downgrade.stderr; then
   echo "database authority lifecycle downgrade unexpectedly succeeded" >&2
@@ -1873,20 +1877,13 @@ DEPLOY_WORKFLOW_STEPS = [
     "name:Set up uv",
     "name:Enforce protected develop source",
     "name:Install Cosign",
-    "name:Verify signed stage receipt before cloud authentication",
     "name:Initialize failed deploy result",
     "name:Authenticate artifact verifier to Google Cloud",
     "name:Verify direct OCI image authority",
     "name:Clear artifact verifier credential context",
-    "name:Validate signed stage receipt after image digest",
     "name:Authenticate deployer to Google Cloud",
     "name:Set up gcloud",
-    "name:Extract and validate selected live configuration projection",
     "name:Execute migration transition",
-    "name:Write migration success receipt",
-    "name:Sign migration success receipt",
-    "name:Upload migration success receipt",
-    "name:Upload migration success receipt bundle",
     "name:Verify service readiness transition",
     "name:Record deploy result",
     "name:Upload deploy result evidence",
@@ -1948,6 +1945,9 @@ ALLOWED_WORKFLOW_STEP_ENV[
 ALLOWED_WORKFLOW_STEP_ENV[
     ("deploy-develop.yml", "deploy", "name:Clear artifact verifier credential context")
 ] = {"DOCKER_CONFIG": "${{ runner.temp }}/artifact-verifier-docker"}
+ALLOWED_WORKFLOW_STEP_ENV[("deploy-develop.yml", "deploy", "name:Execute migration transition")] = {
+    "GCP_PROJECT_ID": "${{ vars.GCP_PROJECT_ID }}"
+}
 ALLOWED_WORKFLOW_STEP_ENV[
     ("deploy-develop.yml", "deploy", "name:Validate signed stage receipt after image digest")
 ] = {
@@ -2016,7 +2016,7 @@ EXACT_WORKFLOW_RUN_SHA256.update(
             "deploy-develop.yml",
             "deploy",
             "name:Execute migration transition",
-        ): "1de550a4757f0ec643b0120e0f10313145575773ac4f515052ac5072c08b93f6",
+        ): "51dc9e97ffb06edb88d2c0119a4cc4ed084a4d0fea4f8c6f23ebf36e80a9767c",
         (
             "deploy-develop.yml",
             "deploy",
@@ -2031,7 +2031,7 @@ EXACT_WORKFLOW_RUN_SHA256.update(
             "deploy-develop.yml",
             "deploy",
             "name:Verify service readiness transition",
-        ): "6911e08b248ee22bea937040a0976407ac38bbe6cc407e1d8bff0f1fab992b92",
+        ): "fa1898b72b71222b31686c5eb41750bf9a3abc3ebce7e662822e8705f837674b",
         (
             "deploy-develop.yml",
             "deploy",
@@ -3703,6 +3703,11 @@ def _collect_develop_iam_violations(root: Path, terraform_config_paths: list[Pat
             if candidate_path == path
         ]
 
+        if '"allUsers"' in text and relative_path != allowed_iam_path:
+            violations.append(
+                f"{relative_path} contains allUsers outside the exact temporary public invoker"
+            )
+
         for resource_type in resource_types:
             if not any(
                 resource_type.startswith(prefix) for prefix in managed_iam_resource_prefixes
@@ -3721,6 +3726,11 @@ def _collect_develop_iam_violations(root: Path, terraform_config_paths: list[Pat
 
         if relative_path != allowed_iam_path:
             continue
+
+        if text.count('"allUsers"') != 1:
+            violations.append(
+                f"{relative_path} must contain allUsers exactly once in the temporary public invoker"
+            )
 
         forbidden_broad_types = [
             "google_project_iam_binding",
@@ -3756,7 +3766,8 @@ def _collect_develop_iam_violations(root: Path, terraform_config_paths: list[Pat
             'resource "google_secret_manager_secret_iam_member" "migration_synthetic_staff_secret_access"',
             'resource "google_artifact_registry_repository_iam_member" "image_publisher_writer"',
             'resource "google_artifact_registry_repository_iam_member" "artifact_verifier_reader"',
-            'resource "google_cloud_run_v2_service_iam_member" "private_invoker"',
+            'resource "google_cloud_run_v2_service_iam_member" "public_invoker"',
+            'resource "google_secret_manager_secret_iam_member" "runtime_demo_access_secret_access"',
             'role    = "roles/cloudsql.client"',
             'role    = "roles/logging.logWriter"',
             'role    = "roles/monitoring.metricWriter"',
@@ -3771,10 +3782,7 @@ def _collect_develop_iam_violations(root: Path, terraform_config_paths: list[Pat
             'member     = "serviceAccount:golden-rose-image-publisher@${var.control_plane_project_id}.iam.gserviceaccount.com"',
             'member     = "serviceAccount:golden-rose-artifact-verifier@${var.control_plane_project_id}.iam.gserviceaccount.com"',
             'member   = "serviceAccount:golden-rose-deployer@${var.control_plane_project_id}.iam.gserviceaccount.com"',
-            'data "external" "tester_authority"',
-            "verify_tester_authority_receipt.py",
-            "data.external.tester_authority[0].result.private_invoker_principal",
-            "data.external.tester_authority[0].result.tester_authority_receipt_sha256",
+            'member   = "allUsers"',
         ]
         for fragment in required_fragments:
             if fragment not in text:
@@ -3787,6 +3795,63 @@ def _collect_develop_iam_violations(root: Path, terraform_config_paths: list[Pat
         except Exception as exc:
             violations.append(f"{relative_path} contains invalid HCL IAM configuration: {exc}")
             parsed_iam = {}
+
+        quota_roles: list[object] = []
+        quota_bindings: list[object] = []
+        for resource in parsed_iam.get("resource", []) if isinstance(parsed_iam, dict) else []:
+            if not isinstance(resource, dict):
+                continue
+            custom_roles = resource.get('"google_project_iam_custom_role"')
+            if isinstance(custom_roles, dict) and '"provisioner_quota_user"' in custom_roles:
+                quota_roles.append(custom_roles['"provisioner_quota_user"'])
+            project_members = resource.get('"google_project_iam_member"')
+            if isinstance(project_members, dict) and '"provisioner_quota_user"' in project_members:
+                quota_bindings.append(project_members['"provisioner_quota_user"'])
+        expected_quota_role = {
+            "project": "${var.project_id}",
+            "role_id": '"goldenRoseProvisionerQuotaUser"',
+            "title": '"Golden Rose Provisioner Quota User"',
+            "description": '"Permits only workload-project quota attribution for the provisioner."',
+            "permissions": ['"serviceusage.services.use"'],
+            "stage": '"GA"',
+            "__is_block__": True,
+        }
+        if quota_roles != [expected_quota_role]:
+            violations.append(
+                f"{relative_path} provisioner quota custom role must match the exact one-permission contract"
+            )
+        expected_quota_binding = {
+            "project": "${var.project_id}",
+            "role": "${google_project_iam_custom_role.provisioner_quota_user.name}",
+            "member": '"serviceAccount:golden-rose-provisioner@${var.control_plane_project_id}.iam.gserviceaccount.com"',
+            "__is_block__": True,
+        }
+        if quota_bindings != [expected_quota_binding]:
+            violations.append(
+                f"{relative_path} provisioner quota binding must match the exact sole-member contract"
+            )
+
+        public_invokers: list[object] = []
+        for resource in parsed_iam.get("resource", []) if isinstance(parsed_iam, dict) else []:
+            if not isinstance(resource, dict):
+                continue
+            service_members = resource.get('"google_cloud_run_v2_service_iam_member"')
+            if isinstance(service_members, dict) and '"public_invoker"' in service_members:
+                public_invokers.append(service_members['"public_invoker"'])
+        expected_public_invoker = {
+            "count": '${var.deployment_stage == "service" ? 1 : 0}',
+            "project": "${var.project_id}",
+            "location": "${var.region}",
+            "name": "${google_cloud_run_v2_service.staff_tracer[0].name}",
+            "role": '"roles/run.invoker"',
+            "member": '"allUsers"',
+            "__is_block__": True,
+        }
+        if public_invokers != [expected_public_invoker]:
+            violations.append(
+                f"{relative_path} temporary public invoker must match the exact allUsers service-stage contract"
+            )
+
         artifact_verifier_readers: list[object] = []
         for resource in parsed_iam.get("resource", []) if isinstance(parsed_iam, dict) else []:
             if not isinstance(resource, dict):
@@ -3850,6 +3915,10 @@ def _collect_develop_iam_violations(root: Path, terraform_config_paths: list[Pat
             'resource "google_artifact_registry_repository_iam_member" "deployer_reader"',
             'resource "google_artifact_registry_repository_iam_member" "image_publisher_reader"',
             "var.deployer_principal",
+            'resource "google_cloud_run_v2_service_iam_member" "private_invoker"',
+            'data "external" "tester_authority"',
+            "verify_tester_authority_receipt.py",
+            "tester_authority_receipt",
         ]
         for fragment in forbidden_fragments:
             if fragment in text:
@@ -3980,7 +4049,6 @@ def _collect_budget_observability_violations(
             required_fragments = [
                 'resource "google_monitoring_notification_channel" "alerts"',
                 'resource "google_logging_project_exclusion" "uuid_bearing_staff_paths"',
-                'resource "google_cloud_run_v2_service_iam_member" "monitoring_readiness_invoker"',
                 'resource "google_monitoring_uptime_check_config" "readiness"',
                 'resource "google_monitoring_alert_policy" "health_failures"',
                 'resource "google_monitoring_alert_policy" "readiness_failures"',
@@ -3993,9 +4061,8 @@ def _collect_budget_observability_violations(
                 "member  = var.observability_viewer_principal",
                 "retention_days = var.log_retention_days",
                 "var.cloud_run_request_log_posture",
-                "service-${data.google_project.current.number}@gcp-sa-monitoring-notification.iam.gserviceaccount.com",
                 'path         = "/readiness"',
-                'type = "OIDC_TOKEN"',
+                'display_name = "Develop private synthetic public readiness"',
                 "google_monitoring_uptime_check_config.readiness[0].uptime_check_id",
             ]
             for fragment in required_fragments:
@@ -4012,6 +4079,7 @@ def _collect_budget_observability_violations(
                 "textPayload",
                 "allUsers",
                 "allAuthenticatedUsers",
+                "service_agent_authentication",
                 "untested RTO",
                 "untested RPO",
                 "approved SLO",
@@ -4097,12 +4165,29 @@ def _collect_cloud_run_contract_violations(root: Path) -> list[str]:
         'resource "google_cloud_run_v2_service" "staff_tracer"',
         'ingress             = "INGRESS_TRAFFIC_ALL"',
         'value = "gcp-develop-private-synthetic"',
+        "min_instance_count = 0",
+        "max_instance_count = 1",
+        "max_instance_request_concurrency = 10",
+        'timeout                          = "60s"',
+        'name  = "GOLDEN_ROSE_DEMO_ACCESS_ENABLED"',
+        'name  = "GOLDEN_ROSE_DEMO_ACCESS_EXPIRES_AT"',
+        "value = var.demo_access_expires_at",
+        'name = "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD"',
+        'secret  = "demo-access-password"',
     ]
     for fragment in required_fragments:
         if fragment not in cloud_run:
             violations.append(
                 f"{cloud_run_path.relative_to(root)} missing required cloud run contract fragment {fragment!r}"
             )
+
+    if not _contains_normalized_fragment(
+        cloud_run,
+        'name = "GOLDEN_ROSE_DEMO_ACCESS_ENABLED" value = "true"',
+    ):
+        violations.append(
+            f"{cloud_run_path.relative_to(root)} demo access enablement drifted from the exact cloud run contract"
+        )
 
     forbidden_fragments = [
         "INGRESS_TRAFFIC_INTERNAL_ONLY",

@@ -1,14 +1,14 @@
-# First private synthetic deployment runbook
+# First human-visible synthetic deployment runbook
 
-This runbook defines the human/operator ceremony for the first private fictional-synthetic `develop` deployment after the separate cloud-read, Terraform-plan, and foundation-apply gates are complete. It is intentionally value-safe: project IDs, domains, tester identities, secret payloads, passwords, tokens, and exact private endpoints stay in operator-held records rather than tracked source.
+This runbook defines the single eight-hour operator packet for the first human-visible fictional-synthetic `develop` deployment. It is intentionally value-safe: project IDs, billing IDs, domains, principals, secret payloads, passwords, tokens, plans, state values, and the exact service URL stay in operator-held records rather than tracked source.
 
-Current source status: foundation/state work and PR #74 are merged through protected `develop@92b104e`. Approved run `33882394981` completed the full Gate P immutable publication, signing, attestation, transparency, final semantic-admission, and approved immutable-reference chain. Gate P is complete and its one-use approval is consumed. Gate S has one completed bounded action: `synthetic-staff-id` has exactly one enabled version with metadata-only readback and private custody. This runbook remains future guidance for deferred runtime/migration database-URL versions and the separately approved migration, service, tester, and qualification ceremonies; it grants none of those actions by itself.
+Current source status: PR #82 merged the accepted human-visible acceleration plan at protected `develop@349a80b98b0b7637754befd9d2fe726d614d0e19`. This source runbook grants no cloud authority. After the source PR merges, one separately approved packet may cover the exact ordered precheck through automated qualification for no more than eight hours. Live/client data, production, destructive recovery, and actions outside that packet remain separate.
 
 ## Scope
 
 - first private fictional-synthetic `develop` deployment only
 - out-of-band secret payload custody and injection
-- private tester access while application auth remains synthetic
+- temporary `allUsers` Cloud Run invocation behind the expiring application Basic gate
 - rollback/forward-recovery coordination inputs before first traffic
 - deployment/readiness evidence distinct from later Gate 6 qualification evidence
 - no Terraform secret payload handling
@@ -16,12 +16,11 @@ Current source status: foundation/state work and PR #74 are merged through prote
 
 ## Preconditions
 
-1. Gate 2 read-only qualification is complete and any naming or IAM collisions are resolved.
-2. Gate 3 reviewed Terraform plan exists and has explicit owner approval.
-3. Gate 4 foundation apply is complete and re-verified with `scripts/verify_gcp_foundation.py`.
-4. The exact immutable image digest, provenance, SBOM evidence, and vulnerability disposition are approved for deployment.
-5. The migration compatibility and rollback-versus-forward-recovery decision has been reviewed for the exact image/database pair.
-6. Named secret custodians, testers, alert recipients, and break-glass responders are recorded in a private operator-held record, not this repository.
+1. The source PR is merged and the packet is bound to its exact protected `develop` SHA, repository, publication workflow identity, Terraform/provider locks, state generations, non-secret inputs, and action allowlists.
+2. Beatrice's selected human identity has custom-role create/read plus project-IAM policy get/set authority for the narrow quota bootstrap and read-only access to enumerate the workload project's folder/organization ancestry and each ancestor IAM policy. Missing ancestor visibility stops the packet; it is not treated as proof of no inherited authority.
+3. Current state, IAM, resources, budget, labels, service-account keys, and collision posture have been read back without mutation.
+4. The exact immutable image digest is either already admitted for the source SHA or is declared as the exact publication workflow's designated packet output.
+5. Private custody locations, alert recipients, and the accidental-exposure path are recorded outside Git and chat.
 
 ## Secret custody rules
 
@@ -41,7 +40,7 @@ Record these items outside tracked source before any payload creation:
 - recovery owner
 - approved secret classes and their reviewed consumers
 - creation time, last rotation time, and approved expiry/review trigger
-- named testers for the first window
+- browser credential recipient for the first window
 - accidental-exposure contact path
 
 Do not place that private record in Git, Terraform variables, CI variables, or repo review handoffs.
@@ -53,6 +52,7 @@ The executable Secret Manager references are limited to:
 - runtime login connection material for `GOLDEN_ROSE_DATABASE_URL` in `runtime-database-url`
 - migration login connection material for the later approved migration execution path in `migration-database-url`, together with the non-secret `GOLDEN_ROSE_MIGRATION_ASSUMED_ROLE=golden_rose_schema_owner` configuration
 - synthetic staff actor UUID for `GOLDEN_ROSE_SYNTHETIC_STAFF_ID` in `synthetic-staff-id`
+- at least 32 random bytes encoded as canonical unpadded base64url for `GOLDEN_ROSE_DEMO_ACCESS_PASSWORD` in `demo-access-password`
 
 `GOLDEN_ROSE_DEPLOYMENT_TARGET`, `GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL`, and `GOLDEN_ROSE_DEPLOYED_IMAGE_DIGEST` are reviewed non-secret Terraform configuration, not Secret Manager payload classes. The metadata-only `deployment-posture` container has no current runtime or migration secret reference and receives no version merely to satisfy historical wording.
 
@@ -60,15 +60,19 @@ If later deployment wiring uses a different secret-to-environment mapping, updat
 
 ## Injection ceremony
 
-1. Confirm the reviewed secret metadata already exists and matches the three executable Secret Manager references.
+1. Confirm the reviewed secret metadata already exists and matches the four executable Secret Manager references.
 2. Generate the synthetic staff UUID without display and create/read back only its metadata-bound version under the separately approved early Gate S action.
 3. Do not create runtime or migration database-URL versions until migration-stage Cloud SQL/database creation and the separately approved login-role ceremony provide real connection material; placeholders and guessed URLs are prohibited.
 4. Generate database passwords and other payload-bearing values without pasting them into chat, shell history, Terraform files, or PR comments.
 5. Create new database-URL Secret versions out of band for the approved payload-bearing secrets only, under the fresh post-database approval.
 6. Verify every version creation through value-safe identifiers only; do not print payloads back to confirm them.
 7. Update the private custody record with custodian, rotation, recovery, and revocation ownership plus the created version references.
-8. Inject only reviewed secret references into the runtime/migration deployment surface at the later approved deployment gate; never convert this into inline environment literals in source-controlled IaC.
-9. After rollout, validate the application through the bounded qualification tooling without emitting the injected values.
+8. Generate the demo password directly into Secret Manager stdin and an owner-held `0600` file outside the repository; never place it in argv, Terraform state, workflow inputs, logs, or chat.
+9. Set the strict UTC RFC 3339 expiry no later than seven days after the service revision creation boundary and keep the timestamp out of public evidence.
+10. Inject only reviewed secret references into the runtime/migration deployment surface; never convert payloads into inline Terraform values.
+11. After rollout, invoke `scripts/qualify_develop_deployment.py` with `--demo-password-file`, `--demo-password-env`, or `--demo-password-stdin`, then clear the handoff.
+
+The develop application accepts persisted mutation values only in generated fictional forms: `Synthetic Qual Employer <8 lowercase hex>`, `Synthetic Demo Employer <8 lowercase hex>` with optional ` Revised`, and `Synthetic Contact <8 lowercase hex>` or `Synthetic Demo Contact <8 lowercase hex>`. Plausible ordinary names fail with a fixed no-store `422` before receipt, domain, or audit access. Do not paste real/client-derived values behind a synthetic prefix.
 
 ## Database password procedure
 
@@ -84,25 +88,22 @@ If later deployment wiring uses a different secret-to-environment mapping, updat
 - Grant the migration login only the `golden_rose_migrator` group role and require the reviewed migration path to assume `golden_rose_schema_owner` explicitly through `GOLDEN_ROSE_MIGRATION_ASSUMED_ROLE`.
 - Before treating deployment authority as qualified, run `scripts/verify_database_authority.py` with reviewed admin/runtime/migration connection material and confirm the live login-role chain plus representative bounded-login probes pass.
 
-## Migration-success receipt and service approval boundary
+## Quota bootstrap and import boundary
 
-- The later service gate also requires the signed migration receipt as a separate service gate input; the migration-success receipt supplements it and never replaces it.
-- A migration-success receipt is authority only after a successful waited migration execution produces the reviewed JSON plus detached Sigstore bundle.
-- The later service gate must verify the migration-success receipt and its detached Sigstore bundle before cloud authentication.
-- That verification must bind to the reviewed GitHub Actions certificate identity and OIDC issuer rather than trusting a blob or bundle without its reviewed signer identity.
-- Service approval still requires separate database/schema/authority readback after migration completion and before service approval; a signed migration-success artifact set is necessary but not sufficient by itself.
-- Do not treat a present migration-success receipt, bundle, or signature as permission to skip the separate database authority and schema readback evidence.
+1. Before provisioner backend initialization, the prechecked human creates—or exact-readbacks—`goldenRoseProvisionerQuotaUser` with title `Golden Rose Provisioner Quota User`, exact description `Permits only workload-project quota attribution for the provisioner.`, stage `GA`, and sole permission `serviceusage.services.use`.
+2. The same human creates—or exact-readbacks—the sole binding to `golden-rose-provisioner@<control-plane-project>.iam.gserviceaccount.com`.
+3. Enumerate the workload project's complete folder/organization ancestry, require exactly one project anchor matching the reviewed workload project with no duplicate ancestor, and read every ancestor IAM policy. Stop on empty/unanchored/unreadable/malformed ancestry; any direct/public/service-account-principal-set ancestor binding that can confer provisioner authority; or any group binding whose service-account membership cannot be proven absent from policy data.
+4. Stop on collision, wrong title/description/stage, any additional permission/member, a broad predefined role, inherited provisioner authority, or a user-managed service-account key.
+5. After propagation, the provisioner initializes the existing workload backend and imports exactly `module.develop.google_project_iam_custom_role.provisioner_quota_user` and `module.develop.google_project_iam_member.provisioner_quota_user`.
+6. Read back both state objects. The first full migration plan must show zero actions for both addresses.
 
-## Private tester access boundary
+## One-packet execution order
 
-While application auth remains synthetic, platform-level access to the private Cloud Run service is the only tester gate. The private tester ceremony must therefore:
+Within the approved eight-hour window: precheck; exact quota bootstrap/readback; backend initialization/import/readback; exact-source image publication if needed; migration plan inspection/apply/readback; database-role and URL-secret preparation; demo-password/expiry preparation; exact migration-job projection/image readback followed by migration execution and database-authority verification; service plan inspection/apply/readback; foundation/application/log qualification; non-mutating teardown/rebuild readiness inspection; private URL and credential-file-location delivery. The migration job's sole container image and the service image must equal the packet's exact verifier-admitted digest before execution/readiness. Unknown mutation outcomes require readback before retry. Deletes, replacements, budget mutation, public database access, broad IAM, extra principals, secret leakage, source/image/state drift, or out-of-allowlist actions stop the packet.
 
-- use only reviewed named tester user identities recorded outside public evidence
-- grant access only at the reviewed Cloud Run service boundary
-- preserve the reviewed IAM-authenticated internet-reachable ingress posture
-- avoid `allUsers` and `allAuthenticatedUsers`
-- avoid broad project-level convenience bindings
-- end with explicit access removal or review-triggered retention in the private operator record
+## Human access boundary
+
+For this fictional-synthetic target only, Cloud Run has exactly `allUsers` → `roles/run.invoker`; the application Basic middleware is the shared browser boundary. `/health` and `/readiness` remain public and minimized. Every business, environment, and static route is protected. Cloud Run remains capped at zero-to-one instances and Cloud SQL remains private. The password and URL are delivered privately; only the owner-held credential-file location may be returned in ordinary chat. `allAuthenticatedUsers`, named tester invokers, project-wide convenience roles, sessions, and cookies remain absent.
 
 See `deploy/gcp/private-tester-access.md` for the exact tester procedure.
 
@@ -111,8 +112,8 @@ See `deploy/gcp/private-tester-access.md` for the exact tester procedure.
 Stop immediately if any of the following occurs:
 
 - a secret payload appears in chat, shell output, Terraform plan/state, PR text, ticket text, screenshot, or artifact
-- a command path requires `allUsers` or `allAuthenticatedUsers`
-- a tester cannot be mapped to a named approved principal
+- a command path requires `allAuthenticatedUsers`, an additional invoker, or any project-wide convenience role
+- the application Basic gate, expiry, or one-instance cap cannot be verified
 - the reviewed digest, migration evidence, or foundation verification no longer matches the intended target
 - a secret must be copied through an unapproved channel
 
@@ -133,8 +134,8 @@ If a secret or private endpoint is exposed, or if public/broad invoker access is
 Allowed repository evidence after the later approved deployment may include only value-safe statements such as:
 
 - secret versions were created out of band
-- named custodians/testers exist in a private record
-- private invoker posture remained named and non-public
+- private credential custody exists in an owner-held record
+- the exact temporary public invoker remained protected by the expiring Basic gate
 - qualification passed or failed with redacted evidence
 
 Do not record payloads, private URLs, tester emails, password derivation material, or raw command transcripts in tracked source.

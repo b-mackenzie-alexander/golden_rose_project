@@ -1,3 +1,5 @@
+import base64
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
@@ -79,6 +81,15 @@ def _set_develop_env(monkeypatch) -> None:
         "Non-production develop — fictional synthetic data only",
     )
     monkeypatch.setenv("GOLDEN_ROSE_DEPLOYED_IMAGE_DIGEST", "sha256:" + "a" * 64)
+    monkeypatch.setenv("GOLDEN_ROSE_DEMO_ACCESS_ENABLED", "true")
+    monkeypatch.setenv(
+        "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD",
+        base64.urlsafe_b64encode(b"h" * 32).decode("ascii").rstrip("="),
+    )
+    monkeypatch.setenv(
+        "GOLDEN_ROSE_DEMO_ACCESS_EXPIRES_AT",
+        (datetime.now(UTC) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    )
 
 
 def test_health_is_database_independent_and_value_safe(monkeypatch) -> None:
@@ -107,12 +118,7 @@ def test_readiness_checks_database_schema_without_business_mutation(monkeypatch)
 
     assert response.status_code == 200
     assert response.headers["Cache-Control"] == "no-store"
-    assert response.json() == {
-        "status": "ready",
-        "schema_revision": "0005_database_authority",
-        "deployment_target": "gcp-develop-private-synthetic",
-        "deployed_image_digest": "sha256:" + "a" * 64,
-    }
+    assert response.json() == {"status": "ready"}
     assert len(connection.statements) == 1
     statement = connection.statements[0].lower()
     assert "alembic_version" in statement

@@ -1,3 +1,5 @@
+import base64
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
@@ -126,12 +128,22 @@ def test_develop_app_exposes_value_safe_non_production_marker(monkeypatch) -> No
         "GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL",
         "Non-production develop — fictional synthetic data only",
     )
+    demo_password = base64.urlsafe_b64encode(b"m" * 32).decode("ascii").rstrip("=")
+    monkeypatch.setenv("GOLDEN_ROSE_DEMO_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("GOLDEN_ROSE_DEMO_ACCESS_PASSWORD", demo_password)
+    monkeypatch.setenv(
+        "GOLDEN_ROSE_DEMO_ACCESS_EXPIRES_AT",
+        (datetime.now(UTC) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    )
 
     fake_engine: Any = FakeEngine()
     app = create_app(engine_factory=lambda: fake_engine)
 
     with TestClient(app) as client:
-        response = client.get("/api/staff/v1/environment")
+        response = client.get(
+            "/api/staff/v1/environment",
+            auth=("golden-rose-demo", demo_password),
+        )
 
     assert response.status_code == 200
     assert response.headers["Cache-Control"] == "no-store"

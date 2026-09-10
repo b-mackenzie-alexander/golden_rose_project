@@ -9,6 +9,7 @@ from golden_rose.api.dependencies import (
     get_db_session,
     get_idempotency_key,
     get_identifier_factory,
+    get_settings,
     get_staff_principal,
 )
 from golden_rose.api.errors import no_store_problem_response
@@ -40,6 +41,7 @@ from golden_rose.application.revise_draft_employer import revise_draft_employer
 from golden_rose.application.search_employers import search_employers
 from golden_rose.auth.principal import StaffPrincipal
 from golden_rose.clock import Clock
+from golden_rose.config import Settings
 from golden_rose.identifiers import IdentifierFactory
 
 router = APIRouter(prefix="/api/staff/v1/employers", tags=["staff-employers"])
@@ -59,6 +61,7 @@ def post_staff_employer_contact(
     principal: Annotated[StaffPrincipal, Depends(get_staff_principal)],
     clock: Annotated[Clock, Depends(get_clock)],
     identifiers: Annotated[IdentifierFactory, Depends(get_identifier_factory)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> EmployerContactResponse | Response:
     try:
         result = create_employer_contact(
@@ -69,6 +72,7 @@ def post_staff_employer_contact(
             full_name=request.full_name,
             clock=clock,
             identifiers=identifiers,
+            environment=settings.environment,
         )
     except PermissionError:
         return no_store_problem_response(
@@ -220,6 +224,7 @@ def post_staff_employer(
     principal: Annotated[StaffPrincipal, Depends(get_staff_principal)],
     clock: Annotated[Clock, Depends(get_clock)],
     identifiers: Annotated[IdentifierFactory, Depends(get_identifier_factory)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> DraftEmployerResponse:
     result = create_draft_employer(
         session=session,
@@ -229,6 +234,7 @@ def post_staff_employer(
         display_name=request.display_name,
         clock=clock,
         identifiers=identifiers,
+        environment=settings.environment,
     )
     response.headers["Cache-Control"] = "no-store"
     response.headers["Idempotency-Result-Version"] = str(result.result_record_version)
@@ -298,6 +304,7 @@ def post_staff_employer_revision(
     session: Annotated[Session, Depends(get_db_session)],
     principal: Annotated[StaffPrincipal, Depends(get_staff_principal)],
     clock: Annotated[Clock, Depends(get_clock)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> EmployerDetailResponse | Response:
     try:
         result = revise_draft_employer(
@@ -309,6 +316,7 @@ def post_staff_employer_revision(
             employer_type=request.employer_type,
             display_name=request.display_name,
             clock=clock,
+            environment=settings.environment,
         )
     except EmployerNotFoundError:
         return no_store_problem_response(

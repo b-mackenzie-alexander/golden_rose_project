@@ -8,9 +8,11 @@ from sqlalchemy.orm import Session
 from golden_rose.application.contact_text import validate_contact_full_name
 from golden_rose.application.create_draft_employer import IdempotencyConflictError
 from golden_rose.application.errors import EmployerNotFoundError, SafePersistenceError
+from golden_rose.application.synthetic_data import require_develop_synthetic_value
 from golden_rose.auth.permissions import can_create_draft_employer_contact, can_read_employer
 from golden_rose.auth.principal import StaffPrincipal
 from golden_rose.clock import Clock
+from golden_rose.config import Environment
 from golden_rose.identifiers import IdentifierFactory
 from golden_rose.persistence.audit_events import insert_employer_contact_created_event
 from golden_rose.persistence.command_receipts import (
@@ -49,6 +51,7 @@ def create_employer_contact(
     full_name: str,
     clock: Clock,
     identifiers: IdentifierFactory,
+    environment: Environment = "local",
 ) -> CreateEmployerContactResult:
     if not can_read_employer(principal):
         msg = "principal lacks employer:read"
@@ -58,6 +61,11 @@ def create_employer_contact(
         raise PermissionError(msg)
 
     normalized_full_name = validate_contact_full_name(full_name)
+    require_develop_synthetic_value(
+        environment=environment,
+        field="contact_full_name",
+        value=normalized_full_name,
+    )
     now = clock.now()
     employer_contact_id = identifiers.new_uuid4()
     audit_event_id = identifiers.new_uuid4()

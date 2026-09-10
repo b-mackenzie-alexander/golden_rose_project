@@ -47,3 +47,14 @@ output "observability_contract" {
     approved_service_level_commitment = false
   }
 }
+
+output "human_visible_develop_contract" {
+  description = "Value-safe temporary access and cost-bound markers for fictional-synthetic develop."
+  value = var.deployment_stage == "service" ? {
+    access_mode    = "expiring-http-basic"
+    public_invoker = true
+    min_instances  = 0
+    max_instances  = 1
+    data_boundary  = "fictional-synthetic-only"
+  } : null
+}

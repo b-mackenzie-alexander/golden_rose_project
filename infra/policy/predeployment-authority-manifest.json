@@ -20,7 +20,7 @@
         "stage_ownership": "service"
       },
       "google_cloud_run_v2_service_iam_member": {
-        "max_count": 3
+        "max_count": 2
       },
       "google_cloud_run_v2_job_iam_member": {
         "max_count": 2
@@ -61,8 +61,11 @@
       "google_project_service": {
         "max_count": 12
       },
+      "google_project_iam_custom_role": {
+        "max_count": 1
+      },
       "google_project_iam_member": {
-        "max_count": 10
+        "max_count": 11
       },
       "google_monitoring_alert_policy": {
         "max_count": 3
@@ -79,10 +82,10 @@
         }
       },
       "google_secret_manager_secret": {
-        "max_count": 4
+        "max_count": 5
       },
       "google_secret_manager_secret_iam_member": {
-        "max_count": 8
+        "max_count": 9
       },
       "google_service_account": {
         "max_count": 6
@@ -180,20 +183,13 @@
               "name:Set up uv",
               "name:Enforce protected develop source",
               "name:Install Cosign",
-              "name:Verify signed stage receipt before cloud authentication",
               "name:Initialize failed deploy result",
               "name:Authenticate artifact verifier to Google Cloud",
               "name:Verify direct OCI image authority",
               "name:Clear artifact verifier credential context",
-              "name:Validate signed stage receipt after image digest",
               "name:Authenticate deployer to Google Cloud",
               "name:Set up gcloud",
-              "name:Extract and validate selected live configuration projection",
               "name:Execute migration transition",
-              "name:Write migration success receipt",
-              "name:Sign migration success receipt",
-              "name:Upload migration success receipt",
-              "name:Upload migration success receipt bundle",
               "name:Verify service readiness transition",
               "name:Record deploy result",
               "name:Upload deploy result evidence"

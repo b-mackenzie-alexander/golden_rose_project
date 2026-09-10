@@ -4,44 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       deployment_stage:
-        description: Separately approved deploy transition
+        description: Stage selected inside the separately approved eight-hour deployment packet
         required: true
         type: choice
         options:
         - migration
         - service
-      stage_receipt_base64:
-        description: Operator-held signed stage receipt bytes, base64 encoded
-        required: true
-        type: string
-      stage_receipt_bundle_base64:
-        description: Detached Sigstore bundle for the operator-held stage receipt, base64 encoded
-        required: true
-        type: string
-      migration_receipt_base64:
-        description: Signed migration-stage receipt required only for service
-        required: false
-        type: string
-      migration_receipt_bundle_base64:
-        description: Detached Sigstore bundle for the signed migration-stage receipt required only for service
-        required: false
-        type: string
-      migration_success_receipt_base64:
-        description: Separately signed migration-success receipt required only for service
-        required: false
-        type: string
-      migration_success_receipt_bundle_base64:
-        description: Detached Sigstore bundle for migration-success receipt required only for service
-        required: false
-        type: string
-      migration_readback_receipt_base64:
-        description: Signed post-migration database/schema/authority readback receipt required only for service
-        required: false
-        type: string
-      migration_readback_receipt_bundle_base64:
-        description: Detached Sigstore bundle for the post-migration database/schema/authority readback receipt required only for service
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -89,49 +57,6 @@ jobs:
         with:
           cosign-release: "v3.0.6"
 
-      - name: Verify signed stage receipt before cloud authentication
-        env:
-          STAGE_RECEIPT_BASE64: ${{ inputs.stage_receipt_base64 }}
-          STAGE_RECEIPT_BUNDLE_BASE64: ${{ inputs.stage_receipt_bundle_base64 }}
-          STAGE_RECEIPT_CERTIFICATE_IDENTITY: ${{ vars.STAGE_RECEIPT_CERTIFICATE_IDENTITY }}
-          MIGRATION_SUCCESS_RECEIPT_BASE64: ${{ inputs.migration_success_receipt_base64 }}
-          MIGRATION_SUCCESS_RECEIPT_BUNDLE_BASE64: ${{ inputs.migration_success_receipt_bundle_base64 }}
-          MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY: ${{ vars.MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY }}
-          MIGRATION_RECEIPT_BASE64: ${{ inputs.migration_receipt_base64 }}
-          MIGRATION_RECEIPT_BUNDLE_BASE64: ${{ inputs.migration_receipt_bundle_base64 }}
-          MIGRATION_READBACK_RECEIPT_BASE64: ${{ inputs.migration_readback_receipt_base64 }}
-          MIGRATION_READBACK_RECEIPT_BUNDLE_BASE64: ${{ inputs.migration_readback_receipt_bundle_base64 }}
-          MIGRATION_READBACK_RECEIPT_CERTIFICATE_IDENTITY: ${{ vars.MIGRATION_READBACK_RECEIPT_CERTIFICATE_IDENTITY }}
-          DEPLOYMENT_STAGE: ${{ inputs.deployment_stage }}
-        run: |
-          set -euo pipefail
-          mkdir -p build/transition-authority
-          test -n "$STAGE_RECEIPT_BASE64"
-          test -n "$STAGE_RECEIPT_BUNDLE_BASE64"
-          test -n "$STAGE_RECEIPT_CERTIFICATE_IDENTITY"
-          printf '%s' "$STAGE_RECEIPT_BASE64" | base64 --decode > build/transition-authority/stage-receipt.json
-          printf '%s' "$STAGE_RECEIPT_BUNDLE_BASE64" | base64 --decode > build/transition-authority/stage-receipt.sigstore.json
-          cosign verify-blob build/transition-authority/stage-receipt.json --bundle build/transition-authority/stage-receipt.sigstore.json --certificate-identity "$STAGE_RECEIPT_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
-          if [ "$DEPLOYMENT_STAGE" = "service" ]; then
-            test -n "$MIGRATION_SUCCESS_RECEIPT_BASE64"
-            test -n "$MIGRATION_SUCCESS_RECEIPT_BUNDLE_BASE64"
-            test -n "$MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY"
-            test -n "$MIGRATION_RECEIPT_BASE64"
-            test -n "$MIGRATION_RECEIPT_BUNDLE_BASE64"
-            test -n "$MIGRATION_READBACK_RECEIPT_BASE64"
-            test -n "$MIGRATION_READBACK_RECEIPT_BUNDLE_BASE64"
-            test -n "$MIGRATION_READBACK_RECEIPT_CERTIFICATE_IDENTITY"
-            printf '%s' "$MIGRATION_RECEIPT_BASE64" | base64 --decode > build/transition-authority/migration-receipt.json
-            printf '%s' "$MIGRATION_RECEIPT_BUNDLE_BASE64" | base64 --decode > build/transition-authority/migration-receipt.sigstore.json
-            cosign verify-blob build/transition-authority/migration-receipt.json --bundle build/transition-authority/migration-receipt.sigstore.json --certificate-identity "$STAGE_RECEIPT_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
-            printf '%s' "$MIGRATION_SUCCESS_RECEIPT_BASE64" | base64 --decode > build/transition-authority/migration-success-receipt.json
-            printf '%s' "$MIGRATION_SUCCESS_RECEIPT_BUNDLE_BASE64" | base64 --decode > build/transition-authority/migration-success-receipt.sigstore.json
-            cosign verify-blob build/transition-authority/migration-success-receipt.json --bundle build/transition-authority/migration-success-receipt.sigstore.json --certificate-identity "$MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
-            printf '%s' "$MIGRATION_READBACK_RECEIPT_BASE64" | base64 --decode > build/transition-authority/migration-database-authority-readback.json
-            printf '%s' "$MIGRATION_READBACK_RECEIPT_BUNDLE_BASE64" | base64 --decode > build/transition-authority/migration-database-authority-readback.sigstore.json
-            cosign verify-blob build/transition-authority/migration-database-authority-readback.json --bundle build/transition-authority/migration-database-authority-readback.sigstore.json --certificate-identity "$MIGRATION_READBACK_RECEIPT_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
-            uv run python scripts/verify_migration_database_readback.py --readback-receipt build/transition-authority/migration-database-authority-readback.json --migration-receipt build/transition-authority/migration-receipt.json --migration-success-receipt build/transition-authority/migration-success-receipt.json
-          fi
 
       - name: Initialize failed deploy result
         run: |
@@ -205,17 +130,6 @@ jobs:
           [ -z "$verifier_cloudsdk_credentials" ] || test ! -e "$verifier_cloudsdk_credentials"
           [ -z "$verifier_google_gha_creds_path" ] || test ! -e "$verifier_google_gha_creds_path"
 
-      - name: Validate signed stage receipt after image digest
-        env:
-          DEPLOYMENT_STAGE: ${{ inputs.deployment_stage }}
-        run: |
-          set -euo pipefail
-          args=(--receipt build/transition-authority/stage-receipt.json --stage "$DEPLOYMENT_STAGE" --source-sha "$GITHUB_SHA" --image-digest "$IMAGE_DIGEST")
-          if [ "$DEPLOYMENT_STAGE" = "service" ]; then
-            args+=(--migration-receipt build/transition-authority/migration-receipt.json)
-            args+=(--migration-success-receipt build/transition-authority/migration-success-receipt.json)
-          fi
-          uv run python scripts/verify_stage_receipt.py "${args[@]}" > build/transition-authority/stage-receipt.sha256
 
       - name: Authenticate deployer to Google Cloud
         id: deployer_auth
@@ -231,57 +145,86 @@ jobs:
         # v2.1.4
         uses: google-github-actions/setup-gcloud@77e7a554d41e2ee56fc945c52dfd3f33d12def9a
 
-      - name: Extract and validate selected live configuration projection
-        env:
-          DEPLOYMENT_STAGE: ${{ inputs.deployment_stage }}
-        run: |
-          set -euo pipefail
-          if [ "$DEPLOYMENT_STAGE" = "migration" ]; then
-            gcloud run jobs describe run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --format=json > build/transition-authority/live-resource.json
-          else
-            gcloud run services describe staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --format=json > build/transition-authority/live-resource.json
-            gcloud run services get-iam-policy staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --format=json > build/transition-authority/live-service-iam-policy.json
-          fi
-          export DEPLOYMENT_STAGE
-          python - <<'PY'
-          import importlib.util
-          import json
-          import os
-          from pathlib import Path
-
-          module_path = Path("scripts/verify_stage_receipt.py")
-          spec = importlib.util.spec_from_file_location("verify_stage_receipt", module_path)
-          if spec is None or spec.loader is None:
-              raise SystemExit("could not load stage receipt verifier")
-          module = importlib.util.module_from_spec(spec)
-          spec.loader.exec_module(module)
-          resource = json.loads(Path("build/transition-authority/live-resource.json").read_text(encoding="utf-8"))
-          iam_policy = None
-          if os.environ["DEPLOYMENT_STAGE"] == "service":
-              iam_policy = json.loads(
-                  Path("build/transition-authority/live-service-iam-policy.json").read_text(
-                      encoding="utf-8"
-                  )
-              )
-          projection = module.extract_live_configuration_projection(
-              resource, stage=os.environ["DEPLOYMENT_STAGE"], iam_policy=iam_policy
-          )
-          Path("build/transition-authority/live-configuration-projection.json").write_text(
-              json.dumps(projection, sort_keys=True, allow_nan=False) + "\n", encoding="utf-8"
-          )
-          PY
-          args=(--receipt build/transition-authority/stage-receipt.json --stage "$DEPLOYMENT_STAGE" --source-sha "$GITHUB_SHA" --image-digest "$IMAGE_DIGEST" --live-configuration-projection build/transition-authority/live-configuration-projection.json)
-          if [ "$DEPLOYMENT_STAGE" = "service" ]; then
-            args+=(--migration-receipt build/transition-authority/migration-receipt.json)
-            args+=(--migration-success-receipt build/transition-authority/migration-success-receipt.json)
-          fi
-          uv run python scripts/verify_stage_receipt.py "${args[@]}"
 
       - name: Execute migration transition
         if: inputs.deployment_stage == 'migration'
+        env:
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
         run: |
           set -euo pipefail
           mkdir -p build/transition-authority
+          JOB_JSON=$(gcloud run jobs describe run-migrations --project "$GCP_PROJECT_ID" --region us-east4 --format=json)
+          export JOB_JSON
+          python - <<'PY'
+          import json
+          import os
+
+          job = json.loads(os.environ["JOB_JSON"])
+          template = job.get("template", {})
+          task_template = template.get("template", {})
+          containers = task_template.get("containers")
+          if not isinstance(containers, list) or len(containers) != 1 or not isinstance(containers[0], dict):
+              raise SystemExit("migration job must contain exactly one reviewed container")
+          if containers[0].get("image") != os.environ["MANAGED_IMAGE"]:
+              raise SystemExit("migration job image must match the direct Cosign-verified image")
+          if task_template.get("serviceAccount") != f"staff-tracer-migration@{os.environ['GCP_PROJECT_ID']}.iam.gserviceaccount.com":
+              raise SystemExit("migration job service account drifted")
+          if template.get("parallelism") != 1 or template.get("taskCount") != 1:
+              raise SystemExit("migration job execution cardinality drifted")
+          if task_template.get("maxRetries") != 0 or task_template.get("timeout") != "1800s":
+              raise SystemExit("migration job retry or timeout posture drifted")
+          if containers[0].get("command") != ["golden-rose-migrate"]:
+              raise SystemExit("migration job command drifted")
+          vpc_access = task_template.get("vpcAccess")
+          interfaces = vpc_access.get("networkInterfaces") if isinstance(vpc_access, dict) else None
+          if not isinstance(interfaces, list) or len(interfaces) != 1 or not isinstance(interfaces[0], dict):
+              raise SystemExit("migration job VPC interface drifted")
+          if vpc_access.get("egress") != "PRIVATE_RANGES_ONLY":
+              raise SystemExit("migration job VPC egress drifted")
+          if not str(interfaces[0].get("network", "")).endswith("/networks/develop-vpc"):
+              raise SystemExit("migration job VPC network drifted")
+          if not str(interfaces[0].get("subnetwork", "")).endswith("/regions/us-east4/subnetworks/develop-direct-vpc"):
+              raise SystemExit("migration job VPC subnetwork drifted")
+          environment = {}
+          for item in containers[0].get("env", []):
+              if not isinstance(item, dict) or not isinstance(item.get("name"), str):
+                  raise SystemExit("migration job environment is malformed")
+              if "value" in item:
+                  environment[item["name"]] = {"value": item.get("value")}
+              else:
+                  secret_ref = item.get("valueSource", {}).get("secretKeyRef", {})
+                  environment[item["name"]] = {
+                      "secret": secret_ref.get("secret"),
+                      "version": secret_ref.get("version"),
+                  }
+          expected_environment = {
+              "GOLDEN_ROSE_ENVIRONMENT": {"value": "develop"},
+              "GOLDEN_ROSE_AUTH_MODE": {"value": "synthetic"},
+              "GOLDEN_ROSE_DEPLOYMENT_TARGET": {"value": "gcp-develop-private-synthetic"},
+              "GOLDEN_ROSE_DEPLOYED_IMAGE_DIGEST": {"value": os.environ["IMAGE_DIGEST"]},
+              "GOLDEN_ROSE_MIGRATION_ASSUMED_ROLE": {"value": "golden_rose_schema_owner"},
+              "GOLDEN_ROSE_DATABASE_URL": {"secret": "migration-database-url", "version": "latest"},
+              "GOLDEN_ROSE_SYNTHETIC_STAFF_ID": {"secret": "synthetic-staff-id", "version": "latest"},
+          }
+          if set(environment) != {*expected_environment, "GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL"}:
+              raise SystemExit("migration job environment inventory drifted")
+          if any(environment.get(name) != value for name, value in expected_environment.items()):
+              raise SystemExit("migration job environment value drifted")
+          public_label = environment["GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL"].get("value", "")
+          if not {"non-production", "synthetic"}.issubset(set(str(public_label).lower().split())):
+              raise SystemExit("migration job public label lost synthetic-only posture")
+          required_labels = {
+              "environment": "develop",
+              "data_boundary": "fictional-synthetic-only",
+              "managed_by": "terraform",
+              "service": "staff-tracer",
+              "cost_center": "develop",
+              "teardown": "intentional-runbook-only",
+          }
+          labels = job.get("labels")
+          if not isinstance(labels, dict) or any(labels.get(key) != value for key, value in required_labels.items()):
+              raise SystemExit("migration job synthetic label posture drifted")
+          PY
           gcloud run jobs execute run-migrations --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --wait --format=json > build/transition-authority/migration-execution.json
           python - <<'PY'
           import json
@@ -294,40 +237,6 @@ jobs:
           path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
           PY
 
-      - name: Write migration success receipt
-        if: inputs.deployment_stage == 'migration'
-        run: |
-          set -euo pipefail
-          uv run python scripts/write_migration_success_receipt.py --migration-receipt build/transition-authority/stage-receipt.json --deploy-result build/deploy-result.json --execution build/transition-authority/migration-execution.json --output build/transition-authority/migration-success-receipt.json
-
-      - name: Sign migration success receipt
-        if: inputs.deployment_stage == 'migration'
-        env:
-          MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY: ${{ vars.MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY }}
-        run: |
-          set -euo pipefail
-          test -n "$MIGRATION_SUCCESS_RECEIPT_CERTIFICATE_IDENTITY"
-          cosign sign-blob --yes --bundle build/transition-authority/migration-success-receipt.sigstore.json build/transition-authority/migration-success-receipt.json >/dev/null
-
-      - name: Upload migration success receipt
-        if: inputs.deployment_stage == 'migration'
-        # v4.6.2
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: migration-success-receipt
-          path: build/transition-authority/migration-success-receipt.json
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload migration success receipt bundle
-        if: inputs.deployment_stage == 'migration'
-        # v4.6.2
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: migration-success-receipt-bundle
-          path: build/transition-authority/migration-success-receipt.sigstore.json
-          if-no-files-found: error
-          retention-days: 14
 
       - name: Verify service readiness transition
         if: inputs.deployment_stage == 'service'
@@ -337,6 +246,8 @@ jobs:
           export SERVICE_JSON
           python - <<'PY'
           import json, os
+          from pathlib import Path
+
           service = json.loads(os.environ["SERVICE_JSON"])
           ready = next((item for item in service.get("status", {}).get("conditions", []) if item.get("type") == "Ready"), None)
           if not ready or ready.get("status") != "True":
@@ -347,6 +258,10 @@ jobs:
           image = containers[0].get("image")
           if image != os.environ["MANAGED_IMAGE"]:
               raise SystemExit("ready service image must match the direct Cosign-verified image")
+          path = Path("build/deploy-result.json")
+          payload = json.loads(path.read_text(encoding="utf-8"))
+          payload.update({"result": "success", "current_stage": "service_readiness", "image_digest": os.environ["IMAGE_DIGEST"]})
+          path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
           PY
 
       - name: Record deploy result

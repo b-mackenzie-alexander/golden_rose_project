@@ -20,9 +20,6 @@ class ReadinessResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     status: Literal["ready"]
-    schema_revision: str
-    deployment_target: str
-    deployed_image_digest: str
 
 
 EXPECTED_SCHEMA_REVISION = "0005_database_authority"
@@ -37,7 +34,7 @@ def get_health(response: Response) -> HealthResponse:
 @router.get("/readiness", response_model=ReadinessResponse)
 def get_readiness(request: Request, response: Response) -> ReadinessResponse | JSONResponse:
     try:
-        settings = Settings()  # type: ignore[call-arg]
+        Settings()  # type: ignore[call-arg]
         engine = request.app.state.db_engine
         with engine.connect() as connection:
             schema_revision = connection.execute(
@@ -64,9 +61,4 @@ def get_readiness(request: Request, response: Response) -> ReadinessResponse | J
         )
 
     response.headers["Cache-Control"] = "no-store"
-    return ReadinessResponse(
-        status="ready",
-        schema_revision=schema_revision,
-        deployment_target=settings.deployment_target or "",
-        deployed_image_digest=settings.deployed_image_digest or "",
-    )
+    return ReadinessResponse(status="ready")

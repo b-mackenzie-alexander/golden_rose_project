@@ -60,40 +60,18 @@ variable "direct_vpc_subnet_cidr" {
 }
 
 
-variable "tester_authority_receipt_path" {
-  description = "Operator-held path to the signed tester-authority receipt; service plans derive the IAM principal from it rather than accepting a principal tfvar."
+variable "demo_access_expires_at" {
+  description = "Sensitive strict UTC RFC 3339 expiry for the temporary service-stage shared access gate; omitted outside service stage."
   type        = string
   nullable    = true
   default     = null
 
   validation {
-    condition     = var.deployment_stage != "service" || var.tester_authority_receipt_path != null
-    error_message = "Service stage requires an operator-held tester-authority receipt path."
+    condition     = var.deployment_stage == "service" ? var.demo_access_expires_at != null && can(regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$", var.demo_access_expires_at)) : var.demo_access_expires_at == null
+    error_message = "Service stage requires one strict UTC RFC 3339 demo-access expiry; other stages require null."
   }
-}
 
-variable "tester_authority_bundle_path" {
-  description = "Operator-held path to the detached Sigstore bundle for the tester-authority receipt."
-  type        = string
-  nullable    = true
-  default     = null
-
-  validation {
-    condition     = var.deployment_stage != "service" || var.tester_authority_bundle_path != null
-    error_message = "Service stage requires the tester-authority detached Sigstore bundle path."
-  }
-}
-
-variable "tester_authority_certificate_identity" {
-  description = "Reviewed GitHub workflow certificate identity required to verify the tester-authority receipt."
-  type        = string
-  nullable    = true
-  default     = null
-
-  validation {
-    condition     = var.deployment_stage != "service" || var.tester_authority_certificate_identity != null
-    error_message = "Service stage requires the reviewed tester-authority certificate identity."
-  }
+  sensitive = true
 }
 
 

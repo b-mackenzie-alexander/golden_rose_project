@@ -4,8 +4,10 @@ on:
   pull_request:
     paths:
       - "infra/gcp/**"
-      - "scripts/validate_terraform_static.py"
-      - "tests/unit/test_terraform_hygiene.py"
+      - 'scripts/validate_terraform_static.py'
+      - 'scripts/verify_gcp_foundation.py'
+      - 'tests/unit/test_terraform_hygiene.py'
+      - 'tests/unit/test_verify_gcp_foundation.py'
       - ".github/workflows/**"
 
 permissions:

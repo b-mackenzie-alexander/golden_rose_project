@@ -7,7 +7,7 @@ import os
 import re
 import secrets
 import stat
-import time
+import subprocess
 from collections.abc import Callable, Sequence
 from contextlib import suppress
 from pathlib import Path
@@ -26,17 +26,13 @@ class _NoRedirectHandler(request.HTTPRedirectHandler):
 
 
 Requester = Callable[[str, str, dict[str, str], dict[str, Any] | None], Any]
-APPROVED_DEPLOYMENT_TARGET = "gcp-develop-private-synthetic"
 APPROVED_CLOUD_RUN_HOST_PATTERN = re.compile(r"^staff-tracer-[a-z0-9-]+\.a\.run\.app$")
 DIGEST_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 EVIDENCE_NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
-GOOGLE_TOKEN_ISSUERS = frozenset({"https://accounts.google.com", "accounts.google.com"})
-IAM_TROUBLESHOOTER_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
-IAM_TROUBLESHOOTER_URL = "https://policytroubleshooter.googleapis.com/v3/iam:troubleshoot"
-SERVICE_RESOURCE_PATTERN = re.compile(
-    r"^//run\.googleapis\.com/projects/[a-z][a-z0-9-]{4,28}[a-z0-9]"
-    r"/locations/[a-z0-9-]+/services/[a-z][a-z0-9-]{0,62}$"
-)
+PROJECT_ID_PATTERN = re.compile(r"^[a-z][a-z0-9-]{4,28}[a-z0-9]$")
+DEMO_USERNAME = "golden-rose-demo"
+DEMO_CHALLENGE = 'Basic realm="Golden Rose synthetic develop", charset="UTF-8"'
+WRONG_DEMO_PASSWORD = "intentionally-wrong-demo-password"
 
 
 def _normalize_response(response: Any) -> tuple[int, dict[str, str], dict[str, Any]]:
@@ -59,21 +55,17 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--expected-service-url", required=True)
-    parser.add_argument("--expected-service-resource", required=True)
     parser.add_argument("--expected-image-digest", required=True)
-    parser.add_argument("--expected-schema-revision", default="0005_database_authority")
     parser.add_argument("--artifact-root")
     parser.add_argument("--evidence-name", default="qualification-evidence.md")
     parser.add_argument("--allow-synthetic-writes", action="store_true")
-    token_source = parser.add_mutually_exclusive_group(required=True)
-    token_source.add_argument("--access-token-stdin", action="store_true")
-    token_source.add_argument("--access-token-file")
-    token_source.add_argument("--access-token-env")
-    unapproved_token_source = parser.add_mutually_exclusive_group(required=True)
-    unapproved_token_source.add_argument("--unapproved-access-token-stdin", action="store_true")
-    unapproved_token_source.add_argument("--unapproved-access-token-file")
-    unapproved_token_source.add_argument("--unapproved-access-token-env")
-    parser.add_argument("--expected-unapproved-subject-env", required=True)
+    password_source = parser.add_mutually_exclusive_group(required=True)
+    password_source.add_argument("--demo-password-stdin", action="store_true")
+    password_source.add_argument("--demo-password-file")
+    password_source.add_argument("--demo-password-env")
+    log_source = parser.add_mutually_exclusive_group(required=True)
+    log_source.add_argument("--log-project-id")
+    log_source.add_argument("--log-export-file")
     return parser.parse_args(argv)
 
 
@@ -114,41 +106,79 @@ def _validate_base_url(base_url: str, expected_service_url: str) -> str:
     return normalized_base_url
 
 
-def _read_token(
+def _read_private_text_file(path: str | Path, *, label: str) -> str:
+    candidate = Path(path)
+    try:
+        file_stat = candidate.lstat()
+        if not stat.S_ISREG(file_stat.st_mode) or file_stat.st_mode & 0o077:
+            raise QualificationError(f"{label} private file boundary failed")
+        if file_stat.st_size > 8 * 1024 * 1024:
+            raise QualificationError(f"{label} private file boundary failed")
+        return candidate.read_text(encoding="utf-8")
+    except QualificationError:
+        raise
+    except (OSError, UnicodeError) as exc:
+        raise QualificationError(f"{label} private file boundary failed") from exc
+
+
+def _collect_cloud_run_logs(
+    project_id: str,
+    *,
+    runner: Callable[..., Any] = subprocess.run,
+) -> str:
+    if not PROJECT_ID_PATTERN.fullmatch(project_id):
+        raise QualificationError("log project boundary failed")
+    command = [
+        "gcloud",
+        "logging",
+        "read",
+        'resource.type="cloud_run_revision" AND resource.labels.service_name="staff-tracer"',
+        f"--project={project_id}",
+        "--freshness=15m",
+        "--limit=1000",
+        "--format=json",
+    ]
+    try:
+        completed = runner(
+            command,
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=120,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise QualificationError("post-qualification log collection failed") from exc
+    if completed.returncode != 0:
+        raise QualificationError("post-qualification log collection failed")
+    return str(completed.stdout)
+
+
+def _read_secret(
     *,
     stdin_selected: bool,
     file_path: str | None,
     env_name: str | None,
     label: str,
 ) -> str:
-    token: str | None = None
+    secret_value: str | None = None
     if stdin_selected:
-        token = os.read(0, 1024 * 64).decode("utf-8")
+        secret_value = os.read(0, 1024 * 64).decode("utf-8")
     elif file_path:
-        token = Path(file_path).read_text(encoding="utf-8")
+        secret_value = _read_private_text_file(file_path, label=label)
     elif env_name:
-        token = os.environ.get(env_name)
-    normalized_token = (token or "").strip()
-    if not normalized_token:
-        raise QualificationError(f"{label} authenticated access token is required")
-    return normalized_token
+        secret_value = os.environ.get(env_name)
+    normalized_value = (secret_value or "").strip()
+    if not normalized_value:
+        raise QualificationError(f"{label} is required")
+    return normalized_value
 
 
-def _read_access_token(args: argparse.Namespace) -> str:
-    return _read_token(
-        stdin_selected=args.access_token_stdin,
-        file_path=args.access_token_file,
-        env_name=args.access_token_env,
-        label="private",
-    )
-
-
-def _read_unapproved_access_token(args: argparse.Namespace) -> str:
-    return _read_token(
-        stdin_selected=args.unapproved_access_token_stdin,
-        file_path=args.unapproved_access_token_file,
-        env_name=args.unapproved_access_token_env,
-        label="unapproved probe",
+def _read_demo_password(args: argparse.Namespace) -> str:
+    return _read_secret(
+        stdin_selected=args.demo_password_stdin,
+        file_path=args.demo_password_file,
+        env_name=args.demo_password_env,
+        label="private demo password",
     )
 
 
@@ -189,14 +219,28 @@ def _request_json(
         raise QualificationError(f"request failed for {path}: {exc.reason}") from exc
 
 
-def _build_private_headers(access_token: str) -> dict[str, str]:
-    normalized_token = access_token.strip()
-    if not normalized_token:
-        raise QualificationError("private authenticated access token is required")
+def _build_demo_headers(password: str) -> dict[str, str]:
+    normalized_password = password.strip()
+    if not normalized_password:
+        raise QualificationError("private demo password is required")
+    encoded = base64.b64encode(f"{DEMO_USERNAME}:{normalized_password}".encode()).decode("ascii")
     return {
         "Accept": "application/json",
-        "Authorization": f"Bearer {normalized_token}",
+        "Authorization": f"Basic {encoded}",
     }
+
+
+def _verify_log_export_is_safe(
+    log_export: str,
+    *,
+    prohibited_values: Sequence[str],
+) -> str:
+    normalized_export = log_export.casefold()
+    fixed_markers = ("authorization", "basic ", "credential", "password")
+    value_markers = tuple(value.strip().casefold() for value in prohibited_values if value.strip())
+    if any(marker in normalized_export for marker in (*fixed_markers, *value_markers)):
+        raise QualificationError("log export contains prohibited values")
+    return "passed_no_prohibited_values"
 
 
 def _require_no_store(boundary: str, headers: dict[str, str]) -> None:
@@ -215,149 +259,35 @@ def _require_no_store(boundary: str, headers: dict[str, str]) -> None:
         raise QualificationError(f"{boundary} cache-control boundary failed")
 
 
-def _validate_expected_service_resource(expected_service_resource: str) -> str:
-    if not SERVICE_RESOURCE_PATTERN.fullmatch(expected_service_resource):
-        raise QualificationError("expected service resource must be an exact Cloud Run service")
-    return expected_service_resource
-
-
-def _decode_jwt_claims(token: str) -> dict[str, Any]:
-    parts = token.split(".")
-    if len(parts) != 3 or any(not part for part in parts):
-        raise QualificationError("unapproved token verification boundary failed")
-    try:
-        payload = parts[1] + "=" * (-len(parts[1]) % 4)
-        claims = json.loads(base64.urlsafe_b64decode(payload).decode("utf-8"))
-    except (UnicodeDecodeError, ValueError, json.JSONDecodeError) as exc:
-        raise QualificationError("unapproved token verification boundary failed") from exc
-    if not isinstance(claims, dict):
-        raise QualificationError("unapproved token verification boundary failed")
-    return claims
-
-
-def _google_verify_oauth2_token(token: str, expected_service_url: str) -> dict[str, Any]:
-    try:
-        from google.auth.transport.requests import Request
-        from google.oauth2 import id_token
-    except ImportError as exc:
-        raise QualificationError("Google identity-token verifier is unavailable") from exc
-    try:
-        verified = id_token.verify_oauth2_token(  # type: ignore[no-untyped-call]
-            token, Request(), audience=expected_service_url
-        )
-    except Exception as exc:
-        raise QualificationError("unapproved token verification boundary failed") from exc
-    if not isinstance(verified, dict):
-        raise QualificationError("unapproved token verification boundary failed")
-    return verified
-
-
-def _verify_google_identity_token(
-    token: str, expected_service_url: str, expected_unapproved_subject: str
-) -> str:
-    unverified_claims = _decode_jwt_claims(token)
-    verified_claims = _google_verify_oauth2_token(token, expected_service_url)
-    required_claims = ("iss", "aud", "sub", "iat", "exp")
-    if any(verified_claims.get(claim) != unverified_claims.get(claim) for claim in required_claims):
-        raise QualificationError("unapproved token verification boundary failed")
-    if verified_claims.get("iss") not in GOOGLE_TOKEN_ISSUERS:
-        raise QualificationError("unapproved token verification boundary failed")
-    if verified_claims.get("aud") != expected_service_url:
-        raise QualificationError("unapproved token verification boundary failed")
-    subject = verified_claims.get("sub")
-    issued_at = verified_claims.get("iat")
-    expires_at = verified_claims.get("exp")
-    not_before = verified_claims.get("nbf")
-    if (
-        not isinstance(subject, str)
-        or not subject
-        or isinstance(issued_at, bool)
-        or not isinstance(issued_at, (int, float))
-        or isinstance(expires_at, bool)
-        or not isinstance(expires_at, (int, float))
-        or (
-            not_before is not None
-            and (isinstance(not_before, bool) or not isinstance(not_before, (int, float)))
-        )
-    ):
-        raise QualificationError("unapproved token verification boundary failed")
-    if not expected_unapproved_subject or subject != expected_unapproved_subject:
-        raise QualificationError("unapproved token verification boundary failed")
-    now = time.time()
-    if issued_at > now or expires_at <= now or (not_before is not None and not_before > now):
-        raise QualificationError("unapproved token verification boundary failed")
-    return subject
-
-
-def _verify_effective_iam_absence(subject: str, expected_service_resource: str) -> None:
-    try:
-        from google.auth import default
-        from google.auth.transport.requests import Request
-    except ImportError as exc:
-        raise QualificationError("Google IAM policy verifier is unavailable") from exc
-    principal = f"principal://goog/subject/{subject}"
-    try:
-        credentials, _ = default(scopes=[IAM_TROUBLESHOOTER_SCOPE])
-        credentials.refresh(Request())  # type: ignore[no-untyped-call]
-        payload = json.dumps(
-            {
-                "accessTuple": {
-                    "principal": principal,
-                    "fullResourceName": expected_service_resource,
-                    "permission": "run.routes.invoke",
-                }
-            }
-        ).encode("utf-8")
-        request_object = request.Request(
-            IAM_TROUBLESHOOTER_URL,
-            data=payload,
-            headers={
-                "Authorization": f"Bearer {credentials.token}",
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
-        with request.urlopen(request_object, timeout=30) as response:
-            result = json.loads(response.read().decode("utf-8"))
-    except Exception as exc:
-        raise QualificationError("effective IAM absence verification boundary failed") from exc
-    access_tuple = result.get("accessTuple") if isinstance(result, dict) else None
-    if (
-        not isinstance(access_tuple, dict)
-        or result.get("access") != "NOT_GRANTED"
-        or access_tuple.get("principal") != principal
-        or access_tuple.get("fullResourceName") != expected_service_resource
-        or access_tuple.get("permission") != "run.routes.invoke"
-    ):
-        raise QualificationError("effective IAM absence verification boundary failed")
-
-
 def _run_prequalification_denial_probes(
     *,
-    expected_service_url: str,
-    expected_service_resource: str,
-    expected_unapproved_subject: str,
-    unapproved_access_token: str,
     requester: Requester,
 ) -> dict[str, str]:
-    subject = _verify_google_identity_token(
-        unapproved_access_token, expected_service_url, expected_unapproved_subject
+    unauthenticated = requester(
+        "GET", "/api/staff/v1/environment", {"Accept": "application/json"}, None
     )
-    _verify_effective_iam_absence(subject, expected_service_resource)
-    unauthenticated_status, _, _ = _normalize_response(
-        requester("GET", "/readiness", {"Accept": "application/json"}, None)
+    wrong = requester(
+        "GET",
+        "/api/staff/v1/environment",
+        _build_demo_headers(WRONG_DEMO_PASSWORD),
+        None,
     )
-    if unauthenticated_status not in (401, 403):
-        raise QualificationError("unauthenticated invocation denial probe failed")
-    unapproved_headers = _build_private_headers(unapproved_access_token)
-    unapproved_status, _, _ = _normalize_response(
-        requester("GET", "/readiness", unapproved_headers, None)
-    )
-    if unapproved_status != 403:
-        raise QualificationError("authenticated unapproved invocation denial probe failed")
+    for label, response in (("unauthenticated", unauthenticated), ("wrong basic", wrong)):
+        status_code, response_headers, payload = _normalize_response(response)
+        challenge = next(
+            (
+                value
+                for name, value in response_headers.items()
+                if name.lower() == "www-authenticate"
+            ),
+            "",
+        )
+        if status_code != 401 or payload or challenge != DEMO_CHALLENGE:
+            raise QualificationError(f"{label} basic denial boundary failed")
+        _require_no_store(f"{label} basic denial", response_headers)
     return {
-        "unauthenticated": "denied_without_business_body",
-        "authenticated_unapproved": "denied_after_verified_token_and_iam_absence",
+        "unauthenticated": "fixed_basic_denial",
+        "wrong_basic": "fixed_basic_denial",
     }
 
 
@@ -369,6 +299,7 @@ def _redact_text(text: str) -> str:
     )
     redacted = re.sub(r"postgresql\+[^\s]+", "[REDACTED]", redacted)
     redacted = re.sub(r"Bearer\s+[^\s]+", "Bearer [REDACTED]", redacted)
+    redacted = re.sub(r"Basic\s+[^\s]+", "Basic [REDACTED]", redacted)
     redacted = re.sub(r"cursor[^\s]*", "[REDACTED]", redacted, flags=re.IGNORECASE)
     redacted = re.sub(r"token[^\s]*", "[REDACTED]", redacted, flags=re.IGNORECASE)
     redacted = re.sub(r"Synthetic Qual Employer[^\n]*", "[REDACTED]", redacted)
@@ -508,7 +439,7 @@ def _failure_boundary(exc: QualificationError) -> str:
         return "employer_contact_query"
     if "contact read" in message:
         return "employer_contact_read"
-    if "token" in message or "authenticated access" in message:
+    if "password" in message or "authenticated access" in message:
         return "authenticated_access"
     if "base URL" in message or "service authority" in message:
         return "network_reachability"
@@ -542,33 +473,50 @@ def qualify_develop_deployment(
     *,
     base_url: str,
     expected_service_url: str,
-    expected_service_resource: str,
-    expected_unapproved_subject: str,
-    access_token: str,
-    unapproved_access_token: str,
-    expected_schema_revision: str,
+    demo_password: str,
+    log_export_reader: Callable[[], str],
     expected_image_digest: str,
     allow_synthetic_writes: bool,
     requester: Requester | None = None,
 ) -> dict[str, Any]:
     validated_base_url = _validate_base_url(base_url, expected_service_url)
-    validated_service_resource = _validate_expected_service_resource(expected_service_resource)
-    validated_expected_image_digest = _validate_expected_image_digest(expected_image_digest)
-    headers = _build_private_headers(access_token)
-    if access_token.strip() == unapproved_access_token.strip():
-        raise QualificationError("qualification requires separate authenticated access tokens")
+    _validate_expected_image_digest(expected_image_digest)
+    headers = _build_demo_headers(demo_password)
+    public_headers = {"Accept": "application/json"}
     request_impl = requester or (
         lambda method, path, req_headers, body: _request_json(
             validated_base_url, method, path, req_headers, body
         )
     )
-    access_denial_probes = _run_prequalification_denial_probes(
-        expected_service_url=validated_base_url,
-        expected_service_resource=validated_service_resource,
-        expected_unapproved_subject=expected_unapproved_subject,
-        unapproved_access_token=unapproved_access_token,
-        requester=request_impl,
+    health_payload = _expect_boundary(
+        boundary="health",
+        response=request_impl("GET", "/health", public_headers, None),
+        expected_status=200,
+        expected_body_status="ok",
     )
+    readiness_payload = _expect_boundary(
+        boundary="readiness",
+        response=request_impl("GET", "/readiness", public_headers, None),
+        expected_status=200,
+        expected_body_status="ready",
+    )
+    if set(health_payload) != {"status"} or set(readiness_payload) != {"status"}:
+        raise QualificationError("public probe minimization boundary failed")
+    access_denial_probes = _run_prequalification_denial_probes(requester=request_impl)
+    environment_status, environment_headers, environment_payload = _normalize_response(
+        request_impl("GET", "/api/staff/v1/environment", headers, None)
+    )
+    if (
+        environment_status != 200
+        or environment_payload.get("environment") != "develop"
+        or environment_payload.get("data_boundary") != "fictional-synthetic-only"
+        or "non-production" not in str(environment_payload.get("label", "")).lower()
+        or "synthetic" not in str(environment_payload.get("label", "")).lower()
+    ):
+        raise QualificationError("environment synthetic boundary failed")
+    _require_no_store("environment", environment_headers)
+    if not allow_synthetic_writes:
+        raise QualificationError("explicit live-write acknowledgement is required")
 
     employer_display_name = f"Synthetic Qual Employer {uuid4().hex[:8]}"
     revised_display_name = f"{employer_display_name} Revised"
@@ -576,27 +524,6 @@ def qualify_develop_deployment(
     create_idempotency_key = str(uuid4())
     revise_idempotency_key = str(uuid4())
     contact_idempotency_key = str(uuid4())
-
-    health_payload = _expect_boundary(
-        boundary="health",
-        response=request_impl("GET", "/health", headers, None),
-        expected_status=200,
-        expected_body_status="ok",
-    )
-    readiness_payload = _expect_boundary(
-        boundary="readiness",
-        response=request_impl("GET", "/readiness", headers, None),
-        expected_status=200,
-        expected_body_status="ready",
-    )
-    if readiness_payload.get("deployment_target") != APPROVED_DEPLOYMENT_TARGET:
-        raise QualificationError("readiness deployment target boundary failed")
-    if readiness_payload.get("schema_revision") != expected_schema_revision:
-        raise QualificationError("readiness schema revision boundary failed")
-    if readiness_payload.get("deployed_image_digest") != validated_expected_image_digest:
-        raise QualificationError("readiness image digest boundary failed")
-    if not allow_synthetic_writes:
-        raise QualificationError("explicit live-write acknowledgement is required")
 
     create_headers = dict(headers)
     create_headers["Idempotency-Key"] = create_idempotency_key
@@ -842,10 +769,29 @@ def qualify_develop_deployment(
         raise QualificationError("employer contact read not-found boundary failed")
     _require_no_store("employer contact read not-found", contact_not_found_headers)
 
+    log_scan = _verify_log_export_is_safe(
+        log_export_reader(),
+        prohibited_values=[
+            DEMO_USERNAME,
+            demo_password,
+            employer_display_name,
+            revised_display_name,
+            contact_full_name,
+            employer_id,
+            contact_id,
+            random_employer_id,
+            random_contact_id,
+            create_idempotency_key,
+            revise_idempotency_key,
+            contact_idempotency_key,
+        ],
+    )
+
     return {
         "qualification_status": "passed",
         "health_status": str(health_payload["status"]),
         "readiness_status": str(readiness_payload["status"]),
+        "log_scan": log_scan,
         "automated_qualification": {
             "status": "passed",
             "synthetic_writes": "explicitly_allowed",
@@ -912,10 +858,13 @@ def qualify_develop_deployment(
             "owner_disposition_retest": "not_triaged",
         },
         "access_denial_probes": access_denial_probes,
-        "readiness_posture": {
-            "deployment_target": readiness_payload.get("deployment_target"),
-            "schema_revision": readiness_payload.get("schema_revision"),
-            "deployed_image_digest": readiness_payload.get("deployed_image_digest"),
+        "platform_posture": {
+            "immutable_image": "verified_by_prior_foundation_readback",
+            "private_database": "verified_by_prior_foundation_readback",
+            "one_instance_cap": "verified_by_prior_foundation_readback",
+            "credential_expiry": "verified_by_prior_foundation_readback",
+            "budget_and_labels": "verified_by_prior_foundation_readback",
+            "log_safety": "verified_by_post_qualification_log_scan",
         },
         "employer_flow": {
             "create": "fresh",
@@ -941,7 +890,6 @@ def qualify_develop_deployment(
             "revise_idempotency_key": revise_idempotency_key,
             "contact_idempotency_key": contact_idempotency_key,
             "cursor": search_payload.get("next_cursor"),
-            "token": access_token,
             "create_result_version": create_response_headers.get("Idempotency-Result-Version"),
             "revise_result_version": revise_response_headers.get("Idempotency-Result-Version"),
             "contact_result_version": contact_response_headers.get("Idempotency-Result-Version"),
@@ -955,22 +903,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.artifact_root:
         destination = _validated_evidence_destination(args.artifact_root, args.evidence_name)
     try:
-        access_token = _read_access_token(args)
-        unapproved_access_token = _read_unapproved_access_token(args)
-        expected_unapproved_subject = _read_token(
-            stdin_selected=False,
-            file_path=None,
-            env_name=args.expected_unapproved_subject_env,
-            label="expected unapproved subject",
+        demo_password = _read_demo_password(args)
+        log_export_reader = (
+            (lambda: _collect_cloud_run_logs(args.log_project_id))
+            if args.log_project_id
+            else lambda: _read_private_text_file(
+                args.log_export_file,
+                label="log export",
+            )
         )
         result = qualify_develop_deployment(
             base_url=args.base_url,
             expected_service_url=args.expected_service_url,
-            expected_service_resource=args.expected_service_resource,
-            expected_unapproved_subject=expected_unapproved_subject,
-            access_token=access_token,
-            unapproved_access_token=unapproved_access_token,
-            expected_schema_revision=args.expected_schema_revision,
+            demo_password=demo_password,
+            log_export_reader=log_export_reader,
             expected_image_digest=args.expected_image_digest,
             allow_synthetic_writes=args.allow_synthetic_writes,
         )

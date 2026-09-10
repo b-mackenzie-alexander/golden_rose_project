@@ -9,7 +9,14 @@ resource "google_cloud_run_v2_service" "staff_tracer" {
   labels              = local.standard_labels
 
   template {
-    service_account = google_service_account.runtime.email
+    service_account                  = google_service_account.runtime.email
+    timeout                          = "60s"
+    max_instance_request_concurrency = 10
+
+    scaling {
+      min_instance_count = 0
+      max_instance_count = 1
+    }
 
     vpc_access {
       egress = "PRIVATE_RANGES_ONLY"
@@ -22,6 +29,13 @@ resource "google_cloud_run_v2_service" "staff_tracer" {
 
     containers {
       image = local.managed_container_image
+
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "512Mi"
+        }
+      }
 
       env {
         name  = "GOLDEN_ROSE_ENVIRONMENT"
@@ -46,6 +60,26 @@ resource "google_cloud_run_v2_service" "staff_tracer" {
       env {
         name  = "GOLDEN_ROSE_DEPLOYED_IMAGE_DIGEST"
         value = var.container_image_digest
+      }
+
+      env {
+        name  = "GOLDEN_ROSE_DEMO_ACCESS_ENABLED"
+        value = "true"
+      }
+
+      env {
+        name  = "GOLDEN_ROSE_DEMO_ACCESS_EXPIRES_AT"
+        value = var.demo_access_expires_at
+      }
+
+      env {
+        name = "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD"
+        value_source {
+          secret_key_ref {
+            secret  = "demo-access-password"
+            version = "latest"
+          }
+        }
       }
 
       env {
@@ -76,5 +110,6 @@ resource "google_cloud_run_v2_service" "staff_tracer" {
     google_monitoring_alert_policy.health_failures,
     google_monitoring_alert_policy.service_error_events,
     google_logging_project_bucket_config.default,
+    google_secret_manager_secret_iam_member.runtime_demo_access_secret_access,
   ]
 }

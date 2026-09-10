@@ -2,13 +2,13 @@
 
 Status: source contract only until the later approved qualification and human-feedback gates run.
 
-The private fictional-synthetic `develop` tranche ends with exactly one final status. These statuses are value-safe labels for tracked documentation; raw private evidence stays operator-held.
+The human-visible fictional-synthetic `develop` tranche ends with exactly one final status. Existing machine-readable labels retain `private_develop` for compatibility, but the transport is intentionally public behind the temporary shared Basic gate; the URL, credential, and raw evidence stay operator-held.
 
 ## Exact statuses
 
 ### `qualified_private_develop_for_human_feedback`
 
-All automated, access, browser, manual accessibility, fluent English/Spanish, monitoring, recovery/cleanup, and feedback-blocker criteria pass.
+All automated, shared-access, browser, manual accessibility, fluent English/Spanish, monitoring, non-mutating recovery-readiness, and feedback-blocker criteria pass.
 
 This status remains non-production and synthetic-only. It is not staff-pilot identity and does not authorize live/client data or production.
 
@@ -37,7 +37,8 @@ This status does not authorize live/client data or production.
 ## Overclaiming boundary
 
 - Exactly one final status may be selected.
-- Passing automated qualification alone is not human browser qualification.
+- Passing automated qualification alone is not human browser qualification; human visibility is mandatory before this final status may be selected.
+- An unexpired shared credential is temporary access, not production identity.
 - Passing browser/manual accessibility rows alone is not fluent-language approval.
 - Human technical feedback is not client acceptance.
 - None of these statuses authorizes live/client data or production.

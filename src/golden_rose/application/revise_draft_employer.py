@@ -17,9 +17,11 @@ from golden_rose.application.errors import (
     EmployerVersionConflictError,
     SafePersistenceError,
 )
+from golden_rose.application.synthetic_data import require_develop_synthetic_value
 from golden_rose.auth.permissions import can_revise_draft_employer
 from golden_rose.auth.principal import StaffPrincipal
 from golden_rose.clock import Clock
+from golden_rose.config import Environment
 from golden_rose.persistence.audit_events import insert_employer_draft_revised_event
 from golden_rose.persistence.command_receipts import (
     CommandReceiptRecord,
@@ -47,12 +49,18 @@ def revise_draft_employer(
     employer_type: Literal["household", "business"],
     display_name: str,
     clock: Clock,
+    environment: Environment = "local",
 ) -> ReviseDraftEmployerResult:
     if not can_revise_draft_employer(principal):
         msg = "principal lacks employer:draft:revise"
         raise PermissionError(msg)
 
     normalized_display_name = validate_employer_display_name(display_name)
+    require_develop_synthetic_value(
+        environment=environment,
+        field="employer_display_name",
+        value=normalized_display_name,
+    )
     now = clock.now()
     request_fingerprint = _build_request_fingerprint(
         employer_id=employer_id,

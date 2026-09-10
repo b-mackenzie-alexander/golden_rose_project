@@ -29,3 +29,8 @@ output "observability_contract" {
   description = "Value-safe reviewed observability contract for the private synthetic develop environment."
   value       = module.develop.observability_contract
 }
+
+output "human_visible_develop_contract" {
+  description = "Value-safe temporary access and cost-bound markers for fictional-synthetic develop."
+  value       = module.develop.human_visible_develop_contract
+}

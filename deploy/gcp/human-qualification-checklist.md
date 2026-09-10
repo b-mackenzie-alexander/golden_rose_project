@@ -1,6 +1,6 @@
 # Human qualification checklist
 
-Status: not_run until an approved named-human qualification gate opens.
+Status: not_run until the separately approved eight-hour deployment packet reaches the mandatory browser walkthrough.
 
 This checklist defines the value-safe manual evidence matrix for the private fictional-synthetic `develop` target. It is source guidance only; it does not grant tester access, service start, cloud access, or permission to run a human walkthrough.
 
@@ -10,6 +10,7 @@ Every required row records pass/fail/not-run, tester role, language, evidence re
 
 | Row | browser | OS | device or viewport | assistive technology | network condition | language | Required coverage | Result | Evidence reference | Disposition |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| shared Basic boundary | macOS Safari | macOS | desktop viewport | keyboard only | normal | English | public minimized probes; fixed denial; browser prompt; no credential reflection/cookie | not-run | [operator-held] | pending |
 | macOS Safari English Employer path | macOS Safari | macOS | desktop viewport | keyboard only | normal | English | Employer create/read/search/revision/replay path | not-run | [operator-held] | pending |
 | macOS Safari Spanish Employer path | macOS Safari | macOS | desktop viewport | keyboard only | normal | Spanish | Employer create/read/search/revision/replay path | not-run | [operator-held] | pending |
 | Chromium desktop English Employer path | Chromium desktop | current desktop OS | desktop viewport | keyboard only | normal | English | Employer create/read/search/revision/replay path | not-run | [operator-held] | pending |
@@ -25,6 +26,6 @@ Every required row records pass/fail/not-run, tester role, language, evidence re
 
 ## Value-safety rules
 
-Do not store submitted names, UUIDs, commands, cursors, tester identities, endpoints, tokens, screenshots containing sensitive values, or raw bodies in this tracked checklist or any tracked manual qualification artifact.
+Do not store submitted names, UUIDs, commands, cursors, tester identities, endpoints, credentials, Authorization headers, expiry timestamps, screenshots containing sensitive values, or raw bodies in this tracked checklist or any tracked manual qualification artifact.
 
 If any required row is failed or not-run, the target is not fully qualified for the human-feedback outcome. Record the blocker category and disposition without exposing raw private evidence.

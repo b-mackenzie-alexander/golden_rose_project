@@ -5,6 +5,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from golden_rose.application.create_draft_employer import IdempotencyConflictError
 from golden_rose.application.errors import SafePersistenceError
+from golden_rose.application.synthetic_data import SyntheticDataAdmissionError
 
 
 class InvalidIdempotencyKeyError(ValueError):
@@ -78,6 +79,17 @@ def install_exception_handlers(app: FastAPI) -> None:
             title="Forbidden",
             detail="forbidden",
             type_="https://golden-rose.local/problems/forbidden",
+        )
+
+    @app.exception_handler(SyntheticDataAdmissionError)
+    async def handle_synthetic_data_admission_error(
+        request: Request, exc: SyntheticDataAdmissionError
+    ) -> JSONResponse:
+        return no_store_problem_response(
+            status_code=422,
+            title="Unprocessable Entity",
+            detail="fictional synthetic value required",
+            type_="https://golden-rose.local/problems/synthetic-data-required",
         )
 
     @app.exception_handler(SafePersistenceError)

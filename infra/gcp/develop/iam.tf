@@ -1,3 +1,18 @@
+resource "google_project_iam_custom_role" "provisioner_quota_user" {
+  project     = var.project_id
+  role_id     = "goldenRoseProvisionerQuotaUser"
+  title       = "Golden Rose Provisioner Quota User"
+  description = "Permits only workload-project quota attribution for the provisioner."
+  permissions = ["serviceusage.services.use"]
+  stage       = "GA"
+}
+
+resource "google_project_iam_member" "provisioner_quota_user" {
+  project = var.project_id
+  role    = google_project_iam_custom_role.provisioner_quota_user.name
+  member  = "serviceAccount:golden-rose-provisioner@${var.control_plane_project_id}.iam.gserviceaccount.com"
+}
+
 resource "google_project_iam_member" "runtime_cloudsql_client" {
   project = var.project_id
   role    = "roles/cloudsql.client"
@@ -82,6 +97,13 @@ resource "google_secret_manager_secret_iam_member" "runtime_synthetic_staff_secr
   member    = "serviceAccount:${google_service_account.runtime.email}"
 }
 
+resource "google_secret_manager_secret_iam_member" "runtime_demo_access_secret_access" {
+  project   = var.project_id
+  secret_id = "demo-access-password"
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.runtime.email}"
+}
+
 resource "google_secret_manager_secret_iam_member" "migration_synthetic_staff_secret_access" {
   project   = var.project_id
   secret_id = "synthetic-staff-id"
@@ -105,32 +127,11 @@ resource "google_artifact_registry_repository_iam_member" "artifact_verifier_rea
   member     = "serviceAccount:golden-rose-artifact-verifier@${var.control_plane_project_id}.iam.gserviceaccount.com"
 }
 
-data "external" "tester_authority" {
-  count   = var.deployment_stage == "service" ? 1 : 0
-  program = ["python3", "${path.root}/../../scripts/verify_tester_authority_receipt.py", "--external"]
-
-  query = {
-    receipt              = var.tester_authority_receipt_path
-    bundle               = var.tester_authority_bundle_path
-    certificate_identity = var.tester_authority_certificate_identity
-    project_id           = var.project_id
-    region               = var.region
-    service              = "staff-tracer"
-  }
-}
-
-resource "google_cloud_run_v2_service_iam_member" "private_invoker" {
+resource "google_cloud_run_v2_service_iam_member" "public_invoker" {
   count    = var.deployment_stage == "service" ? 1 : 0
   project  = var.project_id
   location = var.region
   name     = google_cloud_run_v2_service.staff_tracer[0].name
   role     = "roles/run.invoker"
-  member   = data.external.tester_authority[0].result.private_invoker_principal
-
-  lifecycle {
-    precondition {
-      condition     = can(regex("^[0-9a-f]{64}$", data.external.tester_authority[0].result.tester_authority_receipt_sha256))
-      error_message = "The named tester invoker must be bound to a verified tester-authority receipt SHA-256."
-    }
-  }
+  member   = "allUsers"
 }

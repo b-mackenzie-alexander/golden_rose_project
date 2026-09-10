@@ -105,6 +105,7 @@ jobs:
           uv run mypy src tests
           uv run bandit -q -r src
           uv run alembic upgrade head
+          uv run pytest tests/unit/test_config.py tests/unit/test_demo_access.py tests/unit/application/test_synthetic_data_admission.py tests/unit/api/test_health.py -q
           uv run pytest --cov=golden_rose --cov-report=term-missing --cov-fail-under=95
           if uv run alembic downgrade base 2> build/alembic-downgrade.stderr; then
             echo "database authority lifecycle downgrade unexpectedly succeeded" >&2

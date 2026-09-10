@@ -8,6 +8,8 @@
 
 **Operating model:** One solo developer; agent reviews are quality checks, not human approvals. One source PR and one time-bounded operational approval packet. Production/live-data promotion remains separate.
 
+**Implementation status (2026-09-09):** PR #82 merged this plan at protected `develop@349a80b98b0b7637754befd9d2fe726d614d0e19`. Source implementation is active on `feat/human-visible-develop`. Dependency tracing and review remediation required the twelve-file same-plan amendment recorded in the replay ledger, expanding the source surface from 40 to 52 paths without changing the accepted architecture. No cloud operation is authorized by this status update.
+
 ---
 
 ## 1. Accepted managerial decisions
@@ -82,8 +84,8 @@ One architecture/security agent review and one Terraform/deployment agent review
 
 After source merge, prepare one private packet bound to exact protected source SHA, publication workflow identity, repository, Terraform 1.15.8/provider locks, immutable inputs, current state generations, expected resource-action allowlists, and one transaction ID. If an immutable image already admitted for that exact source exists, bind it at approval. Otherwise the verifier-admitted digest emitted by the exact publication workflow is a designated packet output and becomes the mandatory immutable input to both Terraform plans and every later check without a second approval. One explicit user approval authorizes this ordered sequence for up to eight hours:
 
-1. read-only repository/GCP/state/IAM/resource precheck, including proof that Beatrice's selected human identity currently has exactly the custom-role creation/read and project IAM policy get/set authority needed for the bootstrap;
-2. before provisioner backend initialization, Beatrice creates—or reads back if already present—exact project custom role `goldenRoseProvisionerQuotaUser` containing only `serviceusage.services.use` and its sole binding to the workload provisioner. Any role/binding collision, extra permission/member, wrong stage/title, or missing human authority stops;
+1. read-only repository/GCP/state/IAM/resource precheck, including proof that Beatrice's selected human identity currently has exactly the custom-role creation/read and project IAM policy get/set authority needed for the bootstrap plus read authority for the workload project's complete folder/organization ancestry and every ancestor IAM policy; missing ancestor visibility stops rather than becoming evidence of absence;
+2. before provisioner backend initialization, Beatrice creates—or reads back if already present—exact project custom role `goldenRoseProvisionerQuotaUser` with title `Golden Rose Provisioner Quota User`, description `Permits only workload-project quota attribution for the provisioner.`, stage `GA`, only `serviceusage.services.use`, and its sole binding to the workload provisioner. The live verifier enumerates every ancestor policy and rejects direct, public, or service-account-principal-set inherited provisioner authority plus unresolved group membership. Any role/binding collision, extra permission/member, wrong title/description/stage, inherited expansion, or missing human authority stops;
 3. after the permission is effective, initialize the workload backend as the provisioner and import exact addresses `module.develop.google_project_iam_custom_role.provisioner_quota_user` and `module.develop.google_project_iam_member.provisioner_quota_user` using the exact project/role/member import IDs. Read both state objects back and require the first full migration plan to show zero actions for them;
 4. publish and verify the exact merged image when no admitted digest exists; bind its verifier-admitted digest as the packet output described above;
 5. generate and inspect the `migration` Terraform plan;
@@ -132,7 +134,7 @@ Every planning, implementation, review, and operational handoff for this lane mu
 
 - one solo developer and no assumed human review team;
 - durable human-visible `develop` as the current required outcome;
-- one 40-path source PR and one eight-hour deployment approval packet;
+- one 52-path amended source PR and one eight-hour deployment approval packet;
 - the exact access/quota/database/cost decisions;
 - the current-target stop conditions;
 - the exact next executable action; and

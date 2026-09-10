@@ -42,34 +42,34 @@ automated hiring, matching, ranking, eligibility, or referral system.
   Gate P is complete; its one-use approval is consumed.
   No running shared application, public access, real identity, live/client data,
   or production claim is authorized.
-- Terraform/IaC follows the accepted private synthetic-only GCP `develop`
+- Terraform/IaC follows the accepted fictional-synthetic GCP `develop`
   posture: `us-east4`; split bootstrap, publication, deployment, runtime, and
   migration identities; durable remote state; immutable digest promotion;
-  Secret Manager metadata/IAM only; staged private Cloud SQL/VPC; named private
-  Cloud Run invocation; value-safe observability; and intentional teardown.
-  Gate F is complete with 41 managed addresses plus one expected data source and
-  no executable workload. Gate P is complete; its one-use approval is consumed.
-  Gate S created and metadata-read back only the bounded `synthetic-staff-id`
-  version. Runtime/migration database-URL versions remain deferred until real
-  database/login material exists. Both named-human bootstrap authority transitions,
-  exact apply/readback, and provisioner-owned workload-backend proof are complete.
-  Fresh migration planning stopped on the quota-authority conflict governed by
-  ADR-0015. PR A review then proved its local policy/approval digest could be
-  self-asserted, so source work is paused under accepted ADR-0016 pending protected
-  publication, exact-tip rebaseline, and separate implementation authorization. No
-  signer/environment action, IAM/state, plan/apply,
-  migration, service, tester, qualification, real-identity, live-data, or
-  production operational authority. Private identifiers and secret payloads stay outside
-  tracked source and ordinary documentation.
+  Secret Manager metadata/IAM only; staged private Cloud SQL/VPC; temporary exact
+  `allUsers` Cloud Run invocation behind the expiring application Basic gate;
+  value-safe observability; and intentional teardown. Gate F is complete with 41
+  managed addresses plus one expected data source and no executable workload.
+  Gate P is complete; its one-use approval is consumed. Gate S created and
+  metadata-read back only the bounded `synthetic-staff-id` version.
+  Runtime/migration database-URL versions remain deferred until real database/login
+  material exists. Both named-human bootstrap authority transitions, exact
+  apply/readback, and provisioner-owned workload-backend proof are complete. PR #83
+  merged the reviewed 52-path replacement source contract into protected
+  `develop@9a04b274d9e0132e5a0b409314ba53170b43e303`; all required CI passed. No new
+  IAM/state, plan/apply, image, secret, database, migration, service, access,
+  qualification, real-identity, live-data, or production operation occurred.
+  Private identifiers and secret payloads stay outside tracked source and ordinary
+  documentation.
 - Source-controlled Gate 2 read-only verification tooling now exists: `scripts/verify_gcp_foundation.py`
   evaluates live foundation/effective-authority posture against the reviewed
   contract without adding any mutation mode, and `deploy/gcp/evidence-template.md`
   defines the minimized redacted evidence shape for approved verification runs.
-- Source-controlled private-synthetic qualification tooling now also exists:
+- Source-controlled fictional-synthetic qualification tooling now also exists:
   `scripts/qualify_develop_deployment.py` keeps health/readiness separate from
-  bounded workflow qualification, requires authenticated private access, uses
-  newly generated fictional values only, and emits minimized evidence without
-  leaking submitted identifiers, cursors, tokens, DSNs, or raw bodies.
+  bounded workflow qualification, requires the expiring application Basic
+  credential through a non-argv handoff, uses newly generated fictional values
+  only, and emits minimized evidence without leaking submitted identifiers,
+  cursors, credentials, DSNs, or raw bodies.
 - PR #29 merged the six authorized static remediations at `08fe305`: semantic
   policy, deterministic `uv`, Direct VPC/private-SQL declaration, API ordering,
   Cloud SQL backup enablement, and managed-registry digest authority. The
@@ -77,13 +77,16 @@ automated hiring, matching, ranking, eligibility, or referral system.
   Accepted ADR-0012 reflects the permanent single-maintainer reality: no
   unavailable second human is required, and agent/CI review is quality evidence
   rather than independent authorization. PR #33 merged its consolidated
-  source-controlled pre-deployment work while keeping
-  read-only GCP qualification, Terraform plan, foundation apply, first private
-  synthetic deployment, and qualification as separate explicit owner gates.
+  source-controlled pre-deployment work. Its older separate-gate sequence is
+  historical for this target; ADR-0016 now permits one approval-pending exact
+  eight-hour packet for ordinary fictional-synthetic precheck-through-qualification
+  operations.
 - Accepted ADR-0013 defines staged `foundation → migration → service` Terraform
-  authority, Terraform-only configuration ownership, IAM-private named testers,
-  exact viewer/job-executor and direct-workflow WIF authority, digest-bound
-  Cosign/SLSA/SBOM verification, and authenticated `/readiness` monitoring.
+  authority, Terraform-only configuration ownership, exact viewer/job-executor and
+  direct-workflow WIF authority, digest-bound Cosign/SLSA/SBOM verification, and
+  readiness monitoring. Its former named-IAM-only tester boundary is superseded for
+  this fictional-synthetic target by ADR-0016's exact temporary `allUsers` service
+  invoker behind the expiring application Basic gate.
   PR #37/PR #42/PR #46/PR #48 closed the source and verifier blockers; PR #57
   closed A1; PR #62/PR #63/PR #64 closed the later state/evaluation source
   corrections. E2/E3 state establishment/readback, A5, ownership alignment, the
@@ -98,11 +101,11 @@ automated hiring, matching, ranking, eligibility, or referral system.
   hygiene. That evidence is local-only and does not imply cloud qualification.
 - ADR-0014 now governs delivery granularity: one accepted outcome-scale plan may
   span several roadmap items and implementation PRs, while TDD stays small and
-  every hazardous cloud/data/runtime operation keeps a separate approval. The
-  accepted master plan merged through PR #49 and continues to govern the private
-  fictional-synthetic shared `develop` target for bounded human feedback. It
-  predeclares ordered source and operational gates without collapsing their
-  separate approvals.
+  hazardous authority remains explicit. ADR-0016's newer addendum permits one
+  approval-pending exact eight-hour packet to bundle the current target's ordinary
+  precheck, plans/applies, image, secrets, migration, service, access, readbacks,
+  and qualification. Live data, production, destructive recovery/state editing,
+  and out-of-packet authority remain separate.
 - Automated frontend parity/accessibility evidence exists locally, but human
   browser/manual accessibility/fluent-language qualification remains deferred
   until a shared deployed `develop` target exists.

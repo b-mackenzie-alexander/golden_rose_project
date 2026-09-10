@@ -2,7 +2,7 @@
 
 This procedure governs Beatrice's temporary browser access to the first human-visible fictional-synthetic GCP `develop` deployment while application authentication remains synthetic. Cloud Run invocation is temporarily public, but every business/static route is protected by the expiring shared HTTP Basic gate.
 
-Current source status: PR #82 merged the accepted acceleration packet at protected `develop@349a80b98b0b7637754befd9d2fe726d614d0e19`. This source procedure performs no access grant or secret write. It is executed only inside the later separately approved eight-hour deployment packet.
+Current source status: PR #83 merged the reviewed 52-path source contract into protected `develop@9a04b274d9e0132e5a0b409314ba53170b43e303`; all required CI passed. This procedure performs no access grant or secret write. Eight-hour packet approval is pending, and this procedure has not been executed.
 
 ## Scope
 
@@ -87,10 +87,10 @@ Remove access when the credential expires, the synthetic feedback window closes,
 
 ## Accidental exposure response
 
-If a tester URL, identity roster, or invoker binding leaks:
+If the service URL, credential material, or invoker posture leaks:
 
-1. remove the exposed binding immediately
-2. stop the tester window
+1. remove the exact `allUsers` invoker binding when needed for immediate containment
+2. stop the browser-access window
 3. rotate any affected secrets or access material
-4. re-verify the IAM-authenticated ingress posture and named invoker posture
+4. re-verify the exact service-level `allUsers` invoker set, expiring Basic-gate posture, and fixed unauthorized denials before restoring access
 5. reopen access only after the private record reflects the corrective action

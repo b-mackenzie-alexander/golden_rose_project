@@ -2,7 +2,7 @@
 
 This runbook defines the single eight-hour operator packet for the first human-visible fictional-synthetic `develop` deployment. It is intentionally value-safe: project IDs, billing IDs, domains, principals, secret payloads, passwords, tokens, plans, state values, and the exact service URL stay in operator-held records rather than tracked source.
 
-Current source status: PR #82 merged the accepted human-visible acceleration plan at protected `develop@349a80b98b0b7637754befd9d2fe726d614d0e19`. This source runbook grants no cloud authority. After the source PR merges, one separately approved packet may cover the exact ordered precheck through automated qualification for no more than eight hours. Live/client data, production, destructive recovery, and actions outside that packet remain separate.
+Current source status: PR #83 merged the reviewed 52-path source contract into protected `develop@9a04b274d9e0132e5a0b409314ba53170b43e303`; all required CI passed. This runbook grants no cloud authority. After the documentation-only status closeout merges and the final protected tip is rebound, one separately approved packet may cover the exact ordered precheck through automated qualification for no more than eight hours. Live/client data, production, destructive recovery, and actions outside that packet remain separate.
 
 ## Scope
 
@@ -61,10 +61,10 @@ If later deployment wiring uses a different secret-to-environment mapping, updat
 ## Injection ceremony
 
 1. Confirm the reviewed secret metadata already exists and matches the four executable Secret Manager references.
-2. Generate the synthetic staff UUID without display and create/read back only its metadata-bound version under the separately approved early Gate S action.
-3. Do not create runtime or migration database-URL versions until migration-stage Cloud SQL/database creation and the separately approved login-role ceremony provide real connection material; placeholders and guessed URLs are prohibited.
+2. Read back the already completed bounded `synthetic-staff-id` version through value-safe metadata only; do not create a placeholder or duplicate version merely for this packet.
+3. Do not create runtime or migration database-URL versions until migration-stage Cloud SQL/database creation and the packet's login-role step provide real connection material; placeholders and guessed URLs are prohibited.
 4. Generate database passwords and other payload-bearing values without pasting them into chat, shell history, Terraform files, or PR comments.
-5. Create new database-URL Secret versions out of band for the approved payload-bearing secrets only, under the fresh post-database approval.
+5. Create new database-URL Secret versions out of band for the packet-authorized payload-bearing secrets only after the database and login roles are ready; this is an internal packet step, not a fresh approval.
 6. Verify every version creation through value-safe identifiers only; do not print payloads back to confirm them.
 7. Update the private custody record with custodian, rotation, recovery, and revocation ownership plus the created version references.
 8. Generate the demo password directly into Secret Manager stdin and an owner-held `0600` file outside the repository; never place it in argv, Terraform state, workflow inputs, logs, or chat.

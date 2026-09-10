@@ -1,5 +1,7 @@
 # Signed FinOps Approval Authority Planning Review Handoff
 
+> **Historical closeout:** This handoff preserves the pre-publication signed-authority planning snapshot. ADR-0016 and its initial plan later merged; ADR-0016's 2026-09-09 human-visible addendum then suspended this Gate E0/signer path for fictional-synthetic `develop`, and PR #83 merged the replacement 52-path source contract at `develop@9a04b274d9e0132e5a0b409314ba53170b43e303`. Do not use the present-tense steps below as current authority.
+
 **Status:** ACCEPTED and CLEAN; uncommitted planning-only publication handoff with exact stage/commit/final-range verification/push/PR/readback/CI authority approved
 **Base:** protected `develop@c933bfc934d2f61e4c08e077e92cc82af7e017dc`
 **Branch:** `docs/finops-approval-authority-amendment`

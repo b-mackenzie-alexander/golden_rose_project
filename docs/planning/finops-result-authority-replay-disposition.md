@@ -1,8 +1,8 @@
 # Human-visible develop acceleration source ledger
 
-**Status:** Accepted planning ledger from merged PR #82, amended during authorized source implementation from 40 to 52 dependency- and review-proven paths. This ledger grants no cloud authority.
+**Status:** Accepted planning ledger from merged PR #82, amended during authorized source implementation from 40 to 52 dependency- and review-proven paths. PR #83 merged that 52-path source contract into protected `develop@9a04b274d9e0132e5a0b409314ba53170b43e303`; this ledger grants no cloud authority.
 
-**Implementation base:** exact protected `develop@349a80b98b0b7637754befd9d2fe726d614d0e19`.
+**Historical implementation base:** exact protected `develop@349a80b98b0b7637754befd9d2fe726d614d0e19`.
 
 ## Planning packet — 9 paths
 

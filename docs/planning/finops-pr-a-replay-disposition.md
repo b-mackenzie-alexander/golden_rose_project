@@ -1,6 +1,6 @@
 # Revised PR A paused-candidate replay disposition
 
-**Status:** Accepted planning support for ADR-0016; protected publication pending. This is not permission to copy, commit, publish, or execute the paused candidate.
+**Status:** Historical superseded planning support. ADR-0016 and its first amendment were published, then its merged 2026-09-09 human-visible addendum suspended revised PR A, Gate E0, signer/envelope/runner, and immediate FinOps work for fictional-synthetic `develop`. PR #83 merged the replacement source contract. This remains evidence only and grants no authority to copy, commit, publish, or execute the paused candidate.
 
 **Paused source:** `/Users/genie/Desktop/golden_rose_project` on local `feat/finops-budget-ownership-foundation`, originally based on protected `develop@c933bfc934d2f61e4c08e077e92cc82af7e017dc`.
 

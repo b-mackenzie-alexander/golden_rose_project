@@ -1,6 +1,6 @@
 # FinOps approval environment Gate E0
 
-**Status:** Accepted source-only procedure under ADR-0016; protected publication pending. Do not execute before the amendment and revised PR A merge, separate Gate E0 approval, exact private inputs, and fresh GitHub readback authority.
+**Status:** Historical superseded procedure. ADR-0016's merged 2026-09-09 human-visible addendum suspends Gate E0 and per-domain signer/envelope/runner machinery for fictional-synthetic `develop`; PR #83 merged the replacement source contract at `develop@9a04b274d9e0132e5a0b409314ba53170b43e303`. Do not execute this runbook for the current target. Reconsider it only for a later production or materially different authority decision.
 
 ## Purpose and boundary
 

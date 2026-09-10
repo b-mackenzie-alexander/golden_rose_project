@@ -1,6 +1,6 @@
 # Security — Golden Rose Operations Platform
 
-**Status:** PR #84 merged the PR #83 continuity closeout into protected `develop@63ac29b20314f03381d4a71e901a68ee51e913aa`. Offline packet derivation found current-target provider/database bootstrap and private-verification blockers; bounded no-cloud remediation is active. It keeps the provisioner backend-only, uses the prechecked named human for provider authority, gives a dedicated no-ingress database verifier only Cloud SQL Client plus the two required Secret reads, skips privileged bootstrap on initialized databases, and preserves exact `allUsers` plus the expiring Basic gate. Packet approval remains pending; no execution has begun.
+**Status:** PR #85 merged the bounded provider/database-bootstrap/private-verification remediation from source head `043f15121612985065c80e1c1c78ca3106a28453` into protected `develop@7a9e7c00de82842040f34080f6c529e688a6d445`. Required CI and final architecture/security plus Terraform/deployment agent rereviews passed. The merged contract keeps the provisioner backend-only, uses the prechecked named human for provider authority, gives a dedicated no-ingress database verifier only Cloud SQL Client plus the two required Secret reads, skips privileged bootstrap on initialized databases, and preserves exact `allUsers` plus the expiring Basic gate. Packet approval remains pending; no cloud execution has begun.
 
 ## Security objectives
 - Protect worker, employer, household/worksite, document, and operational data using least privilege and data minimization.

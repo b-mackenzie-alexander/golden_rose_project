@@ -1,5 +1,7 @@
 # Human-visible `develop` continuity handoff
 
+> **Historical closeout:** This handoff preserves the pre-publication review snapshot. PR #83 subsequently merged source head `cc48b9ffe74eaa7abd90488ba37baf8502eac4af` into protected `develop@9a04b274d9e0132e5a0b409314ba53170b43e303`; all required CI passed. Its branch/worktree is historical evidence. No cloud or deployment action occurred. Current authority is `CURRENT_WORK.md` and the post-PR #83 status-closeout handoff.
+
 ## Delivery lock — read this first
 
 - **Staffing reality:** Beatrice is one independent developer. There is no standing human review team, CODEOWNER quorum, second administrator, or on-call security staff. Agent reviews are quality checks, not independent-human authorization.

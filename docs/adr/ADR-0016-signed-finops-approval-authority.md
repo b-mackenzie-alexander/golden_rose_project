@@ -1,6 +1,6 @@
 # ADR-0016: Require signed one-use authority for FinOps transactions
 
-- **Status:** Accepted and merged by PR #81 at `3dca8101141e31e3d5b22739dabeaa4bc61dd15f`; human-visible `develop` acceleration addendum accepted for publication on 2026-09-09
+- **Status:** Accepted and merged by PR #81 at `3dca8101141e31e3d5b22739dabeaa4bc61dd15f`; human-visible `develop` acceleration addendum merged through PR #82, with its 52-path source contract merged by PR #83 at `9a04b274d9e0132e5a0b409314ba53170b43e303`
 - **Date:** 2026-09-07
 - **Owner:** Beatrice Alexander (engagement owner and sole repository maintainer)
 - **Amends:** ADR-0015 transaction-approval authority and Implementation PR A
@@ -181,7 +181,7 @@ Revisit if the protected signer cannot remain value-safe and no-GCP, the exact a
 
 Golden Rose spent roughly two weeks extending production-grade authority and gate machinery before delivering a GCP environment a human could use. That sequencing no longer meets the engagement need. Beatrice is the sole independent developer, human visibility is now mandatory, and ordinary gate processing may not consume multiple days.
 
-This addendum is **Accepted for publication** and controls the paired acceleration plan. It amends ADR-0015's immediate FinOps split and ADR-0013's named-IAM-only tester boundary for fictional-synthetic `develop`; it does not weaken live-data or production gates.
+This addendum is **Accepted and merged through PR #82** and controls the paired acceleration plan. It amends ADR-0015's immediate FinOps split and ADR-0013's named-IAM-only tester boundary for fictional-synthetic `develop`; it does not weaken live-data or production gates.
 
 ### Decision amendment
 
@@ -205,4 +205,4 @@ These are promotion gates. They do not block the human-visible fictional-synthet
 
 ### Acceptance and sequencing
 
-After one proportional architecture/security review and one Terraform/deployment review clear concrete Blocker/High defects, the packet may be accepted, committed, and merged. The next work is the single source PR followed by one separately approved bundled deployment transaction—not another gate-planning cycle.
+After proportional architecture/security and Terraform/deployment reviews cleared concrete current-target Blocker/High defects, PR #83 merged the single 52-path source contract into protected `develop@9a04b274d9e0132e5a0b409314ba53170b43e303`; all required CI passed. The remaining next action is one separately approved bundled deployment transaction—not another gate-planning cycle. No cloud operation occurred through the source merge.

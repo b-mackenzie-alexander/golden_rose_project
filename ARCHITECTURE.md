@@ -1,6 +1,6 @@
 # Architecture — Golden Rose Operations Platform
 
-**Status:** ADR-0016 and its human-visible acceleration plan merged through PR #82 at protected `develop@349a80b98b0b7637754befd9d2fe726d614d0e19`. The source-only implementation is active on `feat/human-visible-develop`: an expiring application Basic boundary, exact temporary public service invocation, one-instance cap, private Cloud SQL, exact quota-use custom role, post-request log qualification, and one eight-hour deployment packet. No cloud operation is authorized by this branch.
+**Status:** ADR-0016 and its human-visible acceleration plan merged through PR #82. PR #83 then merged the reviewed 52-path source contract into protected `develop@9a04b274d9e0132e5a0b409314ba53170b43e303`: an expiring application Basic boundary, exact temporary public service invocation, one-instance cap, private Cloud SQL, exact quota-use custom role, post-request log qualification, and one eight-hour deployment packet. No cloud operation has occurred; packet approval is pending and deployment is unexecuted.
 
 ## Architectural posture
 Start with one modular product and a relational operational core. Preserve explicit trust boundaries and auditability without prematurely splitting into microservices.

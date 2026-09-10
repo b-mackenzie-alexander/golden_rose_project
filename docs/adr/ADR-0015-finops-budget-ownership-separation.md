@@ -4,7 +4,7 @@
 - **Date:** 2026-09-07
 - **Owner:** Beatrice Alexander (engagement owner and sole repository maintainer)
 - **Amends:** ADR-0013 for cost-guardrail ownership, Terraform state topology, and migration-plan identity
-- **Related:** ADR-0012, ADR-0014, accepted ADR-0016 awaiting protected publication, `.hermes/plans/2026-09-07_finops-budget-ownership-separation-plan.md`
+- **Related:** ADR-0012, ADR-0014, merged ADR-0016 and its human-visible `develop` addendum, `.hermes/plans/2026-09-07_finops-budget-ownership-separation-plan.md`
 
 ## Context and evidence posture
 
@@ -23,9 +23,9 @@ Evidence is classified as follows:
 
 ### Post-merge implementation finding
 
-Implementation PR A review later proved that this ADR's local approval-digest contract is incomplete: a caller able to supply both a policy or approval artifact and its matching digest can create a self-consistent packet without proving a separate protected approval ceremony occurred. Beatrice therefore paused the uncommitted PR A candidate and selected a separately protected, cryptographically signed, one-use approval envelope. Accepted ADR-0016 and `.hermes/plans/2026-09-07_signed-finops-approval-authority-amendment-plan.md` define that material correction and await protected publication.
+Implementation PR A review later proved that this ADR's local approval-digest contract is incomplete: a caller able to supply both a policy or approval artifact and its matching digest can create a self-consistent packet without proving a separate protected approval ceremony occurred. Beatrice therefore paused the uncommitted PR A candidate and selected a separately protected, cryptographically signed, one-use approval envelope. ADR-0016 and its first amendment plan later merged; its 2026-09-09 human-visible addendum then suspended that signer path and this ADR's immediate FinOps split for fictional-synthetic `develop`.
 
-Until that amendment merges through protected `develop`, is used as the exact rebaseline, and receives separate implementation authorization, ADR-0015's Implementation PR A authority is suspended. The original ownership-separation decision remains accepted; no current source branch, unsigned policy/digest pair, or local test result authorizes implementation publication or an operational action.
+The original ownership-separation decision remains accepted future production/handoff guidance, but its immediate source and operational sequence is historical for the current target. PR #83 merged the replacement 52-path source contract at protected `develop@9a04b274d9e0132e5a0b409314ba53170b43e303`; it authorizes no operation by itself.
 
 ## Decision
 
@@ -164,6 +164,6 @@ Rejected as the selected delivery direction. Preserving the current contracts re
 
 ## Approval and revisit triggers
 
-This ADR and its outcome-scale plan merged through protected `develop` in PR #79 at `e7bab14795a24ff69fcc3cd7f8bd28f2cbb9cd73`. That original source authorization is now historical and suspended by the implementation-review finding recorded above. Revised PR A may begin only after ADR-0016 is accepted, merged through protected `develop`, rebaselined from the exact tip, and separately authorized. Every bootstrap, IAM, backend, state-transfer, plan/apply, migration, and downstream operation remains separately reviewed and approved.
+This ADR and its outcome-scale plan merged through protected `develop` in PR #79 at `e7bab14795a24ff69fcc3cd7f8bd28f2cbb9cd73`. Its original source authorization and immediate FinOps transition are historical for fictional-synthetic `develop`: ADR-0016's merged 2026-09-09 addendum defers the split and suspends Gate E0/per-domain signing, and PR #83 merged the replacement source contract. Revisit FinOps separation for production/handoff or a concrete billing-ownership trigger. Live data, production, destructive recovery/state editing, and authority outside the one approved synthetic deployment packet remain separate.
 
 Revisit if the provider cannot preserve the existing budget through import-before-remove transfer, workload planning still requires project-level provisioner quota authority after extraction, a billing-authorized non-human identity becomes required, cross-root receipt verification is infeasible, billing custody changes, or production/multi-environment FinOps becomes active.

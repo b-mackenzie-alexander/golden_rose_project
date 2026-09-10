@@ -1,6 +1,6 @@
 # Signed FinOps Approval Isolated Negative-Fixture Ledger
 
-**Status:** Normative accepted supporting contract; protected publication pending for `.hermes/plans/2026-09-07_signed-finops-approval-authority-amendment-plan.md`.
+**Status:** Historical superseded supporting contract. Its protected publication completed, but ADR-0016's merged 2026-09-09 human-visible addendum suspends this signer/fixture path for fictional-synthetic `develop`; PR #83 merged the replacement source contract. Retain as evidence only.
 
 ## Execution rule
 

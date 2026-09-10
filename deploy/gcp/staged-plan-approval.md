@@ -1,20 +1,20 @@
 # Staged plan approval procedure
 
-This document defines the value-safe approval procedure for each separately approved `foundation`, `migration`, and `service` Terraform transition. The post-PR33 remediations and Gate F foundation transition are complete; this procedure grants no new cloud action and remains controlling guidance for later saved-plan transitions.
+This document defines value-safe saved-plan handling for the `foundation`, `migration`, and `service` Terraform transitions. The post-PR33 remediations and Gate F foundation transition are complete. For the current fictional-synthetic target, migration and service plan handling occurs only inside one future explicitly approved eight-hour packet; this procedure grants no cloud action by itself and does not create per-transition approval gates.
 
 ## Purpose
 
-Ensure every later cloud transition is tied to one reviewed saved plan, one exact source state, one exact workload digest posture, and one explicit approval record.
+Ensure every later cloud transition is tied to one reviewed saved plan, one exact source state, one exact workload digest posture, and the exact still-valid packet approval.
 
 Before any backend initialization or apply, the approval bundle must also bind the canonical private backend-config digest plus an opaque resolved backend identity, state object or prefix, and lock scope fingerprint. The pre-initialization comparison must prove bootstrap and workload roots remain distinct and that the reviewed source/inputs still resolve to the approved backend target for that root.
 
 ## Core rule
 
-No Terraform apply, migration execution, service activation, or reverse transition may proceed from chat approval, a remembered prior plan, or a mutable local worktree. Every transition requires its own saved artifacts and explicit operator approval.
+No Terraform apply, migration execution, service activation, or reverse transition may proceed from chat approval, a remembered prior plan, or a mutable local worktree. Every transition requires its own saved artifacts and must fall within the exact allowlist of the still-valid eight-hour packet. Once that packet is explicitly approved, its ordered internal transitions do not require fresh approval unless a named stop condition ends the packet or an operation falls outside its allowlist.
 
 ## Required saved artifacts per transition
 
-For each approved stage transition, preserve these artifacts outside tracked source in the operator-held deployment record:
+For each packet-authorized stage transition, preserve these artifacts outside tracked source in the operator-held deployment record:
 
 1. **Binary plan artifact**
    - exact saved Terraform plan file for the target stage
@@ -36,12 +36,12 @@ For each approved stage transition, preserve these artifacts outside tracked sou
 5. **Stage and workload binding**
    - target stage: `foundation`, `migration`, or `service`
    - exact workload image digest when executable workload is present
-6. **Approval record**
+6. **Packet authority record**
    - approving owner
-   - approval timestamp
-   - approved target stage
-   - saved-plan artifact references
-   - explicit go/no-go note
+   - packet approval timestamp and expiry
+   - packet-authorized target stages
+   - saved-plan artifact references as they are produced and admitted
+   - explicit proceed/stop disposition under the packet allowlist
 7. **Post-apply verification record**
    - exact verifier command used
    - observed pass/fail result
@@ -64,14 +64,14 @@ For each approved stage transition, preserve these artifacts outside tracked sou
 ### Migration
 - saved plan binds the reviewed workload image digest
 - JSON inventory proves the migration job exists and the service does not
-- approval record explicitly authorizes migration-stage resource presence only
-- migration execution itself remains a later separate explicit gate; plan approval alone is not execution approval
+- packet authority record includes the migration stage
+- migration execution proceeds later in the same packet only after migration plan/apply/readback and exact live job-image verification succeed; it is not separately approved
 
 ### Service
 - saved plan binds the reviewed workload image digest
 - JSON inventory proves both migration job and service exist
-- approval record explicitly states deploy-readiness is not qualification
-- later tester access and bounded qualification remain separate explicit gates
+- packet authority record distinguishes deploy-readiness from qualification
+- access and bounded qualification proceed as later ordered stages of the same packet only after service apply/readback succeeds
 
 ## Approval ceremony
 
@@ -80,18 +80,18 @@ For each approved stage transition, preserve these artifacts outside tracked sou
 3. Generate the saved plan using only reviewed non-secret inputs.
 4. Record the plan digest, lock digest, source SHA, stage, and backend fingerprint bundle.
 5. Export the JSON inventory from that exact saved plan.
-6. Verify stage/workload binding before any approval request is sent.
-7. Present the approval bundle to Beatrice with:
+6. Verify stage/workload binding before any apply or other mutation.
+7. Compare the admission bundle to the still-valid packet with:
    - target stage
    - artifact references
    - exact digests
    - backend fingerprint bundle
    - expected inventory
    - destructive/replacement summary
-8. Record explicit approval or rejection.
-9. If approved, apply only that exact saved plan.
+8. Record the proceed or stop disposition under the packet allowlist; this is an internal admission decision, not a fresh approval.
+9. If admitted, apply only that exact saved plan.
 10. Immediately run the reviewed post-apply verifier and record its result.
-11. Stop before the next gate unless that next gate receives its own explicit approval.
+11. Continue to the next ordered stage only while the packet remains valid, the stage is allowlisted, and no stop condition has fired; otherwise stop and require fresh authority.
 
 For the one-time provisioner-operator bootstrap transition, the saved-plan inventory must contain exactly one create—`google_service_account_iam_member.provisioner_operator_token_creator`—and every other action must be no-op. The existing bootstrap operator may execute only that exact approved bootstrap plan. Immediate post-apply verification must supply the operator-held named user through `--provisioner-operator-principal`, require exactly `roles/iam.serviceAccountTokenCreator` on only the provisioner service account, reject missing/wrong/extra/WIF/project-wide authority, and prove short-lived token mint without displaying the token. No workload plan or next gate follows implicitly.
 
@@ -134,7 +134,7 @@ Stop immediately if any of the following is true:
 - workload digest is missing for `migration` or `service`
 - approval exists only in chat and not in the operator-held record
 - post-apply verifier fails or cannot run
-- the next gate is being inferred rather than explicitly approved
+- an operation falls outside the exact approved packet allowlist, or a named stop condition has already ended that packet; internal ordered migration/service/qualification stages are not separate approvals
 
 ## Relationship to other procedures
 
@@ -146,6 +146,6 @@ Stop immediately if any of the following is true:
 
 ## Current status
 
-This procedure remains source-controlled guidance for separately approved saved-plan operations. PR #37/42/46/48 closed the ADR-0013 source/verifier blockers; PR #57 closed A1; PR #58/59 plus WP-2/WP-3 completed workload binding; A2 selected new lineage; and state establishment, ownership alignment, exact foundation apply/verification, Gate P, bounded Gate S, both bootstrap provisioner-authority transitions, and workload-backend proof are complete. Fresh migration plan generation stopped before state read because process-wide quota attribution required forbidden project-level provisioner authority. ADR-0015 governs the ownership direction, but PR A review proved local policy/approval digests could be self-asserted. Source work is paused under accepted ADR-0016 pending protected publication, exact-tip rebaseline, and separate implementation authorization; no historical plan or approval is reusable.
+This procedure remains source-controlled guidance for saved-plan operations inside the one future explicitly approved fictional-synthetic `develop` deployment packet. PR #37/42/46/48 closed the ADR-0013 source/verifier blockers; PR #57 closed A1; PR #58/59 plus WP-2/WP-3 completed workload binding; A2 selected new lineage; and state establishment, ownership alignment, exact foundation apply/verification, Gate P, bounded Gate S, both bootstrap provisioner-authority transitions, and workload-backend proof are complete. PR #83 merged the replacement 52-path source contract into protected `develop@9a04b274d9e0132e5a0b409314ba53170b43e303`; no deployment operation occurred and no historical plan or approval is reusable.
 
-After revised PR A and separate Gate E0, every FinOps/workload-state/bootstrap/workload-plan transaction requires its own protected-workflow-signed value-safe approval envelope and verifier-owned one-use claim. M1 uses exact `workload-plan/migration_plan` authority, then consumes a separate fresh signed FinOps budget receipt before token acquisition. Saved plan and backend bytes remain held through descriptors and are passed to Terraform only through `/dev/fd` with explicit inherited FDs; pathname re-open is forbidden. Every signer, IAM/state/plan/apply, migration/service/tester/qualification action remains separately approval-bound.
+ADR-0016's human-visible addendum suspends separate Gate E0, signer/envelope/runner, signed FinOps receipt, and per-command approval requirements for this fictional-synthetic `develop` target. One explicit eight-hour packet may cover its ordered precheck, plans/applies, image, secrets, migration, service, access, readbacks, and qualification while retaining the runbook's stop conditions. Saved plan and backend bytes remain held through descriptors and are passed to Terraform only through `/dev/fd` with explicit inherited FDs; pathname re-open is forbidden. Live data, production, destructive recovery/state editing, and out-of-packet authority remain separate.

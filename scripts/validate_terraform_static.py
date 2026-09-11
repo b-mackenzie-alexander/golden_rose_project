@@ -4074,7 +4074,7 @@ def _collect_budget_observability_violations(
             required_fragments = [
                 'resource "google_billing_budget" "develop"',
                 "billing_account = var.billing_account_id",
-                'projects = ["projects/${var.project_id}"]',
+                'projects = ["projects/${local.canonical_workload_project_number}"]',
                 "google_monitoring_notification_channel.alerts.name",
                 "disable_default_iam_recipients = true",
                 "threshold_percent = 0.5",

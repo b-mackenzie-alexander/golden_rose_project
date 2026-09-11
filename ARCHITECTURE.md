@@ -1,6 +1,6 @@
 # Architecture — Golden Rose Operations Platform
 
-**Status:** PR #87 merged the stage-aware database-verifier and exact named-human provider-authority correction into protected `develop@5769e0cf6af6c3f4c75fa1f7ce079ae20a96d396`. Foundation verification now aligns with the already-established runtime/migration identity and IAM surface, while migration/service retain the exact private verifier job. Direct `roles/owner` is accepted only for the complete one-user provider binding; provisioner impersonation remains backend-only. The first packet remains stopped/consumed after A02, and no later cloud action occurred. A fresh final-tip packet and approval are required.
+**Status:** PR #88 merged the PR #87 closeout at `develop@4b678d1c2b6b5eb13c1031bd2cd4be16a2da5302`. The successor packet stopped read-only at A02 on incomplete managed-service-agent and redundant same-provider role modeling; its approval is consumed. The active correction exact-binds the observed Compute/Logging managed identities and tolerates only the three redundant bootstrap roles on the same exact provider who already holds Owner, without increasing effective authority. No cloud mutation occurred in that packet.
 
 ## Architectural posture
 Start with one modular product and a relational operational core. Preserve explicit trust boundaries and auditability without prematurely splitting into microservices.

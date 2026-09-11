@@ -1,6 +1,6 @@
 # Security — Golden Rose Operations Platform
 
-**Status:** PR #87 merged the stage-aware database-verifier and exact named-human provider-authority correction into protected `develop@5769e0cf6af6c3f4c75fa1f7ce079ae20a96d396`. The verifier now accepts direct `roles/owner` only for the complete exact named-human provider binding while preserving backend-only provisioner authority and exact stage-specific workload IAM. The first packet remains stopped/consumed after A02; no later cloud action occurred. A fresh final-tip packet and approval are required.
+**Status:** The successor packet bound to `develop@4b678d1c2b6b5eb13c1031bd2cd4be16a2da5302` stopped read-only at A02 on exact project-IAM modeling and is consumed. No mutation occurred. The active correction exact-binds legitimate managed service-agent roles and allows only the three redundant bootstrap roles on the exact named-human Owner, preserving all other fail-closed IAM checks. A fresh final-tip packet and approval are required.
 
 ## Security objectives
 - Protect worker, employer, household/worksite, document, and operational data using least privilege and data minimization.

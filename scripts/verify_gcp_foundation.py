@@ -578,8 +578,17 @@ def _expected_google_managed_project_iam(project_number: object) -> dict[str, se
         "roles/cloudsql.serviceAgent": {
             f"serviceAccount:service-{number}@gcp-sa-cloud-sql.iam.gserviceaccount.com"
         },
+        "roles/compute.instanceGroupManagerServiceAgent": {
+            f"serviceAccount:{number}@cloudservices.gserviceaccount.com"
+        },
+        "roles/compute.serviceAgent": {
+            f"serviceAccount:service-{number}@compute-system.iam.gserviceaccount.com"
+        },
         "roles/containerregistry.ServiceAgent": {
             f"serviceAccount:service-{number}@containerregistry.iam.gserviceaccount.com"
+        },
+        "roles/logging.serviceAgent": {
+            f"serviceAccount:service-{number}@gcp-sa-logging.iam.gserviceaccount.com"
         },
         "roles/pubsub.serviceAgent": {
             f"serviceAccount:service-{number}@gcp-sa-pubsub.iam.gserviceaccount.com"
@@ -1312,6 +1321,12 @@ def evaluate_foundation_snapshot(
         "roles/resourcemanager.projectIamAdmin",
     }
     bootstrap_principal = str(contract["bootstrap_operator_principal"])
+    baseline_project_iam = all(
+        _as_set(project_iam.get(role)) == members for role, members in expected_project_iam.items()
+    ) and all(
+        role in expected_project_iam or _as_set(members) == expected_google_managed_iam.get(role)
+        for role, members in project_iam.items()
+    )
     bootstrap_owner_exception = (
         contract["bootstrap_operator_status"] == "bootstrap-active"
         and all(
@@ -1337,13 +1352,13 @@ def evaluate_foundation_snapshot(
         )
         and all(
             role in expected_project_iam
-            or (role == "roles/owner" and _as_set(members) == {provider_principal})
+            or (role in temporary_bootstrap_roles and _as_set(members) == {provider_principal})
             or _as_set(members) == expected_google_managed_iam.get(role)
             for role, members in project_iam.items()
         )
         and _as_set(project_iam.get("roles/owner")) == {provider_principal}
     )
-    if not bootstrap_owner_exception and not provider_owner_exception:
+    if not baseline_project_iam and not bootstrap_owner_exception and not provider_owner_exception:
         for basic_role in BASIC_ROLES:
             if basic_role in project_iam:
                 violations.append(f"basic role detected in project IAM: {basic_role}")

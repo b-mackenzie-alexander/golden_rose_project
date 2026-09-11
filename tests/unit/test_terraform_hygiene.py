@@ -502,6 +502,7 @@ def test_gcp_first_deployment_runbook_separates_backend_and_provider_authority()
         "provisioner impersonation is limited to the GCS backend",
         "named human supplies Google provider authority",
         "provider authority precheck",
+        "--provider-operator-principal",
         "no project provisioning role is granted to the provisioner",
     ]
     for phrase in required_phrases:

@@ -93,6 +93,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--recovery-authority-principal", required=True)
     parser.add_argument("--bootstrap-operator-principal", required=True)
     parser.add_argument("--provisioner-operator-principal", required=True)
+    parser.add_argument("--provider-operator-principal", required=True)
     parser.add_argument(
         "--bootstrap-operator-status",
         choices=["bootstrap-active", "bootstrap-retired"],
@@ -495,12 +496,14 @@ def _service_account_member(account_id: str, project_id: object) -> str:
     return f"serviceAccount:{account_id}@{project_id}.iam.gserviceaccount.com"
 
 
-def _expected_service_accounts(project_id: str) -> set[str]:
-    return {
-        f"staff-tracer-database-verifier@{project_id}.iam.gserviceaccount.com",
+def _expected_service_accounts(project_id: str, *, mode: str = "service") -> set[str]:
+    accounts = {
         f"staff-tracer-migration@{project_id}.iam.gserviceaccount.com",
         f"staff-tracer-runtime@{project_id}.iam.gserviceaccount.com",
     }
+    if mode != "foundation":
+        accounts.add(f"staff-tracer-database-verifier@{project_id}.iam.gserviceaccount.com")
+    return accounts
 
 
 def _expected_control_plane_service_accounts(control_plane_project_id: str) -> set[str]:
@@ -531,16 +534,22 @@ def _expected_state_bucket_iam(contract: dict[str, Any]) -> dict[str, set[str]]:
     return {"roles/storage.objectAdmin": members}
 
 
-def _expected_project_iam(contract: dict[str, Any]) -> dict[str, set[str]]:
+def _expected_project_iam(
+    contract: dict[str, Any], *, mode: str = "service"
+) -> dict[str, set[str]]:
     project_id = str(contract["project_id"])
     control_plane_project_id = str(contract["control_plane_project_id"])
     observability_principal = str(contract["observability_viewer_principal"])
+    cloud_sql_clients = {
+        f"serviceAccount:staff-tracer-runtime@{project_id}.iam.gserviceaccount.com",
+        f"serviceAccount:staff-tracer-migration@{project_id}.iam.gserviceaccount.com",
+    }
+    if mode != "foundation":
+        cloud_sql_clients.add(
+            f"serviceAccount:staff-tracer-database-verifier@{project_id}.iam.gserviceaccount.com"
+        )
     return {
-        "roles/cloudsql.client": {
-            f"serviceAccount:staff-tracer-runtime@{project_id}.iam.gserviceaccount.com",
-            f"serviceAccount:staff-tracer-migration@{project_id}.iam.gserviceaccount.com",
-            f"serviceAccount:staff-tracer-database-verifier@{project_id}.iam.gserviceaccount.com",
-        },
+        "roles/cloudsql.client": cloud_sql_clients,
         "roles/logging.logWriter": {
             f"serviceAccount:staff-tracer-runtime@{project_id}.iam.gserviceaccount.com",
             f"serviceAccount:staff-tracer-migration@{project_id}.iam.gserviceaccount.com",
@@ -773,7 +782,7 @@ def evaluate_foundation_snapshot(
         snapshot.get("resource_inventory", {}), label="resource inventory"
     )
     if _as_set(resource_inventory.get("service_accounts")) != _expected_service_accounts(
-        str(contract["project_id"])
+        str(contract["project_id"]), mode=mode
     ):
         violations.append("service-account inventory drifted from the approved foundation")
     control_plane_accounts = _as_set(resource_inventory.get("control_plane_service_accounts"))
@@ -1156,11 +1165,32 @@ def evaluate_foundation_snapshot(
             violations.append("foundation verifier mode rejects database authority job")
         if database_authority_job_iam:
             violations.append("foundation verifier mode rejects database authority job IAM")
-        if any(
-            _mapping(policy, label="database authority secret IAM policy")
-            for policy in database_authority_secret_iam.values()
-        ):
-            violations.append("foundation verifier mode rejects database authority secret IAM")
+        expected_foundation_secret_iam = {
+            "migration-database-url": {
+                "roles/secretmanager.secretAccessor": {
+                    f"serviceAccount:staff-tracer-migration@{contract['project_id']}.iam.gserviceaccount.com"
+                }
+            },
+            "runtime-database-url": {
+                "roles/secretmanager.secretAccessor": {
+                    f"serviceAccount:staff-tracer-runtime@{contract['project_id']}.iam.gserviceaccount.com"
+                }
+            },
+        }
+        if set(database_authority_secret_iam) != set(expected_foundation_secret_iam):
+            violations.append("foundation database secret IAM inventory drifted")
+        for secret_name, foundation_secret_roles in expected_foundation_secret_iam.items():
+            actual_roles = _mapping(
+                database_authority_secret_iam.get(secret_name, {}),
+                label=f"foundation database secret IAM for {secret_name}",
+            )
+            if set(actual_roles) != set(foundation_secret_roles):
+                violations.append(f"foundation database secret IAM roles drifted for {secret_name}")
+            for role, foundation_secret_members in foundation_secret_roles.items():
+                if _as_set(actual_roles.get(role)) != foundation_secret_members:
+                    violations.append(
+                        f"foundation database secret IAM drifted for {secret_name} {role}"
+                    )
 
     cloud_sql = _mapping(snapshot.get("cloud_sql", {}), label="cloud sql")
     if mode == "foundation":
@@ -1184,7 +1214,7 @@ def evaluate_foundation_snapshot(
         snapshot.get("service_account_keys", {}), label="service account keys"
     )
     expected_key_accounts = _expected_service_accounts(
-        str(contract["project_id"])
+        str(contract["project_id"]), mode=mode
     ) | _expected_control_plane_service_accounts(str(contract["control_plane_project_id"]))
     if set(service_account_keys) != expected_key_accounts:
         violations.append("service-account key inventory drifted from reviewed identities")
@@ -1271,7 +1301,7 @@ def evaluate_foundation_snapshot(
                     )
 
     project_iam = _mapping(snapshot.get("project_iam", {}), label="project iam")
-    expected_project_iam = _expected_project_iam(contract)
+    expected_project_iam = _expected_project_iam(contract, mode=mode)
     expected_google_managed_iam = _expected_google_managed_project_iam(
         snapshot.get("project_number")
     )
@@ -1296,7 +1326,24 @@ def evaluate_foundation_snapshot(
         )
         and _as_set(project_iam.get("roles/owner")) == {bootstrap_principal}
     )
-    if not bootstrap_owner_exception:
+    provider_principal = str(contract.get("provider_operator_principal", ""))
+    if not PROVISIONER_OPERATOR_PRINCIPAL_PATTERN.fullmatch(provider_principal):
+        violations.append("provider operator principal must be one exact named user")
+    provider_owner_exception = (
+        bool(PROVISIONER_OPERATOR_PRINCIPAL_PATTERN.fullmatch(provider_principal))
+        and all(
+            _as_set(project_iam.get(role)) == members
+            for role, members in expected_project_iam.items()
+        )
+        and all(
+            role in expected_project_iam
+            or (role == "roles/owner" and _as_set(members) == {provider_principal})
+            or _as_set(members) == expected_google_managed_iam.get(role)
+            for role, members in project_iam.items()
+        )
+        and _as_set(project_iam.get("roles/owner")) == {provider_principal}
+    )
+    if not bootstrap_owner_exception and not provider_owner_exception:
         for basic_role in BASIC_ROLES:
             if basic_role in project_iam:
                 violations.append(f"basic role detected in project IAM: {basic_role}")
@@ -1333,12 +1380,7 @@ def evaluate_foundation_snapshot(
     service_account_iam = _mapping(
         snapshot.get("service_account_iam", {}), label="service account iam"
     )
-    runtime_email = f"staff-tracer-runtime@{contract['project_id']}.iam.gserviceaccount.com"
-    migration_email = f"staff-tracer-migration@{contract['project_id']}.iam.gserviceaccount.com"
-    database_verifier_email = (
-        f"staff-tracer-database-verifier@{contract['project_id']}.iam.gserviceaccount.com"
-    )
-    for email in (runtime_email, migration_email, database_verifier_email):
+    for email in _expected_service_accounts(str(contract["project_id"]), mode=mode):
         actual = _mapping(service_account_iam.get(email, {}), label=f"service account iam {email}")
         if actual:
             violations.append(f"service-account IAM drifted for {email}")
@@ -1682,7 +1724,9 @@ def _render_evidence_markdown(snapshot: dict[str, Any], violations: Sequence[str
     return "\n".join(lines) + "\n"
 
 
-def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[str]], Any]:
+def _build_live_command_runner(
+    contract: dict[str, Any], *, mode: str = "service"
+) -> Callable[[Sequence[str]], Any]:
     project_id = str(contract["project_id"])
     control_plane_project_id = str(contract["control_plane_project_id"])
     region = str(contract["region"])
@@ -2099,7 +2143,7 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
         if key == ("service-account-keys",):
             keys: dict[str, Any] = {}
             account_projects = {
-                **dict.fromkeys(_expected_service_accounts(project_id), project_id),
+                **dict.fromkeys(_expected_service_accounts(project_id, mode=mode), project_id),
                 **dict.fromkeys(
                     _expected_control_plane_service_accounts(control_plane_project_id),
                     control_plane_project_id,
@@ -2233,7 +2277,7 @@ def _build_live_command_runner(contract: dict[str, Any]) -> Callable[[Sequence[s
         if key == ("service-account-iam",):
             service_account_policies: dict[str, Any] = {}
             account_projects = {
-                **dict.fromkeys(_expected_service_accounts(project_id), project_id),
+                **dict.fromkeys(_expected_service_accounts(project_id, mode=mode), project_id),
                 **dict.fromkeys(
                     _expected_control_plane_service_accounts(control_plane_project_id),
                     control_plane_project_id,
@@ -2564,6 +2608,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "recovery_authority_principal": args.recovery_authority_principal,
         "bootstrap_operator_principal": args.bootstrap_operator_principal,
         "provisioner_operator_principal": args.provisioner_operator_principal,
+        "provider_operator_principal": args.provider_operator_principal,
         "bootstrap_operator_status": args.bootstrap_operator_status,
         "observability_viewer_principal": args.observability_viewer_principal,
         "recovery_policy_review_status": args.recovery_policy_review_status,
@@ -2571,7 +2616,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "billing_account_id": args.billing_account_id,
     }
     snapshot = collect_foundation_snapshot(
-        _build_live_command_runner(contract),
+        _build_live_command_runner(contract, mode=args.mode),
         mode=args.mode,
     )
     violations = evaluate_foundation_snapshot(snapshot, contract, mode=args.mode)

@@ -34,6 +34,7 @@ def expected_contract() -> dict[str, Any]:
         "recovery_authority_principal": "group:recovery@example.com",
         "bootstrap_operator_principal": "user:bootstrap@example.com",
         "provisioner_operator_principal": "user:provisioner.operator@example.com",
+        "provider_operator_principal": "user:provider.operator@example.com",
         "bootstrap_operator_status": "bootstrap-retired",
         "observability_viewer_principal": "group:observability@example.com",
         "recovery_policy_review_status": "gate-2-evidence-required",
@@ -59,6 +60,8 @@ def verifier_common_args(*, mode: str | None = None) -> list[str]:
         "user:bootstrap@example.com",
         "--provisioner-operator-principal",
         "user:provisioner.operator@example.com",
+        "--provider-operator-principal",
+        "user:provider.operator@example.com",
         "--bootstrap-operator-status",
         "bootstrap-retired",
         "--observability-viewer-principal",
@@ -455,6 +458,140 @@ def valid_snapshot() -> dict[str, Any]:
     }
 
 
+def foundation_snapshot() -> dict[str, Any]:
+    snapshot = valid_snapshot()
+    project_id = expected_contract()["project_id"]
+    database_verifier = f"staff-tracer-database-verifier@{project_id}.iam.gserviceaccount.com"
+    database_verifier_member = f"serviceAccount:{database_verifier}"
+
+    snapshot["resource_inventory"].update(
+        {
+            "service_accounts": [
+                f"staff-tracer-migration@{project_id}.iam.gserviceaccount.com",
+                f"staff-tracer-runtime@{project_id}.iam.gserviceaccount.com",
+            ],
+            "cloud_run_jobs": [],
+            "cloud_run_job": "",
+            "database_authority_job": "",
+            "cloud_run_service": "",
+            "cloud_sql_instance": "",
+        }
+    )
+    snapshot["cloud_run_service"] = {}
+    snapshot["cloud_run_service_iam"] = {}
+    snapshot["migration_job"] = {}
+    snapshot["migration_job_iam"] = {}
+    snapshot["cloud_run_job"] = {}
+    snapshot["cloud_run_job_iam"] = {}
+    snapshot["database_authority_job"] = {}
+    snapshot["database_authority_job_iam"] = {}
+    snapshot["cloud_sql"] = {}
+    snapshot["uptime_checks"] = []
+    snapshot["alert_policies"] = [
+        "Develop private synthetic health failures",
+        "Develop private synthetic service error events",
+    ]
+    snapshot["service_account_keys"].pop(database_verifier)
+    snapshot["service_account_iam"].pop(database_verifier, None)
+    snapshot["project_iam"]["roles/cloudsql.client"].remove(database_verifier_member)
+    for policy in snapshot["database_authority_secret_iam"].values():
+        policy["roles/secretmanager.secretAccessor"].remove(database_verifier_member)
+    return snapshot
+
+
+def test_foundation_mode_accepts_database_verifier_absence_and_existing_secret_consumers() -> None:
+    module = load_module()
+
+    assert (
+        module.evaluate_foundation_snapshot(
+            foundation_snapshot(),
+            expected_contract(),
+            mode="foundation",
+        )
+        == []
+    )
+
+
+def test_foundation_mode_key_inventory_omits_deferred_database_verifier() -> None:
+    module = load_module()
+    snapshot = foundation_snapshot()
+
+    assert (
+        "staff-tracer-database-verifier@example-project.iam.gserviceaccount.com"
+        not in snapshot["service_account_keys"]
+    )
+    assert (
+        module.evaluate_foundation_snapshot(snapshot, expected_contract(), mode="foundation") == []
+    )
+
+
+@pytest.mark.parametrize("mutation", ["missing_policy", "extra_member", "premature_verifier"])
+def test_foundation_mode_rejects_database_secret_iam_drift(mutation: str) -> None:
+    module = load_module()
+    snapshot = foundation_snapshot()
+    policies = snapshot["database_authority_secret_iam"]
+    accessor = "roles/secretmanager.secretAccessor"
+    if mutation == "missing_policy":
+        policies.pop("runtime-database-url")
+    elif mutation == "extra_member":
+        policies["runtime-database-url"][accessor].append("user:unexpected@example.com")
+    else:
+        policies["migration-database-url"][accessor].append(
+            "serviceAccount:staff-tracer-database-verifier@example-project.iam.gserviceaccount.com"
+        )
+
+    violations = module.evaluate_foundation_snapshot(
+        snapshot,
+        expected_contract(),
+        mode="foundation",
+    )
+
+    assert any("foundation database secret IAM" in violation for violation in violations)
+
+
+def test_foundation_mode_accepts_exact_named_human_provider_owner() -> None:
+    module = load_module()
+    contract = expected_contract()
+    snapshot = foundation_snapshot()
+    snapshot["project_iam"]["roles/owner"] = [contract["provider_operator_principal"]]
+
+    assert module.evaluate_foundation_snapshot(snapshot, contract, mode="foundation") == []
+
+
+@pytest.mark.parametrize(
+    ("provider_principal", "role", "members"),
+    [
+        ("user:provider.operator@example.com", "roles/owner", ["user:other@example.com"]),
+        (
+            "user:provider.operator@example.com",
+            "roles/owner",
+            ["user:provider.operator@example.com", "user:other@example.com"],
+        ),
+        (
+            "user:provider.operator@example.com",
+            "roles/editor",
+            ["user:provider.operator@example.com"],
+        ),
+        (
+            "serviceAccount:provider@example-project.iam.gserviceaccount.com",
+            "roles/owner",
+            ["serviceAccount:provider@example-project.iam.gserviceaccount.com"],
+        ),
+    ],
+)
+def test_foundation_mode_rejects_broadened_or_nonhuman_provider_authority(
+    provider_principal: str,
+    role: str,
+    members: list[str],
+) -> None:
+    module = load_module()
+    contract = expected_contract() | {"provider_operator_principal": provider_principal}
+    snapshot = foundation_snapshot()
+    snapshot["project_iam"][role] = members
+
+    assert module.evaluate_foundation_snapshot(snapshot, contract, mode="foundation")
+
+
 def test_service_verifier_accepts_only_exact_expiring_public_basic_boundary() -> None:
     module = load_module()
     snapshot = valid_snapshot()
@@ -780,8 +917,9 @@ def test_foundation_mode_main_allows_absent_cloud_sql_during_collection() -> Non
     mutable_module = cast(Any, module)
     calls: dict[str, Any] = {"cloud_sql_requested": False, "commands": []}
 
-    def fake_build_live_command_runner(contract: dict[str, Any]) -> Any:
+    def fake_build_live_command_runner(contract: dict[str, Any], *, mode: str = "service") -> Any:
         calls["contract"] = contract
+        calls["runner_mode"] = mode
 
         def runner(command: Any) -> Any:
             key = tuple(command)
@@ -845,6 +983,7 @@ def test_foundation_mode_main_allows_absent_cloud_sql_during_collection() -> Non
     exit_code = module.main(verifier_common_args(mode="foundation"))
 
     assert exit_code == 0
+    assert calls["runner_mode"] == "foundation"
     assert calls["cloud_sql_requested"] is True
     assert calls["evaluate"]["mode"] == "foundation"
     assert calls["evaluate"]["snapshot"]["cloud_sql"] == {}
@@ -1151,6 +1290,45 @@ def test_live_runner_excludes_provider_managed_service_accounts(
         "staff-tracer-migration@example-project.iam.gserviceaccount.com",
         "staff-tracer-runtime@example-project.iam.gserviceaccount.com",
     ]
+
+
+def test_foundation_live_runner_omits_deferred_database_verifier_key_and_iam_queries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    contexts: list[str] = []
+
+    def fake_run_json_command(command: list[str], *, context: str) -> Any:
+        contexts.append(context)
+        if context == "service accounts":
+            return [
+                {"email": "staff-tracer-migration@example-project.iam.gserviceaccount.com"},
+                {"email": "staff-tracer-runtime@example-project.iam.gserviceaccount.com"},
+            ]
+        if context == "control-plane service accounts":
+            return [
+                {"email": "golden-rose-artifact-verifier@state-project.iam.gserviceaccount.com"},
+                {"email": "golden-rose-deployer@state-project.iam.gserviceaccount.com"},
+                {"email": "golden-rose-image-publisher@state-project.iam.gserviceaccount.com"},
+                {"email": "golden-rose-provisioner@state-project.iam.gserviceaccount.com"},
+            ]
+        if context.startswith("service account keys "):
+            return []
+        if context.startswith("service account iam "):
+            return {"bindings": []}
+        raise AssertionError(f"unexpected context: {context}")
+
+    monkeypatch.setattr(module, "_run_json_command", fake_run_json_command)
+    runner = module._build_live_command_runner(expected_contract(), mode="foundation")
+
+    runner(("service-accounts",))
+    key_inventory = runner(("service-account-keys",))
+    iam_inventory = runner(("service-account-iam",))
+
+    deferred_email = "staff-tracer-database-verifier@example-project.iam.gserviceaccount.com"
+    assert deferred_email not in key_inventory
+    assert deferred_email not in iam_inventory
+    assert all(deferred_email not in context for context in contexts)
 
 
 @pytest.mark.parametrize(

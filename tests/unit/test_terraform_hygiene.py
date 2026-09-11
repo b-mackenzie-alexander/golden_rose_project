@@ -1506,7 +1506,7 @@ def test_gcp_develop_budgets_model_fixed_thresholds_operator_routing_and_non_cap
     assert "threshold_percent = 0.5" in budgets
     assert "threshold_percent = 0.75" in budgets
     assert "threshold_percent = 1.0" in budgets
-    assert "projects/${var.project_id}" in budgets
+    assert "projects/${local.canonical_workload_project_number}" in budgets
     assert "alerts are not hard spending caps" in budgets
     assert "@" not in budgets
     assert "pubsub" not in budgets.lower()
@@ -1517,6 +1517,33 @@ def test_gcp_develop_budgets_model_fixed_thresholds_operator_routing_and_non_cap
 
     assert 'output "cost_guardrail_contract"' in outputs
     assert "module.develop.cost_guardrail_contract" in outputs
+
+
+@pytest.mark.parametrize("canonical_number", [True, False])
+def test_budget_static_contract_requires_canonical_project_number(
+    tmp_path: Path, canonical_number: bool
+) -> None:
+    budgets = (ROOT / "infra/gcp/develop/budgets.tf").read_text(encoding="utf-8")
+    reference = "local.canonical_workload_project_number" if canonical_number else "var.project_id"
+    budgets = re.sub(
+        r'projects = \["projects/\$\{[^}]+\}"\]',
+        'projects = ["projects/${' + reference + '}"]',
+        budgets,
+    )
+    target = tmp_path / "infra/gcp/develop/budgets.tf"
+    target.parent.mkdir(parents=True)
+    target.write_text(budgets, encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    project_filter_rejected = (
+        "missing required budget contract fragment 'projects =" in result.stdout
+    )
+    assert project_filter_rejected is not canonical_number
 
 
 def test_budget_api_is_managed_and_budget_depends_on_it() -> None:

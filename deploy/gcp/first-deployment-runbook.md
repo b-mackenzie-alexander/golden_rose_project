@@ -1,8 +1,8 @@
 # First human-visible synthetic deployment runbook
 
-This runbook defines the single eight-hour operator packet for the first human-visible fictional-synthetic `develop` deployment. It is intentionally value-safe: project IDs, billing IDs, domains, principals, secret payloads, passwords, tokens, plans, state values, and the exact service URL stay in operator-held records rather than tracked source.
+This runbook defines the single eight-hour operator packet, valid for no more than eight hours, for the first human-visible fictional-synthetic `develop` deployment. It is intentionally value-safe: project IDs, billing IDs, domains, principals, secret payloads, passwords, tokens, plans, state values, and the exact service URL stay in operator-held records rather than tracked source.
 
-Current source status: PR #89 merged the bounded managed-IAM verifier correction into protected `develop@4b7730ce9b52a93f4fb93310c5ad2efd688b68dc`; required CI and final agent rereviews passed. Both prior packet approvals are consumed and no A03+ or cloud mutation occurred. After this minimal status closeout merges and the final protected tip is rebound, one fresh explicitly approved packet may resume the one ordered transaction for no more than eight hours.
+Current execution status: PR #90 is merged at protected `develop@5fb6222`. Both quota resources are imported; preserve serial-41/44-address readback and do not repeat either import. V18 stopped without apply on a budget project-ID/project-number plan diff. The bounded source correction must merge before a fresh final-tip packet resumes activation; no standalone status-closeout PR is required.
 
 ## Scope
 
@@ -18,7 +18,7 @@ Current source status: PR #89 merged the bounded managed-IAM verifier correction
 
 1. The source PR is merged and the packet is bound to its exact protected `develop` SHA, repository, publication workflow identity, Terraform/provider locks, state generations, non-secret inputs, and action allowlists.
 2. Beatrice's selected named human identity has custom-role create/read plus project-IAM policy get/set authority for the narrow quota bootstrap, read-only access to enumerate the workload project's folder/organization ancestry and each ancestor IAM policy, and the existing project permissions required to read/plan/apply the reviewed Terraform-managed workload graph. Bind that exact named `user:` as `--provider-operator-principal` on every live foundation-verifier call. The verifier may accept `roles/owner` only when its complete direct membership is exactly that one provider operator; any other basic role or additional member stops the packet. The provider authority precheck must prove effective scope before packet execution; missing ancestor or managed-resource visibility stops the packet and is not treated as absence.
-3. Terraform credential separation is explicit: provisioner impersonation is limited to the GCS backend through the private backend configuration; the named human supplies Google provider authority for workload refresh/import/plan/apply. Do not export a provisioner token as process-wide `GOOGLE_OAUTH_ACCESS_TOKEN`, and no project provisioning role is granted to the provisioner.
+3. Terraform credential separation is explicit: provisioner impersonation is limited to the GCS backend through the private backend configuration; the named human supplies Google provider authority for workload refresh/import/plan/apply. Do not export a provisioner token as process-wide `GOOGLE_OAUTH_ACCESS_TOKEN`, and no project provisioning role is granted to the provisioner. Set process-local `GOOGLE_CLOUD_QUOTA_PROJECT` to the bound workload project for provider/backend requests; the required quota-use permission already exists. This does not edit ADC credentials or expand IAM.
 4. Current state, IAM, resources, budget, labels, service-account keys, and collision posture have been read back without mutation.
 5. The exact immutable image digest is either already admitted for the source SHA or is declared as the exact publication workflow's designated packet output.
 6. Private custody locations, alert recipients, and the accidental-exposure path are recorded outside Git and chat.
@@ -95,6 +95,8 @@ The develop application accepts persisted mutation values only in generated fict
 9. Never put SQL user resources, password variables, password outputs, connection URLs, or private host values in Terraform, Git, workflow inputs, or ordinary evidence.
 
 ## Quota bootstrap and import boundary
+
+**Current-target resumption:** Both imports below are already complete. Begin with exact readback, not repeated import or state removal. Do not require an empty foundation plan: the source includes six pending demo/database-verifier additions that belong in the combined migration-stage plan/apply. Require the canonical project-number budget filter to be no-op, and stop on any budget mutation or other out-of-scope action.
 
 1. Before provisioner backend initialization, the prechecked human creates—or exact-readbacks—`goldenRoseProvisionerQuotaUser` with title `Golden Rose Provisioner Quota User`, exact description `Permits only workload-project quota attribution for the provisioner.`, stage `GA`, and sole permission `serviceusage.services.use`.
 2. The same human creates—or exact-readbacks—the sole binding to `golden-rose-provisioner@<control-plane-project>.iam.gserviceaccount.com`.

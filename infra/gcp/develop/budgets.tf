@@ -4,8 +4,9 @@ resource "google_billing_budget" "develop" {
 
   # Budget alerts are not hard spending caps.
 
+  # The Budget API returns project numbers; using IDs causes a perpetual update.
   budget_filter {
-    projects = ["projects/${var.project_id}"]
+    projects = ["projects/${local.canonical_workload_project_number}"]
   }
 
   amount {

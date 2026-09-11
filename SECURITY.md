@@ -1,6 +1,6 @@
 # Security — Golden Rose Operations Platform
 
-**Status:** PR #86 merged the PR #85 status closeout into protected `develop@58ea1cfe3b88ac9580971ed44b9cf0814824abf8`. The first one-use packet created and exact-read back only the one-permission quota role and sole provisioner binding, then stopped on mandatory foundation-verifier findings; its approval is consumed. No A03 or later action occurred. The active bounded source remediation preserves backend-only provisioner impersonation, explicitly binds the named-human provider operator, accepts direct `roles/owner` only when its complete membership equals that one user, and makes database-verifier service-account/Cloud SQL/Secret IAM checks exact by stage. A fresh final-tip packet and approval are required before cloud work resumes.
+**Status:** PR #87 merged the stage-aware database-verifier and exact named-human provider-authority correction into protected `develop@5769e0cf6af6c3f4c75fa1f7ce079ae20a96d396`. The verifier now accepts direct `roles/owner` only for the complete exact named-human provider binding while preserving backend-only provisioner authority and exact stage-specific workload IAM. The first packet remains stopped/consumed after A02; no later cloud action occurred. A fresh final-tip packet and approval are required.
 
 ## Security objectives
 - Protect worker, employer, household/worksite, document, and operational data using least privilege and data minimization.

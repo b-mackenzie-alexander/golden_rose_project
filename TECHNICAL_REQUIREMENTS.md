@@ -1,6 +1,6 @@
 # Technical Requirements — Golden Rose Operations Platform
 
-**Status:** PR #86 merged the PR #85 status closeout into protected `develop@58ea1cfe3b88ac9580971ed44b9cf0814824abf8`. The first approved packet stopped after exact A02 quota role/binding creation and readback when the mandatory foundation verifier exposed stage/provider-authority contradictions; its approval is consumed and no A03 or later action occurred. Bounded source remediation is active under the existing outcome plan. A fresh final-tip eight-hour packet and explicit one-use approval are required before cloud execution resumes.
+**Status:** PR #87 merged the stage-aware database-verifier and exact named-human provider-authority correction into protected `develop@5769e0cf6af6c3f4c75fa1f7ce079ae20a96d396`; required CI and final agent rereviews passed. The first packet remains stopped/consumed after exact A02 quota role/binding creation and readback; no A03 or later action occurred. A fresh final-tip packet and explicit one-use approval are required before cloud execution resumes.
 
 ## Product outcome
 Provide agency staff a reliable browser-based operations workspace that replaces fragmented paper/form/spreadsheet employer-demand handling, supports governed operational reporting, and later supports transparent staff review of worker-to-employer/job compatibility.

@@ -2,7 +2,7 @@
 
 This procedure governs Beatrice's temporary browser access to the first human-visible fictional-synthetic GCP `develop` deployment while application authentication remains synthetic. Cloud Run invocation is temporarily public, but every business/static route is protected by the expiring shared HTTP Basic gate.
 
-Current source status: the first approved packet stopped at its mandatory post-quota verifier after creating and exact-reading only the one-permission quota role and sole provisioner binding. Its approval is consumed; no service, invoker, password, URL, access grant, or qualification action occurred. Bounded source remediation is active from protected `develop@58ea1cfe3b88ac9580971ed44b9cf0814824abf8`. This procedure remains unexecuted and requires a fresh final-tip packet plus explicit one-use approval.
+Current source status: PR #87 merged the stage/provider verifier correction at `develop@5769e0cf6af6c3f4c75fa1f7ce079ae20a96d396`. The first packet remains stopped/consumed after the exact quota role/binding; no service, invoker, password, URL, access grant, or qualification action occurred. This procedure remains unexecuted and requires a fresh final-tip packet plus explicit one-use approval.
 
 ## Scope
 

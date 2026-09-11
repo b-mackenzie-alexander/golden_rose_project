@@ -27,7 +27,8 @@
 - [x] Execute the first approved eight-hour packet through its named A02 stop. A00/A01 prechecks passed; the exact one-permission quota role and sole provisioner binding were created and read back; the mandatory foundation verifier then stopped on stage/provider-authority contradictions. The approval is consumed, and no A03 or later action occurred.
 - [x] Merge the PR #87 post-merge status closeout. PR #88 merged into protected `develop@4b678d1c2b6b5eb13c1031bd2cd4be16a2da5302`; required CI passed.
 - [x] Execute the successor packet through its read-only A02 stop. A00/A01 and exact quota-role/binding readback passed; the verifier then exposed incomplete Google-managed service-agent allowlisting plus redundant same-human bootstrap-role handling. The approval is consumed and this packet made no mutation.
-- [ ] Remediate and merge the exact managed-service-agent and same-provider redundant-role verifier contract, then prepare one fresh packet.
+- [x] Merge the bounded managed-service-agent and same-provider redundant-role verifier correction. PR #89 merged source head `7d8bdc336149f177a42baa7d951773ac54585c8f` into protected `develop@4b7730ce9b52a93f4fb93310c5ad2efd688b68dc`; required CI and final agent rereviews passed.
+- [ ] Merge only the PR #89 status closeout, rebaseline, and prepare one fresh final-tip packet before requesting explicit one-use approval.
 - [ ] Under one explicitly approved packet, publish/apply/migrate/activate/qualify the environment and deliver the access-gated URL to Beatrice.
 - [ ] Defer ADR-0015 FinOps state separation until production/handoff or a concrete billing-ownership trigger; retain the current workload budget and exact temporary quota-use exception.
 

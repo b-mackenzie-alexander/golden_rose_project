@@ -2,7 +2,7 @@
 
 This procedure governs Beatrice's temporary browser access to the first human-visible fictional-synthetic GCP `develop` deployment while application authentication remains synthetic. Cloud Run invocation is temporarily public, but every business/static route is protected by the expiring shared HTTP Basic gate.
 
-Current source status: the successor packet stopped read-only at A02 on managed-IAM verifier modeling and is consumed. No service, invoker, password, URL, access grant, or qualification action occurred. Bounded source correction is active from `develop@4b678d1c2b6b5eb13c1031bd2cd4be16a2da5302`; this procedure requires a fresh final-tip packet and approval.
+Current source status: PR #89 merged the bounded managed-IAM verifier correction into protected `develop@4b7730ce9b52a93f4fb93310c5ad2efd688b68dc`; required CI and final agent rereviews passed. Both prior packets are consumed. No service, invoker, password, URL, access grant, qualification, A03+, or cloud mutation occurred. This procedure requires a fresh final-tip packet and approval.
 
 ## Scope
 

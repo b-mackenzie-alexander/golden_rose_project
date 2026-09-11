@@ -1,6 +1,6 @@
 # Architecture — Golden Rose Operations Platform
 
-**Status:** PR #88 merged the PR #87 closeout at `develop@4b678d1c2b6b5eb13c1031bd2cd4be16a2da5302`. The successor packet stopped read-only at A02 on incomplete managed-service-agent and redundant same-provider role modeling; its approval is consumed. The active correction exact-binds the observed Compute/Logging managed identities and tolerates only the three redundant bootstrap roles on the same exact provider who already holds Owner, without increasing effective authority. No cloud mutation occurred in that packet.
+**Status:** PR #89 merged the bounded managed-IAM verifier correction into protected `develop@4b7730ce9b52a93f4fb93310c5ad2efd688b68dc`; required CI and final agent rereviews passed. Both prior packets remain stopped/consumed, no A03+ or cloud mutation occurred, and one fresh final-tip packet plus explicit one-use approval remain required.
 
 ## Architectural posture
 Start with one modular product and a relational operational core. Preserve explicit trust boundaries and auditability without prematurely splitting into microservices.

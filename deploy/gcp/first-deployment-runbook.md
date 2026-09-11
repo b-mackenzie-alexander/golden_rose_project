@@ -2,7 +2,7 @@
 
 This runbook defines the single eight-hour operator packet for the first human-visible fictional-synthetic `develop` deployment. It is intentionally value-safe: project IDs, billing IDs, domains, principals, secret payloads, passwords, tokens, plans, state values, and the exact service URL stay in operator-held records rather than tracked source.
 
-Current source status: PR #88 merged the PR #87 closeout into protected `develop@4b678d1c2b6b5eb13c1031bd2cd4be16a2da5302`. A fresh successor packet was approved; A00/A01 and exact A02 readback passed, but the mandatory foundation verifier stopped on incomplete managed-service-agent allowlisting and exact same-provider redundant-role handling. That packet is consumed and performed no mutation. Bounded source correction is active; after protected merge and final-tip rebind, one fresh explicitly approved packet may resume the one ordered transaction for no more than eight hours.
+Current source status: PR #89 merged the bounded managed-IAM verifier correction into protected `develop@4b7730ce9b52a93f4fb93310c5ad2efd688b68dc`; required CI and final agent rereviews passed. Both prior packet approvals are consumed and no A03+ or cloud mutation occurred. After this minimal status closeout merges and the final protected tip is rebound, one fresh explicitly approved packet may resume the one ordered transaction for no more than eight hours.
 
 ## Scope
 

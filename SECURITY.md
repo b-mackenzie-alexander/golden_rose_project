@@ -1,6 +1,6 @@
 # Security — Golden Rose Operations Platform
 
-**Status:** The successor packet bound to `develop@4b678d1c2b6b5eb13c1031bd2cd4be16a2da5302` stopped read-only at A02 on exact project-IAM modeling and is consumed. No mutation occurred. The active correction exact-binds legitimate managed service-agent roles and allows only the three redundant bootstrap roles on the exact named-human Owner, preserving all other fail-closed IAM checks. A fresh final-tip packet and approval are required.
+**Status:** PR #89 merged the bounded managed-IAM verifier correction into protected `develop@4b7730ce9b52a93f4fb93310c5ad2efd688b68dc`; required CI and final agent rereviews passed. Both prior packet approvals are consumed; no A03+ or cloud mutation occurred. A fresh final-tip packet and approval are required.
 
 ## Security objectives
 - Protect worker, employer, household/worksite, document, and operational data using least privilege and data minimization.

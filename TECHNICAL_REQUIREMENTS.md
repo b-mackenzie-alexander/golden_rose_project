@@ -1,6 +1,6 @@
 # Technical Requirements — Golden Rose Operations Platform
 
-**Status:** PR #88 merged the PR #87 closeout at `develop@4b678d1c2b6b5eb13c1031bd2cd4be16a2da5302`. The successor packet stopped read-only at A02 on managed-IAM verifier modeling and is consumed; no mutation or A03+ action occurred. Bounded source correction is active, and a fresh final-tip packet plus explicit one-use approval are required.
+**Status:** PR #89 merged the bounded managed-IAM verifier correction into protected `develop@4b7730ce9b52a93f4fb93310c5ad2efd688b68dc`; required CI and final agent rereviews passed. Both prior packet approvals are consumed; no mutation or A03+ action occurred. A fresh final-tip packet plus explicit one-use approval are required.
 
 ## Product outcome
 Provide agency staff a reliable browser-based operations workspace that replaces fragmented paper/form/spreadsheet employer-demand handling, supports governed operational reporting, and later supports transparent staff review of worker-to-employer/job compatibility.

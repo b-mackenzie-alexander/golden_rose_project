@@ -2,7 +2,7 @@
 
 This runbook covers the durable bootstrap bucket and the later establishment of new Terraform state lineage for it. It is intentionally value-safe: operator-held project, bucket, location, and principal inputs stay out of tracked source.
 
-Current source status: PR #87 merged the stage/provider verifier correction into protected `develop@5769e0cf6af6c3f4c75fa1f7ce079ae20a96d396`. The first packet remains stopped/consumed after the exact quota role/binding; no backend initialization, import, state access, plan generation, or later action occurred. After status closeout, a fresh final-tip packet and approval are required; no historical approval is reusable.
+Current source status: PR #88 merged at `develop@4b678d1c2b6b5eb13c1031bd2cd4be16a2da5302`. The successor packet passed exact quota-role/binding readback and then stopped read-only on managed-IAM verifier modeling. Its approval is consumed; no backend/state/plan or later action occurred. Bounded source correction is active; a fresh final-tip packet and approval are required.
 
 Before any bootstrap-state establishment/reconciliation request, prove privately that bootstrap and workload roots have distinct state objects/files, backend keys/prefixes, lock scopes, lineages, and recovery paths. Bind each approval to the canonical private backend-config digest plus an opaque resolved backend identity, state object or prefix, and lock scope fingerprint, then require pre-initialization comparison against the reviewed source and operator-held inputs. Establish/read back bootstrap state with the approved existing bootstrap inventory and prove it contains bootstrap addresses only before any workload-root state path or bootstrap-authority retirement.
 

@@ -60,10 +60,12 @@ automated hiring, matching, ranking, eligibility, or referral system.
   `develop@58ea1cf`. The first approved packet created and exact-read back only
   the one-permission quota role and sole provisioner binding, then stopped at its
   mandatory verifier. PR #87 then merged the stage/provider verifier correction at
-  `develop@5769e0c`; required CI and final agent rereviews passed. No backend/state,
+  `develop@5769e0c`; required CI and final agent rereviews passed. PR #88
+  merged its closeout at `develop@4b678d1`. A successor packet stopped read-only at
+  A02 on managed-IAM verifier modeling and is consumed. No backend/state,
   plan/apply, image, Secret, database, migration, service, access, qualification,
-  real-identity, live-data, or production action followed. A fresh final-tip packet
-  and approval are required.
+  real-identity, live-data, or production action followed. Bounded source correction
+  is active; a fresh final-tip packet and approval are required.
   Private identifiers and secret payloads stay outside tracked source and ordinary
   documentation.
 - Source-controlled Gate 2 read-only verification tooling now exists: `scripts/verify_gcp_foundation.py`

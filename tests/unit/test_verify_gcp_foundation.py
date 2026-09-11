@@ -558,6 +558,101 @@ def test_foundation_mode_accepts_exact_named_human_provider_owner() -> None:
     assert module.evaluate_foundation_snapshot(snapshot, contract, mode="foundation") == []
 
 
+def test_foundation_mode_accepts_exact_current_google_managed_service_agents() -> None:
+    module = load_module()
+    snapshot = foundation_snapshot()
+    project_number = snapshot["project_number"]
+    snapshot["project_iam"].update(
+        {
+            "roles/compute.serviceAgent": [
+                f"serviceAccount:service-{project_number}@compute-system.iam.gserviceaccount.com"
+            ],
+            "roles/compute.instanceGroupManagerServiceAgent": [
+                f"serviceAccount:{project_number}@cloudservices.gserviceaccount.com"
+            ],
+            "roles/logging.serviceAgent": [
+                f"serviceAccount:service-{project_number}@gcp-sa-logging.iam.gserviceaccount.com"
+            ],
+        }
+    )
+
+    assert (
+        module.evaluate_foundation_snapshot(snapshot, expected_contract(), mode="foundation") == []
+    )
+
+
+def test_foundation_mode_accepts_same_provider_redundant_bootstrap_roles() -> None:
+    module = load_module()
+    contract = expected_contract()
+    snapshot = foundation_snapshot()
+    provider = contract["provider_operator_principal"]
+    snapshot["project_iam"].update(
+        {
+            "roles/owner": [provider],
+            "roles/artifactregistry.admin": [provider],
+            "roles/iam.serviceAccountCreator": [provider],
+            "roles/resourcemanager.projectIamAdmin": [provider],
+        }
+    )
+
+    assert module.evaluate_foundation_snapshot(snapshot, contract, mode="foundation") == []
+
+
+@pytest.mark.parametrize(
+    ("role", "members"),
+    [
+        (
+            "roles/compute.serviceAgent",
+            ["serviceAccount:wrong@compute-system.iam.gserviceaccount.com"],
+        ),
+        (
+            "roles/compute.instanceGroupManagerServiceAgent",
+            [
+                "serviceAccount:123456789@cloudservices.gserviceaccount.com",
+                "user:unexpected@example.com",
+            ],
+        ),
+        (
+            "roles/logging.serviceAgent",
+            ["serviceAccount:wrong@gcp-sa-logging.iam.gserviceaccount.com"],
+        ),
+    ],
+)
+def test_foundation_mode_rejects_managed_service_agent_drift(
+    role: str,
+    members: list[str],
+) -> None:
+    module = load_module()
+    snapshot = foundation_snapshot()
+    snapshot["project_iam"][role] = members
+
+    assert module.evaluate_foundation_snapshot(snapshot, expected_contract(), mode="foundation")
+
+
+@pytest.mark.parametrize(
+    ("role", "members"),
+    [
+        ("roles/artifactregistry.admin", ["user:other@example.com"]),
+        (
+            "roles/iam.serviceAccountCreator",
+            ["user:provider.operator@example.com", "user:other@example.com"],
+        ),
+        ("roles/compute.admin", ["user:provider.operator@example.com"]),
+    ],
+)
+def test_foundation_mode_rejects_broadened_redundant_provider_roles(
+    role: str,
+    members: list[str],
+) -> None:
+    module = load_module()
+    contract = expected_contract()
+    snapshot = foundation_snapshot()
+    snapshot["project_iam"]["roles/owner"] = [contract["provider_operator_principal"]]
+    snapshot["project_iam"][role] = members
+
+    assert module.evaluate_foundation_snapshot(snapshot, contract, mode="foundation")
+
+
 @pytest.mark.parametrize(
     ("provider_principal", "role", "members"),
     [

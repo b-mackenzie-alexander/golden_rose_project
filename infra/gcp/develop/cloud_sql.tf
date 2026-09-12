@@ -8,6 +8,9 @@ resource "google_sql_database_instance" "develop" {
   deletion_protection = true
 
   settings {
+    # PostgreSQL 16 otherwise defaults to Enterprise Plus, which rejects this tier.
+    edition = "ENTERPRISE"
+
     tier      = "db-f1-micro"
     disk_size = 10
     disk_type = "PD_SSD"

@@ -140,6 +140,8 @@ resource "google_secret_manager_secret_iam_member" "runtime_demo_access_secret_a
   secret_id = "demo-access-password"
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.runtime.email}"
+
+  depends_on = [google_secret_manager_secret.metadata_only["demo-access-password"]]
 }
 
 resource "google_secret_manager_secret_iam_member" "migration_synthetic_staff_secret_access" {

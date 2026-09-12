@@ -29,9 +29,12 @@
 - [x] Execute the successor packet through its read-only A02 stop. A00/A01 and exact quota-role/binding readback passed; the verifier then exposed incomplete Google-managed service-agent allowlisting plus redundant same-human bootstrap-role handling. The approval is consumed and this packet made no mutation.
 - [x] Merge the bounded managed-service-agent and same-provider redundant-role verifier correction. PR #89 merged source head `7d8bdc336149f177a42baa7d951773ac54585c8f` into protected `develop@4b7730ce9b52a93f4fb93310c5ad2efd688b68dc`; required CI and final agent rereviews passed.
 - [x] Merge the PR #89 status closeout. PR #90 established protected `develop@5fb6222`; no further status-closeout PR is needed.
-- [x] Complete both quota-resource imports and preserve exact readback. Workload state is serial 41 with 44 addresses; repeat imports are prohibited.
+- [x] Complete both quota-resource imports and preserve exact readback. The import milestone was serial 41 with 44 addresses; later v20 apply advanced state to serial 45. Repeat imports are prohibited.
 - [x] Prove process-local workload quota attribution permits the provider budget read without broadening IAM.
-- [ ] Merge the canonical budget-project-number source correction so the activation plan preserves the existing budget. V18 produced six expected additive resources plus a project-ID/project-number filter diff; it stopped without apply.
+- [x] Merge canonical budget-project-number correction as PR #91 at `develop@660fd7c`; v19/v20 proved the budget unchanged.
+- [x] Complete v20 exact-source image publication, signing, and all attestation admission.
+- [x] Resolve the v20 partial apply by readback: network/scoped resources exist, no SQL/service exists, and one failed verifier has never executed.
+- [ ] Merge explicit SQL edition and Secret dependency fixes plus ordered exceptional bootstrap recovery; prepare one exact final-tip packet including the specifically approved failed-job cleanup.
 - [ ] Under one explicitly approved packet, publish/apply/migrate/activate/qualify the environment and deliver the access-gated URL to Beatrice.
 - [ ] Defer ADR-0015 FinOps state separation until production/handoff or a concrete billing-ownership trigger; retain the current workload budget and exact temporary quota-use exception.
 

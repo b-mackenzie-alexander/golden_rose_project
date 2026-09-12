@@ -1299,6 +1299,24 @@ def test_gcp_develop_network_uses_dedicated_vpc_and_private_service_access_only(
     assert "local-exec" not in network.lower()
 
 
+def test_cloud_sql_shared_core_pins_enterprise_edition() -> None:
+    cloud_sql = (ROOT / "infra/gcp/develop/cloud_sql.tf").read_text(encoding="utf-8")
+    assert _contains_normalized_fragment(cloud_sql, 'edition = "ENTERPRISE"')
+    assert "db-f1-micro" in cloud_sql
+
+
+def test_demo_secret_access_waits_for_secret_metadata_creation() -> None:
+    iam = (ROOT / "infra/gcp/develop/iam.tf").read_text(encoding="utf-8")
+    block = iam.split(
+        'resource "google_secret_manager_secret_iam_member" "runtime_demo_access_secret_access" {',
+        1,
+    )[1].split("\n}", 1)[0]
+    assert _contains_normalized_fragment(
+        block,
+        'depends_on = [google_secret_manager_secret.metadata_only["demo-access-password"]]',
+    )
+
+
 def test_gcp_develop_cloud_sql_is_private_minimal_postgresql_without_public_ip() -> None:
     cloud_sql = (ROOT / "infra/gcp/develop/cloud_sql.tf").read_text(encoding="utf-8")
     develop_variables = (ROOT / "infra/gcp/develop/variables.tf").read_text(encoding="utf-8")

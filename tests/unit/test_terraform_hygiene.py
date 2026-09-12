@@ -8977,7 +8977,7 @@ def test_deploy_workflow_uses_one_packet_stages_and_direct_oci_authority() -> No
         "scripts/verify_deploy_image_authority.py",
         '--source-commit "$GITHUB_SHA"',
         "Execute migration transition",
-        "gcloud run jobs describe run-migrations",
+        "--kind jobs --name run-migrations",
         "job image must match the direct Cosign-verified image",
         "Verify service readiness transition",
     ]
@@ -9000,7 +9000,7 @@ def test_deploy_workflow_uses_one_packet_stages_and_direct_oci_authority() -> No
     migration_step = workflow.split("- name: Execute migration transition", 1)[1].split(
         "- name: Verify service readiness transition", 1
     )[0]
-    assert migration_step.index("gcloud run jobs describe") < migration_step.index(
+    assert migration_step.index("python scripts/read_cloud_run_v2.py") < migration_step.index(
         "gcloud run jobs execute"
     )
     service_step = workflow.split("- name: Verify service readiness transition", 1)[1].split(
@@ -9027,7 +9027,7 @@ def test_deploy_workflow_executes_bounded_database_authority_job() -> None:
         "- database-verification",
         "Execute database authority verification",
         "if: inputs.deployment_stage == 'database-verification'",
-        "gcloud run jobs describe verify-database-authority",
+        "--kind jobs --name verify-database-authority",
         "database authority job image must match the direct Cosign-verified image",
         "gcloud run jobs execute verify-database-authority",
         '"current_stage": "database_verification"',
@@ -9038,7 +9038,7 @@ def test_deploy_workflow_executes_bounded_database_authority_job() -> None:
     step = workflow.split("- name: Execute database authority verification", 1)[1].split(
         "- name: Verify service readiness transition", 1
     )[0]
-    assert step.index("gcloud run jobs describe") < step.index("gcloud run jobs execute")
+    assert step.index("python scripts/read_cloud_run_v2.py") < step.index("gcloud run jobs execute")
     assert "--update-env-vars" not in step
     assert "--args" not in step
     assert "--command" not in step

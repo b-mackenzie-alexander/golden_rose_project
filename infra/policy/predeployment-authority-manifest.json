@@ -250,7 +250,8 @@
       "scripts/validate_sbom.py",
       "scripts/validate_terraform_static.py",
       "scripts/verify_deploy_image_authority.py",
-      "scripts/write_migration_success_receipt.py"
+      "scripts/write_migration_success_receipt.py",
+      "scripts/read_cloud_run_v2.py"
     ]
   },
   "protected_deployment_paths": [

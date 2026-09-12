@@ -127,6 +127,7 @@ def valid_snapshot() -> dict[str, Any]:
             "name": "staff-tracer",
             "uri": "https://staff-tracer-example-uc.a.run.app",
             "labels": {
+                "goog-terraform-provisioned": "true",
                 "environment": "develop",
                 "data_boundary": "fictional-synthetic-only",
                 "managed_by": "terraform",
@@ -196,6 +197,7 @@ def valid_snapshot() -> dict[str, Any]:
         "migration_job": {
             "name": "run-migrations",
             "labels": {
+                "goog-terraform-provisioned": "true",
                 "environment": "develop",
                 "data_boundary": "fictional-synthetic-only",
                 "managed_by": "terraform",
@@ -238,6 +240,7 @@ def valid_snapshot() -> dict[str, Any]:
         "database_authority_job": {
             "name": "verify-database-authority",
             "labels": {
+                "goog-terraform-provisioned": "true",
                 "environment": "develop",
                 "data_boundary": "fictional-synthetic-only",
                 "managed_by": "terraform",
@@ -1204,7 +1207,7 @@ def test_live_runner_collects_database_authority_job_inventory_and_exact_policie
             ]
         if context == "database authority job":
             return {
-                "name": "verify-database-authority",
+                "name": "projects/example-project/locations/us-east4/jobs/verify-database-authority",
                 "labels": valid_snapshot()["database_authority_job"]["labels"],
                 "template": {
                     "parallelism": 1,
@@ -2738,3 +2741,35 @@ def test_atomic_write_text_rejects_renamed_parent_replaced_with_symlink(tmp_path
 
     assert not (escaped / "foundation.md").exists()
     assert not (displaced_parent / "foundation.md").exists()
+
+
+def test_exact_service_networking_agent_is_permitted_but_other_principals_fail() -> None:
+    module = load_module()
+    expected = module._expected_google_managed_project_iam("123456789")
+    assert expected["roles/servicenetworking.serviceAgent"] == {
+        "serviceAccount:service-123456789@service-networking.iam.gserviceaccount.com"
+    }
+
+
+@pytest.mark.parametrize("key", ["cloud_run_service", "migration_job", "database_authority_job"])
+def test_cloud_run_provider_label_is_exact_and_no_extra_labels_are_admitted(key: str) -> None:
+    m = load_module()
+    snapshot = valid_snapshot()
+    assert m.evaluate_foundation_snapshot(snapshot, expected_contract()) == []
+    snapshot[key]["labels"]["goog-terraform-provisioned"] = "false"
+    assert m.evaluate_foundation_snapshot(snapshot, expected_contract())
+    snapshot[key]["labels"]["goog-terraform-provisioned"] = "true"
+    snapshot[key]["labels"]["extra"] = "unexpected"
+    assert m.evaluate_foundation_snapshot(snapshot, expected_contract())
+
+
+def test_service_networking_agent_rejects_extra_or_wrong_member() -> None:
+    m = load_module()
+    snapshot = valid_snapshot()
+    role = "roles/servicenetworking.serviceAgent"
+    snapshot["project_iam"][role] = [
+        "serviceAccount:service-123456789@service-networking.iam.gserviceaccount.com"
+    ]
+    assert m.evaluate_foundation_snapshot(snapshot, expected_contract()) == []
+    snapshot["project_iam"][role].append("user:other@example.com")
+    assert m.evaluate_foundation_snapshot(snapshot, expected_contract())

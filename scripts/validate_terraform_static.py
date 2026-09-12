@@ -2031,12 +2031,12 @@ EXACT_WORKFLOW_RUN_SHA256.update(
             "deploy-develop.yml",
             "deploy",
             "name:Execute migration transition",
-        ): "bde269efb6efb89e60ec5d7faf384abeee036f69275f062beca9eef42bac7427",
+        ): "a32c980384a59fe0df3397f591c19407dced040f01c2144b9581a6ed692dc46f",
         (
             "deploy-develop.yml",
             "deploy",
             "name:Execute database authority verification",
-        ): "6fa7f5a86d4c57bbcc620be8361dab3ee8a1f62670ac7268456d69bbf0c2cc98",
+        ): "06d2a91b79c5f1bdbedb10306855291d18bf9e10fc6f1e6ef05a7183cb11a911",
         (
             "deploy-develop.yml",
             "deploy",
@@ -2051,7 +2051,7 @@ EXACT_WORKFLOW_RUN_SHA256.update(
             "deploy-develop.yml",
             "deploy",
             "name:Verify service readiness transition",
-        ): "fa1898b72b71222b31686c5eb41750bf9a3abc3ebce7e662822e8705f837674b",
+        ): "8902d091a6cf84bce5202acd273ac3eaee49b0e051ce0b96b41020ad53e611ec",
         (
             "deploy-develop.yml",
             "deploy",

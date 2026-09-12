@@ -3,6 +3,12 @@
 ## Mission and scope
 Golden Rose is a seven-week, evidence-led, compliance-conscious operations-platform engagement for an employment agency. The immediate goal is a safe staff-facing employer-demand workflow; the product must not be treated as a finished public portal, legal/compliance system, or automated hiring/matching system.
 
+## Current deployment handoff — 2026-09-12
+
+One independent developer. V22 created the private PostgreSQL Enterprise micro instance and application database; there is still no human-visible service. Its exact failed-verifier deletion and two-create database apply/readback passed, then it stopped/consumed on a confirmed Cloud Run v1/v2 source readback defect before credentials or migration. Current state serial46/55 managed instances includes the absent verifier's stale tainted entry. Preserve the running database; ordinary refresh will reconcile that absence.
+
+One continuation packet must cover the remaining deployment through browser handoff. Next: merge the bounded v2 readback correction, bind final source/current state, then continue from real bootstrap credentials and migration job creation. Do not repeat failed-job cleanup, imports, database creation, state editing/untaint, status-closeout PRs, FinOps/quorum gates, or production-only prerequisites. Keep private SQL, budget, exact admitted image, expiring Basic gate, one-instance cap, generated-fictional data and post-request logs.
+
 ## Authoritative working surfaces
 1. `CURRENT_WORK.md` — active lane, current objective, next steps, and stop boundaries.
 2. `ROADMAP.md` — phase checklist and rollout truth.

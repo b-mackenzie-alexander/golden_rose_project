@@ -2,6 +2,12 @@
 
 **Status:** Living checklist. Discovery evidence and approved decisions control scope; unchecked items are not authorized merely because they appear below.
 
+## Current deployment outcome — 2026-09-12
+
+- [x] V22 exact failed-verifier cleanup and private PostgreSQL Enterprise/application-database creation; SQL is runnable and has no public IP.
+- [ ] Merge the reviewed Cloud Run v2 readback correction and continue from the preserved database through real credentials, migrations, service and browser handoff.
+- [ ] Human-visible cloud runtime remains incomplete. State serial46/55 managed instances includes the absent verifier's stale state entry; normal refresh, not state editing, will reconcile it. No application users, database URL versions, job executions or service were created in v22.
+
 ## Delivery-method governance
 
 - [x] Adopt ADR-0014 workflow-scale planning: each implementation plan normally covers multiple checklist items or one meaningful user-observable, operational, or risk-bounded outcome and may authorize several ordered implementation PRs.

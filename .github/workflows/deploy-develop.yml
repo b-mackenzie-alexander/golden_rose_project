@@ -154,7 +154,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build/transition-authority
-          JOB_JSON=$(gcloud run jobs describe run-migrations --project "$GCP_PROJECT_ID" --region us-east4 --format=json)
+          JOB_JSON=$(python scripts/read_cloud_run_v2.py --project "$GCP_PROJECT_ID" --region us-east4 --kind jobs --name run-migrations)
           export JOB_JSON
           python - <<'PY'
           import json
@@ -226,6 +226,7 @@ jobs:
               "cost_center": "develop",
               "owner": "technical-owner",
               "teardown": "intentional-runbook-only",
+              "goog-terraform-provisioned": "true",
           }
           labels = job.get("labels")
           if labels != required_labels:
@@ -251,7 +252,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build/transition-authority
-          JOB_JSON=$(gcloud run jobs describe verify-database-authority --project "$GCP_PROJECT_ID" --region us-east4 --format=json)
+          JOB_JSON=$(python scripts/read_cloud_run_v2.py --project "$GCP_PROJECT_ID" --region us-east4 --kind jobs --name verify-database-authority)
           export JOB_JSON
           python - <<'PY'
           import json
@@ -277,6 +278,7 @@ jobs:
               "cost_center": "develop",
               "owner": "technical-owner",
               "teardown": "intentional-runbook-only",
+              "goog-terraform-provisioned": "true",
           }
           if job.get("labels") != expected_labels:
               raise SystemExit("database authority job labels drifted")
@@ -332,16 +334,20 @@ jobs:
         if: inputs.deployment_stage == 'service'
         run: |
           set -euo pipefail
-          SERVICE_JSON=$(gcloud run services describe staff-tracer --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --format=json)
+          SERVICE_JSON=$(python scripts/read_cloud_run_v2.py --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --kind services --name staff-tracer)
           export SERVICE_JSON
           python - <<'PY'
           import json, os
           from pathlib import Path
 
           service = json.loads(os.environ["SERVICE_JSON"])
-          ready = next((item for item in service.get("status", {}).get("conditions", []) if item.get("type") == "Ready"), None)
-          if not ready or ready.get("status") != "True":
-              raise SystemExit("cloud run ready condition must be True")
+          ready = service.get("terminalCondition", {})
+          if ready.get("state") != "CONDITION_SUCCEEDED" or service.get("reconciling", False):
+              raise SystemExit("cloud run v2 terminal condition must be succeeded and reconciled")
+          if not service.get("generation") or service.get("observedGeneration") != service["generation"]:
+              raise SystemExit("cloud run observed generation must match the current generation")
+          if not service.get("latestReadyRevision") or service.get("latestReadyRevision") != service.get("latestCreatedRevision"):
+              raise SystemExit("cloud run current revision must be ready")
           containers = service.get("template", {}).get("containers")
           if not isinstance(containers, list) or len(containers) != 1 or not isinstance(containers[0], dict):
               raise SystemExit("ready service must contain exactly one Cloud Run v2 container")

@@ -1,6 +1,6 @@
 # Security — Golden Rose Operations Platform
 
-**Status:** PR #89 merged the bounded managed-IAM verifier correction into protected `develop@4b7730ce9b52a93f4fb93310c5ad2efd688b68dc`; required CI and final agent rereviews passed. Both prior packet approvals are consumed; no A03+ or cloud mutation occurred. A fresh final-tip packet and approval are required.
+**Status:** V22 completed exact failed-verifier cleanup and private SQL/database creation, with no public SQL IP, application credentials, migration job, or service. It stopped after resolved readback on a confirmed Cloud Run v1/v2 source projection defect. The bounded source correction uses existing read authority, retains all job/service checks, admits only exact provider labels and the source-created Google network agent, and adds no IAM. Corrected-source continuation approval remains required; live data and production remain separately gated.
 
 ## Security objectives
 - Protect worker, employer, household/worksite, document, and operational data using least privilege and data minimization.

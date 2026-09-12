@@ -4,6 +4,12 @@ This runbook defines the single eight-hour operator packet, valid for no more th
 
 Current execution status: PR #91 merged at `develop@660fd7c`; the budget fix is proven. V20 completed image admission and partially applied. It is consumed. Private readback is serial 45 with 53 managed instances, no SQL/service, and one failed never-executed verifier job. Preserve successful resources and both imports. The next packet must bind this actual partial inventory, explicitly authorize the exact failed-job cleanup, and follow the ordered recovery below. No status-closeout PR is required.
 
+## Current partial-state continuation
+
+V22 completed the exact failed-verifier native deletion and database-only apply. Preserve the running private SQL instance/application database. Current operator evidence is serial46/55 managed instances; the absent verifier's stale state entry is resolved by ordinary refresh, never untaint/removal/import. A successor packet begins after fresh prechecks and exact-source image admission with real bootstrap credentials and migration-job creation, then the existing restricted-role/full-reconciliation/service/qualification sequence. Do not repeat cleanup or database creation.
+
+Job/service configuration projections use `scripts/read_cloud_run_v2.py`, a read-only authenticated v2 client. Default gcloud v1 JSON is not a v2 projection. The exact provider attribution label `goog-terraform-provisioned=true` is required along with source labels; arbitrary extra labels remain rejected. Service readiness uses a succeeded v2 terminal condition, reconciled current generation, and matching latest-created/latest-ready revision. Explicit `maxRetries=0` remains mandatory because the API retry field tracks presence and otherwise defaults to three.
+
 ## Scope
 
 - first private fictional-synthetic `develop` deployment only

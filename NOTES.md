@@ -2,6 +2,14 @@
 
 This is the concise, dated engineering and operational note log. It records observed evidence, decisions, verification, and handoffs. It is not a location for client personal data, credentials, raw exports, legal advice, or unapproved policy text.
 
+## 2026-09-12 — V22 database milestone and Cloud Run readback correction
+
+**Observed:** V22 admitted existing successful publication run34669500588 at protected source122e749, deleted only the exact failed never-executed verifier, and applied the inspected database-only plan: exactly two creates. Private PostgreSQL Enterprise micro and the application database are runnable. Exact readback is serial46/55 managed instances; the absent verifier remains a stale tainted state entry until ordinary refresh. No service/jobs, new application users, URL Secret versions or migrations exist.
+
+**Observed:** The next workflow would parse default gcloud v1 Job JSON as v2. Foundation job inventory/projections and service projection share the mismatch; service readiness mixed v1 conditions with a v2 template. Fresh review confirmed the defect before migration. V22 is stopped/consumed after the in-flight database outcome was resolved.
+
+**Validated source correction:** Shared authenticated fixed-host v2 GET/list reader; no token in argv or reflected error payloads; redirect rejection; complete bounded pagination; exact Cloud Run provider attribution label; full-name normalization; current v2 service generation/revision readiness; exact Google service-networking service-agent allowance. Existing configuration and no-override execution checks remain. Focused readback/foundation tests150 pass, Terraform hygiene307 pass, static validation and Ruff pass, canonical mypy src/tests passes; fresh review PASS. Required PR/CI promotion remains the next source step. Private evidence holds identifiers, plans/state, and operator records.
+
 ## Evidence labels
 - **Observed:** directly supplied, seen, or tool-verified.
 - **Reported:** stated by client/staff but not independently validated.

@@ -7,6 +7,7 @@ import re
 import secrets
 import stat
 import subprocess
+import sys
 from collections.abc import Callable, Sequence
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
@@ -25,6 +26,8 @@ APPROVED_PROJECT_LABELS = {
     "owner": "technical-owner",
     "teardown": "intentional-runbook-only",
 }
+APPROVED_CLOUD_RUN_LABELS = {**APPROVED_PROJECT_LABELS, "goog-terraform-provisioned": "true"}
+
 # Required APIs are the Terraform-managed foundation contract. Google-managed
 # or account-default services observed outside this set are evidence, not an
 # automatic foundation-policy violation; only missing required APIs fail.
@@ -596,6 +599,9 @@ def _expected_google_managed_project_iam(project_number: object) -> dict[str, se
         "roles/run.serviceAgent": {
             f"serviceAccount:service-{number}@serverless-robot-prod.iam.gserviceaccount.com"
         },
+        "roles/servicenetworking.serviceAgent": {
+            f"serviceAccount:service-{number}@service-networking.iam.gserviceaccount.com"
+        },
         "roles/secretmanager.serviceAgent": {
             f"serviceAccount:service-{number}@gcp-sa-secretmanager.iam.gserviceaccount.com"
         },
@@ -852,7 +858,7 @@ def evaluate_foundation_snapshot(
 
     cloud_run_service = _mapping(snapshot.get("cloud_run_service", {}), label="cloud run service")
     if mode == "service":
-        if cloud_run_service.get("labels") != APPROVED_PROJECT_LABELS:
+        if cloud_run_service.get("labels") != APPROVED_CLOUD_RUN_LABELS:
             violations.append("cloud run service labels drifted from the approved develop posture")
         if cloud_run_service.get("ingress") != "INGRESS_TRAFFIC_ALL":
             violations.append(
@@ -968,7 +974,7 @@ def evaluate_foundation_snapshot(
 
     migration_job = _mapping(snapshot.get("migration_job", {}), label="migration job")
     if mode in {"migration", "service"}:
-        if migration_job.get("labels") != APPROVED_PROJECT_LABELS:
+        if migration_job.get("labels") != APPROVED_CLOUD_RUN_LABELS:
             violations.append("migration job labels drifted from the approved develop posture")
         if (
             migration_job.get("service_account")
@@ -1071,7 +1077,7 @@ def evaluate_foundation_snapshot(
     if mode in {"migration", "service"}:
         if database_authority_job.get("name") != "verify-database-authority":
             violations.append("database authority job name drifted")
-        if database_authority_job.get("labels") != APPROVED_PROJECT_LABELS:
+        if database_authority_job.get("labels") != APPROVED_CLOUD_RUN_LABELS:
             violations.append("database authority job labels drifted")
         if (
             database_authority_job.get("service_account")
@@ -1833,15 +1839,14 @@ def _build_live_command_runner(
         if key == ("cloud-run-jobs",):
             jobs = _run_json_command(
                 [
-                    "gcloud",
-                    "run",
-                    "jobs",
-                    "list",
+                    sys.executable,
+                    str(Path(__file__).with_name("read_cloud_run_v2.py")),
                     "--project",
                     project_id,
                     "--region",
                     region,
-                    "--format=json",
+                    "--kind",
+                    "jobs",
                 ],
                 context="cloud run jobs",
             )
@@ -1859,16 +1864,16 @@ def _build_live_command_runner(
             try:
                 service = _run_json_command(
                     [
-                        "gcloud",
-                        "run",
-                        "services",
-                        "describe",
-                        "staff-tracer",
+                        sys.executable,
+                        str(Path(__file__).with_name("read_cloud_run_v2.py")),
                         "--project",
                         project_id,
                         "--region",
                         region,
-                        "--format=json",
+                        "--kind",
+                        "services",
+                        "--name",
+                        "staff-tracer",
                     ],
                     context="cloud run service",
                 )
@@ -1889,7 +1894,7 @@ def _build_live_command_runner(
             )
             limits = _mapping(resources.get("limits", {}), label="cloud run service limits")
             return {
-                "name": service.get("name"),
+                "name": str(service.get("name", "")).rsplit("/", 1)[-1],
                 "uri": service.get("uri"),
                 "create_time": service.get("createTime"),
                 "labels": _mapping(service, label="service").get("labels", {}),
@@ -1934,16 +1939,16 @@ def _build_live_command_runner(
             try:
                 job = _run_json_command(
                     [
-                        "gcloud",
-                        "run",
-                        "jobs",
-                        "describe",
-                        "run-migrations",
+                        sys.executable,
+                        str(Path(__file__).with_name("read_cloud_run_v2.py")),
                         "--project",
                         project_id,
                         "--region",
                         region,
-                        "--format=json",
+                        "--kind",
+                        "jobs",
+                        "--name",
+                        "run-migrations",
                     ],
                     context="migration job",
                 )
@@ -1967,7 +1972,7 @@ def _build_live_command_runner(
                 else {}
             )
             return {
-                "name": job.get("name"),
+                "name": str(job.get("name", "")).rsplit("/", 1)[-1],
                 "labels": _mapping(job, label="job").get("labels", {}),
                 "service_account": task_template.get("serviceAccount"),
                 "container_count": container_count,
@@ -2013,16 +2018,16 @@ def _build_live_command_runner(
             try:
                 job = _run_json_command(
                     [
-                        "gcloud",
-                        "run",
-                        "jobs",
-                        "describe",
-                        "verify-database-authority",
+                        sys.executable,
+                        str(Path(__file__).with_name("read_cloud_run_v2.py")),
                         "--project",
                         project_id,
                         "--region",
                         region,
-                        "--format=json",
+                        "--kind",
+                        "jobs",
+                        "--name",
+                        "verify-database-authority",
                     ],
                     context="database authority job",
                 )
@@ -2052,7 +2057,7 @@ def _build_live_command_runner(
                 else {}
             )
             return {
-                "name": job.get("name"),
+                "name": str(job.get("name", "")).rsplit("/", 1)[-1],
                 "labels": _mapping(job, label="database authority job").get("labels", {}),
                 "service_account": _mapping(
                     task_template, label="database authority job task template"

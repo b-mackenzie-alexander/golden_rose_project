@@ -3,11 +3,12 @@
 ## Mission and scope
 Golden Rose is a seven-week, evidence-led, compliance-conscious operations-platform engagement for an employment agency. The immediate goal is a safe staff-facing employer-demand workflow; the product must not be treated as a finished public portal, legal/compliance system, or automated hiring/matching system.
 
-## Current deployment handoff — 2026-09-12
-
-One independent developer. V22 created the private PostgreSQL Enterprise micro instance and application database; there is still no human-visible service. Its exact failed-verifier deletion and two-create database apply/readback passed, then it stopped/consumed on a confirmed Cloud Run v1/v2 source readback defect before credentials or migration. Current state serial46/55 managed instances includes the absent verifier's stale tainted entry. Preserve the running database; ordinary refresh will reconcile that absence.
-
-One continuation packet must cover the remaining deployment through browser handoff. Next: merge the bounded v2 readback correction, bind final source/current state, then continue from real bootstrap credentials and migration job creation. Do not repeat failed-job cleanup, imports, database creation, state editing/untaint, status-closeout PRs, FinOps/quorum gates, or production-only prerequisites. Keep private SQL, budget, exact admitted image, expiring Basic gate, one-instance cap, generated-fictional data and post-request logs.
+## Delivery lock — v24 bootstrap correction
+- **Staffing:** One independent developer; fresh agent review supplies quality evidence.
+- **Human-visible outcome:** Private SQL, the application database, and migration job are running. The admitted v24 image reached PostgreSQL but initial bootstrap rolled back before application roles/tables persisted. No browser service exists. The temporary login and migration URL remain available; preserve them.
+- **Gate budget:** One source-bound continuation covers publication, existing-job image update, migration, restricted credentials, bootstrap retirement, verifier reconciliation, service activation, qualification, and browser handoff. Ordinary steps/readbacks do not become separate approvals.
+- **Next executable action:** Review and promote the managed PostgreSQL bootstrap/grantor correction, bind final source to the preserved resources and current Secret versions, then resume the ordered deployment. Do not rerun the known-broken image.
+- **Do not regress:** No database/job/bootstrap recreation, state editing, broad IAM, live data, production-only gates, or status-only PR. Keep strict immutable image admission, private SQL, restricted application logins, expiring Basic access, one-instance scaling, and post-request log qualification.
 
 ## Authoritative working surfaces
 1. `CURRENT_WORK.md` — active lane, current objective, next steps, and stop boundaries.
@@ -65,11 +66,11 @@ Every later implementation tranche requires an accepted merged outcome-scale pla
 
 ## Latest operational continuation — v23
 
-## Delivery lock — v23 migration-job milestone
+## Delivery lock — v24 bootstrap correction
 - **Staffing:** One independent developer; fresh agent review supplies quality evidence.
-- **Human-visible outcome:** Private SQL and the application database are running. The migration job and its exact deployer bindings are deployed; the runtime demo-Secret accessor was moved into A07 with explicit user approval. No migration has executed and no browser service exists. The temporary bootstrap login and real migration URL Secret are prepared and retained for the initial migration.
-- **Gate budget:** Preserve the one-packet continuation; do not repeat database creation, bootstrap-user creation, or migration-job creation. Keep later restricted-logins/retirement, full verifier reconciliation, service activation, qualification, and browser delivery together.
-- **Next executable action:** Promote the bounded immutable-signature workflow correction, bind the corrected source to the preserved database, job, and bootstrap inventory, then publish and admit that source, update only the job image as required, and resume initial migration. All subsequent steps remain ordered behind its actual success.
-- **Do not regress:** No state editing, cleanup/recreation, production-only governance, broad IAM, or live data. Keep private SQL, exact images, restricted database roles, expiring Basic access, one-instance cap, and post-request log qualification. Never bypass strict image admission.
+- **Human-visible outcome:** Private SQL, the application database, and migration job are running. The admitted v24 image reached PostgreSQL but initial bootstrap rolled back before application roles/tables persisted. No browser service exists. The temporary login and migration URL remain available; preserve them.
+- **Gate budget:** One source-bound continuation covers publication, existing-job image update, migration, restricted credentials, bootstrap retirement, verifier reconciliation, service activation, qualification, and browser handoff. Ordinary steps/readbacks do not become separate approvals.
+- **Next executable action:** Review and promote the managed PostgreSQL bootstrap/grantor correction, bind final source to the preserved resources and current Secret versions, then resume the ordered deployment. Do not rerun the known-broken image.
+- **Do not regress:** No database/job/bootstrap recreation, state editing, broad IAM, live data, production-only gates, or status-only PR. Keep strict immutable image admission, private SQL, restricted application logins, expiring Basic access, one-instance scaling, and post-request log qualification.
 
 **Observed:** The repository default branch is now `develop` under explicit user approval. This registered the existing deployment workflow. Its three missing non-secret deployment variables were populated from existing approved identity/certificate bindings. The first workflow attempt stopped at missing identity configuration; the second authenticated and reached direct OCI admission, which rejected tag-based signature output passed to the immutable-reference checker. Neither attempt executed migration. The correction preserves tag verification for digest discovery, then independently verifies that immutable digest before the unchanged strict semantic checker and attestations.

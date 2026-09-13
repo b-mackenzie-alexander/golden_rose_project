@@ -70,7 +70,8 @@ DATABASE_IDENTITY_QUERY = text(
 
 ROLE_ATTRIBUTES_QUERY = text(
     """
-    SELECT rolname, rolcanlogin, rolsuper, rolcreaterole
+    SELECT rolname, rolcanlogin, rolsuper, rolcreaterole, rolcreatedb,
+           rolreplication, rolbypassrls, rolinherit
     FROM pg_roles
     WHERE rolname = ANY(:role_names)
     """
@@ -85,6 +86,20 @@ ROLE_MEMBERSHIP_QUERY = text(
     WHERE member_role.rolname = ANY(:role_names)
     """
 )
+
+# Include incoming edges as well as outgoing edges: a retained bootstrap or
+# unsafe creator membership cannot be hidden by a names-only projection.
+AUTHORITY_MEMBERSHIP_QUERY = text("""
+    SELECT member_role.rolname AS member, granted_role.rolname AS granted,
+           grantor.rolname AS grantor, grantor.rolsuper AS grantor_superuser,
+           membership.admin_option, membership.inherit_option, membership.set_option
+    FROM pg_auth_members membership
+    JOIN pg_roles member_role ON member_role.oid = membership.member
+    JOIN pg_roles granted_role ON granted_role.oid = membership.roleid
+    JOIN pg_roles grantor ON grantor.oid = membership.grantor
+    WHERE member_role.rolname = ANY(:role_names)
+       OR granted_role.rolname = ANY(:role_names)
+""")
 
 SCHEMA_OWNER_QUERY = text(
     """
@@ -246,6 +261,10 @@ def _role_attributes(
             "rolcanlogin": row["rolcanlogin"],
             "rolsuper": row["rolsuper"],
             "rolcreaterole": row["rolcreaterole"],
+            "rolcreatedb": row["rolcreatedb"],
+            "rolreplication": row["rolreplication"],
+            "rolbypassrls": row["rolbypassrls"],
+            "rolinherit": row["rolinherit"],
         }
         for row in connection.execute(
             ROLE_ATTRIBUTES_QUERY,
@@ -279,7 +298,21 @@ def collect_authority_snapshot(
         for role_name in (migration_login_role, runtime_login_role)
         if role_name is not None
     ]
-    roles = _role_attributes(connection, [*governed_roles, *authenticated_roles])
+    roles = _role_attributes(
+        connection, [*governed_roles, *authenticated_roles, "cloudsqlsuperuser"]
+    )
+    authority_memberships = [
+        dict(row)
+        for row in connection.execute(
+            AUTHORITY_MEMBERSHIP_QUERY,
+            {"role_names": [*governed_roles, *authenticated_roles]},
+        ).mappings()
+    ]
+    if "cloudsqlsuperuser" not in roles:
+        local_members = [
+            str(row["member"]) for row in authority_memberships if row["granted"] == MIGRATOR_ROLE
+        ]
+        roles.update(_role_attributes(connection, local_members))
     role_memberships = _role_memberships(connection, governed_roles)
     authenticated_role_memberships = _role_memberships(connection, authenticated_roles)
 
@@ -345,6 +378,7 @@ def collect_authority_snapshot(
 
     return {
         "roles": roles,
+        "authority_memberships": authority_memberships,
         "schema_owner": schema_owner,
         "role_memberships": role_memberships,
         "authenticated_role_memberships": authenticated_role_memberships,
@@ -361,12 +395,92 @@ def collect_authority_snapshot(
     }
 
 
+def _evaluate_membership_graph(
+    snapshot: dict[str, object], roles: dict[str, dict[str, object]]
+) -> list[str]:
+    rows = snapshot.get("authority_memberships")
+    if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+        return ["snapshot missing structured authority memberships"]
+    # This verifier admits two complete catalog shapes. Bootstrap selection is
+    # separately restricted to the explicit managed deployment target.
+    managed = "cloudsqlsuperuser" in roles
+    expected_edges = {
+        (MIGRATOR_ROLE, SCHEMA_OWNER_ROLE),
+        (snapshot.get("migration_login_role"), MIGRATOR_ROLE),
+        (snapshot.get("runtime_login_role"), RUNTIME_ROLE),
+    }
+    admin_edges = (
+        {("cloudsqlsuperuser", role) for role in (SCHEMA_OWNER_ROLE, MIGRATOR_ROLE, RUNTIME_ROLE)}
+        if managed
+        else set()
+    )
+    seen: set[tuple[object, object]] = set()
+    violations = []
+    if managed and roles["cloudsqlsuperuser"] != {
+        "rolcanlogin": True,
+        "rolinherit": True,
+        "rolcreatedb": True,
+        "rolcreaterole": True,
+        "rolsuper": False,
+        "rolreplication": False,
+        "rolbypassrls": False,
+    }:
+        violations.append("managed database grantor attributes drifted")
+    for row in rows:
+        edge = (row.get("member"), row.get("granted"))
+        options = (row.get("admin_option"), row.get("inherit_option"), row.get("set_option"))
+        if edge in seen:
+            violations.append("duplicate authority membership")
+        seen.add(edge)
+        if edge in admin_edges:
+            if options != (True, False, False) or row.get("grantor_superuser") is not True:
+                violations.append("managed creator membership drifted")
+        elif edge in expected_edges:
+            if options != (False, True, True):
+                violations.append("restricted authority membership options drifted")
+            if (
+                managed
+                and edge == (MIGRATOR_ROLE, SCHEMA_OWNER_ROLE)
+                and row.get("grantor") != "cloudsqlsuperuser"
+            ):
+                violations.append("schema owner membership must use durable managed grantor")
+        elif (
+            not managed
+            and row.get("member") in roles
+            and roles[row["member"]].get("rolsuper") is True
+        ):
+            # Local test installations may retain their actual superuser grant.
+            if edge[1] != MIGRATOR_ROLE or options != (False, True, True):
+                violations.append("unexpected local superuser membership")
+        else:
+            violations.append("unexpected incoming or outgoing authority membership")
+    if not (expected_edges | admin_edges).issubset(seen):
+        violations.append("missing expected authority membership")
+    return violations
+
+
 def evaluate_authority_snapshot(snapshot: dict[str, object]) -> list[str]:
     violations: list[str] = []
 
     roles = snapshot.get("roles")
     if not isinstance(roles, dict):
         return ["snapshot missing roles"]
+    violations.extend(_evaluate_membership_graph(snapshot, roles))
+    for role_name in (
+        SCHEMA_OWNER_ROLE,
+        MIGRATOR_ROLE,
+        RUNTIME_ROLE,
+        snapshot.get("migration_login_role"),
+        snapshot.get("runtime_login_role"),
+    ):
+        role = roles.get(role_name)
+        if not isinstance(role, dict):
+            continue
+        for attribute in ("rolcreatedb", "rolreplication", "rolbypassrls"):
+            if role.get(attribute) is not False:
+                violations.append(f"role {role_name} must not have {attribute}")
+        if role.get("rolinherit") is not True:
+            violations.append(f"role {role_name} must inherit its restricted role")
     for role_name in (SCHEMA_OWNER_ROLE, MIGRATOR_ROLE, RUNTIME_ROLE):
         role = roles.get(role_name)
         if not isinstance(role, dict):

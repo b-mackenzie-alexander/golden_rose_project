@@ -1,5 +1,19 @@
 # Golden Rose Operations Platform — Production Notes
 
+## 2026-09-13 — Managed database bootstrap and retirement
+
+## Delivery lock — v24 bootstrap correction
+- **Staffing:** One independent developer; fresh agent review supplies quality evidence.
+- **Human-visible outcome:** Private SQL, the application database, and migration job are running. The admitted v24 image reached PostgreSQL but initial bootstrap rolled back before application roles/tables persisted. No browser service exists. The temporary login and migration URL remain available; preserve them.
+- **Gate budget:** One source-bound continuation covers publication, existing-job image update, migration, restricted credentials, bootstrap retirement, verifier reconciliation, service activation, qualification, and browser handoff. Ordinary steps/readbacks do not become separate approvals.
+- **Next executable action:** Review and promote the managed PostgreSQL bootstrap/grantor correction, bind final source to the preserved resources and current Secret versions, then resume the ordered deployment. Do not rerun the known-broken image.
+- **Do not regress:** No database/job/bootstrap recreation, state editing, broad IAM, live data, production-only gates, or status-only PR. Keep strict immutable image admission, private SQL, restricted application logins, expiring Basic access, one-instance scaling, and post-request log qualification.
+
+**Observed:** PR #94's immutable-signature correction merged at `5326a07df6423f8d596788732d37f1121b29806a`. V24 publication/admission and the existing-job image update passed. The approved display-label correction and normalization of one terminal newline in the synthetic UUID Secret preserved its identity. Migration then reached PostgreSQL and failed before ownership transfer. One explicitly approved catalog-only diagnostic execution confirmed zero application roles/tables and the existing managed role's capabilities; the temporary diagnostic job was deleted and absence verified.
+
+**Validated locally:** PostgreSQL 16 reproduces the ownership-order failure; reorder alone leaves grantor dependencies that block bootstrap deletion. The managed-target correction creates/grants the three existing application roles while assuming the existing `cloudsqlsuperuser`, grants the session login its temporary migration membership, resets role, then transfers schema ownership. Actual temporary-login deletion, restricted migration rerun, full verifier execution, and negative membership/attribute checks pass. Managed creator memberships are exactly three ADMIN-only, non-INHERIT, non-SET rows granted by PostgreSQL's superuser; restricted logins never inherit the managed administrator. Local bootstrap behavior is preserved. Cloud migration and human handoff remain pending.
+
+
 ## 2026-09-12 — v23 deployment progress and bounded signature correction
 
 **Validated source correction:** Executed-shell regressions demonstrated RED then GREEN. All 329 focused image/workflow/Terraform tests pass (two graph tests rerun with network access after sandbox DNS failures). Ruff, targeted mypy, static workflow policy, Gitleaks, and diff hygiene pass. Fresh agent review returned PASS. Cosign v3.0.6 source confirms its transformed verification identity uses the supplied reference.

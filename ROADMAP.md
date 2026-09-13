@@ -1,24 +1,26 @@
 # Golden Rose Operations Platform — Roadmap
 
-## 2026-09-12 — v23 deployment progress and bounded signature correction
+## 2026-09-13 — v24 bootstrap and retirement correction
 
-## Delivery lock — v23 migration-job milestone
+## Delivery lock — v24 bootstrap correction
 - **Staffing:** One independent developer; fresh agent review supplies quality evidence.
-- **Human-visible outcome:** Private SQL and the application database are running. The migration job and its exact deployer bindings are deployed; the runtime demo-Secret accessor was moved into A07 with explicit user approval. No migration has executed and no browser service exists. The temporary bootstrap login and real migration URL Secret are prepared and retained for the initial migration.
-- **Gate budget:** Preserve the one-packet continuation; do not repeat database creation, bootstrap-user creation, or migration-job creation. Keep later restricted-logins/retirement, full verifier reconciliation, service activation, qualification, and browser delivery together.
-- **Next executable action:** Promote the bounded immutable-signature workflow correction, bind the corrected source to the preserved database, job, and bootstrap inventory, then publish and admit that source, update only the job image as required, and resume initial migration. All subsequent steps remain ordered behind its actual success.
-- **Do not regress:** No state editing, cleanup/recreation, production-only governance, broad IAM, or live data. Keep private SQL, exact images, restricted database roles, expiring Basic access, one-instance cap, and post-request log qualification. Never bypass strict image admission.
+- **Human-visible outcome:** Private SQL, the application database, and migration job are running. The admitted v24 image reached PostgreSQL but initial bootstrap rolled back before application roles/tables persisted. No browser service exists. The temporary login and migration URL remain available; preserve them.
+- **Gate budget:** One source-bound continuation covers publication, existing-job image update, migration, restricted credentials, bootstrap retirement, verifier reconciliation, service activation, qualification, and browser handoff. Ordinary steps/readbacks do not become separate approvals.
+- **Next executable action:** Review and promote the managed PostgreSQL bootstrap/grantor correction, bind final source to the preserved resources and current Secret versions, then resume the ordered deployment. Do not rerun the known-broken image.
+- **Do not regress:** No database/job/bootstrap recreation, state editing, broad IAM, live data, production-only gates, or status-only PR. Keep strict immutable image admission, private SQL, restricted application logins, expiring Basic access, one-instance scaling, and post-request log qualification.
 
-**Observed:** The repository default branch is now `develop` under explicit user approval. This registered the existing deployment workflow. Its three missing non-secret deployment variables were populated from existing approved identity/certificate bindings. The first workflow attempt stopped at missing identity configuration; the second authenticated and reached direct OCI admission, which rejected tag-based signature output passed to the immutable-reference checker. Neither attempt executed migration. The correction preserves tag verification for digest discovery, then independently verifies that immutable digest before the unchanged strict semantic checker and attestations.
+**Observed:** PR #94's immutable-signature correction merged at `5326a07df6423f8d596788732d37f1121b29806a`. V24 publication/admission and the existing-job image update passed. The approved display-label correction and normalization of one terminal newline in the synthetic UUID Secret preserved its identity. Migration then reached PostgreSQL and failed before ownership transfer. One explicitly approved catalog-only diagnostic execution confirmed zero application roles/tables and the existing managed role's capabilities; the temporary diagnostic job was deleted and absence verified.
 
+**Validated locally:** PostgreSQL 16 reproduces the ownership-order failure; reorder alone leaves grantor dependencies that block bootstrap deletion. The managed-target correction creates/grants the three existing application roles while assuming the existing `cloudsqlsuperuser`, grants the session login its temporary migration membership, resets role, then transfers schema ownership. Actual temporary-login deletion, restricted migration rerun, full verifier execution, and negative membership/attribute checks pass. Managed creator memberships are exactly three ADMIN-only, non-INHERIT, non-SET rows granted by PostgreSQL's superuser; restricted logins never inherit the managed administrator. Local bootstrap behavior is preserved. Cloud migration and human handoff remain pending.
 
 **Status:** Living checklist. Discovery evidence and approved decisions control scope; unchecked items are not authorized merely because they appear below.
 
-## Current deployment outcome — 2026-09-12
+## Current deployment outcome — 2026-09-13
 
-- [x] V22 exact failed-verifier cleanup and private PostgreSQL Enterprise/application-database creation; SQL is runnable and has no public IP.
-- [ ] Merge the reviewed Cloud Run v2 readback correction and continue from the preserved database through real credentials, migrations, service and browser handoff.
-- [ ] Human-visible cloud runtime remains incomplete. State serial46/55 managed instances includes the absent verifier's stale state entry; normal refresh, not state editing, will reconcile it. No application users, database URL versions, job executions or service were created in v22.
+- [x] Private SQL/database, real bootstrap credentials, migration job, immutable publication/admission, and corrected job-image deployment.
+- [x] Catalog-only diagnostic: managed role capabilities confirmed; temporary diagnostic job deleted.
+- [ ] Promote the reviewed managed bootstrap/retirement correction and execute the corrected image.
+- [ ] Restricted credentials, actual bootstrap retirement, database verification, service activation, and human-visible browser handoff.
 
 ## Delivery-method governance
 

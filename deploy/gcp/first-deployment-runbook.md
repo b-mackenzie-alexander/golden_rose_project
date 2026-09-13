@@ -1,24 +1,19 @@
 # First human-visible synthetic deployment runbook
 
-## Delivery lock — v26 native database catalog correction
-- **Staffing:** One independent developer; fresh agent review supplies quality evidence.
-- **Human-visible outcome:** Private SQL, the application database, schema, restricted logins, and migration job exist. Initial cloud migration succeeded and the bootstrap login was deleted with its Secret version disabled. No browser service exists yet.
-- **Gate budget:** One source-bound continuation covers publication, existing-job image update, restricted migration, verifier reconciliation, service activation, qualification, and browser handoff. Ordinary steps/readbacks do not become separate approvals.
-- **Next executable action:** Promote the native catalog validator correction, bind final source to the preserved post-retirement resources and credentials, then resume at restricted migration.
-- **Do not regress:** Never repeat initial bootstrap, recreate credentials, re-enable the retired Secret, recreate the database/job, edit state, expand IAM, admit live data, or add production-only gates. Keep immutable image admission, private SQL, restricted application logins, expiring Basic access, one-instance scaling, and log qualification.
-
-**Observed v26:** PR #96 merged the installed-package correction. Initial cloud migration succeeded; restricted migration/runtime users and URL Secrets were created; the bootstrap user was deleted and its URL version disabled. Restricted rerun then stopped at the catalog validator. One approved read-only catalog diagnostic confirmed exactly three restricted memberships, all granted by the same actual platform superuser, with no PostgreSQL creator ADMIN rows. Role attributes were restricted as intended. The diagnostic executed once, succeeded, was deleted, and its absence was verified.
-
-**Validated locally:** The validator now admits either the complete stock PostgreSQL 16 creator layout or the complete observed Cloud SQL native layout. Mixed layouts, extra/missing memberships, elevated options/attributes, and inconsistent native grantors remain rejected. This changes validation only; the cloud database grants need no mutation. Initial bootstrap and installed-package behavior remain unchanged.
-
+## Historical status — v28 packet complete
+- **Staffing:** One independent developer; fresh agent review and automated checks supply quality evidence.
+- **Human-visible outcome:** Protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e` is deployed as the private fictional-synthetic `develop` service. Private SQL, application database, restricted logins, migration job, Cloud Run service, expiring Basic access, automated qualification evidence, and browser handoff evidence exist.
+- **Gate budget:** The v28 one-use deployment packet is complete and consumed. This runbook remains historical evidence and procedural reference; it does not authorize repeating deployment operations.
+- **Next executable action:** Use the running service for human feedback, fix the Spanish-toggle defect, and source-control the v28 qualification-harness normalizations.
+- **Do not regress:** Do not recreate completed resources or credentials, restore bootstrap access, copy private URL/password material into source, admit live data, or revive production-only gates as prerequisites for feedback.
 
 This runbook defines the single eight-hour operator packet, valid for no more than eight hours, for the first human-visible fictional-synthetic `develop` deployment. It is intentionally value-safe: project IDs, billing IDs, domains, principals, secret payloads, passwords, tokens, plans, state values, and the exact service URL stay in operator-held records rather than tracked source.
 
-Current execution status: PR #91 merged at `develop@660fd7c`; the budget fix is proven. V20 completed image admission and partially applied. It is consumed. Private readback is serial 45 with 53 managed instances, no SQL/service, and one failed never-executed verifier job. Preserve successful resources and both imports. The next packet must bind this actual partial inventory, explicitly authorize the exact failed-job cleanup, and follow the ordered recovery below. No status-closeout PR is required.
+Current execution status: v28 completed the first human-visible private synthetic deployment at protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e`. The earlier V20 partial-apply recovery, SQL edition correction, native catalog correction, deletion-protection correction, migration, database verification, service activation, automated qualification, and browser handoff are historical completed stages. No status-closeout PR or repeat packet is required for ordinary feedback work.
 
-## Current partial-state continuation
+## Historical partial-state continuations
 
-V24 preserved the private SQL/database and existing migration job, published/admitted its image, and reached PostgreSQL. Initial role bootstrap rolled back; a separately approved catalog-only diagnostic confirmed zero application roles/tables and was deleted. Preserve bootstrap credentials and the corrected display label/normalized UUID Secret version. The next source-bound continuation updates only the existing job image before the ordered bootstrap/retirement/verification/service sequence. Do not repeat cleanup, database, user, or job creation.
+V24 through v28 preserved successful resources through multiple bounded corrections and continuations. V28 completed the ordered bootstrap/retirement/verification/service sequence and browser handoff. Do not repeat cleanup, database, user, job, service, credential, or access creation as a prerequisite for feedback.
 
 Job/service configuration projections use `scripts/read_cloud_run_v2.py`, a read-only authenticated v2 client. Default gcloud v1 JSON is not a v2 projection. The exact provider attribution label `goog-terraform-provisioned=true` is required along with source labels; arbitrary extra labels remain rejected. Service readiness uses a succeeded v2 terminal condition, reconciled current generation, and matching latest-created/latest-ready revision. Explicit `maxRetries=0` remains mandatory because the API retry field tracks presence and otherwise defaults to three.
 

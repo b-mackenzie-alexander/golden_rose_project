@@ -1,8 +1,8 @@
 # Rollback and forward-recovery runbook
 
-This runbook defines how the first private fictional-synthetic `develop` deployment decides between rollback and forward recovery after a failed migration, failed rollout, or failed bounded qualification. It is executable guidance only after the separate deployment gate is approved; it does not authorize cloud actions from the source-controlled branch.
+This runbook defines how the private fictional-synthetic `develop` deployment decides between rollback and forward recovery after a failed migration, failed rollout, or failed bounded qualification. V28 completed the first deployment; this remains executable guidance only after a separate recovery/deployment approval and does not authorize cloud actions from source.
 
-Current source status: PR #37 merged the deploy/readiness and provenance source contracts at `caf96a7`, PR #42 made tester verification service-stage-only at `b2d79b5`, and PR #48 completed the separate foundation-stage verifier alignment at `5f265d8`. Private records show separately approved partial foundation work; this runbook remains future operator guidance until the later explicitly approved deployment gate.
+Current status: protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e` is running, automated qualification passed, and formal status is `not_qualified` due to the Spanish-toggle defect and open manual rows—not a migration/service failure requiring rollback. The v28 packet is consumed. Any recovery mutation remains separately approved; ordinary Wave 1 source remediation proceeds against the existing service without invoking this runbook.
 
 ## Scope
 

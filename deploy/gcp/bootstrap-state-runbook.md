@@ -2,7 +2,7 @@
 
 This runbook covers the durable bootstrap bucket and the later establishment of new Terraform state lineage for it. It is intentionally value-safe: operator-held project, bucket, location, and principal inputs stay out of tracked source.
 
-Current source status: PR #89 merged the bounded managed-IAM verifier correction into protected `develop@4b7730ce9b52a93f4fb93310c5ad2efd688b68dc`; required CI and final agent rereviews passed. Both prior packets are consumed; no backend/state/plan/A03+ or cloud mutation occurred. A fresh final-tip packet and approval are required.
+Current status: the bootstrap and workload state lineages, provisioner Token Creator bridge, bucket authority, imports, state readbacks, and v28 deployment are complete. Their approvals are consumed and no historical state/plan artifact is reusable. This runbook remains recovery/reference guidance; any future backend/state/plan or cloud mutation requires fresh scoped approval, while ordinary product feedback/source work proceeds without reopening bootstrap.
 
 Before any bootstrap-state establishment/reconciliation request, prove privately that bootstrap and workload roots have distinct state objects/files, backend keys/prefixes, lock scopes, lineages, and recovery paths. Bind each approval to the canonical private backend-config digest plus an opaque resolved backend identity, state object or prefix, and lock scope fingerprint, then require pre-initialization comparison against the reviewed source and operator-held inputs. Establish/read back bootstrap state with the approved existing bootstrap inventory and prove it contains bootstrap addresses only before any workload-root state path or bootstrap-authority retirement.
 

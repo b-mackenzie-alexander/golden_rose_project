@@ -39,37 +39,27 @@ automated hiring, matching, ranking, eligibility, or referral system.
   Approved run `33882394981` completed immutable build/push/scan, keyless signing,
   all three attestations, certificate/transparency verification, final repository
   semantic admission, and verifier-approved immutable-reference emission.
-  Gate P is complete; its one-use approval is consumed.
-  No running shared application, public access, real identity, live/client data,
-  or production claim is authorized.
+  Gate P is complete; its one-use approval is consumed. V28 later completed
+  real Secret versions, private SQL/database authority, restricted migration,
+  service activation, expiring Basic access, automated qualification, and browser
+  handoff at protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e`.
+  The service is not production and the formal qualification status remains
+  `not_qualified` because the Spanish toggle failed and required manual rows remain open.
 - Terraform/IaC follows the accepted fictional-synthetic GCP `develop`
   posture: `us-east4`; split bootstrap, publication, deployment, runtime, and
   migration identities; durable remote state; immutable digest promotion;
   Secret Manager metadata/IAM only; staged private Cloud SQL/VPC; temporary exact
   `allUsers` Cloud Run invocation behind the expiring application Basic gate;
-  value-safe observability; and intentional teardown. Gate F is complete with 41
-  managed addresses plus one expected data source and no executable workload.
-  Gate P is complete; its one-use approval is consumed. Gate S created and
-  metadata-read back only the bounded `synthetic-staff-id` version.
-  Runtime/migration database-URL versions remain deferred until real database/login
-  material exists. Both named-human bootstrap authority transitions, exact
-  apply/readback, and provisioner-owned workload-backend proof are complete. PR #83
-  merged the reviewed 52-path source contract at `develop@9a04b274`; PR #84 merged
-  its continuity closeout at `develop@63ac29b2`; PR #85 merged bounded executability
-  remediation at `develop@7a9e7c0`; and PR #86 merged its status closeout at
-  `develop@58ea1cf`. The first approved packet created and exact-read back only
-  the one-permission quota role and sole provisioner binding, then stopped at its
-  mandatory verifier. PR #87 then merged the stage/provider verifier correction at
-  `develop@5769e0c`; required CI and final agent rereviews passed. PR #88
-  merged its closeout at `develop@4b678d1`. A successor packet stopped read-only at
-  A02 on managed-IAM verifier modeling and is consumed. PR #89 merged the bounded
-  managed-IAM verifier correction at `develop@4b7730c`; required CI and final
-  agent rereviews passed. No backend/state, plan/apply, image, Secret, database,
-  migration, service, access, qualification, real-identity, live-data, or
-  production action followed. Both prior packet approvals are consumed; a fresh
-  final-tip packet and approval are required.
-  Private identifiers and secret payloads stay outside tracked source and ordinary
-  documentation.
+  value-safe observability; and intentional teardown. Gate F, Gate P, bounded
+  Secret preparation, private database authority, migration, service activation,
+  automated qualification, and browser handoff are complete through v28. The
+  historical PR #83-#89 source/remediation and stopped-packet sequence remains
+  preserved in `NOTES.md`; those predecessor approvals and the completed v28 packet
+  are consumed. Ordinary product feedback/source work uses the running service.
+  Any future backend/state, plan/apply, image, Secret, database, migration, service,
+  access, or qualification mutation requires fresh scoped approval; real identity,
+  live data, and production remain separate. Private identifiers and secret payloads
+  stay outside tracked source and ordinary documentation.
 - Source-controlled Gate 2 read-only verification tooling now exists: `scripts/verify_gcp_foundation.py`
   evaluates live foundation/effective-authority posture against the reviewed
   contract without adding any mutation mode, and `deploy/gcp/evidence-template.md`
@@ -88,9 +78,8 @@ automated hiring, matching, ranking, eligibility, or referral system.
   unavailable second human is required, and agent/CI review is quality evidence
   rather than independent authorization. PR #33 merged its consolidated
   source-controlled pre-deployment work. Its older separate-gate sequence is
-  historical for this target; ADR-0016 now permits one approval-pending exact
-  eight-hour packet for ordinary fictional-synthetic precheck-through-qualification
-  operations.
+  historical for this target; ADR-0016 permitted the now-consumed v28 packet,
+  which completed fictional-synthetic deployment and qualification.
 - Accepted ADR-0013 defines staged `foundation → migration → service` Terraform
   authority, Terraform-only configuration ownership, exact viewer/job-executor and
   direct-workflow WIF authority, digest-bound Cosign/SLSA/SBOM verification, and
@@ -111,14 +100,15 @@ automated hiring, matching, ranking, eligibility, or referral system.
   hygiene. That evidence is local-only and does not imply cloud qualification.
 - ADR-0014 now governs delivery granularity: one accepted outcome-scale plan may
   span several roadmap items and implementation PRs, while TDD stays small and
-  hazardous authority remains explicit. ADR-0016's newer addendum permits one
-  approval-pending exact eight-hour packet to bundle the current target's ordinary
-  precheck, plans/applies, image, secrets, migration, service, access, readbacks,
-  and qualification. Live data, production, destructive recovery/state editing,
-  and out-of-packet authority remain separate.
-- Automated frontend parity/accessibility evidence exists locally, but human
-  browser/manual accessibility/fluent-language qualification remains deferred
-  until a shared deployed `develop` target exists.
+  hazardous authority remains explicit. ADR-0016's newer addendum permitted the
+  consumed v28 packet to bundle precheck, plans/applies, image, secrets, migration,
+  service, access, readbacks, and qualification. The private synthetic service is
+  now running; live data, production, destructive recovery/state editing, future
+  cloud mutation, and out-of-packet authority remain separate.
+- Automated frontend parity/accessibility evidence exists, and the v28 browser
+  handoff exposed a production Spanish-toggle defect plus severe workspace UX
+  deficiencies. Manual accessibility/fluent-language qualification remains open;
+  the accepted Wave 1 plan repairs the complete frontend surface in one later PR.
 
 ## Local verification
 

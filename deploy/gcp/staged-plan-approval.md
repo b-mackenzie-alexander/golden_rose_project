@@ -1,6 +1,6 @@
 # Staged plan approval procedure
 
-This document defines value-safe saved-plan handling for the `foundation`, `migration`, and `service` Terraform transitions. The post-PR33 remediations and Gate F foundation transition are complete. For the current fictional-synthetic target, migration and service plan handling occurs only inside one future explicitly approved eight-hour packet; this procedure grants no cloud action by itself and does not create per-transition approval gates.
+This document defines value-safe saved-plan handling for the `foundation`, `migration`, and `service` Terraform transitions. The post-PR33 remediations, Gate F foundation transition, and v28 migration/service packet are complete for protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e`. This procedure remains a value-safe reference for future separately approved transitions; it grants no cloud action by itself and does not create per-transition approval gates.
 
 ## Purpose
 
@@ -10,7 +10,7 @@ Before any backend initialization or apply, the approval bundle must also bind t
 
 ## Core rule
 
-No Terraform apply, migration execution, service activation, or reverse transition may proceed from chat approval, a remembered prior plan, or a mutable local worktree. Every transition requires its own saved artifacts and must fall within the exact allowlist of the still-valid eight-hour packet. Once that packet is explicitly approved, its ordered internal transitions do not require fresh approval unless a named stop condition ends the packet or an operation falls outside its allowlist.
+No Terraform apply, migration execution, service activation, or reverse transition may proceed from chat approval, a remembered prior plan, or a mutable local worktree. The consumed v28 packet satisfied this rule for the first private synthetic deployment. Any future transition requires its own saved artifacts and must fall within the exact allowlist of a still-valid explicit approval. Once a packet is explicitly approved, its ordered internal transitions do not require fresh approval unless a named stop condition ends the packet or an operation falls outside its allowlist.
 
 ## Required saved artifacts per transition
 
@@ -146,6 +146,6 @@ Stop immediately if any of the following is true:
 
 ## Current status
 
-This procedure remains source-controlled guidance for saved-plan operations inside one future explicitly approved fictional-synthetic `develop` deployment packet. PR #89 merged the bounded managed-IAM verifier correction into protected `develop@4b7730ce9b52a93f4fb93310c5ad2efd688b68dc`; required CI and final agent rereviews passed. Both prior packets are consumed; no backend initialization, import, state access, plan generation, A03+, or cloud mutation occurred. No historical plan or approval is reusable.
+V28 used this procedure to complete the first private fictional-synthetic `develop` migration and service transitions for protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e`. The packet and its saved plans are consumed and not reusable. This file remains source-controlled guidance for future separately approved transitions; ordinary product feedback and source work do not require another deployment packet.
 
-ADR-0016's human-visible addendum suspends separate Gate E0, signer/envelope/runner, signed FinOps receipt, and per-command approval requirements for this fictional-synthetic `develop` target. One explicit eight-hour packet may cover its ordered precheck, plans/applies, image, secrets, migration, service, access, readbacks, and qualification while retaining the runbook's stop conditions. Saved plan and backend bytes remain held through descriptors and are passed to Terraform only through `/dev/fd` with explicit inherited FDs; pathname re-open is forbidden. Live data, production, destructive recovery/state editing, and out-of-packet authority remain separate.
+ADR-0016's human-visible addendum continues to suspend separate Gate E0, signer/envelope/runner, signed FinOps receipt, and per-command approval requirements for this fictional-synthetic `develop` target. Any future cloud transition requires a fresh scoped approval and new saved artifacts; live data, production, destructive recovery/state editing, and out-of-packet authority remain separate. Saved plan and backend bytes remain held through descriptors and are passed to Terraform only through `/dev/fd` with explicit inherited FDs; pathname re-open is forbidden.

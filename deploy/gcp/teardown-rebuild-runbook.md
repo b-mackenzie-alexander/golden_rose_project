@@ -1,8 +1,8 @@
 # Teardown and rebuild runbook
 
-This runbook defines the controlled disposal and reconstruction of the human-visible fictional-synthetic `develop` workload environment while preserving the lifecycle-independent control plane and remote state. Before human handoff, only the non-mutating readiness inspection in this document runs. An actual destructive drill occurs only after the browser walkthrough and requires separate destructive approval.
+This runbook defines controlled disposal and reconstruction of the running human-visible fictional-synthetic `develop` workload while preserving the lifecycle-independent control plane and remote state. V28 completed non-mutating teardown/rebuild readiness inspection and browser handoff; no destructive drill has run. Any actual teardown/rebuild requires separate destructive approval.
 
-Current source status: PR #37 merged the teardown/rebuild source contracts at `caf96a7`, PR #42 made tester verification service-stage-only at `b2d79b5`, and PR #48 completed the separate foundation-stage verifier alignment at `5f265d8`. Private records show separately approved partial foundation work; this runbook remains future operator guidance until the later explicitly approved operational gates.
+Current status: protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e` remains the active feedback environment. Its v28 packet is consumed. The current Spanish-toggle/UX remediation is source work and must not trigger teardown, resource recreation, or this runbook's destructive path.
 
 ## Scope
 

@@ -1,58 +1,6 @@
 # Golden Rose Operations Platform — Production Notes
 
-## 2026-09-13 — v26 restricted catalog diagnosis and correction
-
-**Verification:** 975 tests passed with 96.04% coverage on isolated PostgreSQL 16; formatting, Ruff, mypy, Bandit, Gitleaks, and diff whitespace checks passed. Fresh agent review found no actionable current-target findings.
-
-**Observed v26:** PR #96 merged the installed-package correction. Initial cloud migration succeeded; restricted migration/runtime users and URL Secrets were created; the bootstrap user was deleted and its URL version disabled. Restricted rerun then stopped at the catalog validator. One approved read-only catalog diagnostic confirmed exactly three restricted memberships, all granted by the same actual platform superuser, with no PostgreSQL creator ADMIN rows. Role attributes were restricted as intended. The diagnostic executed once, succeeded, was deleted, and its absence was verified.
-
-**Validated locally:** The validator now admits either the complete stock PostgreSQL 16 creator layout or the complete observed Cloud SQL native layout. Mixed layouts, extra/missing memberships, elevated options/attributes, and inconsistent native grantors remain rejected. This changes validation only; the cloud database grants need no mutation. Initial bootstrap and installed-package behavior remain unchanged.
-
-
-## 2026-09-13 — v25 installed-package path correction
-
-**Observed v25:** Publication/admission and the existing-job image update passed. Initial execution completed the corrected role-bootstrap statements, then Alembic failed inside the same transaction because the installed package looked for `alembic.ini` under Python's library directory. Docker keeps that file and migrations in `/app`. No restricted credentials, bootstrap retirement, verifier or service activation occurred.
-
-**Validated correction:** Resolve Alembic configuration from the application working directory, consistent with Docker `WORKDIR /app` and repository-root CLI use. A relocated-package regression reproduces the old failure. The actual built wheel, installed separately from its app directory, completes initial migration, real temporary-login deletion, restricted rerun, and authenticated database verification on PostgreSQL 16. Fresh agent review passed. Preserve existing cloud resources and bind the corrected source into one continuation through browser handoff.
-
-
-## 2026-09-13 — Managed database bootstrap and retirement
-
-## Delivery lock — v24 bootstrap correction
-- **Staffing:** One independent developer; fresh agent review supplies quality evidence.
-- **Human-visible outcome:** Private SQL, the application database, and migration job are running. The admitted v24 image reached PostgreSQL but initial bootstrap rolled back before application roles/tables persisted. No browser service exists. The temporary login and migration URL remain available; preserve them.
-- **Gate budget:** One source-bound continuation covers publication, existing-job image update, migration, restricted credentials, bootstrap retirement, verifier reconciliation, service activation, qualification, and browser handoff. Ordinary steps/readbacks do not become separate approvals.
-- **Next executable action:** Review and promote the managed PostgreSQL bootstrap/grantor correction, bind final source to the preserved resources and current Secret versions, then resume the ordered deployment. Do not rerun the known-broken image.
-- **Do not regress:** No database/job/bootstrap recreation, state editing, broad IAM, live data, production-only gates, or status-only PR. Keep strict immutable image admission, private SQL, restricted application logins, expiring Basic access, one-instance scaling, and post-request log qualification.
-
-**Observed:** PR #94's immutable-signature correction merged at `5326a07df6423f8d596788732d37f1121b29806a`. V24 publication/admission and the existing-job image update passed. The approved display-label correction and normalization of one terminal newline in the synthetic UUID Secret preserved its identity. Migration then reached PostgreSQL and failed before ownership transfer. One explicitly approved catalog-only diagnostic execution confirmed zero application roles/tables and the existing managed role's capabilities; the temporary diagnostic job was deleted and absence verified.
-
-**Validated locally:** PostgreSQL 16 reproduces the ownership-order failure; reorder alone leaves grantor dependencies that block bootstrap deletion. The managed-target correction creates/grants the three existing application roles while assuming the existing `cloudsqlsuperuser`, grants the session login its temporary migration membership, resets role, then transfers schema ownership. Actual temporary-login deletion, restricted migration rerun, full verifier execution, and negative membership/attribute checks pass. Managed creator memberships are exactly three ADMIN-only, non-INHERIT, non-SET rows granted by PostgreSQL's superuser; restricted logins never inherit the managed administrator. Local bootstrap behavior is preserved. Cloud migration and human handoff remain pending.
-
-
-## 2026-09-12 — v23 deployment progress and bounded signature correction
-
-**Validated source correction:** Executed-shell regressions demonstrated RED then GREEN. All 329 focused image/workflow/Terraform tests pass (two graph tests rerun with network access after sandbox DNS failures). Ruff, targeted mypy, static workflow policy, Gitleaks, and diff hygiene pass. Fresh agent review returned PASS. Cosign v3.0.6 source confirms its transformed verification identity uses the supplied reference.
-
-## Delivery lock — v23 migration-job milestone
-- **Staffing:** One independent developer; fresh agent review supplies quality evidence.
-- **Human-visible outcome:** Private SQL and the application database are running. The migration job and its exact deployer bindings are deployed; the runtime demo-Secret accessor was moved into A07 with explicit user approval. No migration has executed and no browser service exists. The temporary bootstrap login and real migration URL Secret are prepared and retained for the initial migration.
-- **Gate budget:** Preserve the one-packet continuation; do not repeat database creation, bootstrap-user creation, or migration-job creation. Keep later restricted-logins/retirement, full verifier reconciliation, service activation, qualification, and browser delivery together.
-- **Next executable action:** Promote the bounded immutable-signature workflow correction, bind the corrected source to the preserved database, job, and bootstrap inventory, then publish and admit that source, update only the job image as required, and resume initial migration. All subsequent steps remain ordered behind its actual success.
-- **Do not regress:** No state editing, cleanup/recreation, production-only governance, broad IAM, or live data. Keep private SQL, exact images, restricted database roles, expiring Basic access, one-instance cap, and post-request log qualification. Never bypass strict image admission.
-
-**Observed:** The repository default branch is now `develop` under explicit user approval. This registered the existing deployment workflow. Its three missing non-secret deployment variables were populated from existing approved identity/certificate bindings. The first workflow attempt stopped at missing identity configuration; the second authenticated and reached direct OCI admission, which rejected tag-based signature output passed to the immutable-reference checker. Neither attempt executed migration. The correction preserves tag verification for digest discovery, then independently verifies that immutable digest before the unchanged strict semantic checker and attestations.
-
-
 This is the concise, dated engineering and operational note log. It records observed evidence, decisions, verification, and handoffs. It is not a location for client personal data, credentials, raw exports, legal advice, or unapproved policy text.
-
-## 2026-09-12 — V22 database milestone and Cloud Run readback correction
-
-**Observed:** V22 admitted existing successful publication run34669500588 at protected source122e749, deleted only the exact failed never-executed verifier, and applied the inspected database-only plan: exactly two creates. Private PostgreSQL Enterprise micro and the application database are runnable. Exact readback is serial46/55 managed instances; the absent verifier remains a stale tainted state entry until ordinary refresh. No service/jobs, new application users, URL Secret versions or migrations exist.
-
-**Observed:** The next workflow would parse default gcloud v1 Job JSON as v2. Foundation job inventory/projections and service projection share the mismatch; service readiness mixed v1 conditions with a v2 template. Fresh review confirmed the defect before migration. V22 is stopped/consumed after the in-flight database outcome was resolved.
-
-**Validated source correction:** Shared authenticated fixed-host v2 GET/list reader; no token in argv or reflected error payloads; redirect rejection; complete bounded pagination; exact Cloud Run provider attribution label; full-name normalization; current v2 service generation/revision readiness; exact Google service-networking service-agent allowance. Existing configuration and no-override execution checks remain. Focused readback/foundation tests150 pass, Terraform hygiene307 pass, static validation and Ruff pass, canonical mypy src/tests passes; fresh review PASS. Required PR/CI promotion remains the next source step. Private evidence holds identifiers, plans/state, and operator records.
 
 ## Evidence labels
 - **Observed:** directly supplied, seen, or tool-verified.
@@ -2631,6 +2579,80 @@ This is the concise, dated engineering and operational note log. It records obse
 - **Validated readback:** State serial 45 has 53 managed instances, ten more than before apply. No SQL instance or Cloud Run service exists. One verifier job exists, Ready=False with `SecretsAccessCheckFailed`, zero executions, and tainted Terraform state with deletion protection. Network/peering and scoped identity/Secret additions are preserved. V20 is stopped/consumed; no reapply, deletion, or state edit occurred.
 - **Correction:** Pin Enterprise edition and add the demo Secret metadata dependency. The runbook sequences exceptional database-target and migration-job-target saved plans around real out-of-band Secret preparation, followed by full untargeted reconciliation. Fresh recovery approval must explicitly name native deletion of only the bound failed never-executed verifier, followed by absence readback and create-only Terraform reconciliation; all other destructive changes remain excluded.
 - **Verification:** Both edition/dependency regressions observed RED then GREEN. Terraform validate/fmt/static checks, affected Ruff/mypy, and diff hygiene passed. Clean-source hygiene passed 306 checks with one runbook-phrase failure; after correction all five runbook checks passed. Fresh final source review returned PASS with no actionable findings. Fresh recovery-strategy review confirmed the ordered plan and exact native-deletion route avoid Terraform's protected tainted destroy without state editing.
+
+
+
+## 2026-09-12 — V22 database milestone and Cloud Run readback correction
+
+**Observed:** V22 admitted existing successful publication run34669500588 at protected source122e749, deleted only the exact failed never-executed verifier, and applied the inspected database-only plan: exactly two creates. Private PostgreSQL Enterprise micro and the application database are runnable. Exact readback is serial46/55 managed instances; the absent verifier remains a stale tainted state entry until ordinary refresh. No service/jobs, new application users, URL Secret versions or migrations exist.
+
+**Observed:** The next workflow would parse default gcloud v1 Job JSON as v2. Foundation job inventory/projections and service projection share the mismatch; service readiness mixed v1 conditions with a v2 template. Fresh review confirmed the defect before migration. V22 is stopped/consumed after the in-flight database outcome was resolved.
+
+**Validated source correction:** Shared authenticated fixed-host v2 GET/list reader; no token in argv or reflected error payloads; redirect rejection; complete bounded pagination; exact Cloud Run provider attribution label; full-name normalization; current v2 service generation/revision readiness; exact Google service-networking service-agent allowance. Existing configuration and no-override execution checks remain. Focused readback/foundation tests150 pass, Terraform hygiene307 pass, static validation and Ruff pass, canonical mypy src/tests passes; fresh review PASS. Required PR/CI promotion remains the next source step. Private evidence holds identifiers, plans/state, and operator records.
+
+## 2026-09-12 — v23 deployment progress and bounded signature correction
+
+**Validated source correction:** Executed-shell regressions demonstrated RED then GREEN. All 329 focused image/workflow/Terraform tests pass (two graph tests rerun with network access after sandbox DNS failures). Ruff, targeted mypy, static workflow policy, Gitleaks, and diff hygiene pass. Fresh agent review returned PASS. Cosign v3.0.6 source confirms its transformed verification identity uses the supplied reference.
+
+## Delivery lock — v23 migration-job milestone
+- **Staffing:** One independent developer; fresh agent review supplies quality evidence.
+- **Human-visible outcome:** Private SQL and the application database are running. The migration job and its exact deployer bindings are deployed; the runtime demo-Secret accessor was moved into A07 with explicit user approval. No migration has executed and no browser service exists. The temporary bootstrap login and real migration URL Secret are prepared and retained for the initial migration.
+- **Gate budget:** Preserve the one-packet continuation; do not repeat database creation, bootstrap-user creation, or migration-job creation. Keep later restricted-logins/retirement, full verifier reconciliation, service activation, qualification, and browser delivery together.
+- **Next executable action:** Promote the bounded immutable-signature workflow correction, bind the corrected source to the preserved database, job, and bootstrap inventory, then publish and admit that source, update only the job image as required, and resume initial migration. All subsequent steps remain ordered behind its actual success.
+- **Do not regress:** No state editing, cleanup/recreation, production-only governance, broad IAM, or live data. Keep private SQL, exact images, restricted database roles, expiring Basic access, one-instance cap, and post-request log qualification. Never bypass strict image admission.
+
+**Observed:** The repository default branch is now `develop` under explicit user approval. This registered the existing deployment workflow. Its three missing non-secret deployment variables were populated from existing approved identity/certificate bindings. The first workflow attempt stopped at missing identity configuration; the second authenticated and reached direct OCI admission, which rejected tag-based signature output passed to the immutable-reference checker. Neither attempt executed migration. The correction preserves tag verification for digest discovery, then independently verifies that immutable digest before the unchanged strict semantic checker and attestations.
+
+## 2026-09-13 — Managed database bootstrap and retirement
+
+## Delivery lock — v24 bootstrap correction
+- **Staffing:** One independent developer; fresh agent review supplies quality evidence.
+- **Human-visible outcome:** Private SQL, the application database, and migration job are running. The admitted v24 image reached PostgreSQL but initial bootstrap rolled back before application roles/tables persisted. No browser service exists. The temporary login and migration URL remain available; preserve them.
+- **Gate budget:** One source-bound continuation covers publication, existing-job image update, migration, restricted credentials, bootstrap retirement, verifier reconciliation, service activation, qualification, and browser handoff. Ordinary steps/readbacks do not become separate approvals.
+- **Next executable action:** Review and promote the managed PostgreSQL bootstrap/grantor correction, bind final source to the preserved resources and current Secret versions, then resume the ordered deployment. Do not rerun the known-broken image.
+- **Do not regress:** No database/job/bootstrap recreation, state editing, broad IAM, live data, production-only gates, or status-only PR. Keep strict immutable image admission, private SQL, restricted application logins, expiring Basic access, one-instance scaling, and post-request log qualification.
+
+**Observed:** PR #94's immutable-signature correction merged at `5326a07df6423f8d596788732d37f1121b29806a`. V24 publication/admission and the existing-job image update passed. The approved display-label correction and normalization of one terminal newline in the synthetic UUID Secret preserved its identity. Migration then reached PostgreSQL and failed before ownership transfer. One explicitly approved catalog-only diagnostic execution confirmed zero application roles/tables and the existing managed role's capabilities; the temporary diagnostic job was deleted and absence verified.
+
+**Validated locally:** PostgreSQL 16 reproduces the ownership-order failure; reorder alone leaves grantor dependencies that block bootstrap deletion. The managed-target correction creates/grants the three existing application roles while assuming the existing `cloudsqlsuperuser`, grants the session login its temporary migration membership, resets role, then transfers schema ownership. Actual temporary-login deletion, restricted migration rerun, full verifier execution, and negative membership/attribute checks pass. Managed creator memberships are exactly three ADMIN-only, non-INHERIT, non-SET rows granted by PostgreSQL's superuser; restricted logins never inherit the managed administrator. Local bootstrap behavior is preserved. Cloud migration and human handoff remain pending.
+
+## 2026-09-13 — v25 installed-package path correction
+
+**Observed v25:** Publication/admission and the existing-job image update passed. Initial execution completed the corrected role-bootstrap statements, then Alembic failed inside the same transaction because the installed package looked for `alembic.ini` under Python's library directory. Docker keeps that file and migrations in `/app`. No restricted credentials, bootstrap retirement, verifier or service activation occurred.
+
+**Validated correction:** Resolve Alembic configuration from the application working directory, consistent with Docker `WORKDIR /app` and repository-root CLI use. A relocated-package regression reproduces the old failure. The actual built wheel, installed separately from its app directory, completes initial migration, real temporary-login deletion, restricted rerun, and authenticated database verification on PostgreSQL 16. Fresh agent review passed. Preserve existing cloud resources and bind the corrected source into one continuation through browser handoff.
+
+## 2026-09-13 — v26 restricted catalog diagnosis and correction
+
+**Verification:** 975 tests passed with 96.04% coverage on isolated PostgreSQL 16; formatting, Ruff, mypy, Bandit, Gitleaks, and diff whitespace checks passed. Fresh agent review found no actionable current-target findings.
+
+**Observed v26:** PR #96 merged the installed-package correction. Initial cloud migration succeeded; restricted migration/runtime users and URL Secrets were created; the bootstrap user was deleted and its URL version disabled. Restricted rerun then stopped at the catalog validator. One approved read-only catalog diagnostic confirmed exactly three restricted memberships, all granted by the same actual platform superuser, with no PostgreSQL creator ADMIN rows. Role attributes were restricted as intended. The diagnostic executed once, succeeded, was deleted, and its absence was verified.
+
+**Validated locally:** The validator now admits either the complete stock PostgreSQL 16 creator layout or the complete observed Cloud SQL native layout. Mixed layouts, extra/missing memberships, elevated options/attributes, and inconsistent native grantors remain rejected. This changes validation only; the cloud database grants need no mutation. Initial bootstrap and installed-package behavior remain unchanged.
+
+## 2026-09-13 — v28 develop deployment, qualification, and browser handoff
+
+**Validated:** Protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e` is deployed to GCP as a private fictional-synthetic staff tracer service. The v28 continuation completed immutable publication/admission, Cloud SQL API deletion-protection enablement, migration-mode foundation verification, database authority verification, service activation, generated expiring Basic access, service readiness, automated application qualification, and browser handoff.
+
+**Observed:** The queued database-verification workflow did not start in time and was cancelled; the same verifier ran successfully as a direct Cloud Run job fallback. Browser handoff loaded the staff workspace in session `golden-rose-v28`. The Spanish toggle did not switch during handoff and is the first visible UI/UX defect to address.
+
+**Private evidence:** The v28 Obsidian packet contains completion, qualification, service, browser, and credential evidence. The renderable access note is `/Users/genie/Documents/Obsidian Vault/Client Engagements/Golden Rose Private Operator Evidence/2026-09-13-cloud-sql-deletion-protection-continuation-3414818-v28/DEVELOP_DEMO_ACCESS.md` and the browser handoff note is `/Users/genie/Documents/Obsidian Vault/Client Engagements/Golden Rose Private Operator Evidence/2026-09-13-cloud-sql-deletion-protection-continuation-3414818-v28/evidence/browser-handoff/HANDOFF.md`. Credentials and service URL remain private evidence and must not be copied into source control.
+
+## 2026-09-13 — continuity drift repair after v28
+- **Observed:** Rechecked protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e`, GitHub PR/run state, GCP Cloud Run/Cloud SQL/job readbacks, private v28 Obsidian evidence, and browser behavior. The service is running for private fictional-synthetic technical feedback, while the Spanish toggle defect and manual accessibility/fluent-language evidence remain open.
+- **Reconciled:** `ROADMAP.md`, `infra/gcp/README.md`, and `deploy/gcp/first-deployment-runbook.md` now treat deployment-packet work as complete/consumed and point follow-up work to the running service instead of a fresh deployment continuation.
+- **Private evidence:** The v28 Obsidian packet keeps URL/password/raw evidence private; tracked source records only value-safe paths and status.
+
+## 2026-09-13 — Wave 1 Employer workspace UX planning
+- **Owner direction:** The deployed workspace is technically reachable but visibly too rough for meaningful human use. Wave 1 must work backward from the UI/UX, repair the production Spanish toggle, create a deliberate responsive shell and panel hierarchy, improve existing create/search/detail/revision usability, and add only session-derived operational orientation.
+- **Product-copy amendment:** Stakeholders already know the environment context. Do not print repeated private/synthetic/develop disclaimers across the dashboard; preserve those controls in server validation, deployment configuration, source-of-truth docs, qualification, and private evidence instead.
+- **Delivery decision:** `.hermes/plans/2026-09-13_131919-wave-1-employer-workspace-ux-remediation-plan.md` authorizes one cohesive UI and qualification-harness implementation branch and one implementation PR after this planning/continuity PR merges. Internal RED → GREEN nodes do not require micro PRs or repeated independent review; dual-perspective review occurs once over the complete candidate, with focused rereview only after substantive findings.
+- **Source finding:** Production `App` currently renders `AppRoutes` without `LanguageProvider`, while tests that prove language switching wrap `AppRoutes` manually. Wave 1 begins by pinning the real production composition-root regression before visual restructuring.
+- **Initial independent plan/continuity review:** Two reviewers returned `CHANGES_REQUIRED`: one required README contract capitalization; both found active pre-v28 authority drift and a missing final newline; one required exact RED/GREEN/browser/publication steps and inclusion of all v28 harness debt; the other found the selected technical-feedback status contradicted `deploy/gcp/qualification-status-contract.md`.
+- **Remediation:** Restored the tested `No secret payloads` phrase; aligned active AGENTS/security/root/infrastructure/architecture/technical/runbook/plan-status surfaces to completed v28; selected exact status `not_qualified`; expanded the single implementation PR to include bounded header, generated-fictional negative-probe, and Cloud Audit/application-log normalization TDD; and added exact test nodes, loopback viewport commands, committed-head checks, and range Gitleaks requirements. Fresh focused rereview is required before publication.
+- **First focused rereview:** Plan/executability returned `PASS` with no findings after focused contract tests and a complete diff-plus-plan Gitleaks scan. Architecture/security/continuity found one remaining Medium class: seven active root/runbook/ADR-index surfaces still presented pre-v28 no-service/future-packet state.
+- **Second continuity remediation:** Updated the root README and technical status, private-access/bootstrap/recovery/teardown runbooks, architecture status, technology decision register, ADR-0005 status note, and ADR index to current v28 completion, exact `not_qualified` posture, consumed-packet history, and fresh approval only for future mutation. Historical dated NOTES and completed roadmap milestones remain unchanged as evidence. A final focused continuity rereview is required before publication.
+- **Final focused rereview:** Fresh continuity/authority review returned `PASS` with no actionable Blocker, High, or Medium findings. Clean-copy Terraform hygiene passed `307 passed`; clean-copy static validation and repository diff hygiene passed. The documentation/planning candidate is cleared for exact staging, commit, committed-range checks, secret scanning, push, and protected PR creation.
 
 ## Updating this file
 Add a short dated entry after a material planning, implementation, test, security, or release event. Link detailed evidence rather than duplicating it. Record commands and results only when they were actually run.

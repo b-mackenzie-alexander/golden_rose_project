@@ -1,27 +1,17 @@
 # Golden Rose Operations Platform — Roadmap
 
-## 2026-09-13 — v24 bootstrap and retirement correction
+## 2026-09-13 — v28 human-visible develop deployment
 
-## Delivery lock — v26 native database catalog correction
-- **Staffing:** One independent developer; fresh agent review supplies quality evidence.
-- **Human-visible outcome:** Private SQL, the application database, schema, restricted logins, and migration job exist. Initial cloud migration succeeded and the bootstrap login was deleted with its Secret version disabled. No browser service exists yet.
-- **Gate budget:** One source-bound continuation covers publication, existing-job image update, restricted migration, verifier reconciliation, service activation, qualification, and browser handoff. Ordinary steps/readbacks do not become separate approvals.
-- **Next executable action:** Promote the native catalog validator correction, bind final source to the preserved post-retirement resources and credentials, then resume at restricted migration.
-- **Do not regress:** Never repeat initial bootstrap, recreate credentials, re-enable the retired Secret, recreate the database/job, edit state, expand IAM, admit live data, or add production-only gates. Keep immutable image admission, private SQL, restricted application logins, expiring Basic access, one-instance scaling, and log qualification.
+## Delivery lock — v28 deployed develop testing environment
+- **Staffing:** One independent developer; fresh agent review and automated checks supply quality evidence.
+- **Human-visible outcome:** Protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e` is deployed to GCP as the private fictional-synthetic staff tracer service with private Cloud SQL, restricted database logins, service activation, expiring Basic access, automated qualification evidence, and browser handoff evidence.
+- **Gate budget:** The v28 one-use deployment packet is complete and consumed. Continue from the running service; separate approvals remain required for live data, production promotion, destructive recovery/state editing, unreviewed IAM expansion, or materially different authority boundaries.
+- **Next executable action:** Merge the accepted Wave 1 Employer workspace UX plan with this v28 continuity repair, then implement and review the complete UI and qualification-harness package in one implementation PR.
+- **Do not regress:** Do not recreate completed cloud resources or credentials, restore bootstrap access, copy private access material into source, admit live data, or revive production-only gates as prerequisites for feedback.
 
-**Observed v26:** PR #96 merged the installed-package correction. Initial cloud migration succeeded; restricted migration/runtime users and URL Secrets were created; the bootstrap user was deleted and its URL version disabled. Restricted rerun then stopped at the catalog validator. One approved read-only catalog diagnostic confirmed exactly three restricted memberships, all granted by the same actual platform superuser, with no PostgreSQL creator ADMIN rows. Role attributes were restricted as intended. The diagnostic executed once, succeeded, was deleted, and its absence was verified.
+**Validated v28:** The develop environment is now human-visible. Publication/admission, Cloud SQL API deletion-protection enablement, foundation verification, database authority verification by direct Cloud Run verifier fallback, service activation, demo access preparation, service readiness, automated qualification, and browser handoff completed for protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e`.
 
-**Validated locally:** The validator now admits either the complete stock PostgreSQL 16 creator layout or the complete observed Cloud SQL native layout. Mixed layouts, extra/missing memberships, elevated options/attributes, and inconsistent native grantors remain rejected. This changes validation only; the cloud database grants need no mutation. Initial bootstrap and installed-package behavior remain unchanged.
-
-## Historical deployment evidence
-
-**Observed v25:** Publication/admission and the existing-job image update passed. Initial execution completed the corrected role-bootstrap statements, then Alembic failed inside the same transaction because the installed package looked for `alembic.ini` under Python's library directory. Docker keeps that file and migrations in `/app`. No restricted credentials, bootstrap retirement, verifier or service activation occurred.
-
-**Validated correction:** Resolve Alembic configuration from the application working directory, consistent with Docker `WORKDIR /app` and repository-root CLI use. A relocated-package regression reproduces the old failure. The actual built wheel, installed separately from its app directory, completes initial migration, real temporary-login deletion, restricted rerun, and authenticated database verification on PostgreSQL 16. Fresh agent review passed. Preserve existing cloud resources and bind the corrected source into one continuation through browser handoff.
-
-**Observed:** PR #94's immutable-signature correction merged at `5326a07df6423f8d596788732d37f1121b29806a`. V24 publication/admission and the existing-job image update passed. The approved display-label correction and normalization of one terminal newline in the synthetic UUID Secret preserved its identity. Migration then reached PostgreSQL and failed before ownership transfer. One explicitly approved catalog-only diagnostic execution confirmed zero application roles/tables and the existing managed role's capabilities; the temporary diagnostic job was deleted and absence verified.
-
-**Validated locally:** PostgreSQL 16 reproduces the ownership-order failure; reorder alone leaves grantor dependencies that block bootstrap deletion. The managed-target correction creates/grants the three existing application roles while assuming the existing `cloudsqlsuperuser`, grants the session login its temporary migration membership, resets role, then transfers schema ownership. Actual temporary-login deletion, restricted migration rerun, full verifier execution, and negative membership/attribute checks pass. Managed creator memberships are exactly three ADMIN-only, non-INHERIT, non-SET rows granted by PostgreSQL's superuser; restricted logins never inherit the managed administrator. Local bootstrap behavior is preserved. Cloud migration and human handoff remain pending.
+**Private operator evidence:** Renderable Obsidian access and browser handoff notes live in the v28 private packet. Repository documentation records the evidence location only; credentials and service URL remain private.
 
 **Status:** Living checklist. Discovery evidence and approved decisions control scope; unchecked items are not authorized merely because they appear below.
 
@@ -31,8 +21,13 @@
 - [x] Catalog-only diagnostic: managed role capabilities confirmed; temporary diagnostic job deleted.
 - [x] Initial cloud migration, restricted credentials, and actual bootstrap retirement.
 - [x] Restricted-role catalog diagnostic completed; temporary job deleted and absence verified.
-- [ ] Promote the native catalog validator correction and complete restricted migration/database verification.
-- [ ] Service activation, qualification, and human-visible browser handoff.
+- [x] Native catalog validator correction promoted; restricted migration and database verification completed.
+- [x] Service activation, qualification, and human-visible browser handoff.
+- [ ] Human feedback triage from the running service.
+- [ ] Source-controlled follow-up for the Spanish-toggle defect and v28 qualification-harness normalizations.
+- [x] Accept the Wave 1 product direction: repair the production language provider, establish an intentional responsive workspace shell, separate Employer create/search/detail/revision flows, and add honest session-derived orientation without prominent environment disclaimers or fake metrics.
+- [ ] Merge `.hermes/plans/2026-09-13_131919-wave-1-employer-workspace-ux-remediation-plan.md` with the v28 continuity repair through protected `develop`.
+- [ ] Implement, fully verify, independently review, and merge the complete Wave 1 UI and qualification-harness package as one implementation PR.
 
 ## Delivery-method governance
 
@@ -44,9 +39,9 @@
 - [x] Merge the accepted packet through protected `develop` before its source implementation PRs or operational gates begin. PR #49 merged the accepted ADR-0014 / ADR-0013 Amendment B / master-plan packet into protected `develop` at `fa8334c`.
 - [x] Record the permanent solo-developer operating model: no standing human review team, CODEOWNER quorum, or second administrator may be assumed. Fresh agent reviews are quality evidence; the accepted solo-maintainer High does not block source work.
 - [x] Correct delivery sequencing: establish a durable human-visible fictional-synthetic `develop` environment before production-only governance, recovery, and handoff qualification.
-- [ ] **Current top delivery outcome:** deploy the current Employer/EmployerContact product to the existing governed GCP project, expose it through an expiring high-entropy shared access gate, and complete Beatrice's first real browser walkthrough.
+- [x] **Current top delivery outcome:** deploy the current Employer/EmployerContact product to the existing governed GCP project, expose it through an expiring high-entropy shared access gate, and complete the first browser handoff. V28 completed this for protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e`.
 - [x] Merge one source PR for the exact quota-use exception, shared access gate, public service invoker, one-instance bounds, private Cloud SQL, automated qualification, and promotion-retirement controls. PR #83 merged the 52-path source contract into protected `develop` at `9a04b274d9e0132e5a0b409314ba53170b43e303`; all required CI passed.
-- [ ] Execute one bounded eight-hour deployment packet from precheck through automated qualification; ordinary steps/readbacks do not require separate gate days.
+- [x] Execute one bounded deployment packet from precheck through automated qualification and browser handoff; v28 is complete and consumed.
 - [x] Complete, qualify, and merge PR A artifact/transition-authority remediation. PR #51 merged into protected `develop` at `a7f0649`; the source-only branch is retired, and no later operational gate is authorized until PR B and the remaining source-readiness requirements merge.
 - [x] Complete, qualify, and merge PR B qualification/human-feedback readiness. PR #52 merged the source-only readiness contract into protected `develop` at `7272907`; no cloud, service, tester, human, live-data, or production authority was granted.
 - [x] Complete conditional PR C contract-preserving remediation. PR #53 merged the absent-Cloud-Run verifier correction at `673f6d5`; the Cloud-SQL absence follow-up merged at `9663480`; and PR #56 merged the live-proven absent-future-identity and logging-exclusions fallback collection at `72c56c4`. The subsequent private A1 remediation aligned project labels/WIF, established the source-defined Artifact Registry writer/reader boundary, restored effective state-bucket custody and exact temporary bootstrap object authority, removed the empty erroneous registry repository, and reconciled the observed two logging-to-logging sinks through a bounded verifier contract. Final current-source private A1 verification passed with zero violations. WP-2/WP-3 and A2 subsequently selected the bootstrap-only new-lineage path; E2/E3 state establishment/readback, A5, ownership alignment, Gate F apply, and workload-free verification are complete.
@@ -66,9 +61,9 @@
 - [x] Merge canonical budget-project-number correction as PR #91 at `develop@660fd7c`; v19/v20 proved the budget unchanged.
 - [x] Complete v20 exact-source image publication, signing, and all attestation admission.
 - [x] Resolve the v20 partial apply by readback: network/scoped resources exist, no SQL/service exists, and one failed verifier has never executed.
-- [ ] Merge explicit SQL edition and Secret dependency fixes plus ordered exceptional bootstrap recovery; prepare one exact final-tip packet including the specifically approved failed-job cleanup.
-- [ ] Under one explicitly approved packet, publish/apply/migrate/activate/qualify the environment and deliver the access-gated URL to Beatrice.
-- [ ] Defer ADR-0015 FinOps state separation until production/handoff or a concrete billing-ownership trigger; retain the current workload budget and exact temporary quota-use exception.
+- [x] Merge explicit SQL edition and Secret dependency fixes plus ordered exceptional bootstrap recovery; PR #92 through PR #98 closed the source and continuation fixes required for v28.
+- [x] Under one explicitly approved packet, publish/apply/migrate/activate/qualify the environment and deliver private access through operator-held Obsidian evidence. V28 completed this for protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e`.
+- [x] Defer ADR-0015 FinOps state separation until production/handoff or a concrete billing-ownership trigger; retain the current workload budget and exact temporary quota-use exception for the private synthetic `develop` runtime.
 
 ## Phase 0 — Discovery and planning baseline
 - [x] Record source-material ledger and evidence notes for received client artifacts.
@@ -115,8 +110,8 @@
 - [x] Merge the bounded revise-draft-employer receipt-lookup follow-up. PR #40 merged into protected `develop` at `fabb78a`; it is historical context only and not a base for continued coding.
 - [x] Merge the observability / verifier API policy reconciliation. PR #41 merged into protected `develop` at `6ef2452`; local implementation of the next verifier slice must rebaseline from this exact tip rather than from the retired planning branch.
 - [x] Implement, independently rereview, and merge the accepted private-SQL foundation / verifier reconciliation. PR #42 merged the source-only, no-cloud slice into protected `develop` at `b2d79b5`; it makes tester-authority verification service-stage-only while retaining private Cloud SQL as a required lower-layer foundation contract. The separate private-network / Cloud SQL authority gate remains later and unapproved.
-- [ ] Establish and qualify the isolated GCP non-production environment with wholly fictional synthetic data only: Artifact Registry, Secret Manager metadata and out-of-band payload injection, Cloud Run, Cloud SQL, Logging/Monitoring, and GitHub Workload Identity Federation. PR #83 merged the source contract at `develop@9a04b274d9e0132e5a0b409314ba53170b43e303`; no activation occurred. Any client/live-derived data admission requires a new reviewed decision and is prohibited under ADR-0009.
-- [ ] Verify non-production deployment by immutable image digest, least-privilege runtime/deployment identities, budget/alert routing, migration/rollback, log redaction, and a documented and tested disposable teardown/rebuild path. Backup/restore qualification remains deferred until live-data or production admission.
+- [x] Establish and qualify the isolated GCP non-production environment with wholly fictional synthetic data only: Artifact Registry, Secret Manager metadata and out-of-band payload injection, Cloud Run, Cloud SQL, Logging/Monitoring, and GitHub Workload Identity Federation. V28 completed the private synthetic `develop` activation and automated qualification at protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e`. Any client/live-derived data admission requires a new reviewed decision and is prohibited under ADR-0009.
+- [x] Verify non-production deployment by immutable image digest, least-privilege runtime/deployment identities, budget/alert routing, migration evidence, log redaction, and source-controlled disposable teardown/rebuild readiness. Production backup/restore qualification remains deferred until live-data or production admission.
 
 ## Phase 1 — Staff pilot foundation: employer demand workflow
 **Goal:** Give authorized agency staff a reliable, browser-based place to create and find employer staffing requests without duplicating response stores.
@@ -308,16 +303,16 @@
 
 - [x] Publish the reviewed `linux/amd64` image once and capture its immutable digest. Approved run `33882394981` completed this Gate P operation from exact protected `develop@92b104e`; its one-use approval is consumed.
 - [x] Verify exact-workflow keyless signature, transparency inclusion, SLSA v1 provenance, SPDX image SBOM, and backend/frontend SBOM bindings. Final repository semantic admission and verifier-approved immutable-reference emission passed in run `33882394981`.
-- [ ] Complete Secret-version preparation inside the bundled deployment packet without exposing payloads. The early `synthetic-staff-id` version exists; runtime/migration database URLs are created only after Cloud SQL/database roles provide real connection material, and the demo access password is generated directly into private custody/Secret Manager. Do not create placeholders.
-- [ ] Produce, inspect, and apply the exact `migration` plan inside the approved eight-hour deployment packet after the narrow `serviceusage.services.use` provisioner binding is verified. Keep the existing workload-owned budget unchanged; stop on deletes/replacements, budget mutation, broad IAM, or public database access.
-- [ ] Inside the same approved packet, prepare database login roles and runtime/migration URL Secret versions through non-echoing private handoffs, then verify authority.
-- [ ] Verify the configured migration job identity, digest, environment, secret references, network, and database authority; execute it once and capture schema/compatibility evidence.
-- [ ] Produce, inspect, and apply the exact `service` plan inside the same packet only after migration success.
-- [ ] Verify ready revision/digest, private database path, one-instance cap, temporary `allUsers` invoker, expiring Basic gate, and fixed unauthenticated denial.
-- [ ] **D4 automated qualification:** after service activation and private delivery of the shared credential to Beatrice, run foundation, database, bounded synthetic application, log, alert, cost, unauthenticated/wrong-credential denial, and disposable teardown/rebuild checks.
-- [ ] **H1 human qualification:** only after D4 creates the running target, perform human browser workflow, accessibility, and usability walkthroughs plus available English/Spanish technical checks. Fluent-language review may remain open under `operational_private_develop_technical_feedback_only` and does not block technical feedback use.
-- [ ] Record exactly one master-plan status: `qualified_private_develop_for_human_feedback`, `operational_private_develop_technical_feedback_only` (only the allowlisted fluent-language review may remain open), `not_qualified`, or `torn_down_after_failed_activation`; include blocker, tester-access removal/review date, recovery/cleanup, and feedback disposition without private values.
-- [ ] Do not describe the target as production-ready or admit live/client-derived data.
+- [x] Complete Secret-version preparation inside the bundled deployment packet without exposing payloads. The private v28 evidence records real runtime/migration URL versions and generated demo access custody; no payloads are committed.
+- [x] Produce, inspect, and apply the exact `migration` plan inside the approved packet while preserving the workload-owned budget and stopping on out-of-scope changes.
+- [x] Inside the same approved packet, prepare database login roles and runtime/migration URL Secret versions through non-echoing private handoffs, then verify authority.
+- [x] Verify the configured migration job identity, digest, environment, secret references, network, and database authority; execute migration and capture schema/compatibility evidence.
+- [x] Produce, inspect, and apply the exact `service` plan after migration success.
+- [x] Verify ready revision/digest, private database path, one-instance cap, temporary `allUsers` invoker, expiring Basic gate, and fixed unauthenticated denial.
+- [x] **D4 automated qualification:** after service activation and private delivery of the shared credential, run foundation, database, bounded synthetic application, log, unauthenticated/wrong-credential denial, and value-safe qualification checks. Final v28 automated qualification passed; manual recovery/monitoring evidence remains not-evidenced for production/handoff.
+- [ ] **H1 human qualification:** browser handoff loaded the workspace, but manual accessibility/usability and fluent English/Spanish review remain open. The Spanish toggle defect is the first language-parity issue to fix.
+- [x] Record master-plan status as `not_qualified`: the private synthetic target is running and automated qualification passed, but the Spanish-toggle defect plus unrun manual accessibility/usability and fluent-language rows fall outside the narrow technical-feedback-only exception. The service may support bounded owner-led exploratory feedback without being called qualified.
+- [x] Do not describe the target as production-ready or admit live/client-derived data.
 
 **Critical checkpoint:** A functioning private synthetic `develop` target is qualified by evidence, or the project has a truthful blocker record and recovery plan without weakening controls.
 

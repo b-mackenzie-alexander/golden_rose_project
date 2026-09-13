@@ -2,7 +2,7 @@
 
 This procedure governs Beatrice's temporary browser access to the first human-visible fictional-synthetic GCP `develop` deployment while application authentication remains synthetic. Cloud Run invocation is temporarily public, but every business/static route is protected by the expiring shared HTTP Basic gate.
 
-Current source status: PR #89 merged the bounded managed-IAM verifier correction into protected `develop@4b7730ce9b52a93f4fb93310c5ad2efd688b68dc`; required CI and final agent rereviews passed. Both prior packets are consumed. No service, invoker, password, URL, access grant, qualification, A03+, or cloud mutation occurred. This procedure requires a fresh final-tip packet and approval.
+Current runtime status: v28 deployed protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e`, created the exact service invoker and generated expiring Basic credential, delivered access through private operator-held evidence, completed automated qualification, and opened the workspace in a browser. The formal status is `not_qualified` because the Spanish toggle failed and required manual accessibility/usability/fluent-language rows remain open. The v28 packet is consumed; this procedure remains the access/revocation reference and grants no repeat mutation.
 
 ## Scope
 

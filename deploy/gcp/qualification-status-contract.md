@@ -1,6 +1,6 @@
 # Qualification status contract
 
-Status: source contract only until the later approved qualification and human-feedback gates run.
+Status: v28 automated qualification and initial browser handoff ran. The current exact final status is `not_qualified` because the production Spanish toggle failed and required manual browser/accessibility/fluent-language rows remain unrun; Wave 1 is the bounded remediation path.
 
 The human-visible fictional-synthetic `develop` tranche ends with exactly one final status. Existing machine-readable labels retain `private_develop` for compatibility, but the transport is intentionally public behind the temporary shared Basic gate; the URL, credential, and raw evidence stay operator-held.
 

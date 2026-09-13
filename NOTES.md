@@ -1,5 +1,19 @@
 # Golden Rose Operations Platform — Production Notes
 
+## 2026-09-12 — v23 deployment progress and bounded signature correction
+
+**Validated source correction:** Executed-shell regressions demonstrated RED then GREEN. All 329 focused image/workflow/Terraform tests pass (two graph tests rerun with network access after sandbox DNS failures). Ruff, targeted mypy, static workflow policy, Gitleaks, and diff hygiene pass. Fresh agent review returned PASS. Cosign v3.0.6 source confirms its transformed verification identity uses the supplied reference.
+
+## Delivery lock — v23 migration-job milestone
+- **Staffing:** One independent developer; fresh agent review supplies quality evidence.
+- **Human-visible outcome:** Private SQL and the application database are running. The migration job and its exact deployer bindings are deployed; the runtime demo-Secret accessor was moved into A07 with explicit user approval. No migration has executed and no browser service exists. The temporary bootstrap login and real migration URL Secret are prepared and retained for the initial migration.
+- **Gate budget:** Preserve the one-packet continuation; do not repeat database creation, bootstrap-user creation, or migration-job creation. Keep later restricted-logins/retirement, full verifier reconciliation, service activation, qualification, and browser delivery together.
+- **Next executable action:** Promote the bounded immutable-signature workflow correction, bind the corrected source to the preserved database, job, and bootstrap inventory, then publish and admit that source, update only the job image as required, and resume initial migration. All subsequent steps remain ordered behind its actual success.
+- **Do not regress:** No state editing, cleanup/recreation, production-only governance, broad IAM, or live data. Keep private SQL, exact images, restricted database roles, expiring Basic access, one-instance cap, and post-request log qualification. Never bypass strict image admission.
+
+**Observed:** The repository default branch is now `develop` under explicit user approval. This registered the existing deployment workflow. Its three missing non-secret deployment variables were populated from existing approved identity/certificate bindings. The first workflow attempt stopped at missing identity configuration; the second authenticated and reached direct OCI admission, which rejected tag-based signature output passed to the immutable-reference checker. Neither attempt executed migration. The correction preserves tag verification for digest discovery, then independently verifies that immutable digest before the unchanged strict semantic checker and attestations.
+
+
 This is the concise, dated engineering and operational note log. It records observed evidence, decisions, verification, and handoffs. It is not a location for client personal data, credentials, raw exports, legal advice, or unapproved policy text.
 
 ## 2026-09-12 — V22 database milestone and Cloud Run readback correction

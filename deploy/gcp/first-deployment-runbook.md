@@ -164,3 +164,7 @@ Allowed repository evidence after the later approved deployment may include only
 - qualification passed or failed with redacted evidence
 
 Do not record payloads, private URLs, tester emails, password derivation material, or raw command transcripts in tracked source.
+
+## Deployment workflow registration and digest discovery
+
+Before dispatch, confirm the workflow is registered on the repository default branch (`develop` as explicitly approved during v23), and the develop environment contains the exact existing workload-identity provider, workload project, artifact-verifier identity, deployer identity, and build certificate identity. These variables reference reviewed authority; they do not grant IAM. Verify the source tag only to discover its signed digest. Re-verify the immutable reference into the signature file admitted by the repository checker; never substitute tag-produced output or relax immutable subject checks. Preserve completed database/job/credential steps on retries and confirm whether a prior attempt actually executed migration.

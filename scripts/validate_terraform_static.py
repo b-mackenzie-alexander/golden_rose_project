@@ -2011,7 +2011,7 @@ EXACT_WORKFLOW_RUN_SHA256.update(
             "deploy-develop.yml",
             "deploy",
             "name:Verify direct OCI image authority",
-        ): "b345fca9e3029ec24c1532d43461447013f3f180de2670f6090d4d94bf949691",
+        ): "d6d32c11fc0b698b96f60be1b966eef10ea2ffa9798f72b7d5f28482e5317c0c",
         (
             "deploy-develop.yml",
             "deploy",

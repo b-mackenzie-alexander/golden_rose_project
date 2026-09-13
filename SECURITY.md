@@ -1,5 +1,9 @@
 # Security — Golden Rose Operations Platform
 
+## 2026-09-12 — v23 execution posture
+
+The private database and migration job are deployed. The bootstrap login/URL Secret exist solely for initial schema migration, which has not executed. Persistent restricted logins, bootstrap retirement, database authority verification, service activation, and browser qualification remain pending. Explicit user amendments moved the existing runtime demo-Secret accessor into migration-job creation and selected `develop` as repository default branch. Existing artifact-verifier/deployer identities and certificate binding were supplied as missing deployment variables; no new IAM authority was added by variable configuration. A workflow correction re-verifies the discovered immutable digest before strict image admission; certificate, transparency, type-set, subject, source, provenance, and SBOM checks remain unchanged.
+
 **Status:** V22 completed exact failed-verifier cleanup and private SQL/database creation, with no public SQL IP, application credentials, migration job, or service. It stopped after resolved readback on a confirmed Cloud Run v1/v2 source projection defect. The bounded source correction uses existing read authority, retains all job/service checks, admits only exact provider labels and the source-created Google network agent, and adds no IAM. Corrected-source continuation approval remains required; live data and production remain separately gated.
 
 ## Security objectives

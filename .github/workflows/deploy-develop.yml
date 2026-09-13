@@ -92,15 +92,16 @@ jobs:
           printf '%s' "$ARTIFACT_VERIFIER_ACCESS_TOKEN" | docker login us-east4-docker.pkg.dev --username oauth2accesstoken --password-stdin
           IMAGE_TAG="$MANAGED_REPOSITORY:${GITHUB_SHA}"
           mkdir -p build/oci-authority
-          cosign verify --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$IMAGE_TAG" > build/oci-authority/signature.json
+          cosign verify --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$IMAGE_TAG" > build/oci-authority/tag-signature.json
           IMAGE_DIGEST="$(python - <<'PY'
           import json
           from pathlib import Path
-          records = json.loads(Path("build/oci-authority/signature.json").read_text(encoding="utf-8"))
+          records = json.loads(Path("build/oci-authority/tag-signature.json").read_text(encoding="utf-8"))
           print(records[0]["critical"]["image"]["docker-manifest-digest"])
           PY
           )"
           MANAGED_IMAGE="${MANAGED_REPOSITORY}@${IMAGE_DIGEST}"
+          cosign verify --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/oci-authority/signature.json
           cosign verify-attestation --type slsaprovenance1 --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/oci-authority/provenance.json
           cosign verify-attestation --type https://spdx.dev/Document --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/oci-authority/image-sbom.json
           cosign verify-attestation --type https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1 --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/oci-authority/application-sbom.json

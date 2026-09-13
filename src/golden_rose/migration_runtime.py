@@ -13,7 +13,6 @@ EX_CONFIG = 78
 EX_TEMPFAIL = 75
 MIGRATION_ADVISORY_LOCK_KEY = 4_021_005
 MIGRATION_ASSUMED_ROLE = "golden_rose_schema_owner"
-ROOT = Path(__file__).resolve().parents[2]
 
 DATABASE_AUTHORITY_ROLE_COUNT_QUERY = """
 SELECT count(*) AS golden_rose_database_authority_role_count
@@ -239,7 +238,8 @@ def main() -> int:
             ):
                 return EX_CONFIG
             assume_database_role(connection, MIGRATION_ASSUMED_ROLE)
-            config = Config(str(ROOT / "alembic.ini"))
+            # Docker installs the package in site-packages; Alembic stays in WORKDIR /app.
+            config = Config(str(Path.cwd() / "alembic.ini"))
             config.attributes["connection"] = connection
             command.upgrade(config, "head")
             connection.execute(

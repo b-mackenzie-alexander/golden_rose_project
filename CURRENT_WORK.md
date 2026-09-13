@@ -1,14 +1,18 @@
 # Current Work — Golden Rose Operations Platform
 
 **Updated:** 2026-09-13
-**Lane:** Managed PostgreSQL bootstrap and temporary-login retirement correction.
+**Lane:** Installed migration configuration correction after v25 bootstrap SQL completion.
 
-## Delivery lock — v24 bootstrap correction
+## Delivery lock — v25 installed-package correction
 - **Staffing:** One independent developer; fresh agent review supplies quality evidence.
-- **Human-visible outcome:** Private SQL, the application database, and migration job are running. The admitted v24 image reached PostgreSQL but initial bootstrap rolled back before application roles/tables persisted. No browser service exists. The temporary login and migration URL remain available; preserve them.
+- **Human-visible outcome:** Private SQL, the application database, and migration job are running. The admitted v25 image completed the role-bootstrap SQL, then failed inside the transaction on Alembic configuration lookup. No browser service exists. The temporary login and migration URL remain available; preserve them.
 - **Gate budget:** One source-bound continuation covers publication, existing-job image update, migration, restricted credentials, bootstrap retirement, verifier reconciliation, service activation, qualification, and browser handoff. Ordinary steps/readbacks do not become separate approvals.
-- **Next executable action:** Review and promote the managed PostgreSQL bootstrap/grantor correction, bind final source to the preserved resources and current Secret versions, then resume the ordered deployment. Do not rerun the known-broken image.
+- **Next executable action:** Promote the installed-package configuration lookup correction, bind final source to the preserved resources/current Secret versions and three failed migration executions, then resume the ordered deployment. Do not rerun the known-broken image.
 - **Do not regress:** No database/job/bootstrap recreation, state editing, broad IAM, live data, production-only gates, or status-only PR. Keep strict immutable image admission, private SQL, restricted application logins, expiring Basic access, one-instance scaling, and post-request log qualification.
+
+**Observed v25:** Publication/admission and the existing-job image update passed. Initial execution completed the corrected role-bootstrap statements, then Alembic failed inside the same transaction because the installed package looked for `alembic.ini` under Python's library directory. Docker keeps that file and migrations in `/app`. No restricted credentials, bootstrap retirement, verifier or service activation occurred.
+
+**Validated correction:** Resolve Alembic configuration from the application working directory, consistent with Docker `WORKDIR /app` and repository-root CLI use. A relocated-package regression reproduces the old failure. The actual built wheel, installed separately from its app directory, completes initial migration, real temporary-login deletion, restricted rerun, and authenticated database verification on PostgreSQL 16. Fresh agent review passed. Preserve existing cloud resources and bind the corrected source into one continuation through browser handoff.
 
 **Observed:** PR #94's immutable-signature correction merged at `5326a07df6423f8d596788732d37f1121b29806a`. V24 publication/admission and the existing-job image update passed. The approved display-label correction and normalization of one terminal newline in the synthetic UUID Secret preserved its identity. Migration then reached PostgreSQL and failed before ownership transfer. One explicitly approved catalog-only diagnostic execution confirmed zero application roles/tables and the existing managed role's capabilities; the temporary diagnostic job was deleted and absence verified.
 

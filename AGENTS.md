@@ -3,11 +3,11 @@
 ## Mission and scope
 Golden Rose is a seven-week, evidence-led, compliance-conscious operations-platform engagement for an employment agency. The immediate goal is a safe staff-facing employer-demand workflow; the product must not be treated as a finished public portal, legal/compliance system, or automated hiring/matching system.
 
-## Delivery lock — v24 bootstrap correction
+## Delivery lock — v25 installed-package correction
 - **Staffing:** One independent developer; fresh agent review supplies quality evidence.
-- **Human-visible outcome:** Private SQL, the application database, and migration job are running. The admitted v24 image reached PostgreSQL but initial bootstrap rolled back before application roles/tables persisted. No browser service exists. The temporary login and migration URL remain available; preserve them.
+- **Human-visible outcome:** Private SQL, the application database, and migration job are running. The admitted v25 image completed the role-bootstrap SQL, then failed inside the transaction on Alembic configuration lookup. No browser service exists. The temporary login and migration URL remain available; preserve them.
 - **Gate budget:** One source-bound continuation covers publication, existing-job image update, migration, restricted credentials, bootstrap retirement, verifier reconciliation, service activation, qualification, and browser handoff. Ordinary steps/readbacks do not become separate approvals.
-- **Next executable action:** Review and promote the managed PostgreSQL bootstrap/grantor correction, bind final source to the preserved resources and current Secret versions, then resume the ordered deployment. Do not rerun the known-broken image.
+- **Next executable action:** Promote the installed-package configuration lookup correction, bind final source to the preserved resources/current Secret versions and three failed migration executions, then resume the ordered deployment. Do not rerun the known-broken image.
 - **Do not regress:** No database/job/bootstrap recreation, state editing, broad IAM, live data, production-only gates, or status-only PR. Keep strict immutable image admission, private SQL, restricted application logins, expiring Basic access, one-instance scaling, and post-request log qualification.
 
 ## Authoritative working surfaces
@@ -66,11 +66,11 @@ Every later implementation tranche requires an accepted merged outcome-scale pla
 
 ## Latest operational continuation — v23
 
-## Delivery lock — v24 bootstrap correction
+## Delivery lock — v25 installed-package correction
 - **Staffing:** One independent developer; fresh agent review supplies quality evidence.
-- **Human-visible outcome:** Private SQL, the application database, and migration job are running. The admitted v24 image reached PostgreSQL but initial bootstrap rolled back before application roles/tables persisted. No browser service exists. The temporary login and migration URL remain available; preserve them.
+- **Human-visible outcome:** Private SQL, the application database, and migration job are running. The admitted v25 image completed the role-bootstrap SQL, then failed inside the transaction on Alembic configuration lookup. No browser service exists. The temporary login and migration URL remain available; preserve them.
 - **Gate budget:** One source-bound continuation covers publication, existing-job image update, migration, restricted credentials, bootstrap retirement, verifier reconciliation, service activation, qualification, and browser handoff. Ordinary steps/readbacks do not become separate approvals.
-- **Next executable action:** Review and promote the managed PostgreSQL bootstrap/grantor correction, bind final source to the preserved resources and current Secret versions, then resume the ordered deployment. Do not rerun the known-broken image.
+- **Next executable action:** Promote the installed-package configuration lookup correction, bind final source to the preserved resources/current Secret versions and three failed migration executions, then resume the ordered deployment. Do not rerun the known-broken image.
 - **Do not regress:** No database/job/bootstrap recreation, state editing, broad IAM, live data, production-only gates, or status-only PR. Keep strict immutable image admission, private SQL, restricted application logins, expiring Basic access, one-instance scaling, and post-request log qualification.
 
 **Observed:** The repository default branch is now `develop` under explicit user approval. This registered the existing deployment workflow. Its three missing non-secret deployment variables were populated from existing approved identity/certificate bindings. The first workflow attempt stopped at missing identity configuration; the second authenticated and reached direct OCI admission, which rejected tag-based signature output passed to the immutable-reference checker. Neither attempt executed migration. The correction preserves tag verification for digest discovery, then independently verifies that immutable digest before the unchanged strict semantic checker and attestations.

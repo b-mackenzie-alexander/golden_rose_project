@@ -1,5 +1,12 @@
 # Golden Rose Operations Platform — Production Notes
 
+## 2026-09-13 — v25 installed-package path correction
+
+**Observed v25:** Publication/admission and the existing-job image update passed. Initial execution completed the corrected role-bootstrap statements, then Alembic failed inside the same transaction because the installed package looked for `alembic.ini` under Python's library directory. Docker keeps that file and migrations in `/app`. No restricted credentials, bootstrap retirement, verifier or service activation occurred.
+
+**Validated correction:** Resolve Alembic configuration from the application working directory, consistent with Docker `WORKDIR /app` and repository-root CLI use. A relocated-package regression reproduces the old failure. The actual built wheel, installed separately from its app directory, completes initial migration, real temporary-login deletion, restricted rerun, and authenticated database verification on PostgreSQL 16. Fresh agent review passed. Preserve existing cloud resources and bind the corrected source into one continuation through browser handoff.
+
+
 ## 2026-09-13 — Managed database bootstrap and retirement
 
 ## Delivery lock — v24 bootstrap correction

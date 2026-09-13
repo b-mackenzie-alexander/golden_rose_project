@@ -1,5 +1,10 @@
 # Security — Golden Rose Operations Platform
 
+## 2026-09-13 — Installed migration configuration
+
+The correction changes only where the migration entrypoint reads its existing Alembic configuration: the trusted application working directory instead of the installed Python library tree. Docker fixes that directory to `/app`; no new input, IAM, database role, or Secret authority is added. The actual installed-wheel bootstrap/retirement/restricted-verifier lifecycle passed locally. V25 stopped at configuration lookup before restricted users or service activation.
+
+
 ## 2026-09-13 — Managed bootstrap grantor boundary
 
 **Observed:** PR #94's immutable-signature correction merged at `5326a07df6423f8d596788732d37f1121b29806a`. V24 publication/admission and the existing-job image update passed. The approved display-label correction and normalization of one terminal newline in the synthetic UUID Secret preserved its identity. Migration then reached PostgreSQL and failed before ownership transfer. One explicitly approved catalog-only diagnostic execution confirmed zero application roles/tables and the existing managed role's capabilities; the temporary diagnostic job was deleted and absence verified.

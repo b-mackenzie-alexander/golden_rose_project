@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
@@ -26,28 +27,53 @@ def _expected_snapshot() -> dict[str, object]:
                 "rolcanlogin": False,
                 "rolsuper": False,
                 "rolcreaterole": False,
+                "rolcreatedb": False,
+                "rolreplication": False,
+                "rolbypassrls": False,
+                "rolinherit": True,
             },
             "golden_rose_migrator": {
                 "rolcanlogin": False,
                 "rolsuper": False,
                 "rolcreaterole": False,
+                "rolcreatedb": False,
+                "rolreplication": False,
+                "rolbypassrls": False,
+                "rolinherit": True,
             },
             "golden_rose_runtime": {
                 "rolcanlogin": False,
                 "rolsuper": False,
                 "rolcreaterole": False,
+                "rolcreatedb": False,
+                "rolreplication": False,
+                "rolbypassrls": False,
+                "rolinherit": True,
             },
             "golden_rose_migration_login": {
                 "rolcanlogin": True,
                 "rolsuper": False,
                 "rolcreaterole": False,
+                "rolcreatedb": False,
+                "rolreplication": False,
+                "rolbypassrls": False,
+                "rolinherit": True,
             },
             "golden_rose_runtime_login": {
                 "rolcanlogin": True,
                 "rolsuper": False,
                 "rolcreaterole": False,
+                "rolcreatedb": False,
+                "rolreplication": False,
+                "rolbypassrls": False,
+                "rolinherit": True,
             },
         },
+        "authority_memberships": [
+            _membership("golden_rose_migrator", "golden_rose_schema_owner"),
+            _membership("golden_rose_migration_login", "golden_rose_migrator"),
+            _membership("golden_rose_runtime_login", "golden_rose_runtime"),
+        ],
         "schema_owner": "golden_rose_schema_owner",
         "role_memberships": {
             "golden_rose_migrator": ["golden_rose_schema_owner"],
@@ -242,3 +268,93 @@ def test_verify_database_authority_main_fails_bounded_on_sqlalchemy_error(
     assert "database connection boundary failed" in output
     assert "postgresql+psycopg" not in output
     assert "db.example" not in output
+
+
+def _membership(member: str, granted: str, *, admin: bool = False) -> dict[str, object]:
+    return {
+        "member": member,
+        "granted": granted,
+        "grantor": "test_admin" if admin else "cloudsqlsuperuser",
+        "grantor_superuser": admin,
+        "admin_option": admin,
+        "inherit_option": not admin,
+        "set_option": not admin,
+    }
+
+
+def _managed_snapshot() -> dict[str, Any]:
+    snapshot = cast(dict[str, Any], _expected_snapshot())
+    snapshot["roles"]["cloudsqlsuperuser"] = {
+        "rolcanlogin": True,
+        "rolinherit": True,
+        "rolcreatedb": True,
+        "rolcreaterole": True,
+        "rolsuper": False,
+        "rolreplication": False,
+        "rolbypassrls": False,
+    }
+    snapshot["authority_memberships"].extend(
+        _membership("cloudsqlsuperuser", role, admin=True)
+        for role in ("golden_rose_schema_owner", "golden_rose_migrator", "golden_rose_runtime")
+    )
+    return snapshot
+
+
+def test_managed_catalog_graph_is_exact():
+    assert evaluate_authority_snapshot(_managed_snapshot()) == []
+
+
+@pytest.mark.parametrize(
+    "drift",
+    [
+        "grantor",
+        "missing_admin",
+        "extra_admin",
+        "admin_set",
+        "admin_inherit",
+        "admin_grantor",
+        "unexpected_administrator",
+        "retained_bootstrap",
+        "extra_login_role",
+        "login_createdb",
+        "app_replication",
+        "app_bypassrls",
+        "duplicate",
+        "restricted_admin",
+        "managed_superuser",
+        "missing_graph",
+    ],
+)
+def test_managed_catalog_graph_rejects_drift(drift):
+    snapshot = _managed_snapshot()
+    rows = snapshot["authority_memberships"]
+    if drift == "grantor":
+        rows[0]["grantor"] = "retired_bootstrap"
+    elif drift == "missing_admin":
+        rows.pop()
+    elif drift == "extra_admin":
+        rows.append(_membership("cloudsqlsuperuser", "golden_rose_migration_login", admin=True))
+    elif drift in ("admin_set", "admin_inherit"):
+        rows[-1]["set_option" if drift == "admin_set" else "inherit_option"] = True
+    elif drift == "admin_grantor":
+        rows[-1]["grantor_superuser"] = False
+    elif drift == "unexpected_administrator":
+        rows[-1]["member"] = "unexpected_administrator"
+    elif drift == "retained_bootstrap":
+        rows.append(_membership("retained_bootstrap", "golden_rose_migrator"))
+    elif drift == "extra_login_role":
+        rows.append(_membership("golden_rose_runtime_login", "cloudsqlsuperuser"))
+    elif drift == "login_createdb":
+        snapshot["roles"]["golden_rose_migration_login"]["rolcreatedb"] = True
+    elif drift in ("app_replication", "app_bypassrls"):
+        attribute = "rolreplication" if drift == "app_replication" else "rolbypassrls"
+        snapshot["roles"]["golden_rose_runtime"][attribute] = True
+    elif drift == "duplicate":
+        rows.append(dict(rows[0]))
+    elif drift == "restricted_admin":
+        rows[0]["admin_option"] = True
+    elif drift == "managed_superuser":
+        snapshot["roles"]["cloudsqlsuperuser"]["rolsuper"] = True
+    elif drift == "missing_graph":
+        snapshot.pop("authority_memberships")
+    assert evaluate_authority_snapshot(snapshot)

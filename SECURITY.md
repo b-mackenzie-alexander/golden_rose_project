@@ -1,5 +1,14 @@
 # Security — Golden Rose Operations Platform
 
+## 2026-09-13 — Managed bootstrap grantor boundary
+
+**Observed:** PR #94's immutable-signature correction merged at `5326a07df6423f8d596788732d37f1121b29806a`. V24 publication/admission and the existing-job image update passed. The approved display-label correction and normalization of one terminal newline in the synthetic UUID Secret preserved its identity. Migration then reached PostgreSQL and failed before ownership transfer. One explicitly approved catalog-only diagnostic execution confirmed zero application roles/tables and the existing managed role's capabilities; the temporary diagnostic job was deleted and absence verified.
+
+**Validated locally:** PostgreSQL 16 reproduces the ownership-order failure; reorder alone leaves grantor dependencies that block bootstrap deletion. The managed-target correction creates/grants the three existing application roles while assuming the existing `cloudsqlsuperuser`, grants the session login its temporary migration membership, resets role, then transfers schema ownership. Actual temporary-login deletion, restricted migration rerun, full verifier execution, and negative membership/attribute checks pass. Managed creator memberships are exactly three ADMIN-only, non-INHERIT, non-SET rows granted by PostgreSQL's superuser; restricted logins never inherit the managed administrator. Local bootstrap behavior is preserved. Cloud migration and human handoff remain pending.
+
+The correction adds no cloud IAM or application role. The existing managed database administrator is the durable grantor solely for this private-synthetic target. Its three PostgreSQL creator ADMIN memberships are explicitly modeled; each has SET and INHERIT disabled. The live verifier checks incoming/outgoing memberships, grant options, durable grantor, and full restricted-role attributes. The temporary diagnostic had the existing migration identity/Secret/network, performed catalog reads only, and is absent. Production and live data remain separately gated.
+
+
 ## 2026-09-12 — v23 execution posture
 
 The private database and migration job are deployed. The bootstrap login/URL Secret exist solely for initial schema migration, which has not executed. Persistent restricted logins, bootstrap retirement, database authority verification, service activation, and browser qualification remain pending. Explicit user amendments moved the existing runtime demo-Secret accessor into migration-job creation and selected `develop` as repository default branch. Existing artifact-verifier/deployer identities and certificate binding were supplied as missing deployment variables; no new IAM authority was added by variable configuration. A workflow correction re-verifies the discovered immutable digest before strict image admission; certificate, transparency, type-set, subject, source, provenance, and SBOM checks remain unchanged.

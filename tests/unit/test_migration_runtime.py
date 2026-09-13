@@ -112,7 +112,7 @@ def test_migration_runtime_holds_advisory_lock_for_alembic_upgrade(monkeypatch) 
         for statement in connection.executed
     )
     assert any(
-        "GRANT golden_rose_migrator TO CURRENT_USER" in statement
+        "GRANT golden_rose_migrator TO SESSION_USER" in statement
         for statement in connection.executed
     )
     assert any("pg_advisory_unlock" in statement for statement in connection.executed)
@@ -142,7 +142,7 @@ def test_migration_runtime_skips_privileged_bootstrap_for_initialized_database(
     assert observed == {"revision": "head"}
     assert any("golden_rose_database_authority_role_count" in item for item in connection.executed)
     assert not any(
-        "GRANT golden_rose_migrator TO CURRENT_USER" in item for item in connection.executed
+        "GRANT golden_rose_migrator TO SESSION_USER" in item for item in connection.executed
     )
     assert any("SET ROLE golden_rose_schema_owner" in item for item in connection.executed)
 
@@ -214,3 +214,16 @@ def test_migration_runtime_fails_closed_when_advisory_lock_is_held(monkeypatch) 
     assert any("pg_try_advisory_lock" in statement for statement in connection.executed)
     assert any("pg_advisory_unlock" not in statement for statement in connection.executed)
     assert engine.disposed is True
+
+
+def test_local_bootstrap_never_assumes_managed_administrator(monkeypatch) -> None:  # noqa: ANN001
+    _set_minimal_migration_env(monkeypatch)
+    monkeypatch.setenv("GOLDEN_ROSE_ENVIRONMENT", "test")
+    connection = _FakeConnection()
+    monkeypatch.setattr(
+        "golden_rose.migration_runtime.create_database_engine", lambda: _FakeEngine(connection)
+    )
+    monkeypatch.setattr("golden_rose.migration_runtime.command.upgrade", lambda *_: None)
+    assert main() == 0
+    assert not any("cloudsqlsuperuser" in item for item in connection.executed)
+    assert any("GRANT golden_rose_migrator TO CURRENT_USER" in item for item in connection.executed)

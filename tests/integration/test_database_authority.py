@@ -498,3 +498,103 @@ def test_database_authority_verifier_script_passes_on_reviewed_head(
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "database authority verification passed" in result.stdout
+
+
+def test_managed_bootstrap_can_be_deleted_before_restricted_migration(
+    engine: Engine,
+    database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Model observed PG16 Cloud SQL capabilities without a superuser bootstrap."""
+    from golden_rose.migration_runtime import MANAGED_DATABASE_AUTHORITY_INITIALIZED_QUERY
+    from scripts.verify_database_authority import main as verify_main
+
+    bootstrap = "gr_test_temporary_bootstrap"
+    with engine.connect() as connection:
+        connection.execute(text("DROP SCHEMA public CASCADE"))
+        connection.execute(text("CREATE SCHEMA public"))
+        connection.commit()
+        _drop_authenticated_login_roles(connection)
+        _drop_database_authority_roles(connection)
+        connection.execute(text("CREATE ROLE cloudsqlsuperuser LOGIN CREATEDB CREATEROLE"))
+        connection.execute(
+            text(
+                f"CREATE ROLE {bootstrap} LOGIN PASSWORD 'test_bootstrap_pw' "
+                "CREATEDB CREATEROLE IN ROLE cloudsqlsuperuser"
+            )
+        )
+        database_name = connection.execute(text("SELECT current_database()")).scalar_one()
+        connection.execute(
+            text(f"ALTER DATABASE {_quoted_ident(database_name)} OWNER TO cloudsqlsuperuser")
+        )
+        connection.execute(text("ALTER SCHEMA public OWNER TO pg_database_owner"))
+        connection.commit()
+    monkeypatch.setenv("GOLDEN_ROSE_ENVIRONMENT", "develop")
+    monkeypatch.setenv("GOLDEN_ROSE_DEPLOYMENT_TARGET", "gcp-develop-private-synthetic")
+    monkeypatch.setenv("GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL", "non-production synthetic")
+    monkeypatch.setenv("GOLDEN_ROSE_DEPLOYED_IMAGE_DIGEST", "sha256:" + "a" * 64)
+    monkeypatch.setenv("GOLDEN_ROSE_AUTH_MODE", "synthetic")
+    monkeypatch.setenv("GOLDEN_ROSE_SYNTHETIC_STAFF_ID", "22222222-2222-4222-8222-222222222222")
+    monkeypatch.setenv(
+        "GOLDEN_ROSE_DATABASE_URL",
+        _login_database_url(database_url, bootstrap, "test_bootstrap_pw"),
+    )
+    try:
+        assert migration_runtime_main() == 0
+        with engine.connect() as connection:
+            _create_authenticated_login_roles(connection)
+        migration_url = _login_database_url(
+            database_url, MIGRATION_LOGIN_ROLE, MIGRATION_LOGIN_PASSWORD
+        )
+        runtime_url = _login_database_url(database_url, RUNTIME_LOGIN_ROLE, RUNTIME_LOGIN_PASSWORD)
+        monkeypatch.setenv("GOLDEN_ROSE_DATABASE_URL", migration_url)
+        # A retained privileged bootstrap must still block restricted reuse.
+        assert migration_runtime_main() == 78
+        with engine.begin() as connection:
+            connection.execute(text(f"DROP ROLE {bootstrap}"))
+        assert migration_runtime_main() == 0
+        monkeypatch.setenv("GOLDEN_ROSE_MIGRATION_DATABASE_URL", migration_url)
+        monkeypatch.setenv("GOLDEN_ROSE_RUNTIME_DATABASE_URL", runtime_url)
+        assert verify_main() == 0
+        for drift_sql in (
+            "GRANT golden_rose_runtime TO cloudsqlsuperuser WITH SET TRUE",
+            "GRANT golden_rose_runtime TO cloudsqlsuperuser WITH INHERIT TRUE",
+            "REVOKE golden_rose_runtime FROM cloudsqlsuperuser",
+            "ALTER ROLE golden_rose_migrator CREATEDB",
+            "GRANT golden_rose_runtime TO CURRENT_USER",
+            f"GRANT cloudsqlsuperuser TO {MIGRATION_LOGIN_ROLE}",
+            "REVOKE golden_rose_schema_owner FROM golden_rose_migrator; "
+            "GRANT golden_rose_schema_owner TO golden_rose_migrator",
+        ):
+            with engine.connect() as connection:
+                transaction = connection.begin()
+                try:
+                    connection.execute(text(drift_sql))
+                    snapshot = collect_authority_snapshot(
+                        connection,
+                        migration_login_role=MIGRATION_LOGIN_ROLE,
+                        runtime_login_role=RUNTIME_LOGIN_ROLE,
+                    )
+                    assert evaluate_authority_snapshot(snapshot), drift_sql
+                    connection.execute(text(f"SET LOCAL ROLE {MIGRATION_LOGIN_ROLE}"))
+                    assert not connection.execute(
+                        text(MANAGED_DATABASE_AUTHORITY_INITIALIZED_QUERY)
+                    ).scalar_one(), drift_sql
+                finally:
+                    transaction.rollback()
+    finally:
+        with engine.connect() as connection:
+            connection.execute(text("DROP SCHEMA public CASCADE"))
+            connection.execute(text("CREATE SCHEMA public"))
+            connection.commit()
+            _drop_authenticated_login_roles(connection)
+            _drop_database_authority_roles(connection)
+            connection.execute(text(f"DROP ROLE IF EXISTS {bootstrap}"))
+            connection.execute(
+                text(f"ALTER DATABASE {_quoted_ident(database_name)} OWNER TO CURRENT_USER")
+            )
+            connection.execute(text("DROP OWNED BY cloudsqlsuperuser"))
+            connection.execute(text("DROP ROLE cloudsqlsuperuser"))
+            connection.commit()
+        monkeypatch.setenv("GOLDEN_ROSE_DATABASE_URL", database_url)
+        command.upgrade(_alembic_config(), "head")

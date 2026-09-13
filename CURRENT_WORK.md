@@ -1,14 +1,20 @@
 # Current Work — Golden Rose Operations Platform
 
 **Updated:** 2026-09-13
-**Lane:** Installed migration configuration correction after v25 bootstrap SQL completion.
+**Lane:** Native database catalog validation after successful v26 bootstrap retirement.
 
-## Delivery lock — v25 installed-package correction
+## Delivery lock — v26 native database catalog correction
 - **Staffing:** One independent developer; fresh agent review supplies quality evidence.
-- **Human-visible outcome:** Private SQL, the application database, and migration job are running. The admitted v25 image completed the role-bootstrap SQL, then failed inside the transaction on Alembic configuration lookup. No browser service exists. The temporary login and migration URL remain available; preserve them.
-- **Gate budget:** One source-bound continuation covers publication, existing-job image update, migration, restricted credentials, bootstrap retirement, verifier reconciliation, service activation, qualification, and browser handoff. Ordinary steps/readbacks do not become separate approvals.
-- **Next executable action:** Promote the installed-package configuration lookup correction, bind final source to the preserved resources/current Secret versions and three failed migration executions, then resume the ordered deployment. Do not rerun the known-broken image.
-- **Do not regress:** No database/job/bootstrap recreation, state editing, broad IAM, live data, production-only gates, or status-only PR. Keep strict immutable image admission, private SQL, restricted application logins, expiring Basic access, one-instance scaling, and post-request log qualification.
+- **Human-visible outcome:** Private SQL, the application database, schema, restricted logins, and migration job exist. Initial cloud migration succeeded and the bootstrap login was deleted with its Secret version disabled. No browser service exists yet.
+- **Gate budget:** One source-bound continuation covers publication, existing-job image update, restricted migration, verifier reconciliation, service activation, qualification, and browser handoff. Ordinary steps/readbacks do not become separate approvals.
+- **Next executable action:** Promote the native catalog validator correction, bind final source to the preserved post-retirement resources and credentials, then resume at restricted migration.
+- **Do not regress:** Never repeat initial bootstrap, recreate credentials, re-enable the retired Secret, recreate the database/job, edit state, expand IAM, admit live data, or add production-only gates. Keep immutable image admission, private SQL, restricted application logins, expiring Basic access, one-instance scaling, and log qualification.
+
+**Observed v26:** PR #96 merged the installed-package correction. Initial cloud migration succeeded; restricted migration/runtime users and URL Secrets were created; the bootstrap user was deleted and its URL version disabled. Restricted rerun then stopped at the catalog validator. One approved read-only catalog diagnostic confirmed exactly three restricted memberships, all granted by the same actual platform superuser, with no PostgreSQL creator ADMIN rows. Role attributes were restricted as intended. The diagnostic executed once, succeeded, was deleted, and its absence was verified.
+
+**Validated locally:** The validator now admits either the complete stock PostgreSQL 16 creator layout or the complete observed Cloud SQL native layout. Mixed layouts, extra/missing memberships, elevated options/attributes, and inconsistent native grantors remain rejected. This changes validation only; the cloud database grants need no mutation. Initial bootstrap and installed-package behavior remain unchanged.
+
+## Historical deployment evidence
 
 **Observed v25:** Publication/admission and the existing-job image update passed. Initial execution completed the corrected role-bootstrap statements, then Alembic failed inside the same transaction because the installed package looked for `alembic.ini` under Python's library directory. Docker keeps that file and migrations in `/app`. No restricted credentials, bootstrap retirement, verifier or service activation occurred.
 

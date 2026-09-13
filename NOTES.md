@@ -1,5 +1,14 @@
 # Golden Rose Operations Platform — Production Notes
 
+## 2026-09-13 — v26 restricted catalog diagnosis and correction
+
+**Verification:** 975 tests passed with 96.04% coverage on isolated PostgreSQL 16; formatting, Ruff, mypy, Bandit, Gitleaks, and diff whitespace checks passed. Fresh agent review found no actionable current-target findings.
+
+**Observed v26:** PR #96 merged the installed-package correction. Initial cloud migration succeeded; restricted migration/runtime users and URL Secrets were created; the bootstrap user was deleted and its URL version disabled. Restricted rerun then stopped at the catalog validator. One approved read-only catalog diagnostic confirmed exactly three restricted memberships, all granted by the same actual platform superuser, with no PostgreSQL creator ADMIN rows. Role attributes were restricted as intended. The diagnostic executed once, succeeded, was deleted, and its absence was verified.
+
+**Validated locally:** The validator now admits either the complete stock PostgreSQL 16 creator layout or the complete observed Cloud SQL native layout. Mixed layouts, extra/missing memberships, elevated options/attributes, and inconsistent native grantors remain rejected. This changes validation only; the cloud database grants need no mutation. Initial bootstrap and installed-package behavior remain unchanged.
+
+
 ## 2026-09-13 — v25 installed-package path correction
 
 **Observed v25:** Publication/admission and the existing-job image update passed. Initial execution completed the corrected role-bootstrap statements, then Alembic failed inside the same transaction because the installed package looked for `alembic.ini` under Python's library directory. Docker keeps that file and migrations in `/app`. No restricted credentials, bootstrap retirement, verifier or service activation occurred.

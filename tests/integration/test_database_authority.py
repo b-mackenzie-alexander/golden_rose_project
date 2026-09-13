@@ -505,7 +505,7 @@ def test_managed_bootstrap_can_be_deleted_before_restricted_migration(
     database_url: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Model observed PG16 Cloud SQL capabilities without a superuser bootstrap."""
+    """Exercise stock PG16 and observed native grants with a restricted bootstrap."""
     from golden_rose.migration_runtime import MANAGED_DATABASE_AUTHORITY_INITIALIZED_QUERY
     from scripts.verify_database_authority import main as verify_main
 
@@ -565,6 +565,46 @@ def test_managed_bootstrap_can_be_deleted_before_restricted_migration(
             f"GRANT cloudsqlsuperuser TO {MIGRATION_LOGIN_ROLE}",
             "REVOKE golden_rose_schema_owner FROM golden_rose_migrator; "
             "GRANT golden_rose_schema_owner TO golden_rose_migrator",
+        ):
+            with engine.connect() as connection:
+                transaction = connection.begin()
+                try:
+                    connection.execute(text(drift_sql))
+                    snapshot = collect_authority_snapshot(
+                        connection,
+                        migration_login_role=MIGRATION_LOGIN_ROLE,
+                        runtime_login_role=RUNTIME_LOGIN_ROLE,
+                    )
+                    assert evaluate_authority_snapshot(snapshot), drift_sql
+                    connection.execute(text(f"SET LOCAL ROLE {MIGRATION_LOGIN_ROLE}"))
+                    assert not connection.execute(
+                        text(MANAGED_DATABASE_AUTHORITY_INITIALIZED_QUERY)
+                    ).scalar_one(), drift_sql
+                finally:
+                    transaction.rollback()
+        # Model the catalog observed in Cloud SQL after bootstrap retirement.
+        # Only this disposable local fixture changes grants; cloud grants already
+        # have this shape and need no correction.
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "REVOKE golden_rose_schema_owner FROM cloudsqlsuperuser CASCADE; "
+                    "GRANT golden_rose_schema_owner TO golden_rose_migrator; "
+                    "REVOKE golden_rose_migrator FROM cloudsqlsuperuser; "
+                    "REVOKE golden_rose_runtime FROM cloudsqlsuperuser"
+                )
+            )
+        assert migration_runtime_main() == 0
+        assert verify_main() == 0
+        for drift_sql in (
+            f"GRANT golden_rose_migrator TO {MIGRATION_LOGIN_ROLE} WITH ADMIN TRUE",
+            "GRANT golden_rose_runtime TO CURRENT_USER",
+            "GRANT golden_rose_runtime TO cloudsqlsuperuser WITH ADMIN TRUE, "
+            "INHERIT FALSE, SET FALSE",
+            f"REVOKE golden_rose_runtime FROM {RUNTIME_LOGIN_ROLE}",
+            f"GRANT cloudsqlsuperuser TO {RUNTIME_LOGIN_ROLE}",
+            f"ALTER ROLE {MIGRATION_LOGIN_ROLE} NOINHERIT",
+            "ALTER ROLE golden_rose_runtime CREATEDB",
         ):
             with engine.connect() as connection:
                 transaction = connection.begin()

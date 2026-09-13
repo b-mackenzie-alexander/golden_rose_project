@@ -3,12 +3,12 @@
 ## Mission and scope
 Golden Rose is a seven-week, evidence-led, compliance-conscious operations-platform engagement for an employment agency. The immediate goal is a safe staff-facing employer-demand workflow; the product must not be treated as a finished public portal, legal/compliance system, or automated hiring/matching system.
 
-## Delivery lock — v25 installed-package correction
+## Delivery lock — v26 native database catalog correction
 - **Staffing:** One independent developer; fresh agent review supplies quality evidence.
-- **Human-visible outcome:** Private SQL, the application database, and migration job are running. The admitted v25 image completed the role-bootstrap SQL, then failed inside the transaction on Alembic configuration lookup. No browser service exists. The temporary login and migration URL remain available; preserve them.
-- **Gate budget:** One source-bound continuation covers publication, existing-job image update, migration, restricted credentials, bootstrap retirement, verifier reconciliation, service activation, qualification, and browser handoff. Ordinary steps/readbacks do not become separate approvals.
-- **Next executable action:** Promote the installed-package configuration lookup correction, bind final source to the preserved resources/current Secret versions and three failed migration executions, then resume the ordered deployment. Do not rerun the known-broken image.
-- **Do not regress:** No database/job/bootstrap recreation, state editing, broad IAM, live data, production-only gates, or status-only PR. Keep strict immutable image admission, private SQL, restricted application logins, expiring Basic access, one-instance scaling, and post-request log qualification.
+- **Human-visible outcome:** Private SQL, the application database, schema, restricted logins, and migration job exist. Initial cloud migration succeeded and the bootstrap login was deleted with its Secret version disabled. No browser service exists yet.
+- **Gate budget:** One source-bound continuation covers publication, existing-job image update, restricted migration, verifier reconciliation, service activation, qualification, and browser handoff. Ordinary steps/readbacks do not become separate approvals.
+- **Next executable action:** Promote the native catalog validator correction, bind final source to the preserved post-retirement resources and credentials, then resume at restricted migration.
+- **Do not regress:** Never repeat initial bootstrap, recreate credentials, re-enable the retired Secret, recreate the database/job, edit state, expand IAM, admit live data, or add production-only gates. Keep immutable image admission, private SQL, restricted application logins, expiring Basic access, one-instance scaling, and log qualification.
 
 ## Authoritative working surfaces
 1. `CURRENT_WORK.md` — active lane, current objective, next steps, and stop boundaries.

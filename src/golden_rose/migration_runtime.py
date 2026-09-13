@@ -142,7 +142,7 @@ ALTER SCHEMA public OWNER TO golden_rose_schema_owner;
 # Only the three automatic PG16 creator memberships are excluded from incoming
 # application memberships. Their complete options, grantor, and managed role
 # attributes are checked below; outgoing restricted-role checks stay unchanged.
-MANAGED_DATABASE_AUTHORITY_INITIALIZED_QUERY = (
+POSTGRES_MANAGED_DATABASE_AUTHORITY_INITIALIZED_QUERY = (
     DATABASE_AUTHORITY_INITIALIZED_QUERY.replace(
         "WHERE granted_role.rolname = 'golden_rose_schema_owner'",
         "WHERE granted_role.rolname = 'golden_rose_schema_owner' "
@@ -192,6 +192,46 @@ MANAGED_DATABASE_AUTHORITY_INITIALIZED_QUERY = (
 ) AS golden_rose_database_authority_initialized
 """,
     )
+)
+
+
+# Cloud SQL's native catalog uses one actual platform superuser as durable
+# grantor and has no creator ADMIN rows. Admit this complete observed shape,
+# never a partial mixture of it and the stock PostgreSQL creator shape.
+CLOUD_SQL_DATABASE_AUTHORITY_INITIALIZED_QUERY = DATABASE_AUTHORITY_INITIALIZED_QUERY.replace(
+    ") AS golden_rose_database_authority_initialized",
+    """
+    AND (SELECT count(*) = 3 AND count(DISTINCT membership.grantor) = 1 AND bool_and(
+        grantor.rolsuper AND NOT membership.admin_option
+        AND membership.inherit_option AND membership.set_option)
+        FROM pg_auth_members membership
+        JOIN pg_roles granted ON granted.oid = membership.roleid
+        JOIN pg_roles grantor ON grantor.oid = membership.grantor
+        WHERE granted.rolname IN ('golden_rose_schema_owner',
+            'golden_rose_migrator', 'golden_rose_runtime'))
+    AND (SELECT count(*) = 1 AND bool_and(
+        member.rolcanlogin AND member.rolinherit AND NOT member.rolsuper
+        AND NOT member.rolcreatedb AND NOT member.rolcreaterole
+        AND NOT member.rolreplication AND NOT member.rolbypassrls
+        AND (SELECT count(*) = 1 FROM pg_auth_members outgoing
+             WHERE outgoing.member = member.oid))
+        FROM pg_auth_members membership
+        JOIN pg_roles granted ON granted.oid = membership.roleid
+        JOIN pg_roles member ON member.oid = membership.member
+        WHERE granted.rolname = 'golden_rose_runtime')
+    AND (SELECT rolinherit FROM pg_roles WHERE rolname = current_user)
+    AND (SELECT count(*) = 1 AND bool_and(
+        rolcanlogin AND rolinherit AND rolcreatedb AND rolcreaterole
+        AND NOT rolsuper AND NOT rolreplication AND NOT rolbypassrls)
+        FROM pg_roles WHERE rolname = 'cloudsqlsuperuser')
+) AS golden_rose_database_authority_initialized
+""",
+)
+
+MANAGED_DATABASE_AUTHORITY_INITIALIZED_QUERY = (
+    f"SELECT (({POSTGRES_MANAGED_DATABASE_AUTHORITY_INITIALIZED_QUERY}) OR "
+    f"({CLOUD_SQL_DATABASE_AUTHORITY_INITIALIZED_QUERY})) "
+    "AS golden_rose_database_authority_initialized"
 )
 
 

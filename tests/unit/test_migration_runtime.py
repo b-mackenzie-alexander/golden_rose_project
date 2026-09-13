@@ -227,3 +227,39 @@ def test_local_bootstrap_never_assumes_managed_administrator(monkeypatch) -> Non
     assert main() == 0
     assert not any("cloudsqlsuperuser" in item for item in connection.executed)
     assert any("GRANT golden_rose_migrator TO CURRENT_USER" in item for item in connection.executed)
+
+
+def test_installed_migration_uses_application_working_directory(monkeypatch, tmp_path) -> None:  # noqa: ANN001
+    """The image installs Python under site-packages but keeps Alembic in /app."""
+    import importlib.util
+    from pathlib import Path
+
+    import golden_rose.migration_runtime as source
+
+    _set_minimal_migration_env(monkeypatch)
+    installed = tmp_path / "lib" / "python3.12" / "site-packages" / "golden_rose"
+    installed.mkdir(parents=True)
+    module_file = installed / "migration_runtime.py"
+    module_file.write_text(Path(source.__file__).read_text())
+    app = tmp_path / "app"
+    app.mkdir()
+    (app / "alembic.ini").write_text("[alembic]\nscript_location = migrations\n")
+    (app / "migrations").mkdir()
+    monkeypatch.chdir(app)
+    spec = importlib.util.spec_from_file_location("installed_migration_runtime", module_file)
+    assert spec is not None and spec.loader is not None
+    installed_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(installed_module)
+    monkeypatch.setattr(
+        installed_module, "create_database_engine", lambda: _FakeEngine(_FakeConnection())
+    )
+    observed = []
+
+    def upgrade(config, revision):  # noqa: ANN001
+        assert config.get_main_option("script_location") == "migrations"
+        assert Path(config.config_file_name) == app / "alembic.ini"
+        observed.append(revision)
+
+    monkeypatch.setattr(installed_module.command, "upgrade", upgrade)
+    assert installed_module.main() == 0
+    assert observed == ["head"]

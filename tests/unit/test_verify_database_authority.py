@@ -358,3 +358,48 @@ def test_managed_catalog_graph_rejects_drift(drift):
     elif drift == "missing_graph":
         snapshot.pop("authority_memberships")
     assert evaluate_authority_snapshot(snapshot)
+
+
+def _cloud_sql_snapshot() -> dict[str, Any]:
+    snapshot = _managed_snapshot()
+    snapshot["authority_memberships"] = snapshot["authority_memberships"][:3]
+    for row in snapshot["authority_memberships"]:
+        row["grantor"] = "platform_superuser"
+        row["grantor_superuser"] = True
+    return snapshot
+
+
+def test_cloud_sql_native_catalog_graph_is_exact() -> None:
+    assert evaluate_authority_snapshot(_cloud_sql_snapshot()) == []
+
+
+@pytest.mark.parametrize(
+    "drift",
+    [
+        "non_superuser",
+        "mixed_grantors",
+        "creator_row",
+        "extra_login",
+        "admin",
+        "missing",
+        "duplicate",
+    ],
+)
+def test_cloud_sql_native_catalog_graph_rejects_drift(drift: str) -> None:
+    snapshot = _cloud_sql_snapshot()
+    rows = snapshot["authority_memberships"]
+    if drift == "non_superuser":
+        rows[0]["grantor_superuser"] = False
+    elif drift == "mixed_grantors":
+        rows[0]["grantor"] = "other_superuser"
+    elif drift == "creator_row":
+        rows.append(_membership("cloudsqlsuperuser", "golden_rose_runtime", admin=True))
+    elif drift == "extra_login":
+        rows.append(_membership("retained_bootstrap", "golden_rose_migrator"))
+    elif drift == "admin":
+        rows[1]["admin_option"] = True
+    elif drift == "missing":
+        rows.pop()
+    elif drift == "duplicate":
+        rows.append(dict(rows[0]))
+    assert evaluate_authority_snapshot(snapshot)

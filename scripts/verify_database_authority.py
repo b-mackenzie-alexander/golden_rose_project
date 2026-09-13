@@ -401,9 +401,10 @@ def _evaluate_membership_graph(
     rows = snapshot.get("authority_memberships")
     if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
         return ["snapshot missing structured authority memberships"]
-    # This verifier admits two complete catalog shapes. Bootstrap selection is
+    # This verifier admits complete local and managed catalog shapes. Bootstrap selection is
     # separately restricted to the explicit managed deployment target.
     managed = "cloudsqlsuperuser" in roles
+    native = managed and not any(row.get("member") == "cloudsqlsuperuser" for row in rows)
     expected_edges = {
         (MIGRATOR_ROLE, SCHEMA_OWNER_ROLE),
         (snapshot.get("migration_login_role"), MIGRATOR_ROLE),
@@ -411,7 +412,7 @@ def _evaluate_membership_graph(
     }
     admin_edges = (
         {("cloudsqlsuperuser", role) for role in (SCHEMA_OWNER_ROLE, MIGRATOR_ROLE, RUNTIME_ROLE)}
-        if managed
+        if managed and not native
         else set()
     )
     seen: set[tuple[object, object]] = set()
@@ -426,6 +427,16 @@ def _evaluate_membership_graph(
         "rolbypassrls": False,
     }:
         violations.append("managed database grantor attributes drifted")
+    if native and (
+        any(
+            row.get("grantor_superuser") is not True
+            or not isinstance(row.get("grantor"), str)
+            or not row.get("grantor")
+            for row in rows
+        )
+        or len({row.get("grantor") for row in rows if isinstance(row.get("grantor"), str)}) != 1
+    ):
+        violations.append("native managed memberships must share one durable superuser grantor")
     for row in rows:
         edge = (row.get("member"), row.get("granted"))
         options = (row.get("admin_option"), row.get("inherit_option"), row.get("set_option"))
@@ -440,6 +451,7 @@ def _evaluate_membership_graph(
                 violations.append("restricted authority membership options drifted")
             if (
                 managed
+                and not native
                 and edge == (MIGRATOR_ROLE, SCHEMA_OWNER_ROLE)
                 and row.get("grantor") != "cloudsqlsuperuser"
             ):

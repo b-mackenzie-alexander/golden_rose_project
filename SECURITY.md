@@ -1,5 +1,12 @@
 # Security — Golden Rose Operations Platform
 
+## 2026-09-13 — Native managed catalog boundary
+
+**Observed v26:** PR #96 merged the installed-package correction. Initial cloud migration succeeded; restricted migration/runtime users and URL Secrets were created; the bootstrap user was deleted and its URL version disabled. Restricted rerun then stopped at the catalog validator. One approved read-only catalog diagnostic confirmed exactly three restricted memberships, all granted by the same actual platform superuser, with no PostgreSQL creator ADMIN rows. Role attributes were restricted as intended. The diagnostic executed once, succeeded, was deleted, and its absence was verified.
+
+**Validated locally:** The validator now admits either the complete stock PostgreSQL 16 creator layout or the complete observed Cloud SQL native layout. Mixed layouts, extra/missing memberships, elevated options/attributes, and inconsistent native grantors remain rejected. This changes validation only; the cloud database grants need no mutation. Initial bootstrap and installed-package behavior remain unchanged.
+
+
 ## 2026-09-13 — Installed migration configuration
 
 The correction changes only where the migration entrypoint reads its existing Alembic configuration: the trusted application working directory instead of the installed Python library tree. Docker fixes that directory to `/app`; no new input, IAM, database role, or Secret authority is added. The actual installed-wheel bootstrap/retirement/restricted-verifier lifecycle passed locally. V25 stopped at configuration lookup before restricted users or service activation.

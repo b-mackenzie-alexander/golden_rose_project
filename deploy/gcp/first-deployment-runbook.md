@@ -1,5 +1,17 @@
 # First human-visible synthetic deployment runbook
 
+## Delivery lock — v26 native database catalog correction
+- **Staffing:** One independent developer; fresh agent review supplies quality evidence.
+- **Human-visible outcome:** Private SQL, the application database, schema, restricted logins, and migration job exist. Initial cloud migration succeeded and the bootstrap login was deleted with its Secret version disabled. No browser service exists yet.
+- **Gate budget:** One source-bound continuation covers publication, existing-job image update, restricted migration, verifier reconciliation, service activation, qualification, and browser handoff. Ordinary steps/readbacks do not become separate approvals.
+- **Next executable action:** Promote the native catalog validator correction, bind final source to the preserved post-retirement resources and credentials, then resume at restricted migration.
+- **Do not regress:** Never repeat initial bootstrap, recreate credentials, re-enable the retired Secret, recreate the database/job, edit state, expand IAM, admit live data, or add production-only gates. Keep immutable image admission, private SQL, restricted application logins, expiring Basic access, one-instance scaling, and log qualification.
+
+**Observed v26:** PR #96 merged the installed-package correction. Initial cloud migration succeeded; restricted migration/runtime users and URL Secrets were created; the bootstrap user was deleted and its URL version disabled. Restricted rerun then stopped at the catalog validator. One approved read-only catalog diagnostic confirmed exactly three restricted memberships, all granted by the same actual platform superuser, with no PostgreSQL creator ADMIN rows. Role attributes were restricted as intended. The diagnostic executed once, succeeded, was deleted, and its absence was verified.
+
+**Validated locally:** The validator now admits either the complete stock PostgreSQL 16 creator layout or the complete observed Cloud SQL native layout. Mixed layouts, extra/missing memberships, elevated options/attributes, and inconsistent native grantors remain rejected. This changes validation only; the cloud database grants need no mutation. Initial bootstrap and installed-package behavior remain unchanged.
+
+
 This runbook defines the single eight-hour operator packet, valid for no more than eight hours, for the first human-visible fictional-synthetic `develop` deployment. It is intentionally value-safe: project IDs, billing IDs, domains, principals, secret payloads, passwords, tokens, plans, state values, and the exact service URL stay in operator-held records rather than tracked source.
 
 Current execution status: PR #91 merged at `develop@660fd7c`; the budget fix is proven. V20 completed image admission and partially applied. It is consumed. Private readback is serial 45 with 53 managed instances, no SQL/service, and one failed never-executed verifier job. Preserve successful resources and both imports. The next packet must bind this actual partial inventory, explicitly authorize the exact failed-job cleanup, and follow the ordered recovery below. No status-closeout PR is required.

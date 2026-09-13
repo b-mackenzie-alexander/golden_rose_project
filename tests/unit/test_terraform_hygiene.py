@@ -1358,6 +1358,7 @@ def test_gcp_develop_cloud_sql_is_private_minimal_postgresql_without_public_ip()
     assert "0.0.0.0/0" not in cloud_sql
     assert "authorized_networks" not in cloud_sql
     assert "public" not in cloud_sql.lower()
+    assert _contains_normalized_fragment(cloud_sql, "deletion_protection_enabled = true")
     assert "password" not in cloud_sql.lower()
     assert "google_sql_user" not in cloud_sql
     assert "google_sql_database" in cloud_sql

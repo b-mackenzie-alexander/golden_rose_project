@@ -1307,6 +1307,56 @@ def test_live_runner_treats_gcloud_cannot_find_service_as_absent() -> None:
     assert runner(("cloud-run-service",)) == {}
 
 
+@pytest.mark.parametrize(
+    ("api_value", "expected_value"),
+    [(True, True), (False, False), (None, None)],
+)
+def test_live_runner_reads_cloud_sql_api_deletion_protection_from_settings(
+    api_value: bool | None, expected_value: bool | None
+) -> None:
+    module = load_module()
+    mutable_module = cast(Any, module)
+
+    def fake_run_json_command(command: list[str], *, context: str) -> dict[str, Any]:
+        assert context == "cloud sql"
+        assert command == [
+            "gcloud",
+            "sql",
+            "instances",
+            "describe",
+            "develop-postgres",
+            "--project",
+            "example-project",
+            "--format=json",
+        ]
+        settings: dict[str, Any] = {
+            "ipConfiguration": {
+                "ipv4Enabled": False,
+                "privateNetwork": "projects/example-project/global/networks/develop",
+            },
+            "userLabels": valid_snapshot()["cloud_sql"]["labels"],
+        }
+        if api_value is not None:
+            settings["deletionProtectionEnabled"] = api_value
+        return {
+            "name": "develop-postgres",
+            "databaseVersion": "POSTGRES_16",
+            "settings": settings,
+        }
+
+    mutable_module._run_json_command = fake_run_json_command
+    runner = module._build_live_command_runner(expected_contract())
+
+    assert runner(("cloud-sql",)) == {
+        "name": "develop-postgres",
+        "database_version": "POSTGRES_16",
+        "deletion_protection": expected_value,
+        "ipv4_enabled": False,
+        "private_network": "projects/example-project/global/networks/develop",
+        "labels": valid_snapshot()["cloud_sql"]["labels"],
+    }
+
+
 def test_live_runner_reads_gcloud_storage_snake_case_bucket_posture(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

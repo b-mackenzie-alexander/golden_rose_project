@@ -2151,7 +2151,9 @@ def _build_live_command_runner(
             return {
                 "name": instance.get("name"),
                 "database_version": instance.get("databaseVersion"),
-                "deletion_protection": instance.get("deletionProtectionEnabled"),
+                "deletion_protection": _mapping(settings, label="cloud sql settings").get(
+                    "deletionProtectionEnabled"
+                ),
                 "ipv4_enabled": _mapping(ip_configuration, label="ip configuration").get(
                     "ipv4Enabled"
                 ),

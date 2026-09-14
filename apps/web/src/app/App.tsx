@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 
+import { WorkInterestCatalog } from '../intakes/WorkInterests';
 import { IntakeWorkspace } from '../intakes/IntakeWorkspace';
 import { AppShell } from './AppShell';
 import { NotFoundPage } from './NotFoundPage';
@@ -17,7 +18,11 @@ export function AppRoutes() {
           element={<EmployerWorkspace onPersistedRestore={reloadCanonicalDocument} />}
         />
         <Route path="staff/intakes/workers" element={<IntakeWorkspace key="worker" kind="worker" />} />
-        <Route path="staff/intakes/employers" element={<IntakeWorkspace key="employer" kind="employer" />} />
+        <Route
+          path="staff/intakes/employers"
+          element={<IntakeWorkspace key="employer" kind="employer" />}
+        />
+        <Route path="staff/work-interests" element={<WorkInterestCatalog />} />
         <Route path="staff/intakes/:intakeId" element={<IntakeWorkspace />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>

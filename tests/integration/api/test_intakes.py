@@ -241,7 +241,7 @@ def test_wrong_kind_section_is_422(client, kind, section):
     )
 
 
-@pytest.mark.parametrize("later", ["reviews", "links", "finalize", "finalization", "follow-ups"])
+@pytest.mark.parametrize("later", ["links", "finalize", "finalization"])
 def test_future_workflow_routes_absent(client, later):
     response = client.post(f"{ROOT}/{uuid4()}/{later}", json={})
     safe(response, 404)

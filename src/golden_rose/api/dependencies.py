@@ -47,6 +47,11 @@ def get_staff_principal(settings: Annotated[Settings, Depends(get_settings)]) ->
             "intake:read",
             "intake:draft:create",
             "intake:draft:revise",
+            "intake:review",
+            "intake:follow_up",
+            "intake:restricted_history:read",
+            "work_interest:read",
+            "work_interest:manage",
             "worker_residence:read",
             "worker_residence:write",
             "party_address:read",
@@ -93,3 +98,18 @@ def get_idempotency_key(
         raise InvalidIdempotencyKeyError
 
     return parsed
+
+
+def get_staff_directory(settings: Annotated[Settings, Depends(get_settings)]):
+    from golden_rose.auth.staff_directory import StaffDirectory, StaffDirectoryEntry
+
+    if settings.environment not in {"local", "test"}:
+        return StaffDirectory()
+    principal = get_staff_principal(settings)
+    return StaffDirectory(
+        (
+            StaffDirectoryEntry(
+                principal.actor_id, "Fictional staff reviewer", True, principal.permissions
+            ),
+        )
+    )

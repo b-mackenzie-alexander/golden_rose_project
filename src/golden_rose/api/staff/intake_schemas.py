@@ -120,6 +120,32 @@ class IntakeResponseValue(IntakeValue):
         return QueryIntakesRequest.parse_reference(value)
 
 
+class FollowUpSummary(IntakeResponseValue):
+    owner_staff_id: UUID
+    next_follow_up_at: datetime
+    overdue: bool
+
+    @field_validator("owner_staff_id", mode="before")
+    @classmethod
+    def owner_id(cls, value: Any) -> Any:
+        return QueryIntakesRequest.parse_reference(value)
+
+    @field_validator("next_follow_up_at", mode="before")
+    @classmethod
+    def instant(cls, value: Any) -> Any:
+        return datetime.fromisoformat(value) if isinstance(value, str) else value
+
+
+class LatestIntakeReview(IntakeResponseValue):
+    review_id: UUID
+    reviewed_record_version: int = Field(ge=1)
+    reviewed_content_version: int = Field(ge=1)
+    outcome: Literal["intake_reviewed", "needs_follow_up"]
+    actor_id: UUID
+    actor_display_name: Text200
+    occurred_at: datetime
+
+
 class IntakeSummary(IntakeResponseValue):
     intake_id: UUID
     kind: Literal["worker", "employer"]
@@ -128,7 +154,8 @@ class IntakeSummary(IntakeResponseValue):
     display_name: Text200 | None = None
     complete: bool
     missing_fields: list[MissingIntakeField] = Field(max_length=15)
-    review_status: Literal["unreviewed"]
+    review_status: Literal["unreviewed", "needs_follow_up", "current", "stale"]
+    follow_up: FollowUpSummary | None = None
     updated_at: datetime
     offer: OfferSummary | None = None
 
@@ -143,6 +170,7 @@ class IntakeSummary(IntakeResponseValue):
 
 
 class IntakeDetail(IntakeResponseValue):
+    latest_review: LatestIntakeReview | None = None
     summary: IntakeSummary
     content_version: int = Field(ge=1, le=2_147_483_647)
     candidate: WorkerDraftContent | EmployerDraftContent

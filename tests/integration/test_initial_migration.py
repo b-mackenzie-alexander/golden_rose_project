@@ -113,6 +113,7 @@ def test_entity_authority_metadata_binds_receipts_and_events_by_type_and_id() ->
         "employer_id",
         "employer_contact_id",
         "intake_id",
+        "work_interest_id",
     )
     assert entity_authority_columns["entity_type"].primary_key is True
     assert entity_authority_columns["entity_id"].primary_key is True

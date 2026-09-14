@@ -27,9 +27,18 @@ export function AppShell() {
                   {language === 'en' ? 'Employer intakes' : 'Registros de empleadores'}
                 </NavLink>
               </li>
+              <li>
+                <NavLink className="focus-ring nav-link control-44" to="/staff/work-interests">
+                  {language === 'en' ? 'Work-interest catalog' : 'Catálogo de intereses laborales'}
+                </NavLink>
+              </li>
             </ul>
           </nav>
-          <button className="focus-ring language-action control-44" type="button" onClick={toggleLanguage}>
+          <button
+            className="focus-ring language-action control-44"
+            type="button"
+            onClick={toggleLanguage}
+          >
             {messages.switchLanguage}
           </button>
         </div>

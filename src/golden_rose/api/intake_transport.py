@@ -23,10 +23,17 @@ _CODES = {
 }
 
 
-def intake_problem(code: str, status: int) -> JSONResponse:
+def intake_problem(
+    code: str, status: int, *, missing_fields: list[str] | None = None
+) -> JSONResponse:
     headers = dict(_HEADERS)
     if status == 503:
         headers["Retry-After"] = "1"
+    from typing import get_args
+
+    from golden_rose.api.staff.intake_schemas import MissingIntakeField
+
+    safe_missing = sorted(set(missing_fields or []) & set(get_args(MissingIntakeField)))
     return JSONResponse(
         {
             "type": f"urn:golden-rose:intake:{code}",
@@ -34,6 +41,11 @@ def intake_problem(code: str, status: int) -> JSONResponse:
             "status": status,
             "detail": "The intake request could not be completed.",
             "code": code,
+            **(
+                {"missing_fields": safe_missing}
+                if code == "incomplete" and status == 422 and safe_missing
+                else {}
+            ),
         },
         status_code=status,
         headers=headers,
@@ -47,8 +59,10 @@ class IntakeTransportMiddleware:
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         path = scope.get("path", "")
-        prefix = "/api/staff/v1/intakes"
-        if scope["type"] != "http" or not (path == prefix or path.startswith(prefix + "/")):
+        prefixes = ("/api/staff/v1/intakes", "/api/staff/v1/work-interests")
+        if scope["type"] != "http" or not any(
+            path == prefix or path.startswith(prefix + "/") for prefix in prefixes
+        ):
             await self.app(scope, receive, send)
             return
         body = bytearray()

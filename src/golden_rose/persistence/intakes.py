@@ -8,6 +8,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from golden_rose.application.intake_errors import IntakeError
+from golden_rose.persistence.intake_review_state import review_projection, selected_interests
 from golden_rose.persistence.models import audit_events, command_results, intake_addresses, intakes
 
 
@@ -78,7 +79,11 @@ def missing_fields(session: Session, row: dict[str, Any]) -> list[str]:
     content = row["content"]
     if row["kind"] == "worker":
         missing = [f for f in ("full_name", "phone") if not content.get(f)]
-        if not content.get("interests", {}).get("other_description"):
+        interests = content.get("interests", {})
+        if interests.get("selections"):
+            if not selected_interests(session, content):
+                missing.append("interests")
+        elif not interests.get("other_description"):
             missing.append("interests")
         if content.get("availability", {}).get("mode", "unknown") == "unknown":
             missing.append("availability")
@@ -128,11 +133,12 @@ def intake_summary(session: Session, row: dict[str, Any]) -> dict[str, Any]:
         result["display_name"] = name
     if row["content"].get("offer"):
         result["offer"] = {k: v for k, v in row["content"]["offer"].items() if k != "terms"}
+    result.update(review_projection(session, row)[0])
     return result
 
 
 def intake_detail(session: Session, row: dict[str, Any]) -> dict[str, Any]:
-    return {
+    result = {
         "summary": intake_summary(session, row),
         "content_version": row["content_version"],
         "candidate": row["content"],
@@ -140,3 +146,8 @@ def intake_detail(session: Session, row: dict[str, Any]) -> dict[str, Any]:
         "links": {},
         "dependency_stale": False,
     }
+
+    latest = review_projection(session, row)[1]
+    if latest is not None:
+        result["latest_review"] = latest
+    return result

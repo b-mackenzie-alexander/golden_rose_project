@@ -10,6 +10,7 @@ from golden_rose.api.errors import install_exception_handlers
 from golden_rose.api.health import router as health_router
 from golden_rose.api.intake_transport import IntakeTransportMiddleware, intake_problem
 from golden_rose.api.staff.employers import router as staff_employers_router
+from golden_rose.api.staff.intake_workflows import router as staff_intake_workflows_router
 from golden_rose.api.staff.intakes import router as staff_intakes_router
 from golden_rose.application.intake_errors import IntakeError
 from golden_rose.config import Settings
@@ -51,13 +52,14 @@ def create_app(
 
     @app.exception_handler(IntakeError)
     async def handle_intake_error(request, exc: IntakeError):
-        return intake_problem(exc.code, exc.status)
+        return intake_problem(exc.code, exc.status, missing_fields=exc.missing_fields)
 
     app.include_router(health_router)
     if settings.environment == "develop":
         app.include_router(environment_router)
     app.include_router(staff_employers_router)
     app.include_router(staff_intakes_router)
+    app.include_router(staff_intake_workflows_router)
     if settings.static_assets_path is not None:
         app.include_router(create_static_assets_router(Path(settings.static_assets_path)))
     return app

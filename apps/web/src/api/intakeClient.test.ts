@@ -1,5 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getIntake, getIntakeAddress, queryIntakes, saveIntake } from './intakeClient';
+import {
+  queryWorkInterests,
+  saveWorkInterest,
+  queryIntakeHistory,
+  getRestrictedHistory,
+  queryFollowUpOwners,
+  getIntake,
+  getIntakeAddress,
+  queryIntakes,
+  saveIntake,
+} from './intakeClient';
 const id = 'bda61d25-4021-4d8a-9f5d-9b77ad6c351f';
 const key = '22222222-2222-4222-8222-222222222222';
 const detail = {
@@ -65,7 +75,13 @@ describe('intake transport', () => {
       resolved: null,
     });
     expect((await getIntakeAddress(id, 'worker_residence')).ok).toBe(true);
-    response({ intake_id: id, version: 2, section: 'worksite_address', candidate: null, resolved: null });
+    response({
+      intake_id: id,
+      version: 2,
+      section: 'worksite_address',
+      candidate: null,
+      resolved: null,
+    });
     expect((await getIntakeAddress(id, 'worker_residence')).ok).toBe(false);
   });
   it('accepts exact command receipt and replay current version', async () => {
@@ -78,7 +94,11 @@ describe('intake transport', () => {
       expect(fetch).toHaveBeenCalledWith(
         '/api/staff/v1/intakes',
         expect.objectContaining({
-          headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'Idempotency-Key': key },
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'Idempotency-Key': key,
+          },
           body: JSON.stringify(command.body),
         }),
       );
@@ -159,4 +179,114 @@ describe('intake transport', () => {
     response({ ...detail, candidate: { full_name: null, interests: null } });
     expect((await getIntake(id)).ok).toBe(true);
   });
+});
+
+it('validates review/follow-up summaries and selected catalog versions', async () => {
+  response({
+    ...detail,
+    summary: {
+      ...detail.summary,
+      review_status: 'current',
+      follow_up: { owner_staff_id: id, next_follow_up_at: '2026-09-14T12:00:00Z', overdue: false },
+    },
+    latest_review: {
+      review_id: id,
+      reviewed_record_version: 1,
+      reviewed_content_version: 1,
+      outcome: 'intake_reviewed',
+      actor_id: id,
+      actor_display_name: 'Fictional',
+      occurred_at: '2026-09-14T12:00:00Z',
+    },
+    candidate: { interests: { selections: [{ interest_id: id, catalog_version: 1 }] } },
+  });
+  expect((await getIntake(id)).ok).toBe(true);
+  response({ ...detail, latest_review: { actor_display_name: { unexpected: true } } });
+  expect((await getIntake(id)).ok).toBe(false);
+  response({
+    ...detail,
+    candidate: { interests: { selections: [{ interest_id: id, catalog_version: 0 }] } },
+  });
+  expect((await getIntake(id)).ok).toBe(false);
+  response({ ...detail, summary: { ...detail.summary, follow_up: { owner_staff_id: 'bad' } } });
+  expect((await getIntake(id)).ok).toBe(false);
+});
+it('uses bounded catalog, owner and history endpoints with strict response identities', async () => {
+  const entry = {
+    interest_id: id,
+    version: 1,
+    code: 'fictional',
+    label_en: 'Fictional',
+    label_es: 'Ficticio',
+    active: true,
+  };
+  response({ items: [entry], next_cursor: 'next' });
+  expect((await queryWorkInterests('cursor', true)).ok).toBe(true);
+  expect(fetch).toHaveBeenCalledWith(
+    '/api/staff/v1/work-interests/query',
+    expect.objectContaining({
+      body: JSON.stringify({ page_size: 25, include_retired: true, cursor: 'cursor' }),
+    }),
+  );
+  response({ items: [{ staff_id: id, display_name: 'Fictional owner' }], next_cursor: null });
+  expect((await queryFollowUpOwners(id)).ok).toBe(true);
+  response({ items: [{ staff_id: id, display_name: 'Fictional owner' }], next_cursor: null });
+  expect((await queryFollowUpOwners(id, 'next')).ok).toBe(true);
+  response({
+    items: [
+      {
+        event_id: id,
+        version: 2,
+        content_version: 1,
+        event_type: 'intake.reviewed',
+        actor_id: id,
+        actor_display_name: 'Fictional',
+        occurred_at: '2026-09-14T12:00:00Z',
+        outcome: 'intake_reviewed',
+      },
+    ],
+    next_cursor: null,
+  });
+  expect((await queryIntakeHistory(id)).ok).toBe(true);
+  response({ items: [], next_cursor: null });
+  expect((await queryIntakeHistory(id, 'next')).ok).toBe(true);
+  response({
+    event_id: id,
+    note: 'Fictional',
+    reviewed_content: { kind: 'worker', content: {}, addresses: {} },
+  });
+  expect((await getRestrictedHistory(id, id)).ok).toBe(true);
+  response({ event_id: 'wrong' });
+  expect((await getRestrictedHistory(id, id)).ok).toBe(false);
+  response({ items: [{ ...entry, active: 'yes' }], next_cursor: null });
+  expect((await queryWorkInterests()).ok).toBe(false);
+  response({ command_id: key, result_record_version: 1, current: entry }, 201, {
+    'Idempotency-Replayed': 'false',
+    'Idempotency-Result-Version': '1',
+  });
+  expect((await saveWorkInterest({ ...command, path: '/work-interests' })).ok).toBe(true);
+  response({ command_id: key, result_record_version: 2, current: entry }, 200, {
+    'Idempotency-Replayed': 'true',
+    'Idempotency-Result-Version': '2',
+  });
+  expect((await saveWorkInterest({ ...command, path: '/work-interests' })).ok).toBe(false);
+});
+it('validates structured protected follow-up context and rejects extra protected fields', async () => {
+  const follow_up = {
+    action: 'attempt',
+    reason_code: 'clarification',
+    reason_text: 'Fictional',
+    time_zone: 'Etc/UTC',
+    method: 'phone',
+    outcome: 'no_answer',
+  };
+  response({ event_id: id, follow_up });
+  expect((await getRestrictedHistory(id, id)).ok).toBe(true);
+  response({ event_id: id, follow_up: { ...follow_up, unexpected: 'hidden' } });
+  expect((await getRestrictedHistory(id, id)).ok).toBe(false);
+  response({
+    event_id: id,
+    follow_up: { action: 'needs_follow_up', reason_text: 'Fictional', time_zone: 'Etc/UTC' },
+  });
+  expect((await getRestrictedHistory(id, id)).ok).toBe(true);
 });

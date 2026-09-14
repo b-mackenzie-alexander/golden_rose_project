@@ -5,9 +5,10 @@ import unicodedata
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal
+from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # Pinned ISO alphabetic code snapshots. No runtime catalog/network dependency.
 # Country set: UN M49 ISO-alpha2 table, retrieved 2026-09-14, plus ISO TW.
@@ -641,8 +642,30 @@ class Schedule(IntakeValue):
         return self
 
 
+class InterestSelection(IntakeValue):
+    interest_id: UUID
+    catalog_version: int = Field(ge=1, le=2147483647)
+
+    @field_validator("interest_id", mode="before")
+    @classmethod
+    def full_uuid(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            parsed = UUID(value)
+            if str(parsed) != value.lower():
+                raise ValueError("Full UUID required")
+            return parsed
+        return value
+
+
 class Interests(IntakeValue):
+    selections: list[InterestSelection] = Field(default_factory=list, max_length=20)
     other_description: Text200 | None = None
+
+    @model_validator(mode="after")
+    def unique_selections(self) -> "Interests":
+        if len({item.interest_id for item in self.selections}) != len(self.selections):
+            raise ValueError("Duplicate interests")
+        return self
 
 
 class WorkerDraftContent(IntakeValue):

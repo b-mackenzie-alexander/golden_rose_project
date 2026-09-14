@@ -97,6 +97,11 @@ def execute_intake(
             separators=(",", ":"),
         ).encode()
     ).digest()
+    if (
+        supplied.get("interests", {}).get("selections")
+        and "work_interest:read" not in principal.permissions
+    ):
+        raise IntakeError("forbidden", 403)
     try:
         serialize_command_key(session=session, command_id=command_id)
         receipt = (
@@ -205,6 +210,12 @@ def execute_intake(
                     updated_by=principal.actor_id,
                 )
             )
+        if row["content"].get("interests", {}).get("selections"):
+            if "work_interest:read" not in principal.permissions:
+                raise IntakeError("forbidden", 403)
+            from golden_rose.persistence.intake_review_state import selected_interests
+
+            selected_interests(session, row["content"], lock=True)
         for address_section, address in addresses.items():
             columns = {
                 key: (address or {}).get(key)

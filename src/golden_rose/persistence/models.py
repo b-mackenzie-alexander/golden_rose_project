@@ -1,4 +1,5 @@
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Column,
     ForeignKeyConstraint,
@@ -328,7 +329,7 @@ intakes = Table(
     CheckConstraint("lifecycle_status='draft'", name="ck_intakes_lifecycle_draft"),
     CheckConstraint("version>=1", name="ck_intakes_version_positive"),
     CheckConstraint(
-        "content_version>=1 AND content_version=version", name="ck_intakes_content_version"
+        "content_version>=1 AND content_version<=version", name="ck_intakes_content_version"
     ),
     CheckConstraint("jsonb_typeof(content)='object'", name="ck_intakes_content_object"),
     CheckConstraint("octet_length(content::text)<=32768", name="ck_intakes_content_size"),
@@ -478,5 +479,437 @@ command_results.append_constraint(
         .replace("result_event_type", "event_type")
         .replace("result_record_version", "result_version"),
         name="ck_command_results_authority_shape",
+    )
+)
+
+
+# PR B workflow history is append-only; sensitive values have separate tables.
+intake_reviews = Table(
+    "intake_reviews",
+    metadata,
+    Column("review_id", UUID(as_uuid=True), primary_key=True),
+    Column("intake_id", UUID(as_uuid=True), nullable=False),
+    Column("command_id", UUID(as_uuid=True), nullable=False),
+    Column("event_id", UUID(as_uuid=True), nullable=False),
+    Column("reviewed_record_version", Integer, nullable=False),
+    Column("reviewed_content_version", Integer, nullable=False),
+    Column("result_version", Integer, nullable=False),
+    Column("outcome", String(32), nullable=False),
+    Column("actor_id", UUID(as_uuid=True), nullable=False),
+    Column("actor_display_name", String(200), nullable=False),
+    Column("occurred_at", TIMESTAMP(timezone=True), nullable=False),
+)
+intake_review_payloads = Table(
+    "intake_review_payloads",
+    metadata,
+    Column("review_id", UUID(as_uuid=True), primary_key=True),
+    Column("reviewed_content", JSONB, nullable=False),
+    Column("note", String(512)),
+    Column("dependency_refs", JSONB, nullable=False, server_default="{}"),
+)
+intake_follow_up_events = Table(
+    "intake_follow_up_events",
+    metadata,
+    Column("event_id", UUID(as_uuid=True), primary_key=True),
+    Column("intake_id", UUID(as_uuid=True), nullable=False),
+    Column("command_id", UUID(as_uuid=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    Column("content_version", Integer, nullable=False),
+    Column("action", String(32), nullable=False),
+    Column("actor_id", UUID(as_uuid=True), nullable=False),
+    Column("actor_display_name", String(200), nullable=False),
+    Column("occurred_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("owner_staff_id", UUID(as_uuid=True), nullable=False),
+    Column("next_follow_up_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("time_zone", String(100), nullable=False),
+    Column("reason_code", String(32)),
+    Column("method", String(32)),
+    Column("outcome", String(64)),
+    Column("review_id", UUID(as_uuid=True)),
+)
+intake_history_payloads = Table(
+    "intake_history_payloads",
+    metadata,
+    Column("event_id", UUID(as_uuid=True), primary_key=True),
+    Column("reason_text", String(512), nullable=False),
+    Column("note", String(512)),
+)
+work_interests = Table(
+    "work_interests",
+    metadata,
+    Column("interest_id", UUID(as_uuid=True), primary_key=True),
+    Column("code", String(64), nullable=False),
+    Column("version", Integer, nullable=False),
+    Column("label_en", String(100), nullable=False),
+    Column("label_es", String(100), nullable=False),
+    Column("active", Boolean, nullable=False),
+    Column("created_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("created_by", UUID(as_uuid=True), nullable=False),
+    Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("updated_by", UUID(as_uuid=True), nullable=False),
+)
+work_interest_versions = Table(
+    "work_interest_versions",
+    metadata,
+    Column("interest_id", UUID(as_uuid=True), primary_key=True),
+    Column("version", Integer, primary_key=True),
+    Column("label_en", String(100), nullable=False),
+    Column("label_es", String(100), nullable=False),
+    Column("active", Boolean, nullable=False),
+    Column("actor_id", UUID(as_uuid=True), nullable=False),
+    Column("occurred_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("command_id", UUID(as_uuid=True), nullable=False),
+)
+entity_authorities.append_column(Column("work_interest_id", UUID(as_uuid=True)))
+
+
+# Keep metadata's exhaustive authority arms aligned with migration 0007.
+def _replace_check(table: Table, name: str, sql: str) -> None:
+    prior = next(c for c in table.constraints if c.name == name)
+    table.constraints.remove(prior)
+    table.append_constraint(CheckConstraint(sql, name=name))
+
+
+_types = ("employer", "employer_contact", "intake", "work_interest")
+for _table, _name, _column in (
+    (entity_authorities, "ck_entity_authorities_entity_type", "entity_type"),
+    (command_receipts, "ck_command_receipts_entity_type", "result_entity_type"),
+    (audit_events, "ck_audit_events_entity_type", "entity_type"),
+):
+    _replace_check(_table, _name, f"{_column} IN (" + ",".join(repr(v) for v in _types) + ")")
+_replace_check(
+    entity_authorities,
+    "ck_entity_authorities_exactly_one_concrete_id",
+    " OR ".join(
+        f"(entity_type='{kind}' AND {kind}_id IS NOT NULL AND {kind}_id=entity_id AND "
+        + " AND ".join(f"{other}_id IS NULL" for other in _types if other != kind)
+        + ")"
+        for kind in _types
+    ),
+)
+entity_authorities.append_constraint(
+    ForeignKeyConstraint(
+        ["work_interest_id"],
+        ["work_interests.interest_id"],
+        name="fk_entity_authorities_work_interest",
+        deferrable=True,
+        initially="DEFERRED",
+    )
+)
+entity_authorities.append_constraint(UniqueConstraint("work_interest_id"))
+_new_commands = {
+    "review_intake": ("intake", "intake.reviewed", ">=2"),
+    "follow_up_intake": ("intake", "intake.follow_up_recorded", ">=2"),
+    "create_work_interest": ("work_interest", "work_interest.created", "=1"),
+    "revise_work_interest": ("work_interest", "work_interest.revised", ">=2"),
+}
+for _table, _name, _column, _values in (
+    (command_receipts, "ck_command_receipts_command_type", "command_type", list(_new_commands)),
+    (
+        audit_events,
+        "ck_audit_events_event_type",
+        "event_type",
+        [v[1] for v in _new_commands.values()],
+    ),
+    (
+        audit_events,
+        "ck_audit_events_schema_name",
+        "event_schema_name",
+        [v[1] for v in _new_commands.values()],
+    ),
+):
+    _prior = next(
+        c for c in _table.constraints if isinstance(c, CheckConstraint) and c.name == _name
+    )
+    _replace_check(
+        _table,
+        _name,
+        "("
+        + str(_prior.sqltext)
+        + ") OR "
+        + _column
+        + " IN ("
+        + ",".join(repr(v) for v in _values)
+        + ")",
+    )
+for _table, _name, _prefix in (
+    (command_receipts, "ck_command_receipts_result_authority_shape", "result_"),
+    (command_results, "ck_command_results_authority_shape", ""),
+):
+    _prior = next(
+        c for c in _table.constraints if isinstance(c, CheckConstraint) and c.name == _name
+    )
+    _version = "result_record_version" if _prefix else "result_version"
+    _sql = (
+        "("
+        + str(_prior.sqltext)
+        + ") OR "
+        + " OR ".join(
+            f"(command_type='{cmd}' AND {_prefix}entity_type='{entity}' "
+            f"AND {_prefix}event_type='{event}' AND {_version}{version})"
+            for cmd, (entity, event, version) in _new_commands.items()
+        )
+    )
+    _replace_check(_table, _name, _sql)
+
+# Concrete workflow relationships and scalar invariants mirror migration 0007.
+work_interests.append_constraint(
+    CheckConstraint("code::text ~ '^[a-z0-9_]{1,64}$'::text", name="ck_work_interests_code")
+)
+work_interests.append_constraint(
+    CheckConstraint("btrim(label_en::text) <> ''::text", name="work_interests_label_en_check")
+)
+work_interests.append_constraint(
+    CheckConstraint("btrim(label_es::text) <> ''::text", name="work_interests_label_es_check")
+)
+work_interests.append_constraint(
+    CheckConstraint("version >= 1", name="work_interests_version_check")
+)
+work_interests.append_constraint(UniqueConstraint("code", name="work_interests_code_key"))
+work_interest_versions.append_constraint(
+    CheckConstraint(
+        "btrim(label_en::text) <> ''::text", name="work_interest_versions_label_en_check"
+    )
+)
+work_interest_versions.append_constraint(
+    CheckConstraint(
+        "btrim(label_es::text) <> ''::text", name="work_interest_versions_label_es_check"
+    )
+)
+work_interest_versions.append_constraint(
+    CheckConstraint("version >= 1", name="work_interest_versions_version_check")
+)
+work_interest_versions.append_constraint(
+    UniqueConstraint("command_id", name="work_interest_versions_command_id_key")
+)
+work_interest_versions.append_constraint(
+    ForeignKeyConstraint(
+        ["command_id"],
+        ["command_receipts.command_id"],
+        name="work_interest_versions_command_id_fkey",
+        deferrable=True,
+        initially="DEFERRED",
+    )
+)
+work_interest_versions.append_constraint(
+    ForeignKeyConstraint(
+        ["interest_id"],
+        ["work_interests.interest_id"],
+        name="work_interest_versions_interest_id_fkey",
+    )
+)
+intake_reviews.append_constraint(
+    CheckConstraint(
+        "btrim(actor_display_name::text) <> ''::text",
+        name="intake_reviews_actor_display_name_check",
+    )
+)
+intake_reviews.append_constraint(
+    CheckConstraint(
+        "reviewed_content_version >= 1 AND reviewed_content_version <= reviewed_record_version",
+        name="intake_reviews_check",
+    )
+)
+intake_reviews.append_constraint(
+    CheckConstraint("result_version = (reviewed_record_version + 1)", name="intake_reviews_check1")
+)
+intake_reviews.append_constraint(
+    CheckConstraint(
+        (
+            "outcome::text = ANY (ARRAY['intake_reviewed'::character varying, "
+            "'needs_follow_up'::character varying]::text[])"
+        ),
+        name="intake_reviews_outcome_check",
+    )
+)
+intake_reviews.append_constraint(
+    CheckConstraint(
+        "reviewed_record_version >= 1", name="intake_reviews_reviewed_record_version_check"
+    )
+)
+intake_reviews.append_constraint(
+    UniqueConstraint("command_id", name="intake_reviews_command_id_key")
+)
+intake_reviews.append_constraint(UniqueConstraint("event_id", name="intake_reviews_event_id_key"))
+intake_reviews.append_constraint(
+    UniqueConstraint(
+        "intake_id", "result_version", name="intake_reviews_intake_id_result_version_key"
+    )
+)
+intake_reviews.append_constraint(
+    UniqueConstraint("intake_id", "review_id", name="intake_reviews_intake_id_review_id_key")
+)
+intake_reviews.append_constraint(
+    ForeignKeyConstraint(
+        ["review_id"],
+        ["intake_review_payloads.review_id"],
+        name="fk_intake_reviews_required_payload",
+        deferrable=True,
+        initially="DEFERRED",
+    )
+)
+intake_reviews.append_constraint(
+    ForeignKeyConstraint(
+        ["command_id"],
+        ["command_receipts.command_id"],
+        name="intake_reviews_command_id_fkey",
+        deferrable=True,
+        initially="DEFERRED",
+    )
+)
+intake_reviews.append_constraint(
+    ForeignKeyConstraint(
+        ["event_id"],
+        ["audit_events.audit_event_id"],
+        name="intake_reviews_event_id_fkey",
+        deferrable=True,
+        initially="DEFERRED",
+    )
+)
+intake_reviews.append_constraint(
+    ForeignKeyConstraint(["intake_id"], ["intakes.intake_id"], name="intake_reviews_intake_id_fkey")
+)
+intake_review_payloads.append_constraint(
+    CheckConstraint(
+        "dependency_refs = '{}'::jsonb", name="intake_review_payloads_dependency_refs_check"
+    )
+)
+intake_review_payloads.append_constraint(
+    CheckConstraint(
+        "note IS NULL OR btrim(note::text) <> ''::text", name="intake_review_payloads_note_check"
+    )
+)
+intake_review_payloads.append_constraint(
+    CheckConstraint(
+        "jsonb_typeof(reviewed_content) = 'object'::text",
+        name="intake_review_payloads_reviewed_content_check",
+    )
+)
+intake_review_payloads.append_constraint(
+    ForeignKeyConstraint(
+        ["review_id"],
+        ["intake_reviews.review_id"],
+        name="intake_review_payloads_review_id_fkey",
+        deferrable=True,
+        initially="DEFERRED",
+    )
+)
+intake_follow_up_events.append_constraint(
+    CheckConstraint(
+        (
+            "action::text = 'needs_follow_up'::text AND review_id IS NOT NULL "
+            "AND reason_code IS NOT NULL AND (reason_code::text = ANY (ARRAY['"
+            "missing_information'::character varying, 'clarification'::charact"
+            "er varying, 'other'::character varying]::text[])) AND method IS N"
+            "ULL AND outcome IS NULL OR (action::text = ANY (ARRAY['reschedule"
+            "'::character varying, 'reassign'::character varying]::text[])) AN"
+            "D review_id IS NULL AND reason_code IS NULL AND method IS NULL AN"
+            "D outcome IS NULL OR action::text = 'attempt'::text AND review_id"
+            " IS NULL AND reason_code IS NULL AND method IS NOT NULL AND (meth"
+            "od::text = ANY (ARRAY['phone'::character varying, 'email'::charac"
+            "ter varying, 'in_person'::character varying, 'other'::character v"
+            "arying]::text[])) AND outcome IS NOT NULL AND (outcome::text = AN"
+            "Y (ARRAY['no_answer'::character varying, 'voicemail_left'::charac"
+            "ter varying, 'callback_requested'::character varying, 'contact_re"
+            "ached_information_pending'::character varying, 'invalid_contact_i"
+            "nformation'::character varying, 'information_received'::character"
+            " varying, 'other'::character varying]::text[]))"
+        ),
+        name="ck_intake_follow_up_shape",
+    )
+)
+intake_follow_up_events.append_constraint(
+    CheckConstraint(
+        (
+            "action::text = ANY (ARRAY['needs_follow_up'::character varying, '"
+            "reschedule'::character varying, 'reassign'::character varying, 'a"
+            "ttempt'::character varying]::text[])"
+        ),
+        name="intake_follow_up_events_action_check",
+    )
+)
+intake_follow_up_events.append_constraint(
+    CheckConstraint(
+        "btrim(actor_display_name::text) <> ''::text",
+        name="intake_follow_up_events_actor_display_name_check",
+    )
+)
+intake_follow_up_events.append_constraint(
+    CheckConstraint(
+        "content_version >= 1 AND content_version < version", name="intake_follow_up_events_check"
+    )
+)
+intake_follow_up_events.append_constraint(
+    CheckConstraint(
+        "btrim(time_zone::text) <> ''::text", name="intake_follow_up_events_time_zone_check"
+    )
+)
+intake_follow_up_events.append_constraint(
+    CheckConstraint("version >= 2", name="intake_follow_up_events_version_check")
+)
+intake_follow_up_events.append_constraint(
+    UniqueConstraint("command_id", name="intake_follow_up_events_command_id_key")
+)
+intake_follow_up_events.append_constraint(
+    UniqueConstraint("intake_id", "version", name="intake_follow_up_events_intake_id_version_key")
+)
+intake_follow_up_events.append_constraint(
+    ForeignKeyConstraint(
+        ["event_id"],
+        ["intake_history_payloads.event_id"],
+        name="fk_intake_follow_up_required_payload",
+        deferrable=True,
+        initially="DEFERRED",
+    )
+)
+intake_follow_up_events.append_constraint(
+    ForeignKeyConstraint(
+        ["command_id"],
+        ["command_receipts.command_id"],
+        name="intake_follow_up_events_command_id_fkey",
+        deferrable=True,
+        initially="DEFERRED",
+    )
+)
+intake_follow_up_events.append_constraint(
+    ForeignKeyConstraint(
+        ["event_id"],
+        ["audit_events.audit_event_id"],
+        name="intake_follow_up_events_event_id_fkey",
+        deferrable=True,
+        initially="DEFERRED",
+    )
+)
+intake_follow_up_events.append_constraint(
+    ForeignKeyConstraint(
+        ["intake_id"], ["intakes.intake_id"], name="intake_follow_up_events_intake_id_fkey"
+    )
+)
+intake_follow_up_events.append_constraint(
+    ForeignKeyConstraint(
+        ["intake_id", "review_id"],
+        ["intake_reviews.intake_id", "intake_reviews.review_id"],
+        name="intake_follow_up_events_intake_id_review_id_fkey",
+        deferrable=True,
+        initially="DEFERRED",
+    )
+)
+intake_history_payloads.append_constraint(
+    CheckConstraint(
+        "note IS NULL OR btrim(note::text) <> ''::text", name="intake_history_payloads_note_check"
+    )
+)
+intake_history_payloads.append_constraint(
+    CheckConstraint(
+        "btrim(reason_text::text) <> ''::text", name="intake_history_payloads_reason_text_check"
+    )
+)
+intake_history_payloads.append_constraint(
+    ForeignKeyConstraint(
+        ["event_id"],
+        ["intake_follow_up_events.event_id"],
+        name="intake_history_payloads_event_id_fkey",
+        deferrable=True,
+        initially="DEFERRED",
     )
 )

@@ -3,6 +3,7 @@ import type { DraftObject, DraftValue, IntakeKind } from '../api/intakeContracts
 import { useLanguage } from '../i18n/LanguageProvider';
 import { countries, currencies } from './catalogs';
 import { intakeMessages } from './messages';
+import { WorkInterestPicker } from './WorkInterests';
 
 type Label = readonly [string, string];
 type FieldProps = {
@@ -162,6 +163,12 @@ export function IntakeFields({
       {kind === 'worker' ? (
         <>
           <p>{m.selfReported}</p>
+          <WorkInterestPicker
+            value={obj(value.interests)}
+            change={(v) => {
+              change({ ...value, interests: v });
+            }}
+          />
           <Field
             label={['Other work interests', 'Otros intereses laborales']}
             value={obj(value.interests).other_description}

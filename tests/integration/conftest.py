@@ -48,7 +48,9 @@ def clean_test_tables(connection) -> None:
             text("""
         SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
         WHERE n.nspname='public' AND c.relname IN
-          ('intakes','intake_addresses','intake_links','command_results')
+          ('intakes','intake_addresses','intake_links','command_results',
+           'work_interests','work_interest_versions','intake_reviews','intake_review_payloads',
+           'intake_follow_up_events','intake_history_payloads')
     """)
         )
         .scalars()

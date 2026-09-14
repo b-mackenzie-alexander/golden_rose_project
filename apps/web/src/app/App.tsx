@@ -4,6 +4,7 @@ import { AppShell } from './AppShell';
 import { NotFoundPage } from './NotFoundPage';
 import { reloadCanonicalDocument } from '../browser/privacyLifecycle';
 import { EmployerWorkspace } from '../employers/EmployerWorkspace';
+import { LanguageProvider } from '../i18n/LanguageProvider';
 
 export function AppRoutes() {
   return (
@@ -19,8 +20,10 @@ export function AppRoutes() {
 
 export function App() {
   return (
-    <BrowserRouter>
-      <AppRoutes />
-    </BrowserRouter>
+    <LanguageProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </LanguageProvider>
   );
 }

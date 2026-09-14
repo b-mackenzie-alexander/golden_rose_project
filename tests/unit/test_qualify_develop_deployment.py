@@ -2,6 +2,7 @@ import base64
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import Any
@@ -33,6 +34,37 @@ class FakeResponse:
         self.headers = {"Cache-Control": "no-store"}
         if headers:
             self.headers.update(headers)
+
+
+class FakeHeaderMapping:
+    def __init__(self, items: list[tuple[str, str]]) -> None:
+        self._items = items
+
+    def items(self) -> list[tuple[str, str]]:
+        return self._items
+
+
+class FakeOpenResponse:
+    def __init__(self, headers: FakeHeaderMapping, status: int = 200) -> None:
+        self.headers = headers
+        self.status = status
+
+    def __enter__(self) -> "FakeOpenResponse":
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return b'{"status":"ok"}'
+
+
+class FakeOpener:
+    def __init__(self, response: FakeOpenResponse) -> None:
+        self.response = response
+
+    def open(self, *_args: object, **_kwargs: object) -> FakeOpenResponse:
+        return self.response
 
 
 class FakeRequester:
@@ -206,7 +238,7 @@ def test_manifest_lists_qualification_script_entrypoint() -> None:
 
 
 @pytest.mark.parametrize(
-    "log_export",
+    "log_message",
     [
         'authorization: "Basic redacted"',
         f"credential={DEMO_PASSWORD}",
@@ -214,9 +246,17 @@ def test_manifest_lists_qualification_script_entrypoint() -> None:
     ],
 )
 def test_log_export_scan_rejects_authorization_credentials_and_fictional_values(
-    log_export: str,
+    log_message: str,
 ) -> None:
     module = load_module()
+    log_export = json.dumps(
+        [
+            {
+                "resource": {"type": "cloud_run_revision"},
+                "jsonPayload": {"message": log_message},
+            }
+        ]
+    )
 
     with pytest.raises(module.QualificationError, match="log export contains prohibited values"):
         module._verify_log_export_is_safe(
@@ -278,6 +318,176 @@ def test_cloud_log_reader_runs_exact_post_qualification_bounded_query() -> None:
             },
         }
     ]
+
+
+def test_response_normalization_canonicalizes_header_names_for_all_replay_and_cache_checks() -> (
+    None
+):
+    module = load_module()
+
+    status, tuple_headers, payload = module._normalize_response(
+        (200, FakeHeaderMapping([("cache-control", "no-store")]), {"status": "ok"})
+    )
+    assert status == 200
+    assert tuple_headers == {"Cache-Control": "no-store"}
+    assert payload == {"status": "ok"}
+
+    fake_response = SimpleNamespace(
+        status_code=201,
+        headers=FakeHeaderMapping(
+            [("CACHE-CONTROL", "no-store"), ("idempotency-replayed", "true")]
+        ),
+        payload={"status": "created"},
+    )
+    _, response_headers, _ = module._normalize_response(fake_response)
+    assert response_headers == {
+        "Cache-Control": "no-store",
+        "Idempotency-Replayed": "true",
+    }
+
+    duplicate_headers = FakeHeaderMapping(
+        [("Cache-Control", "no-store"), ("cache-control", "public")]
+    )
+    with pytest.raises(module.QualificationError, match="duplicate response header"):
+        module._normalize_response((200, duplicate_headers, {"status": "ok"}))
+
+    requester = FakeRequester()
+
+    def lower_header_requester(
+        method: str, path: str, headers: dict[str, str], body: dict[str, Any] | None
+    ) -> Any:
+        response = requester(method, path, headers, body)
+        return SimpleNamespace(
+            status_code=response.status_code,
+            headers=FakeHeaderMapping(
+                [(name.lower(), value) for name, value in response.headers.items()]
+            ),
+            payload=response.payload,
+        )
+
+    result = module.qualify_develop_deployment(
+        base_url="https://staff-tracer-abc123.a.run.app",
+        expected_service_url="https://staff-tracer-abc123.a.run.app",
+        demo_password=DEMO_PASSWORD,
+        log_export_reader=lambda: SAFE_LOG_EXPORT,
+        expected_image_digest=EXPECTED_IMAGE_DIGEST,
+        allow_synthetic_writes=True,
+        requester=lower_header_requester,
+    )
+    assert result["qualification_status"] == "passed"
+
+
+def test_request_json_preserves_duplicate_response_headers_before_normalization(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    fake_response = FakeOpenResponse(
+        FakeHeaderMapping([("Cache-Control", "no-store"), ("cache-control", "public")])
+    )
+
+    monkeypatch.setattr(
+        module.request,
+        "build_opener",
+        lambda *_args: FakeOpener(fake_response),
+    )
+
+    response = module._request_json(
+        "https://staff-tracer-abc123.a.run.app",
+        "GET",
+        "/health",
+        {},
+        None,
+    )
+
+    with pytest.raises(module.QualificationError, match="duplicate response header"):
+        module._normalize_response(response)
+
+
+def test_live_negative_revision_probes_use_generated_fictional_allowlist_values() -> None:
+    module = load_module()
+    requester = FakeRequester()
+    revision_bodies: list[dict[str, Any]] = []
+
+    def generated_fictional_requester(
+        method: str, path: str, headers: dict[str, str], body: dict[str, Any] | None
+    ) -> FakeResponse:
+        if path == f"/api/staff/v1/employers/{requester.employer_id}/revisions":
+            assert body is not None
+            revision_bodies.append(dict(body))
+            display_name = str(body["display_name"])
+            if not re.fullmatch(r"Synthetic Qual Employer [0-9a-f]{8}(?: Revised)?", display_name):
+                return FakeResponse(422, {"status": "invalid"})
+        return requester(method, path, headers, body)
+
+    result = module.qualify_develop_deployment(
+        base_url="https://staff-tracer-abc123.a.run.app",
+        expected_service_url="https://staff-tracer-abc123.a.run.app",
+        demo_password=DEMO_PASSWORD,
+        log_export_reader=lambda: SAFE_LOG_EXPORT,
+        expected_image_digest=EXPECTED_IMAGE_DIGEST,
+        allow_synthetic_writes=True,
+        requester=generated_fictional_requester,
+    )
+
+    assert result["qualification_status"] == "passed"
+    assert len(revision_bodies) == 4
+    assert revision_bodies[2]["display_name"] == revision_bodies[1]["display_name"]
+    assert revision_bodies[2]["expected_version"] == 1
+    assert revision_bodies[3]["display_name"] == revision_bodies[1]["display_name"]
+    assert revision_bodies[3]["employer_type"] == "household"
+
+
+def test_log_collection_excludes_cloud_audit_metadata_before_prohibited_value_scan() -> None:
+    module = load_module()
+    log_export = json.dumps(
+        [
+            {
+                "protoPayload": {
+                    "authorizationInfo": [{"permission": "run.routes.invoke"}],
+                    "metadata": {"authorization": "provider metadata only"},
+                },
+                "resource": {"type": "cloud_run_revision"},
+            },
+            {
+                "resource": {"type": "cloud_run_revision"},
+                "jsonPayload": {"message": "request completed"},
+                "textPayload": "bounded application line",
+            },
+        ]
+    )
+
+    assert (
+        module._verify_log_export_is_safe(
+            log_export,
+            prohibited_values=["Generated Employer"],
+        )
+        == "passed_no_prohibited_values"
+    )
+
+
+def test_log_collection_fails_closed_on_malformed_or_ambiguous_log_export() -> None:
+    module = load_module()
+
+    with pytest.raises(module.QualificationError, match="log export boundary failed"):
+        module._verify_log_export_is_safe("not-json", prohibited_values=[])
+
+    ambiguous = json.dumps([{"protoPayload": {"metadata": "audit only"}}])
+    with pytest.raises(module.QualificationError, match="log export boundary failed"):
+        module._verify_log_export_is_safe(ambiguous, prohibited_values=[])
+
+    app_leak = json.dumps(
+        [
+            {
+                "resource": {"type": "cloud_run_revision"},
+                "jsonPayload": {"message": "Generated Employer leaked"},
+            }
+        ]
+    )
+    with pytest.raises(module.QualificationError, match="log export contains prohibited values"):
+        module._verify_log_export_is_safe(
+            app_leak,
+            prohibited_values=["Generated Employer"],
+        )
 
 
 def test_qualification_uses_public_probes_then_fixed_basic_denials_and_private_password() -> None:
@@ -491,7 +701,6 @@ def test_qualify_develop_deployment_rejects_cache_permissive_success_response() 
         body: dict[str, Any] | None,
     ) -> FakeResponse:
         response = requester(method, path, headers, body)
-        response.headers.setdefault("cache-control", "no-store")
         if path == f"/api/staff/v1/employers/{requester.employer_id}" and method == "GET":
             response.headers = {"Cache-Control": "public, max-age=60"}
         return response

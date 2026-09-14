@@ -43,8 +43,9 @@ The improved Wave 1 UI is the preserved uncommitted predecessor in `/Users/genie
 - [ ] Human feedback triage from the running service.
 - [ ] Source-controlled follow-up for the Spanish-toggle defect and v28 qualification-harness normalizations.
 - [x] Accept the Wave 1 product direction: repair the production language provider, establish an intentional responsive workspace shell, separate Employer create/search/detail/revision flows, and add honest session-derived orientation without prominent environment disclaimers or fake metrics.
-- [ ] Reconcile the Wave 1 predecessor’s exact merged planning/source status before closeout; do not repeat its earlier planning PR or infer the dirty improved-UI candidate is merged.
-- [ ] Implement, fully verify, independently review, and merge the complete Wave 1 UI and qualification-harness package as one implementation PR.
+- [x] Merge `.hermes/plans/2026-09-13_131919-wave-1-employer-workspace-ux-remediation-plan.md` with the v28 continuity repair through protected `develop`.
+- [x] Merge the PR #100 staff-intake contract/ADR-0017/outcome-scale plan through protected `develop`; implementation work now rebaselines from `develop@ce38fb0`.
+- [ ] Implement, fully verify, independently review, and merge the complete Wave 1 UI and qualification-harness package as one implementation PR. Tasks 1-5 are GREEN on `feat/staff-intake-workflows`; Task 6 final accessibility/privacy/visual/publication verification is next.
 
 ## Delivery-method governance
 

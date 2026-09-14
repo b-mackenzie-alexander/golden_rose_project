@@ -426,7 +426,7 @@ export function EmployerRevisionForm(props: EmployerRevisionFormProps) {
   if (!isEditing) {
     if (terminalNotFound) {
       return (
-        <section aria-live="assertive" className="workspace-panel" role="alert">
+        <section aria-live="assertive" className="workflow-note" role="alert">
           <h3 ref={notFoundHeadingRef} tabIndex={-1}>
             {messages.employerRevisionNotFoundHeading}
           </h3>
@@ -437,7 +437,7 @@ export function EmployerRevisionForm(props: EmployerRevisionFormProps) {
 
     if (successResult !== null) {
       return (
-        <section aria-live="polite" className="workspace-panel" role="status">
+        <section aria-live="polite" className="workflow-note" role="status">
           <h3 ref={successHeadingRef} tabIndex={-1}>
             {messages.employerRevisionSuccessHeading}
           </h3>
@@ -447,7 +447,7 @@ export function EmployerRevisionForm(props: EmployerRevisionFormProps) {
     }
 
     return (
-      <section aria-label={messages.employerRevisionHeading} className="workspace-panel">
+      <section aria-label={messages.employerRevisionHeading} className="workspace-form">
         <button className="focus-ring" disabled={blockedByWorkspace} onClick={openEditor} type="button">
           {messages.employerRevisionEditAction}
         </button>
@@ -468,7 +468,7 @@ export function EmployerRevisionForm(props: EmployerRevisionFormProps) {
   return (
     <form
       aria-label={messages.employerRevisionHeading}
-      className="workspace-panel"
+      className="workspace-form"
       onSubmit={(event) => {
         void handleSubmit(event);
       }}

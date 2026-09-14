@@ -1484,7 +1484,7 @@ def test_create_draft_employer_concurrent_conflicting_commands_yield_one_conflic
 
     assert len(successes) == 1
     assert len(failures) == 1
-    assert isinstance(failures[0], IdempotencyConflictError)
+    assert isinstance(failures[0], IdempotencyConflictError), repr(failures[0].__cause__)
     assert employer_count == 1
     assert command_receipt_count == 1
     assert audit_event_count == 1

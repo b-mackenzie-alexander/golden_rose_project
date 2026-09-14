@@ -2721,3 +2721,25 @@ This is the concise, dated engineering and operational note log. It records obse
 
 ## Updating this file
 Add a short dated entry after a material planning, implementation, test, security, or release event. Link detailed evidence rather than duplicating it. Record commands and results only when they were actually run.
+
+## 2026-09-14 — PR A staff-intake implementation activated
+
+- **Staffing:** One independent developer; fresh agent reviews provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #100 merged the intake planning packet at `ce38fb0`; PR #101 merged the Wave 1 UX source at `9a6b66735f7261ca705f7e8ba5b7c2afcd815f92`. The v28 deployment remains historical and `not_qualified`; these source merges are not deployment or renewed availability evidence. Browser UX verification is deferred at the owner's request until PR A is finished.
+- **Gate budget:** The v28 deployment packet remains consumed. The owner explicitly authorized PR A source implementation and disposable local PostgreSQL tests with fictional data. No cloud inspection/mutation, deployment, live/client data or production authority follows.
+- **Next executable action:** Complete PR A durable worker/employer draft save/resume, section-local restricted address saves, bounded shared queries, atomic audit/result/receipt authority and source tests on `feat/staff-intake-drafts`, rebased from exact `develop@9a6b66735f7261ca705f7e8ba5b7c2afcd815f92`; obtain fresh specification and quality review before publication.
+- **Do not regress:** Preserve merged Employer UX/APIs, immutable command retry identity, independent dirty section buffers, restricted addresses, synthetic-only testing, private access custody and existing cloud protections. PR B review/follow-up and PR C/D linking/finalization/corrections remain later ordered work.
+
+This activation supersedes older statements below that planning or the UI predecessor is unmerged/uncommitted, or that the active lane is docs-only. It does not claim PR A is complete or grant browser-service or cloud authority.
+
+**Observed progress:** Strict value/request contracts passed 58 focused tests and fresh specification/quality review after two schedule edge-case fixes. Disposable local PostgreSQL 16 runs under `/private/tmp/golden-rose-intake-pra-db` with a Unix socket only; schema/API integration verification is in progress. No completion claim.
+
+## 2026-09-14 — PR A candidate verified
+
+**Validated:** Full backend candidate gate 1,154 passed with 95.80% coverage; frontend 165 tests plus 24 lock tests and full verify passed. Ruff format/lint, mypy, Bandit, Terraform static policy and backend/frontend SBOM validators passed. Backend advisory audit clean; npm High gate passed with inherited Moderate development-tool advisory documented in the PR A handoff.
+
+**Reviewed and remediated:** Schedule offset/overflow validation; default restricted-reveal metadata emission; duplicate address reload generation/record guards; and shared bounded command-key serialization after reproducing a secondary receipt-index race in legacy concurrent creates. Backend and frontend specification/quality rereviews passed. Browser UX verification deferred by owner; no deployment or runtime qualification claim.
+
+**Final integration remediation:** An advanced-current retry could otherwise advance the common version over unseen edits in another section. The form now acknowledges the original command while preserving all buffers and requiring reconciliation before any further write. Four deferred-response regressions and final independent rereview passed.
+
+**Exact final frontend:** 169 tests plus 24 lock tests; full verify passed after final integration remediation. Coverage 94.61% statements / 90.24% branches / 98.31% functions / 95.73% lines.

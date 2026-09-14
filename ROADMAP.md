@@ -1,5 +1,16 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-09-14 — PR A staff-intake implementation activated
+
+- **Staffing:** One independent developer; fresh agent reviews provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #100 merged the intake planning packet at `ce38fb0`; PR #101 merged the Wave 1 UX source at `9a6b66735f7261ca705f7e8ba5b7c2afcd815f92`. The v28 deployment remains historical and `not_qualified`; these source merges are not deployment or renewed availability evidence. Browser UX verification is deferred at the owner's request until PR A is finished.
+- **Gate budget:** The v28 deployment packet remains consumed. The owner explicitly authorized PR A source implementation and disposable local PostgreSQL tests with fictional data. No cloud inspection/mutation, deployment, live/client data or production authority follows.
+- **Next executable action:** Publish the verified PR A candidate on `feat/staff-intake-drafts` from exact `develop@9a6b66735f7261ca705f7e8ba5b7c2afcd815f92`, complete required CI and protected review/merge, then return to the deferred browser UX verification. Fresh backend, frontend and final integration reviews have passed.
+- **Do not regress:** Preserve merged Employer UX/APIs, immutable command retry identity, independent dirty section buffers, restricted addresses, synthetic-only testing, private access custody and existing cloud protections. PR B review/follow-up and PR C/D linking/finalization/corrections remain later ordered work.
+
+This activation supersedes older statements below that planning or the UI predecessor is unmerged/uncommitted, or that the active lane is docs-only. It does not claim PR A is complete or grant browser-service or cloud authority.
+
+
 ## 2026-09-14 — Staff intake planning boundary
 
 Accepted conversational direction is durable shared worker/employer intake with explicit save/resume, version-bound review and follow-up, restricted addresses, deliberate existing-party links without overwrite, and atomic finalization only after complete current review. Technical details remain proposed source contracts, not deployed functionality or new client/counsel policy. See [Staff intake contract](docs/planning/staff-intake-contract.md), [outcome-scale plan](.hermes/plans/2026-09-14-staff-intake-workflows-plan.md), and proposed [ADR-0017](docs/adr/ADR-0017-staff-intake-workflows.md).
@@ -8,8 +19,8 @@ The improved Wave 1 UI is the preserved uncommitted predecessor in `/Users/genie
 
 ## Staff-intake outcome checklist
 
-- [ ] Review, accept, and merge the documentation-only intake contract/ADR-0017/outcome-scale plan to `develop`.
-- [ ] Finish, qualify, review, and merge the preserved improved-UI predecessor separately before intake coding.
+- [x] Intake planning packet merged through PR #100 at `ce38fb0`.
+- [x] Wave 1 improved-UI source merged separately through PR #101 at `9a6b667`; browser UX verification remains deferred, not claimed complete.
 - [ ] After both merge, implement shared worker/employer draft save/resume and bounded queries with real persistence.
 - [ ] Implement restricted fields, current-version review and accountable append-only follow-up.
 - [ ] Implement explicit links and atomic complete/current-reviewed finalization with canonical reads; no automatic overwrite, ShiftNeed, open demand or placement.

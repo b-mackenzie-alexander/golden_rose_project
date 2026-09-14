@@ -1,3 +1,4 @@
+from datetime import UTC
 from uuid import UUID
 
 import pytest
@@ -7,7 +8,7 @@ from sqlalchemy import ForeignKeyConstraint, inspect, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from golden_rose.persistence.models import metadata
-from tests.integration.conftest import PROJECT_ROOT, VERSIONS_DIR
+from tests.integration.conftest import PROJECT_ROOT, VERSIONS_DIR, clean_test_tables
 
 
 def _insert_employer_authority(connection, employer_id: str) -> None:
@@ -111,6 +112,7 @@ def test_entity_authority_metadata_binds_receipts_and_events_by_type_and_id() ->
         "entity_id",
         "employer_id",
         "employer_contact_id",
+        "intake_id",
     )
     assert entity_authority_columns["entity_type"].primary_key is True
     assert entity_authority_columns["entity_id"].primary_key is True
@@ -164,10 +166,10 @@ def test_entity_authority_metadata_binds_receipts_and_events_by_type_and_id() ->
     )
     assert tuple(element.column.name for element in audit_result_fk.elements) == (
         "command_id",
-        "result_entity_type",
-        "result_entity_id",
-        "result_record_version",
-        "result_event_type",
+        "entity_type",
+        "entity_id",
+        "result_version",
+        "event_type",
         "actor_id",
     )
     assert audit_result_fk.deferrable is True
@@ -303,12 +305,13 @@ def test_employer_contact_migration_upgrades_populated_employer_authority_withou
             assert preserved_employer["display_name"] == "Synthetic Predecessor Employer"
             assert preserved_employer["version"] == 1
             assert preserved_employer["updated_by"] == UUID("22222222-2222-4222-8222-222222222222")
-            assert preserved_employer["updated_at"].isoformat() == "2026-08-04T12:00:00+00:00"
+            assert (
+                preserved_employer["updated_at"].astimezone(UTC).isoformat()
+                == "2026-08-04T12:00:00+00:00"
+            )
     finally:
         with engine.begin() as cleanup_connection:
-            cleanup_connection.execute(
-                text("TRUNCATE TABLE audit_events, command_receipts, employers CASCADE")
-            )
+            clean_test_tables(cleanup_connection)
         command.upgrade(alembic_config, "head")
 
 
@@ -337,10 +340,10 @@ def test_revision_metadata_binds_audit_event_to_command_result_version() -> None
     )
     assert tuple(element.column.name for element in audit_event_fk.elements) == (
         "command_id",
-        "result_entity_type",
-        "result_entity_id",
-        "result_record_version",
-        "result_event_type",
+        "entity_type",
+        "entity_id",
+        "result_version",
+        "event_type",
         "actor_id",
     )
 
@@ -430,10 +433,10 @@ def test_initial_metadata_exposes_authority_relationships() -> None:
     )
     assert tuple(element.column.name for element in audit_event_fk.elements) == (
         "command_id",
-        "result_entity_type",
-        "result_entity_id",
-        "result_record_version",
-        "result_event_type",
+        "entity_type",
+        "entity_id",
+        "result_version",
+        "event_type",
         "actor_id",
     )
     assert audit_event_fk.deferrable is True
@@ -548,9 +551,7 @@ def test_populated_predecessor_schema_upgrades_with_authority_preserved(engine) 
             }
     finally:
         with engine.begin() as cleanup_connection:
-            cleanup_connection.execute(
-                text("TRUNCATE TABLE audit_events, command_receipts, employers CASCADE")
-            )
+            clean_test_tables(cleanup_connection)
         command.upgrade(alembic_config, "head")
 
 
@@ -644,15 +645,15 @@ def test_revision_migration_upgrades_existing_create_rows_and_receipts(engine) -
                 )
             ).one()
 
-            assert upgraded_row.updated_at.isoformat() == "2026-08-04T12:00:00+00:00"
+            assert (
+                upgraded_row.updated_at.astimezone(UTC).isoformat() == "2026-08-04T12:00:00+00:00"
+            )
             assert str(upgraded_row.updated_by) == "22222222-2222-4222-8222-222222222222"
             assert upgraded_row.result_record_version == 1
             assert upgraded_row.result_event_type == "employer.created"
     finally:
         with engine.begin() as cleanup_connection:
-            cleanup_connection.execute(
-                text("TRUNCATE TABLE audit_events, command_receipts, employers CASCADE")
-            )
+            clean_test_tables(cleanup_connection)
         command.upgrade(alembic_config, "head")
 
 
@@ -745,9 +746,7 @@ def test_revision_migration_refuses_incomplete_existing_receipt_event_cardinalit
             )
     finally:
         with engine.begin() as cleanup_connection:
-            cleanup_connection.execute(
-                text("TRUNCATE TABLE audit_events, command_receipts, employers CASCADE")
-            )
+            clean_test_tables(cleanup_connection)
         command.upgrade(alembic_config, "head")
 
 
@@ -846,9 +845,7 @@ def test_revision_migration_backfills_receipts_under_transactional_trigger_guard
             assert "command_receipts_revision_compatibility_defaults" in trigger_names
     finally:
         with engine.begin() as cleanup_connection:
-            cleanup_connection.execute(
-                text("TRUNCATE TABLE audit_events, command_receipts, employers CASCADE")
-            )
+            clean_test_tables(cleanup_connection)
         command.upgrade(alembic_config, "head")
 
 
@@ -949,9 +946,7 @@ def test_revision_migration_restores_receipt_mutation_denial_after_upgrade(engin
             upgraded_connection.rollback()
     finally:
         with engine.begin() as cleanup_connection:
-            cleanup_connection.execute(
-                text("TRUNCATE TABLE audit_events, command_receipts, employers CASCADE")
-            )
+            clean_test_tables(cleanup_connection)
         command.upgrade(alembic_config, "head")
 
 
@@ -1032,13 +1027,13 @@ def test_revision_live_schema_enforces_one_step_event_version_authority(connecti
             "actor_id",
         ],
         "referred_schema": None,
-        "referred_table": "command_receipts",
+        "referred_table": "command_results",
         "referred_columns": [
             "command_id",
-            "result_entity_type",
-            "result_entity_id",
-            "result_record_version",
-            "result_event_type",
+            "entity_type",
+            "entity_id",
+            "result_version",
+            "event_type",
             "actor_id",
         ],
         "options": {"initially": "DEFERRED", "deferrable": True},
@@ -1233,9 +1228,7 @@ def test_revision_empty_downgrade_restores_closeout_schema_and_guards(engine) ->
     command.upgrade(alembic_config, "head")
 
     with engine.begin() as migration_connection:
-        migration_connection.execute(
-            text("TRUNCATE TABLE audit_events, command_receipts, employers CASCADE")
-        )
+        clean_test_tables(migration_connection)
 
     try:
         with pytest.raises(RuntimeError):
@@ -1297,9 +1290,7 @@ def test_revision_populated_create_only_downgrade_preserves_rows_correspondence_
     command.upgrade(alembic_config, "head")
 
     with engine.begin() as migration_connection:
-        migration_connection.execute(
-            text("TRUNCATE TABLE audit_events, command_receipts, employers CASCADE")
-        )
+        clean_test_tables(migration_connection)
         migration_connection.execute(
             text(
                 """
@@ -1448,9 +1439,7 @@ def test_revision_populated_create_only_downgrade_preserves_rows_correspondence_
             )
     finally:
         with engine.begin() as cleanup_connection:
-            cleanup_connection.execute(
-                text("TRUNCATE TABLE audit_events, command_receipts, employers CASCADE")
-            )
+            clean_test_tables(cleanup_connection)
         command.upgrade(alembic_config, "head")
 
 
@@ -1463,9 +1452,7 @@ def test_revision_populated_downgrade_fails_closed_and_preserves_schema_data_gua
     command.upgrade(alembic_config, "head")
 
     with engine.begin() as migration_connection:
-        migration_connection.execute(
-            text("TRUNCATE TABLE audit_events, command_receipts, employers CASCADE")
-        )
+        clean_test_tables(migration_connection)
         migration_connection.execute(
             text(
                 """
@@ -1602,9 +1589,7 @@ def test_revision_populated_downgrade_fails_closed_and_preserves_schema_data_gua
             )
     finally:
         with engine.begin() as cleanup_connection:
-            cleanup_connection.execute(
-                text("TRUNCATE TABLE audit_events, command_receipts, employers CASCADE")
-            )
+            clean_test_tables(cleanup_connection)
         command.upgrade(alembic_config, "head")
 
 
@@ -1800,13 +1785,13 @@ def test_live_schema_exposes_authority_relationships(connection) -> None:
             "actor_id",
         ],
         "referred_schema": None,
-        "referred_table": "command_receipts",
+        "referred_table": "command_results",
         "referred_columns": [
             "command_id",
-            "result_entity_type",
-            "result_entity_id",
-            "result_record_version",
-            "result_event_type",
+            "entity_type",
+            "entity_id",
+            "result_version",
+            "event_type",
             "actor_id",
         ],
         "options": {"initially": "DEFERRED", "deferrable": True},

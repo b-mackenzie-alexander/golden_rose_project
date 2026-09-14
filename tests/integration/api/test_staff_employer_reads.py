@@ -2475,6 +2475,12 @@ def test_openapi_exposes_only_approved_staff_employer_routes() -> None:
         assert openapi.status_code == 200
         paths = openapi.json()["paths"]
         assert set(paths) == {
+            "/api/staff/v1/intakes",
+            "/api/staff/v1/intakes/query",
+            "/api/staff/v1/intakes/{intake_id}",
+            "/api/staff/v1/intakes/{intake_id}/revisions",
+            "/api/staff/v1/intakes/{intake_id}/addresses/{section}",
+            "/api/staff/v1/intakes/{intake_id}/addresses/{section}/revisions",
             "/health",
             "/readiness",
             "/api/staff/v1/employers",

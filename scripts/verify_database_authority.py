@@ -23,12 +23,20 @@ EXPECTED_RUNTIME_TABLE_PRIVILEGES: dict[str, set[str]] = {
     "entity_authorities": {"INSERT", "SELECT"},
     "command_receipts": {"INSERT", "SELECT"},
     "audit_events": {"INSERT", "SELECT"},
+    "intakes": {"INSERT", "SELECT"},
+    "intake_addresses": {"INSERT", "SELECT"},
+    "intake_links": {"INSERT", "SELECT"},
+    "command_results": {"INSERT", "SELECT"},
 }
 EXPECTED_RUNTIME_SCHEMA_PRIVILEGES: set[str] = {"USAGE"}
 EXPECTED_RUNTIME_FUNCTION_PRIVILEGES: dict[str, set[str]] = {
     "deny_mutation_on_append_only_tables": set(),
     "populate_employer_revision_compatibility_fields": set(),
     "populate_command_receipt_revision_compatibility_fields": set(),
+    "populate_legacy_command_result": set(),
+    "guard_intake_identity": set(),
+    "guard_intake_write_authority": set(),
+    "guard_intake_address_authority": set(),
 }
 EXPECTED_DEFAULT_PRIVILEGES: dict[str, set[str]] = {
     "tables": {"INSERT", "SELECT"},
@@ -47,11 +55,19 @@ EXPECTED_SCHEMA_OWNER_OBJECTS: set[str] = {
     "entity_authorities",
     "command_receipts",
     "audit_events",
+    "intakes",
+    "intake_addresses",
+    "intake_links",
+    "command_results",
 }
 EXPECTED_SCHEMA_OWNER_FUNCTIONS: set[str] = {
     "deny_mutation_on_append_only_tables",
     "populate_employer_revision_compatibility_fields",
     "populate_command_receipt_revision_compatibility_fields",
+    "populate_legacy_command_result",
+    "guard_intake_identity",
+    "guard_intake_write_authority",
+    "guard_intake_address_authority",
 }
 DEFAULT_PRIVILEGE_OBJECT_TYPE_MAP: dict[str, str] = {
     "r": "tables",
@@ -122,7 +138,7 @@ TABLE_OWNER_QUERY = text(
         'employer_contacts',
         'entity_authorities',
         'command_receipts',
-        'audit_events'
+        'audit_events', 'intakes', 'intake_addresses', 'intake_links', 'command_results'
       )
     """
 )
@@ -148,7 +164,8 @@ PUBLIC_TABLE_PRIVILEGE_QUERY = text(
       AND class.relkind = 'r'
       AND class.relname IN (
         'alembic_version', 'employers', 'employer_contacts',
-        'entity_authorities', 'command_receipts', 'audit_events'
+        'entity_authorities', 'command_receipts', 'audit_events',
+        'intakes', 'intake_addresses', 'intake_links', 'command_results'
       )
       AND acl.grantee = 0
     """
@@ -163,7 +180,7 @@ RUNTIME_TABLE_PRIVILEGE_QUERY = text(
             ('employer_contacts'),
             ('entity_authorities'),
             ('command_receipts'),
-            ('audit_events')
+            ('audit_events'), ('intakes'), ('intake_addresses'), ('intake_links'), ('command_results')
     ),
     privileges(privilege_type) AS (
         VALUES
@@ -203,7 +220,11 @@ RUNTIME_FUNCTION_PRIVILEGE_QUERY = text(
         VALUES
             ('deny_mutation_on_append_only_tables', 'public.deny_mutation_on_append_only_tables()'),
             ('populate_employer_revision_compatibility_fields', 'public.populate_employer_revision_compatibility_fields()'),
-            ('populate_command_receipt_revision_compatibility_fields', 'public.populate_command_receipt_revision_compatibility_fields()')
+            ('populate_command_receipt_revision_compatibility_fields', 'public.populate_command_receipt_revision_compatibility_fields()'),
+            ('populate_legacy_command_result', 'public.populate_legacy_command_result()'),
+            ('guard_intake_identity', 'public.guard_intake_identity()'),
+            ('guard_intake_write_authority', 'public.guard_intake_write_authority()'),
+            ('guard_intake_address_authority', 'public.guard_intake_address_authority()')
     ) AS functions(function_name, signature)
     """
 )
@@ -242,6 +263,203 @@ DEFAULT_PRIVILEGE_QUERY = text(
     LEFT JOIN pg_roles AS grantee_role ON grantee_role.oid = acl.grantee
     """
 )
+
+
+# UPDATE is column-scoped; granting whole-table UPDATE is deliberately rejected.
+EXPECTED_RUNTIME_UPDATE_COLUMNS = {
+    "intakes": {"content", "version", "content_version", "updated_at", "updated_by"},
+    "intake_addresses": {"line1", "line2", "locality", "region", "postal_code", "country"},
+    "intake_links": set(),
+    "command_results": set(),
+}
+# PostgreSQL 16 canonical definitions for the reviewed PR A constraint arms.
+# Compare definitions as well as names: a same-name permissive CHECK must fail.
+EXPECTED_INTAKE_CONSTRAINTS = {
+    "audit_events.ck_audit_events_entity_type": (
+        "CHECK (entity_type::text = ANY (ARRAY['employer'::character varying, 'employer_contac"
+        "t'::character varying, 'intake'::character varying]::text[]))"
+    ),
+    "audit_events.ck_audit_events_event_type": (
+        "CHECK (event_type::text = ANY (ARRAY['employer.created'::character varying, 'employer"
+        "_contact.created'::character varying, 'employer.draft_revised'::character varying, 'i"
+        "ntake.created'::character varying, 'intake.revised'::character varying]::text[]))"
+    ),
+    "audit_events.ck_audit_events_schema_name": (
+        "CHECK (event_schema_name::text = ANY (ARRAY['employer.created'::character varying, 'e"
+        "mployer_contact.created'::character varying, 'employer.draft_revised'::character vary"
+        "ing, 'intake.created'::character varying, 'intake.revised'::character varying]::text["
+        "]))"
+    ),
+    "audit_events.fk_audit_events_command_result": (
+        "FOREIGN KEY (command_id, entity_type, entity_id, new_record_version, event_type, acto"
+        "r_id) REFERENCES command_results(command_id, entity_type, entity_id, result_version, "
+        "event_type, actor_id) DEFERRABLE INITIALLY DEFERRED"
+    ),
+    "command_receipts.ck_command_receipts_command_type": (
+        "CHECK (command_type::text = ANY (ARRAY['create_draft_employer'::character varying, 'c"
+        "reate_employer_contact'::character varying, 'revise_draft_employer'::character varyin"
+        "g, 'create_intake'::character varying, 'revise_intake'::character varying, 'revise_in"
+        "take_address'::character varying]::text[]))"
+    ),
+    "command_receipts.ck_command_receipts_entity_type": (
+        "CHECK (result_entity_type::text = ANY (ARRAY['employer'::character varying, 'employer"
+        "_contact'::character varying, 'intake'::character varying]::text[]))"
+    ),
+    "command_receipts.ck_command_receipts_result_authority_shape": (
+        "CHECK (command_type::text = 'create_draft_employer'::text AND result_entity_type::tex"
+        "t = 'employer'::text AND result_event_type::text = 'employer.created'::text AND resul"
+        "t_record_version = 1 OR command_type::text = 'create_employer_contact'::text AND resu"
+        "lt_entity_type::text = 'employer_contact'::text AND result_event_type::text = 'employ"
+        "er_contact.created'::text AND result_record_version = 1 OR command_type::text = 'revi"
+        "se_draft_employer'::text AND result_entity_type::text = 'employer'::text AND result_e"
+        "vent_type::text = 'employer.draft_revised'::text AND result_record_version >= 2 OR co"
+        "mmand_type::text = 'create_intake'::text AND result_entity_type::text = 'intake'::tex"
+        "t AND result_event_type::text = 'intake.created'::text AND result_record_version = 1 "
+        "OR (command_type::text = ANY (ARRAY['revise_intake'::character varying, 'revise_intak"
+        "e_address'::character varying]::text[])) AND result_entity_type::text = 'intake'::tex"
+        "t AND result_event_type::text = 'intake.revised'::text AND result_record_version >= 2"
+        ")"
+    ),
+    "command_receipts.fk_command_receipts_primary_result": (
+        "FOREIGN KEY (command_id, result_entity_type, result_entity_id, result_record_version,"
+        " result_event_type, actor_id) REFERENCES command_results(command_id, entity_type, ent"
+        "ity_id, result_version, event_type, actor_id) DEFERRABLE INITIALLY DEFERRED"
+    ),
+    "command_results.ck_command_results_authority_shape": (
+        "CHECK (command_type::text = 'create_draft_employer'::text AND entity_type::text = 'em"
+        "ployer'::text AND event_type::text = 'employer.created'::text AND result_version = 1 "
+        "OR command_type::text = 'create_employer_contact'::text AND entity_type::text = 'empl"
+        "oyer_contact'::text AND event_type::text = 'employer_contact.created'::text AND resul"
+        "t_version = 1 OR command_type::text = 'revise_draft_employer'::text AND entity_type::"
+        "text = 'employer'::text AND event_type::text = 'employer.draft_revised'::text AND res"
+        "ult_version >= 2 OR command_type::text = 'create_intake'::text AND entity_type::text "
+        "= 'intake'::text AND event_type::text = 'intake.created'::text AND result_version = 1"
+        " OR (command_type::text = ANY (ARRAY['revise_intake'::character varying, 'revise_inta"
+        "ke_address'::character varying]::text[])) AND entity_type::text = 'intake'::text AND "
+        "event_type::text = 'intake.revised'::text AND result_version >= 2)"
+    ),
+    "command_results.ck_command_results_version_positive": ("CHECK (result_version >= 1)"),
+    "command_results.command_results_pkey": ("PRIMARY KEY (command_id, entity_type, entity_id)"),
+    "command_results.fk_command_results_entity_authority": (
+        "FOREIGN KEY (entity_type, entity_id) REFERENCES entity_authorities(entity_type, entit"
+        "y_id) DEFERRABLE INITIALLY DEFERRED"
+    ),
+    "command_results.fk_command_results_exact_audit": (
+        "FOREIGN KEY (command_id, entity_id, result_version, event_type, actor_id) REFERENCES "
+        "audit_events(command_id, entity_id, new_record_version, event_type, actor_id) DEFERRA"
+        "BLE INITIALLY DEFERRED"
+    ),
+    "command_results.fk_command_results_receipt_actor_type": (
+        "FOREIGN KEY (command_id, actor_id, command_type) REFERENCES command_receipts(command_"
+        "id, actor_id, command_type) DEFERRABLE INITIALLY DEFERRED"
+    ),
+    "command_results.fk_command_results_typed_audit": (
+        "FOREIGN KEY (command_id, entity_type, entity_id) REFERENCES audit_events(command_id, "
+        "entity_type, entity_id) DEFERRABLE INITIALLY DEFERRED"
+    ),
+    "command_results.uq_command_results_exact_authority": (
+        "UNIQUE (command_id, entity_type, entity_id, result_version, event_type, actor_id)"
+    ),
+    "command_results.uq_command_results_single_result": ("UNIQUE (command_id)"),
+    "entity_authorities.ck_entity_authorities_entity_type": (
+        "CHECK (entity_type::text = ANY (ARRAY['employer'::character varying, 'employer_contac"
+        "t'::character varying, 'intake'::character varying]::text[]))"
+    ),
+    "entity_authorities.ck_entity_authorities_exactly_one_concrete_id": (
+        "CHECK (entity_type::text = 'employer'::text AND employer_id IS NOT NULL AND employer_"
+        "id = entity_id AND employer_contact_id IS NULL AND intake_id IS NULL OR entity_type::"
+        "text = 'employer_contact'::text AND employer_contact_id IS NOT NULL AND employer_cont"
+        "act_id = entity_id AND employer_id IS NULL AND intake_id IS NULL OR entity_type::text"
+        " = 'intake'::text AND intake_id IS NOT NULL AND intake_id = entity_id AND employer_id"
+        " IS NULL AND employer_contact_id IS NULL)"
+    ),
+    "entity_authorities.fk_entity_authorities_intake": (
+        "FOREIGN KEY (intake_id) REFERENCES intakes(intake_id) DEFERRABLE INITIALLY DEFERRED"
+    ),
+    "intake_addresses.ck_intake_addresses_country": (
+        "CHECK (country IS NULL OR country::text ~ '^[A-Z]{2}$'::text)"
+    ),
+    "intake_addresses.ck_intake_addresses_nonblank": (
+        "CHECK ((line1 IS NULL OR btrim(line1::text) <> ''::text) AND (line2 IS NULL OR btrim("
+        "line2::text) <> ''::text) AND (locality IS NULL OR btrim(locality::text) <> ''::text)"
+        " AND (region IS NULL OR btrim(region::text) <> ''::text) AND (postal_code IS NULL OR "
+        "btrim(postal_code::text) <> ''::text))"
+    ),
+    "intake_addresses.ck_intake_addresses_section": (
+        "CHECK (section::text = ANY (ARRAY['worker_residence'::character varying, 'party_addre"
+        "ss'::character varying, 'worksite_address'::character varying]::text[]))"
+    ),
+    "intake_addresses.fk_intake_addresses_intake": (
+        "FOREIGN KEY (intake_id) REFERENCES intakes(intake_id)"
+    ),
+    "intake_addresses.guard_intake_address_authority": ("TRIGGER DEFERRABLE INITIALLY DEFERRED"),
+    "intake_addresses.intake_addresses_pkey": ("PRIMARY KEY (intake_id, section)"),
+    "intake_links.ck_intake_links_not_available": ("CHECK (false)"),
+    "intake_links.fk_intake_links_intake": (
+        "FOREIGN KEY (intake_id) REFERENCES intakes(intake_id)"
+    ),
+    "intake_links.intake_links_pkey": ("PRIMARY KEY (intake_id)"),
+    "intakes.ck_intakes_content_kind": (
+        "CHECK (kind::text = 'worker'::text AND (content - ARRAY['full_name'::text, 'phone'::t"
+        "ext, 'interests'::text, 'availability'::text]) = '{}'::jsonb OR kind::text = 'employe"
+        "r'::text AND (content - ARRAY['employer_type'::text, 'display_name'::text, 'represent"
+        "ative_name'::text, 'phone'::text, 'role_title'::text, 'duties_summary'::text, 'worker"
+        "_count'::text, 'schedule'::text, 'offer'::text]) = '{}'::jsonb)"
+    ),
+    "intakes.ck_intakes_content_object": ("CHECK (jsonb_typeof(content) = 'object'::text)"),
+    "intakes.ck_intakes_content_size": ("CHECK (octet_length(content::text) <= 32768)"),
+    "intakes.ck_intakes_content_version": (
+        "CHECK (content_version >= 1 AND content_version = version)"
+    ),
+    "intakes.ck_intakes_kind": (
+        "CHECK (kind::text = ANY (ARRAY['worker'::character varying, 'employer'::character var"
+        "ying]::text[]))"
+    ),
+    "intakes.ck_intakes_lifecycle_draft": ("CHECK (lifecycle_status::text = 'draft'::text)"),
+    "intakes.ck_intakes_schema_version": ("CHECK (schema_version = 1)"),
+    "intakes.ck_intakes_version_positive": ("CHECK (version >= 1)"),
+    "intakes.guard_intake_write_authority": ("TRIGGER DEFERRABLE INITIALLY DEFERRED"),
+    "intakes.intakes_pkey": ("PRIMARY KEY (intake_id)"),
+    "intakes.uq_intakes_id_kind": ("UNIQUE (intake_id, kind)"),
+}
+INTAKE_CONSTRAINT_QUERY = text("""
+    SELECT t.relname||'.'||c.conname AS key,
+      pg_get_constraintdef(c.oid,true) AS definition, c.convalidated
+    FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid
+    JOIN pg_namespace n ON n.oid=t.relnamespace
+    WHERE n.nspname='public' AND t.relname||'.'||c.conname = ANY(:names)
+""")
+
+RUNTIME_COLUMN_UPDATE_QUERY = text("""
+    SELECT c.relname AS table_name, a.attname AS column_name,
+      has_column_privilege(:runtime_role,c.oid,a.attnum,'UPDATE') AS allowed
+    FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+    JOIN pg_attribute a ON a.attrelid=c.oid
+    WHERE n.nspname='public' AND c.relname = ANY(:table_names)
+      AND a.attnum>0 AND NOT a.attisdropped
+""")
+INTAKE_TRIGGER_QUERY = text("""
+    SELECT c.relname AS table_name,t.tgname AS trigger_name,t.tgenabled,
+      t.tgdeferrable,t.tginitdeferred,p.proname AS function_name
+    FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
+    JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_proc p ON p.oid=t.tgfoid
+    WHERE n.nspname='public' AND NOT t.tgisinternal
+      AND (c.relname = ANY(:table_names) OR t.tgname='populate_legacy_command_result')
+""")
+EXPECTED_INTAKE_TRIGGERS = {
+    "intakes.guard_intake_identity": ("guard_intake_identity", False),
+    "intakes.guard_intake_write_authority": ("guard_intake_write_authority", True),
+    "intakes.deny_mutation_intakes": ("deny_mutation_on_append_only_tables", False),
+    "intake_addresses.guard_intake_address_identity": ("guard_intake_identity", False),
+    "intake_addresses.guard_intake_address_authority": ("guard_intake_address_authority", True),
+    "intake_addresses.deny_mutation_intake_addresses": (
+        "deny_mutation_on_append_only_tables",
+        False,
+    ),
+    "intake_links.deny_mutation_intake_links": ("deny_mutation_on_append_only_tables", False),
+    "command_results.deny_mutation_command_results": ("deny_mutation_on_append_only_tables", False),
+    "command_receipts.populate_legacy_command_result": ("populate_legacy_command_result", False),
+}
 
 
 def _as_set(values: object) -> set[str]:
@@ -376,7 +594,52 @@ def collect_authority_snapshot(
         if grantee == PUBLIC_ROLE:
             public_default_privileges[object_type].append(str(privilege_type))
 
+    intake_constraints = {
+        row["key"]: row["definition"] if row["convalidated"] else None
+        for row in connection.execute(
+            INTAKE_CONSTRAINT_QUERY, {"names": list(EXPECTED_INTAKE_CONSTRAINTS)}
+        ).mappings()
+    }
+    runtime_update_columns: dict[str, list[str]] = defaultdict(list)
+    for row in connection.execute(
+        RUNTIME_COLUMN_UPDATE_QUERY,
+        {
+            "runtime_role": RUNTIME_ROLE,
+            "table_names": list(EXPECTED_RUNTIME_UPDATE_COLUMNS),
+        },
+    ).mappings():
+        if row["allowed"]:
+            runtime_update_columns[row["table_name"]].append(row["column_name"])
+    intake_triggers = {
+        f"{row['table_name']}.{row['trigger_name']}": {
+            "function": row["function_name"],
+            "enabled": row["tgenabled"],
+            "deferred": row["tgdeferrable"] and row["tginitdeferred"],
+        }
+        for row in connection.execute(
+            INTAKE_TRIGGER_QUERY,
+            {
+                "table_names": list(EXPECTED_RUNTIME_UPDATE_COLUMNS),
+            },
+        ).mappings()
+    }
+    security_definer_functions = (
+        connection.execute(
+            text("""
+        SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname=ANY(:names) AND p.prosecdef
+    """),
+            {"names": list(EXPECTED_SCHEMA_OWNER_FUNCTIONS)},
+        )
+        .scalars()
+        .all()
+    )
+
     return {
+        "intake_constraints": intake_constraints,
+        "runtime_update_columns": dict(runtime_update_columns),
+        "intake_triggers": intake_triggers,
+        "security_definer_functions": security_definer_functions,
         "roles": roles,
         "authority_memberships": authority_memberships,
         "schema_owner": schema_owner,
@@ -473,6 +736,30 @@ def _evaluate_membership_graph(
 
 def evaluate_authority_snapshot(snapshot: dict[str, object]) -> list[str]:
     violations: list[str] = []
+
+    constraints = snapshot.get("intake_constraints")
+    if not isinstance(constraints, dict):
+        violations.append("snapshot missing intake constraint definitions")
+    else:
+        for key, definition in EXPECTED_INTAKE_CONSTRAINTS.items():
+            if constraints.get(key) != definition:
+                violations.append(f"intake constraint drifted for {key}")
+    update_columns = snapshot.get("runtime_update_columns")
+    if not isinstance(update_columns, dict):
+        violations.append("snapshot missing intake column privileges")
+    else:
+        for table, expected in EXPECTED_RUNTIME_UPDATE_COLUMNS.items():
+            if _as_set(update_columns.get(table, [])) != expected:
+                violations.append(f"runtime UPDATE columns drifted for {table}")
+    triggers = snapshot.get("intake_triggers")
+    if not isinstance(triggers, dict):
+        violations.append("snapshot missing intake triggers")
+    else:
+        for key, (function, deferred) in EXPECTED_INTAKE_TRIGGERS.items():
+            if triggers.get(key) != {"function": function, "enabled": "O", "deferred": deferred}:
+                violations.append(f"intake trigger drifted for {key}")
+    if snapshot.get("security_definer_functions") != []:
+        violations.append("governed functions must use invoker authority")
 
     roles = snapshot.get("roles")
     if not isinstance(roles, dict):

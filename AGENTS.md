@@ -1,5 +1,16 @@
 # AGENTS.md — Golden Rose Operations Platform
 
+## 2026-09-14 — PR A staff-intake implementation activated
+
+- **Staffing:** One independent developer; fresh agent reviews provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #100 merged the intake planning packet at `ce38fb0`; PR #101 merged the Wave 1 UX source at `9a6b66735f7261ca705f7e8ba5b7c2afcd815f92`. The v28 deployment remains historical and `not_qualified`; these source merges are not deployment or renewed availability evidence. Browser UX verification is deferred at the owner's request until PR A is finished.
+- **Gate budget:** The v28 deployment packet remains consumed. The owner explicitly authorized PR A source implementation and disposable local PostgreSQL tests with fictional data. No cloud inspection/mutation, deployment, live/client data or production authority follows.
+- **Next executable action:** Publish the verified PR A candidate on `feat/staff-intake-drafts` from exact `develop@9a6b66735f7261ca705f7e8ba5b7c2afcd815f92`, complete required CI and protected review/merge, then return to the deferred browser UX verification. Fresh backend, frontend and final integration reviews have passed.
+- **Do not regress:** Preserve merged Employer UX/APIs, immutable command retry identity, independent dirty section buffers, restricted addresses, synthetic-only testing, private access custody and existing cloud protections. PR B review/follow-up and PR C/D linking/finalization/corrections remain later ordered work.
+
+This activation supersedes older statements below that planning or the UI predecessor is unmerged/uncommitted, or that the active lane is docs-only. It does not claim PR A is complete or grant browser-service or cloud authority.
+
+
 ## Mission and scope
 Golden Rose is a seven-week, evidence-led, compliance-conscious operations-platform engagement for an employment agency. The immediate goal is a safe staff-facing employer-demand workflow; the product must not be treated as a finished public portal, legal/compliance system, or automated hiring/matching system.
 

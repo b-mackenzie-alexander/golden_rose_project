@@ -40,7 +40,29 @@ def session(engine: Engine):
         yield db_session
 
 
+def clean_test_tables(connection) -> None:
+    # These statement guards intentionally reject TRUNCATE, including CASCADE.
+    # Only the disposable test database owner disables its exact cleanup guards.
+    guarded_tables = (
+        connection.execute(
+            text("""
+        SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname='public' AND c.relname IN
+          ('intakes','intake_addresses','intake_links','command_results')
+    """)
+        )
+        .scalars()
+        .all()
+    )
+    for table in guarded_tables:
+        connection.execute(text(f"ALTER TABLE {table} DISABLE TRIGGER deny_mutation_{table}"))
+    targets = ", ".join(["audit_events", "command_receipts", "employers", *guarded_tables])
+    connection.execute(text(f"TRUNCATE TABLE {targets} CASCADE"))
+    for table in guarded_tables:
+        connection.execute(text(f"ALTER TABLE {table} ENABLE TRIGGER deny_mutation_{table}"))
+
+
 @pytest.fixture()
 def clean_tables(connection) -> None:
-    connection.execute(text("TRUNCATE TABLE audit_events, command_receipts, employers CASCADE"))
+    clean_test_tables(connection)
     connection.commit()

@@ -42,6 +42,21 @@ def get_db_session(request: Request) -> Iterator[Session]:
 
 
 def get_staff_principal(settings: Annotated[Settings, Depends(get_settings)]) -> StaffPrincipal:
+    intake_permissions = (
+        {
+            "intake:read",
+            "intake:draft:create",
+            "intake:draft:revise",
+            "worker_residence:read",
+            "worker_residence:write",
+            "party_address:read",
+            "party_address:write",
+            "worksite_address:read",
+            "worksite_address:write",
+        }
+        if settings.environment in {"local", "test"}
+        else set()
+    )
     return StaffPrincipal(
         actor_id=settings.synthetic_staff_id,
         role_name="synthetic_staff",
@@ -53,6 +68,7 @@ def get_staff_principal(settings: Annotated[Settings, Depends(get_settings)]) ->
                 EMPLOYER_CONTACT_DRAFT_CREATE_PERMISSION,
                 EMPLOYER_CONTACT_READ_PERMISSION,
             }
+            | intake_permissions
         ),
     )
 

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -32,6 +32,7 @@ def reserve_command_receipt(
     result_entity_id: UUID,
     created_at: datetime,
 ) -> bool:
+    serialize_command_key(session=session, command_id=command_id)
     result = session.execute(
         insert(command_receipts)
         .values(
@@ -61,6 +62,7 @@ def reserve_create_employer_contact_receipt(
     result_entity_id: UUID,
     created_at: datetime,
 ) -> bool:
+    serialize_command_key(session=session, command_id=command_id)
     result = session.execute(
         insert(command_receipts)
         .values(
@@ -91,6 +93,7 @@ def reserve_revision_command_receipt(
     result_record_version: int,
     created_at: datetime,
 ) -> bool:
+    serialize_command_key(session=session, command_id=command_id)
     result = session.execute(
         insert(command_receipts)
         .values(
@@ -127,3 +130,19 @@ def get_command_receipt(*, session: Session, command_id: UUID) -> CommandReceipt
         ).where(command_receipts.c.command_id == command_id)
     ).one()
     return CommandReceiptRecord(*row)
+
+
+def serialize_command_key(*, session: Session, command_id: UUID) -> None:
+    """Serialize all receipt writers before checking any overlapping unique keys.
+
+    The result-to-receipt actor/type FK needs a second unique index. A concurrent
+    targeted ON CONFLICT(command_id) alone does not arbitrate that second index.
+    Every legacy and intake writer therefore acquires the same bounded key lock.
+    """
+    session.execute(text("SET LOCAL lock_timeout = '5s'"))
+    session.execute(
+        text("SELECT pg_advisory_xact_lock(:key)"),
+        {
+            "key": int.from_bytes(command_id.bytes[:8], "big", signed=True),
+        },
+    )

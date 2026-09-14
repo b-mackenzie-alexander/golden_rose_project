@@ -1,5 +1,18 @@
 # Security — Golden Rose Operations Platform
 
+## PR A source security evidence
+
+The intake source uses field-specific read/write checks before restricted capture and replay; minimized typed responses; metadata-only restricted-reveal events; authority-bound signed cursors; and one atomic domain/event/result/receipt transaction. Migration 0006 preserves legacy APIs while closing malformed typed-authority and unaudited-write paths. Fresh backend and frontend source reviews passed after remediation. Browser/live deployment qualification remains deferred, and intake rights are not granted in develop.
+
+The npm High-severity gate passes but retains the existing Moderate Vitest development-tool advisory [GHSA-82fw-gwwq-j7x9](https://github.com/advisories/GHSA-82fw-gwwq-j7x9). The current jsdom gate configures neither standalone mocker/interceptor plugins nor Vitest browser mode; no affected development service was started. This is tracked tooling follow-up, not an all-severity audit pass. See the [PR A handoff](docs/review-handoffs/2026-09-14-staff-intake-pr-a-handoff.md).
+
+## 2026-09-14 — PR A source activation
+
+PR #100 merged this intake planning contract at `ce38fb0`; PR #101 merged the Wave 1 UX predecessor at `9a6b66735f7261ca705f7e8ba5b7c2afcd815f92`. The owner subsequently authorized PR A implementation and disposable local PostgreSQL tests. The active branch is `feat/staff-intake-drafts` from that exact integration tip. Older docs-only/unmerged-predecessor statements below describe the planning snapshot and are superseded for this source lane. Browser UX verification is deferred until PR A is finished at the owner's request.
+
+PR A adds only durable candidate drafts, separately authorized address sections, bounded shared recovery and typed atomic receipt/result/audit authority. Review/follow-up, links, canonical finalization and corrections remain PRs B–D. The v28 runtime is historical and remains `not_qualified`; no deployment, cloud inspection/mutation, live data or production is authorized or claimed.
+
+
 ## 2026-09-14 — Staff intake planning boundary
 
 Accepted conversational direction is durable shared worker/employer intake with explicit save/resume, version-bound review and follow-up, restricted addresses, deliberate existing-party links without overwrite, and atomic finalization only after complete current review. Technical details remain proposed source contracts, not deployed functionality or new client/counsel policy. See [Staff intake contract](docs/planning/staff-intake-contract.md), [outcome-scale plan](.hermes/plans/2026-09-14-staff-intake-workflows-plan.md), and proposed [ADR-0017](docs/adr/ADR-0017-staff-intake-workflows.md).

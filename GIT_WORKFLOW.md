@@ -2,6 +2,12 @@
 
 **Status:** Accepted repository policy. GitHub enforcement/configuration is managed through reviewed infrastructure as code in `infra/github/`; `develop` and `main` protections have been exercised through real PRs.
 
+## 2026-09-14 — Staff intake planning boundary
+
+Accepted conversational direction is durable shared worker/employer intake with explicit save/resume, version-bound review and follow-up, restricted addresses, deliberate existing-party links without overwrite, and atomic finalization only after complete current review. Technical details remain proposed source contracts, not deployed functionality or new client/counsel policy. See [Staff intake contract](docs/planning/staff-intake-contract.md), [outcome-scale plan](.hermes/plans/2026-09-14-staff-intake-workflows-plan.md), and proposed [ADR-0017](docs/adr/ADR-0017-staff-intake-workflows.md).
+
+The improved Wave 1 UI is the preserved uncommitted predecessor in `/Users/genie/Desktop/golden_rose_project` on `feat/staff-intake-workflows`; do not reset, stash, copy over, or mix it into this docs-only planning worktree. Complete and merge that predecessor and the accepted planning packet before intake coding. V28 deployment/browser evidence is historical and its packet consumed; this audit did not recheck runtime availability or access expiry. The last recorded formal status remains `not_qualified`. No cloud, live-data, public-plane, implementation, or service-start authority is granted here.
+
 ## Core rules
 - Protected integration/release branches are `develop` and `main`; never commit directly, force-push, or bypass review/checks.
 - Work starts on a short-lived, purpose-named branch from the current approved base.
@@ -106,9 +112,10 @@ infra/github/
 The policy should cover protected branches, required checks, review-count mode,
 merge methods, conversation resolution, force-push/deletion rules, branch
 deletion after merge, and drift verification. It must be exercised by a real PR
-before it is considered operational. The current zero-approval policy is
-historical residual risk, not the target state and not evidence that review or
-validation may be skipped.
+before it is considered operational. The current zero-approval policy is the accepted solo-maintainer operating
+posture with an open High residual risk, not independent authorization and not
+evidence that review or validation may be skipped. No fictional human quorum is
+a prerequisite for this synthetic source-planning lane.
 
 ## Sensitive-data and artifact hygiene
 Never commit credentials, `.env` files, client records, legacy exports, raw personal data, production backups, unapproved generated reports, or unmanaged cloud state. Commit only reviewed source, non-secret configuration/templates, tests with wholly fictional synthetic fixtures unless a separate test-data procedure explicitly approves otherwise, documentation, and approved infrastructure definitions.

@@ -29,6 +29,8 @@ Use `ADR-NNNN-short-title.md`, with monotonic numbers. Never renumber an existin
 - `ADR-0015-finops-budget-ownership-separation.md` — accepted ownership-separation baseline merged through PR #79 at `develop@e7bab147`. Its original Implementation PR A authority is suspended after review proved the local policy/approval digest could be self-asserted; operational gates remain separate.
 - `ADR-0016-signed-finops-approval-authority.md` — accepted and merged amendment. Its 2026-09-09 human-visible addendum suspended Gate E0, per-domain signing, immediate FinOps separation, named-IAM-only tester access, and per-command approvals for fictional-synthetic `develop`; v28 used the replacement one-packet path to complete the first deployment. The v28 packet is consumed. Live data, production, destructive recovery/state editing, and future cloud mutation remain separately approved.
 
+- `ADR-0017-staff-intake-workflows.md` — proposed docs-only staff intake publication packet: durable manual drafts, separately authorized current-content review/finalization, restricted worker/party addresses, exact typed canonical outputs and narrow canonical-contract amendments. Improved-UI predecessor, fresh review and accepted protected planning publication remain activation gates; not implemented/deployed.
+
 ## Required sections
 - Status and date
 - Context/evidence posture

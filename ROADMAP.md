@@ -1,12 +1,29 @@
 # Golden Rose Operations Platform — Roadmap
 
-## 2026-09-13 — v28 human-visible develop deployment
+## 2026-09-14 — Staff intake planning boundary
+
+Accepted conversational direction is durable shared worker/employer intake with explicit save/resume, version-bound review and follow-up, restricted addresses, deliberate existing-party links without overwrite, and atomic finalization only after complete current review. Technical details remain proposed source contracts, not deployed functionality or new client/counsel policy. See [Staff intake contract](docs/planning/staff-intake-contract.md), [outcome-scale plan](.hermes/plans/2026-09-14-staff-intake-workflows-plan.md), and proposed [ADR-0017](docs/adr/ADR-0017-staff-intake-workflows.md).
+
+The improved Wave 1 UI is the preserved uncommitted predecessor in `/Users/genie/Desktop/golden_rose_project` on `feat/staff-intake-workflows`; do not reset, stash, copy over, or mix it into this docs-only planning worktree. Complete and merge that predecessor and the accepted planning packet before intake coding. V28 deployment/browser evidence is historical and its packet consumed; this audit did not recheck runtime availability or access expiry. The last recorded formal status remains `not_qualified`. No cloud, live-data, public-plane, implementation, or service-start authority is granted here.
+
+## Staff-intake outcome checklist
+
+- [ ] Review, accept, and merge the documentation-only intake contract/ADR-0017/outcome-scale plan to `develop`.
+- [ ] Finish, qualify, review, and merge the preserved improved-UI predecessor separately before intake coding.
+- [ ] After both merge, implement shared worker/employer draft save/resume and bounded queries with real persistence.
+- [ ] Implement restricted fields, current-version review and accountable append-only follow-up.
+- [ ] Implement explicit links and atomic complete/current-reviewed finalization with canonical reads; no automatic overwrite, ShiftNeed, open demand or placement.
+- [ ] PR D: implement bounded canonical corrections and current-facts re-review under contract §9; preserve original finalized intake/review/output links and never overwrite through intake.
+- [ ] Complete ordered PRs A–D, including section-local Save status/key isolation and success-then-unknown-with-later-dirty-edits tests. Docs-only publication is independent of UI merge; both merges are required before coding.
+- [ ] Qualify bilingual/accessibility/privacy/concurrency/replay behavior under the accepted plan; obtain fresh scoped approval for any later runtime deployment.
+
+## Historical 2026-09-13 — v28 human-visible develop deployment
 
 ## Delivery lock — v28 deployed develop testing environment
 - **Staffing:** One independent developer; fresh agent review and automated checks supply quality evidence.
-- **Human-visible outcome:** Protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e` is deployed to GCP as the private fictional-synthetic staff tracer service with private Cloud SQL, restricted database logins, service activation, expiring Basic access, automated qualification evidence, and browser handoff evidence.
-- **Gate budget:** The v28 one-use deployment packet is complete and consumed. Continue from the running service; separate approvals remain required for live data, production promotion, destructive recovery/state editing, unreviewed IAM expansion, or materially different authority boundaries.
-- **Next executable action:** Merge the accepted Wave 1 Employer workspace UX plan with this v28 continuity repair, then implement and review the complete UI and qualification-harness package in one implementation PR.
+- **Human-visible outcome:** Historical v28 evidence records the private fictional-synthetic Cloud Run/Cloud SQL staff workspace and browser handoff at protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e`. Availability and expiring access were not newly checked on 2026-09-14. The improved UI is an unmerged predecessor, and intake is not implemented or deployed.
+- **Gate budget:** The v28 one-use deployment packet is complete and consumed. This is docs-only planning, not authority to inspect or mutate the runtime. Any future synthetic deployment uses a fresh bounded packet; live data, production, destructive recovery/state editing and materially different authority remain separately scoped.
+- **Next executable action:** Review and publish the docs-only staff-intake planning packet to protected `develop`; complete and merge the preserved Wave 1 improved-UI predecessor before intake coding, then rebaseline a separate implementation branch from the exact merged integration tip. This lane authorizes no implementation, service start, cloud inspection/mutation, live data, or production.
 - **Do not regress:** Do not recreate completed cloud resources or credentials, restore bootstrap access, copy private access material into source, admit live data, or revive production-only gates as prerequisites for feedback.
 
 **Validated v28:** The develop environment is now human-visible. Publication/admission, Cloud SQL API deletion-protection enablement, foundation verification, database authority verification by direct Cloud Run verifier fallback, service activation, demo access preparation, service readiness, automated qualification, and browser handoff completed for protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e`.
@@ -15,7 +32,7 @@
 
 **Status:** Living checklist. Discovery evidence and approved decisions control scope; unchecked items are not authorized merely because they appear below.
 
-## Current deployment outcome — 2026-09-13
+## Recorded deployment outcome — 2026-09-13 (not rechecked)
 
 - [x] Private SQL/database, real bootstrap credentials, migration job, immutable publication/admission, and corrected job-image deployment.
 - [x] Catalog-only diagnostic: managed role capabilities confirmed; temporary diagnostic job deleted.
@@ -26,7 +43,7 @@
 - [ ] Human feedback triage from the running service.
 - [ ] Source-controlled follow-up for the Spanish-toggle defect and v28 qualification-harness normalizations.
 - [x] Accept the Wave 1 product direction: repair the production language provider, establish an intentional responsive workspace shell, separate Employer create/search/detail/revision flows, and add honest session-derived orientation without prominent environment disclaimers or fake metrics.
-- [ ] Merge `.hermes/plans/2026-09-13_131919-wave-1-employer-workspace-ux-remediation-plan.md` with the v28 continuity repair through protected `develop`.
+- [ ] Reconcile the Wave 1 predecessor’s exact merged planning/source status before closeout; do not repeat its earlier planning PR or infer the dirty improved-UI candidate is merged.
 - [ ] Implement, fully verify, independently review, and merge the complete Wave 1 UI and qualification-harness package as one implementation PR.
 
 ## Delivery-method governance
@@ -178,7 +195,9 @@
 - [ ] Block automated ranking, eligibility, hiring, or referral decisions.
 - [ ] Test authorization, aggregation/redaction, accessibility, and auditability.
 
-## Phase 3 — Worker profile and controlled documents
+## Phase 3 — Broader worker profile and controlled documents
+
+The near-term staff-intake contract is an explicit bounded exception: it proposes Worker/contact/residence/preferences creation or reuse after complete current review. This phase still controls broader worker/public onboarding, ongoing profile management, documents and referral readiness; it does not defer the separately planned staff-intake outcome.
 **Goal:** Add a staged, inclusive worker profile for agency review and controlled referral preparation.
 
 - [ ] Approve worker field inventory, field purpose, visibility, retention, and correction process.
@@ -208,7 +227,9 @@
 - Payment, e-signature, background/identity/credit screening, messaging, and calendar vendors.
 - Legacy-response migration or unrestricted production-data collection.
 
-## Delivery date tracker — August 20 to September 7, 2026
+## Historical delivery date tracker — August 20 to September 7, 2026
+
+This elapsed schedule is preserved as history, not the current executable lane. The 2026-09-14 intake checklist and CURRENT_WORK control current sequencing; old uncompleted deadlines and predecessor worker exclusions do not independently authorize or block that explicit intake exception.
 
 **Purpose:** At-a-glance schedule control for the private fictional-synthetic cloud `develop` target, controlled staff-pilot decision, and production-activation backstop. A checked item means the named evidence exists; elapsed time or partial effort is not completion.
 

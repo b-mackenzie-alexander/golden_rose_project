@@ -1262,12 +1262,41 @@ uv run bandit -q -r src
 uv run alembic upgrade head
 uv run pytest tests/unit/test_config.py tests/unit/test_demo_access.py tests/unit/application/test_synthetic_data_admission.py tests/unit/api/test_health.py -q
 uv run pytest --cov=golden_rose --cov-report=term-missing --cov-fail-under=95
+# The populated successor refuses downgrade by design. Use a fresh database
+# only in this workflow's disposable PostgreSQL service for the inherited guard.
+uv run python - <<'PYCODE'
+import os
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
+url = make_url(os.environ["GOLDEN_ROSE_DATABASE_URL"])
+assert os.environ.get("GITHUB_ACTIONS") == "true"
+assert (url.host, url.port, url.username, url.database) == (
+    "127.0.0.1", 55432, "golden_rose_test", "golden_rose_test"
+)
+admin = create_engine(url.set(database="postgres"), isolation_level="AUTOCOMMIT")
+with admin.connect() as connection:
+    connection.execute(text("CREATE DATABASE golden_rose_downgrade_test"))
+admin.dispose()
+PYCODE
+export GOLDEN_ROSE_DATABASE_URL="${GOLDEN_ROSE_DATABASE_URL%/golden_rose_test}/golden_rose_downgrade_test"
+uv run alembic upgrade head
+uv run python - <<'PYCODE'
+import os
+from sqlalchemy import create_engine, text
+engine = create_engine(os.environ["GOLDEN_ROSE_DATABASE_URL"])
+with engine.connect() as connection:
+    for table in ("intakes", "intake_addresses", "intake_links", "command_results",
+                  "command_receipts", "audit_events", "entity_authorities"):
+        assert connection.execute(text(f"SELECT count(*) FROM {table}")).scalar_one() == 0
+engine.dispose()
+PYCODE
 if uv run alembic downgrade base 2> build/alembic-downgrade.stderr; then
   echo "database authority lifecycle downgrade unexpectedly succeeded" >&2
   exit 1
 fi
 grep -F "database authority lifecycle downgrade is intentionally unsupported without an operator-reviewed role handoff" build/alembic-downgrade.stderr
 uv run alembic upgrade head
+# GitHub destroys both disposable databases with the job service.
 uv run pip-audit --skip-editable
 mkdir -p build
 uv run cyclonedx-py environment --pyproject pyproject.toml --output-reproducible --of JSON -o build/backend-sbom.cdx.json

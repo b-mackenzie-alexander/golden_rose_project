@@ -5,6 +5,8 @@ import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
 from scripts.verify_database_authority import (
+    EXPECTED_INTAKE_CONSTRAINTS,
+    EXPECTED_INTAKE_TRIGGERS,
     _required_authenticated_probe_urls,
     evaluate_authority_snapshot,
     main,
@@ -22,6 +24,16 @@ def test_verify_database_authority_script_exists_at_expected_path() -> None:
 
 def _expected_snapshot() -> dict[str, object]:
     return {
+        "intake_constraints": dict(EXPECTED_INTAKE_CONSTRAINTS),
+        "intake_triggers": {
+            key: {"function": function, "enabled": "O", "deferred": deferred}
+            for key, (function, deferred) in EXPECTED_INTAKE_TRIGGERS.items()
+        },
+        "security_definer_functions": [],
+        "runtime_update_columns": {
+            "intakes": ["content", "version", "content_version", "updated_at", "updated_by"],
+            "intake_addresses": ["line1", "line2", "locality", "region", "postal_code", "country"],
+        },
         "roles": {
             "golden_rose_schema_owner": {
                 "rolcanlogin": False,
@@ -92,11 +104,19 @@ def _expected_snapshot() -> dict[str, object]:
             "entity_authorities": "golden_rose_schema_owner",
             "command_receipts": "golden_rose_schema_owner",
             "audit_events": "golden_rose_schema_owner",
+            "intakes": "golden_rose_schema_owner",
+            "intake_addresses": "golden_rose_schema_owner",
+            "intake_links": "golden_rose_schema_owner",
+            "command_results": "golden_rose_schema_owner",
         },
         "function_owners": {
             "deny_mutation_on_append_only_tables": "golden_rose_schema_owner",
             "populate_employer_revision_compatibility_fields": "golden_rose_schema_owner",
             "populate_command_receipt_revision_compatibility_fields": "golden_rose_schema_owner",
+            "populate_legacy_command_result": "golden_rose_schema_owner",
+            "guard_intake_identity": "golden_rose_schema_owner",
+            "guard_intake_write_authority": "golden_rose_schema_owner",
+            "guard_intake_address_authority": "golden_rose_schema_owner",
         },
         "public_table_privileges": {},
         "runtime_table_privileges": {
@@ -106,6 +126,10 @@ def _expected_snapshot() -> dict[str, object]:
             "entity_authorities": ["INSERT", "SELECT"],
             "command_receipts": ["INSERT", "SELECT"],
             "audit_events": ["INSERT", "SELECT"],
+            "intakes": ["INSERT", "SELECT"],
+            "intake_addresses": ["INSERT", "SELECT"],
+            "intake_links": ["INSERT", "SELECT"],
+            "command_results": ["INSERT", "SELECT"],
         },
         "runtime_schema_privileges": ["USAGE"],
         "runtime_function_privileges": {
@@ -403,3 +427,30 @@ def test_cloud_sql_native_catalog_graph_rejects_drift(drift: str) -> None:
     elif drift == "duplicate":
         rows.append(dict(rows[0]))
     assert evaluate_authority_snapshot(snapshot)
+
+
+@pytest.mark.parametrize(
+    "key,value",
+    [
+        ("intake_constraints", {"intakes.ck_intakes_content_kind": "CHECK (true)"}),
+        ("intake_triggers", {}),
+        ("runtime_update_columns", {"intakes": ["content", "intake_id"]}),
+        ("security_definer_functions", ["guard_intake_identity"]),
+    ],
+)
+def test_intake_authority_drift_fails_closed(key, value):
+    snapshot = _expected_snapshot()
+    snapshot[key] = value
+    assert evaluate_authority_snapshot(snapshot)
+
+
+def test_ci_checks_downgrade_on_verified_empty_disposable_successor():
+    workflow = (ROOT / ".github/workflows/application-quality.yml").read_text()
+    create = workflow.index("CREATE DATABASE golden_rose_downgrade_test")
+    empty_check = workflow.index("SELECT count(*) FROM {table}", create)
+    downgrade = workflow.index("if uv run alembic downgrade base", empty_check)
+    refusal = workflow.index("operator-reviewed role handoff", downgrade)
+    assert create < empty_check < downgrade < refusal
+    assert "DROP DATABASE" not in workflow
+    assert 'assert os.environ.get("GITHUB_ACTIONS") == "true"' in workflow
+    assert '"127.0.0.1", 55432, "golden_rose_test", "golden_rose_test"' in workflow

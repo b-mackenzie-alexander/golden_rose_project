@@ -1,5 +1,12 @@
 # ADR-0017 — Staff intake workflows
 
+## 2026-09-14 — PR A source activation
+
+PR #100 merged this intake planning contract at `ce38fb0`; PR #101 merged the Wave 1 UX predecessor at `9a6b66735f7261ca705f7e8ba5b7c2afcd815f92`. The owner subsequently authorized PR A implementation and disposable local PostgreSQL tests. The active branch is `feat/staff-intake-drafts` from that exact integration tip. Older docs-only/unmerged-predecessor statements below describe the planning snapshot and are superseded for this source lane. Browser UX verification is deferred until PR A is finished at the owner's request.
+
+PR A adds only durable candidate drafts, separately authorized address sections, bounded shared recovery and typed atomic receipt/result/audit authority. Review/follow-up, links, canonical finalization and corrections remain PRs B–D. The v28 runtime is historical and remains `not_qualified`; no deployment, cloud inspection/mutation, live data or production is authorized or claimed.
+
+
 **Status:** Proposed — finalized for approved docs-only publication; pending fresh review and accepted protected planning merge.
 **Date:** 2026-09-14
 **Owner:** Beatrice, technical delivery owner. Conversational workflow acceptance is distinct from technical approval and client/counsel/live-use acceptance.

@@ -52,6 +52,15 @@ def test_synthetic_principal_has_exact_create_and_read_permissions() -> None:
             EMPLOYER_DRAFT_REVISE_PERMISSION,
             EMPLOYER_CONTACT_DRAFT_CREATE_PERMISSION,
             EMPLOYER_CONTACT_READ_PERMISSION,
+            "intake:read",
+            "intake:draft:create",
+            "intake:draft:revise",
+            "worker_residence:read",
+            "worker_residence:write",
+            "party_address:read",
+            "party_address:write",
+            "worksite_address:read",
+            "worksite_address:write",
         }
     )
 
@@ -76,6 +85,15 @@ def test_synthetic_principal_has_exact_bounded_employer_permissions() -> None:
             EMPLOYER_DRAFT_REVISE_PERMISSION,
             EMPLOYER_CONTACT_DRAFT_CREATE_PERMISSION,
             EMPLOYER_CONTACT_READ_PERMISSION,
+            "intake:read",
+            "intake:draft:create",
+            "intake:draft:revise",
+            "worker_residence:read",
+            "worker_residence:write",
+            "party_address:read",
+            "party_address:write",
+            "worksite_address:read",
+            "worksite_address:write",
         }
     )
 
@@ -98,6 +116,15 @@ def test_request_headers_cannot_grant_read_permission() -> None:
             EMPLOYER_DRAFT_REVISE_PERMISSION,
             EMPLOYER_CONTACT_DRAFT_CREATE_PERMISSION,
             EMPLOYER_CONTACT_READ_PERMISSION,
+            "intake:read",
+            "intake:draft:create",
+            "intake:draft:revise",
+            "worker_residence:read",
+            "worker_residence:write",
+            "party_address:read",
+            "party_address:write",
+            "worksite_address:read",
+            "worksite_address:write",
         }
     )
     assert not hasattr(principal, "headers")
@@ -196,6 +223,15 @@ def test_synthetic_principal_has_exact_bounded_employer_and_contact_permissions(
             EMPLOYER_DRAFT_REVISE_PERMISSION,
             EMPLOYER_CONTACT_DRAFT_CREATE_PERMISSION,
             EMPLOYER_CONTACT_READ_PERMISSION,
+            "intake:read",
+            "intake:draft:create",
+            "intake:draft:revise",
+            "worker_residence:read",
+            "worker_residence:write",
+            "party_address:read",
+            "party_address:write",
+            "worksite_address:read",
+            "worksite_address:write",
         }
     )
 
@@ -218,7 +254,35 @@ def test_request_headers_cannot_grant_employer_contact_permissions() -> None:
             EMPLOYER_DRAFT_REVISE_PERMISSION,
             EMPLOYER_CONTACT_DRAFT_CREATE_PERMISSION,
             EMPLOYER_CONTACT_READ_PERMISSION,
+            "intake:read",
+            "intake:draft:create",
+            "intake:draft:revise",
+            "worker_residence:read",
+            "worker_residence:write",
+            "party_address:read",
+            "party_address:write",
+            "worksite_address:read",
+            "worksite_address:write",
         }
     )
     assert not hasattr(principal, "headers")
     assert not hasattr(principal, "request_headers")
+
+
+def test_intake_permissions_are_not_activated_in_develop():
+    settings = Settings(
+        environment="local",
+        auth_mode="synthetic",
+        database_url="postgresql+psycopg://test:test@127.0.0.1:55432/golden_rose",
+        synthetic_staff_id=uuid4(),
+    ).model_copy(update={"environment": "develop"})
+    principal = get_staff_principal(settings)
+    assert principal.permissions == frozenset(
+        {
+            CREATE_DRAFT_EMPLOYER_PERMISSION,
+            EMPLOYER_READ_PERMISSION,
+            EMPLOYER_DRAFT_REVISE_PERMISSION,
+            EMPLOYER_CONTACT_DRAFT_CREATE_PERMISSION,
+            EMPLOYER_CONTACT_READ_PERMISSION,
+        }
+    )

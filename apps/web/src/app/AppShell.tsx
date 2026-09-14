@@ -3,7 +3,7 @@ import { NavLink, Outlet } from 'react-router';
 import { useLanguage } from '../i18n/LanguageProvider';
 
 export function AppShell() {
-  const { messages, toggleLanguage } = useLanguage();
+  const { messages, toggleLanguage, language } = useLanguage();
 
   return (
     <>
@@ -15,6 +15,16 @@ export function AppShell() {
               <li>
                 <NavLink className="focus-ring nav-link control-44" to="/employers">
                   {messages.employersNav}
+                </NavLink>
+              </li>
+              <li>
+                <NavLink className="focus-ring nav-link control-44" to="/staff/intakes/workers">
+                  {language === 'en' ? 'Worker intakes' : 'Registros de trabajadores'}
+                </NavLink>
+              </li>
+              <li>
+                <NavLink className="focus-ring nav-link control-44" to="/staff/intakes/employers">
+                  {language === 'en' ? 'Employer intakes' : 'Registros de empleadores'}
                 </NavLink>
               </li>
             </ul>

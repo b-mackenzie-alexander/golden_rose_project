@@ -338,3 +338,18 @@ select {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Staff intake drafts use independent section saves. */
+.intake-workspace { max-width: 72rem; margin-inline: auto; }
+.intake-workspace fieldset { border: 1px solid var(--color-border, #bcc6cb); border-radius: .75rem; padding: 1.25rem; margin-block: 1.25rem; min-width: 0; }
+.intake-workspace legend { font-weight: 700; padding-inline: .4rem; }
+.intake-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); gap: 1rem; }
+.intake-field { display: flex; flex-direction: column; gap: .4rem; margin-block: .75rem; }
+.intake-workspace input:not([type=checkbox]), .intake-workspace select, .intake-workspace textarea { width: 100%; min-height: 44px; padding: .65rem; border: 1px solid #77858e; border-radius: .35rem; background: white; color: #172b36; font: inherit; }
+.intake-workspace button { min-height: 44px; padding: .65rem 1rem; margin: .4rem .5rem .4rem 0; }
+.intake-workspace :focus-visible { outline: 3px solid #725214; outline-offset: 3px; }
+.intake-save-banner { padding: 1rem; background: #f3eee3; border-left: 4px solid #725214; }
+.intake-list { list-style: none; padding: 0; }
+.intake-list li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .7rem; border-bottom: 1px solid #bcc6cb; padding: 1rem 0; }
+.intake-reference { overflow-wrap: anywhere; }
+.intake-range { border-bottom: 1px solid #bcc6cb; padding-block: .5rem; }

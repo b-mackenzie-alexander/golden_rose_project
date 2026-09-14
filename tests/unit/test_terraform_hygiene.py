@@ -9357,3 +9357,28 @@ def test_static_validation_rejects_weakened_temporary_public_access_contract(
 
     assert result.returncode == 1
     assert expected in result.stdout.lower()
+
+
+@pytest.mark.parametrize(
+    "original",
+    [
+        'assert os.environ.get("GITHUB_ACTIONS") == "true"',
+        '"127.0.0.1", 55432, "golden_rose_test", "golden_rose_test"',
+        'assert connection.execute(text(f"SELECT count(*) FROM {table}")).scalar_one() == 0',
+    ],
+)
+def test_disposable_downgrade_workflow_guards_cannot_be_removed(
+    tmp_path: Path, original: str
+) -> None:
+    _write_minimal_required_terraform_scaffold(tmp_path)
+    workflow = _current_workflow_text("application-quality.yml").replace(original, "pass", 1)
+    _write_workflow_fixture(tmp_path, "application-quality.yml", workflow)
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_terraform_static.py", "--root", str(tmp_path)],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode == 1
+    assert "contains forbidden workflow run mutation" in result.stdout

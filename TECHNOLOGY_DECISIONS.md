@@ -1,5 +1,13 @@
 # Technology Decisions — Golden Rose Operations Platform
 
+## 2026-09-14 — PR B source implementation
+
+PR #102 merged durable intake drafts at `develop@2783415dd19027428bf2036730b6c0d83f23ab3c`. The owner completed the bounded local browser-verification step and authorized PR B on `feat/staff-intake-review`. Review/follow-up, protected history and governed bilingual work interests are now implemented in the source candidate. Fresh specification/quality and final integration reviews approved source publication; local qualification passed 1,253 backend tests (95.64% coverage) and 202 frontend tests. Required CI and protected merge remain; this is not deployed functionality. The browser evidence remains separately preserved in `ee82615` on `test/staff-intake-browser-ux`, and the requested minor-polish note is reserved for the next docs PR.
+
+Migration `0007_intake_review_follow_up` extends exact receipt/result/audit authority and append-only protected payloads. Review binds the saved content/catalog versions; follow-up changes aggregate version without changing reviewed facts. Owner choices come only from an injected trusted directory; no user administration or develop permission grant is introduced. Contract §6 clarifies the bounded owner query and structured protected follow-up context. PR C linking/finalization and PR D corrections remain later work under the accepted plan. No cloud inspection/mutation, deployment, live/client data or production authority follows. The historical v28 packet remains consumed and its formal status remains `not_qualified`.
+
+See the [PR B handoff](docs/review-handoffs/2026-09-14-staff-intake-pr-b-handoff.md) for the current evidence and next action. Older PR A-only and planning-only activation statements below are historical.
+
 ## 2026-09-14 — PR A source activation
 
 PR #100 merged this intake planning contract at `ce38fb0`; PR #101 merged the Wave 1 UX predecessor at `9a6b66735f7261ca705f7e8ba5b7c2afcd815f92`. The owner subsequently authorized PR A implementation and disposable local PostgreSQL tests. The active branch is `feat/staff-intake-drafts` from that exact integration tip. Older docs-only/unmerged-predecessor statements below describe the planning snapshot and are superseded for this source lane. Browser UX verification is deferred until PR A is finished at the owner's request.

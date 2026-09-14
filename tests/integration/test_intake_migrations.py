@@ -171,7 +171,7 @@ def test_populated_intake_downgrade_refuses_before_ddl(migration_database):
         assert connection.execute(text("SELECT count(*) FROM intakes")).scalar_one() == 1
         assert (
             connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-            == "0006_intake_drafts"
+            == "0007_intake_review_follow_up"
         )
         assert (
             connection.execute(text("SELECT to_regclass('public.command_results')")).scalar_one()
@@ -218,7 +218,7 @@ def test_empty_successor_reaches_inherited_downgrade_guard(migration_database):
     # Alembic's transactional DDL keeps the original head when 0005 refuses.
     with migration_database.connect() as connection:
         assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == (
-            "0006_intake_drafts"
+            "0007_intake_review_follow_up"
         )
 
 

@@ -1,5 +1,15 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-09-14 — PR B source candidate verified
+
+- **Staffing:** One independent developer; agent implementation and fresh component reviews provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #102 merged durable intake drafts at `develop@2783415dd19027428bf2036730b6c0d83f23ab3c`. Bounded local browser verification passed the exercised flows with recorded tool/manual limits; its separate docs commit is `ee82615` on `test/staff-intake-browser-ux`. The disposable browser services/data were cleaned up. Historical v28 cloud evidence remains `not_qualified` and was not rechecked.
+- **Gate budget:** The owner authorized PR B source work and previously approved disposable local PostgreSQL testing. No cloud inspection/mutation, deployment, live/client data, production directory or develop permission activation follows; the old cloud packet remains consumed.
+- **Next executable action:** Publish the verified PR B candidate on `feat/staff-intake-review` to `develop` and complete required CI before the owner merges. Fresh backend/frontend specification and quality reviews plus final integration review approved source publication. After merge, rebaseline PR C from the exact new integration tip.
+- **Do not regress:** PR A save/resume, independent dirty buffers and original command retries, restricted addresses, existing Employer APIs/UI, bilingual parity and private cloud protections. Linking/finalization and canonical correction remain PR C/D.
+
+This activation supersedes older PR A-only, docs-only and unmerged-predecessor statements below. Minor UX polish is deferred at the owner's request; its separate untracked note is reserved for the next docs-update PR and must not be staged into PR B. PR B local qualification passed: 1,253 backend tests / 95.64% coverage and 202 frontend tests with full web verification. The disposable PostgreSQL cluster was stopped and removed. Publication/required CI and protected merge remain; no PR B runtime was started or deployed.
+
 ## 2026-09-14 — PR A staff-intake implementation activated
 
 - **Staffing:** One independent developer; fresh agent reviews provide quality evidence, not independent-human authorization.
@@ -20,9 +30,9 @@ The improved Wave 1 UI is the preserved uncommitted predecessor in `/Users/genie
 ## Staff-intake outcome checklist
 
 - [x] Intake planning packet merged through PR #100 at `ce38fb0`.
-- [x] Wave 1 improved-UI source merged separately through PR #101 at `9a6b667`; browser UX verification remains deferred, not claimed complete.
-- [ ] After both merge, implement shared worker/employer draft save/resume and bounded queries with real persistence.
-- [ ] Implement restricted fields, current-version review and accountable append-only follow-up.
+- [x] Wave 1 improved-UI source merged through PR #101 at `9a6b667`; bounded local browser verification followed PR #102, with manual/tool limits recorded separately.
+- [x] PR A: shared worker/employer draft save/resume and bounded queries merged through PR #102 at `2783415`.
+- [ ] PR B: governed work interests, current-version review and accountable append-only follow-up are implemented and locally verified; required CI/protected merge remain.
 - [ ] Implement explicit links and atomic complete/current-reviewed finalization with canonical reads; no automatic overwrite, ShiftNeed, open demand or placement.
 - [ ] PR D: implement bounded canonical corrections and current-facts re-review under contract §9; preserve original finalized intake/review/output links and never overwrite through intake.
 - [ ] Complete ordered PRs A–D, including section-local Save status/key isolation and success-then-unknown-with-later-dirty-edits tests. Docs-only publication is independent of UI merge; both merges are required before coding.

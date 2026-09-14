@@ -1,5 +1,15 @@
 # AGENTS.md — Golden Rose Operations Platform
 
+## 2026-09-14 — PR B source candidate verified
+
+- **Staffing:** One independent developer; agent implementation and fresh component reviews provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #102 merged durable intake drafts at `develop@2783415dd19027428bf2036730b6c0d83f23ab3c`. Bounded local browser verification passed the exercised flows with recorded tool/manual limits; its separate docs commit is `ee82615` on `test/staff-intake-browser-ux`. The disposable browser services/data were cleaned up. Historical v28 cloud evidence remains `not_qualified` and was not rechecked.
+- **Gate budget:** The owner authorized PR B source work and previously approved disposable local PostgreSQL testing. No cloud inspection/mutation, deployment, live/client data, production directory or develop permission activation follows; the old cloud packet remains consumed.
+- **Next executable action:** Publish the verified PR B candidate on `feat/staff-intake-review` to `develop` and complete required CI before the owner merges. Fresh backend/frontend specification and quality reviews plus final integration review approved source publication. After merge, rebaseline PR C from the exact new integration tip.
+- **Do not regress:** PR A save/resume, independent dirty buffers and original command retries, restricted addresses, existing Employer APIs/UI, bilingual parity and private cloud protections. Linking/finalization and canonical correction remain PR C/D.
+
+This activation supersedes older PR A-only, docs-only and unmerged-predecessor statements below. Minor UX polish is deferred at the owner's request; its separate untracked note is reserved for the next docs-update PR and must not be staged into PR B. PR B local qualification passed: 1,253 backend tests / 95.64% coverage and 202 frontend tests with full web verification. The disposable PostgreSQL cluster was stopped and removed. Publication/required CI and protected merge remain; no PR B runtime was started or deployed.
+
 ## 2026-09-14 — PR A staff-intake implementation activated
 
 - **Staffing:** One independent developer; fresh agent reviews provide quality evidence, not independent-human authorization.

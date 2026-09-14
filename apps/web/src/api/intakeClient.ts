@@ -1,4 +1,10 @@
 import type {
+  WorkInterest,
+  HistoryItem,
+  Page,
+  RestrictedHistory,
+  StaffChoice,
+  CatalogResult,
   AddressDetail,
   AddressSection,
   DraftObject,
@@ -45,7 +51,25 @@ function content(value: unknown, kind: IntakeKind): value is DraftObject {
       (kind === 'worker' ? ['interests', 'availability'] : ['offer', 'schedule']).includes(key)
     )
       return true;
-    if (kind === 'worker' && key === 'interests') return sectionObject(item, ['other_description']);
+    if (kind === 'worker' && key === 'interests')
+      return (
+        object(item) &&
+        Object.entries(item).every(([field, entry]) =>
+          field === 'other_description'
+            ? entry === null || typeof entry === 'string'
+            : field === 'selections' &&
+              Array.isArray(entry) &&
+              entry.length <= 20 &&
+              entry.every(
+                (selection) =>
+                  object(selection) &&
+                  typeof selection.interest_id === 'string' &&
+                  uuid.test(selection.interest_id) &&
+                  positive(selection.catalog_version) &&
+                  Object.keys(selection).every((k) => ['interest_id', 'catalog_version'].includes(k)),
+              ),
+        )
+      );
     if (kind === 'worker' && key === 'availability' && object(item)) {
       return Object.entries(item).every(([field, entry]) =>
         field === 'ranges'
@@ -91,7 +115,13 @@ function summary(v: unknown): v is IntakeSummary {
     typeof v.complete === 'boolean' &&
     Array.isArray(v.missing_fields) &&
     v.missing_fields.every((x) => typeof x === 'string') &&
-    v.review_status === 'unreviewed' &&
+    ['unreviewed', 'needs_follow_up', 'current', 'stale'].includes(String(v.review_status)) &&
+    (v.follow_up === undefined ||
+      (object(v.follow_up) &&
+        typeof v.follow_up.owner_staff_id === 'string' &&
+        uuid.test(v.follow_up.owner_staff_id) &&
+        typeof v.follow_up.next_follow_up_at === 'string' &&
+        typeof v.follow_up.overdue === 'boolean')) &&
     typeof v.updated_at === 'string' &&
     (v.display_name === undefined || v.display_name === null || typeof v.display_name === 'string')
   );
@@ -104,7 +134,18 @@ function detail(v: unknown): v is IntakeDetail {
     content(v.candidate, v.summary.kind) &&
     object(v.resolved) &&
     object(v.links) &&
-    typeof v.dependency_stale === 'boolean'
+    typeof v.dependency_stale === 'boolean' &&
+    (v.latest_review === undefined ||
+      (object(v.latest_review) &&
+        typeof v.latest_review.review_id === 'string' &&
+        uuid.test(v.latest_review.review_id) &&
+        positive(v.latest_review.reviewed_record_version) &&
+        positive(v.latest_review.reviewed_content_version) &&
+        ['intake_reviewed', 'needs_follow_up'].includes(String(v.latest_review.outcome)) &&
+        typeof v.latest_review.actor_id === 'string' &&
+        uuid.test(v.latest_review.actor_id) &&
+        typeof v.latest_review.actor_display_name === 'string' &&
+        typeof v.latest_review.occurred_at === 'string'))
   );
 }
 async function request<T>(
@@ -156,7 +197,9 @@ async function request<T>(
         !['true', 'false'].includes(replayed ?? '') ||
         version !== String(candidate.result_record_version) ||
         candidate.command_id !== key ||
-        candidate.current.summary.version < candidate.result_record_version
+        (object(candidate.current) && object(candidate.current.summary)
+          ? candidate.current.summary.version
+          : (candidate.current as unknown as WorkInterest).version) < candidate.result_record_version
       )
         return { ok: false, failure: 'unknown' };
     }
@@ -178,7 +221,11 @@ export const queryIntakes = (kind: IntakeKind, filter: DraftObject = {}) =>
   );
 export const getIntake = (id: string) =>
   uuid.test(id)
-    ? request(`/intakes/${id}`, undefined, (v): v is IntakeDetail => detail(v) && v.summary.intake_id === id)
+    ? request(
+        `/intakes/${id}`,
+        undefined,
+        (v): v is IntakeDetail => detail(v) && v.summary.intake_id === id,
+      )
     : Promise.resolve<Result<IntakeDetail>>({ ok: false, failure: 'failed' });
 export const getIntakeAddress = (id: string, section: AddressSection) =>
   request(
@@ -190,7 +237,14 @@ export const getIntakeAddress = (id: string, section: AddressSection) =>
       positive(v.version) &&
       v.section === section &&
       (v.candidate === null ||
-        sectionObject(v.candidate, ['line1', 'line2', 'locality', 'region', 'postal_code', 'country'])) &&
+        sectionObject(v.candidate, [
+          'line1',
+          'line2',
+          'locality',
+          'region',
+          'postal_code',
+          'country',
+        ])) &&
       (v.resolved === null ||
         sectionObject(v.resolved, ['line1', 'line2', 'locality', 'region', 'postal_code', 'country'])),
   );
@@ -199,6 +253,117 @@ export const saveIntake = (command: Command) =>
     command.path,
     command.body,
     (v): v is IntakeCommandResult =>
-      object(v) && typeof v.command_id === 'string' && positive(v.result_record_version) && detail(v.current),
+      object(v) &&
+      typeof v.command_id === 'string' &&
+      positive(v.result_record_version) &&
+      detail(v.current),
     command.key,
+  );
+
+const page = <T>(value: unknown, item: (v: unknown) => v is T): value is Page<T> =>
+  object(value) &&
+  Array.isArray(value.items) &&
+  value.items.length <= 25 &&
+  value.items.every(item) &&
+  (value.next_cursor === null || typeof value.next_cursor === 'string');
+const interest = (v: unknown): v is WorkInterest =>
+  object(v) &&
+  typeof v.interest_id === 'string' &&
+  uuid.test(v.interest_id) &&
+  positive(v.version) &&
+  typeof v.code === 'string' &&
+  typeof v.label_en === 'string' &&
+  typeof v.label_es === 'string' &&
+  typeof v.active === 'boolean';
+export const queryWorkInterests = (cursor?: string, includeRetired = false) =>
+  request(
+    '/work-interests/query',
+    { page_size: 25, include_retired: includeRetired, ...(cursor ? { cursor } : {}) },
+    (v): v is Page<WorkInterest> => page(v, interest),
+  );
+export const saveWorkInterest = (command: Command) =>
+  request(
+    command.path,
+    command.body,
+    (v): v is CatalogResult =>
+      object(v) &&
+      typeof v.command_id === 'string' &&
+      positive(v.result_record_version) &&
+      interest(v.current),
+    command.key,
+  );
+export const queryFollowUpOwners = (id: string, cursor?: string) =>
+  request(
+    `/intakes/${id}/follow-up-owners/query`,
+    { page_size: 25, ...(cursor ? { cursor } : {}) },
+    (v): v is Page<StaffChoice> =>
+      page(
+        v,
+        (x): x is StaffChoice =>
+          object(x) &&
+          typeof x.staff_id === 'string' &&
+          uuid.test(x.staff_id) &&
+          typeof x.display_name === 'string',
+      ),
+  );
+export const queryIntakeHistory = (id: string, cursor?: string) =>
+  request(
+    `/intakes/${id}/history/query`,
+    { page_size: 25, ...(cursor ? { cursor } : {}) },
+    (v): v is Page<HistoryItem> =>
+      page(
+        v,
+        (x): x is HistoryItem =>
+          object(x) &&
+          typeof x.event_id === 'string' &&
+          uuid.test(x.event_id) &&
+          positive(x.version) &&
+          positive(x.content_version) &&
+          typeof x.event_type === 'string' &&
+          typeof x.actor_id === 'string' &&
+          uuid.test(x.actor_id) &&
+          typeof x.actor_display_name === 'string' &&
+          typeof x.occurred_at === 'string' &&
+          ['review_id', 'outcome', 'owner_staff_id', 'next_follow_up_at'].every(
+            (key) => x[key] === undefined || typeof x[key] === 'string',
+          ),
+      ),
+  );
+export const getRestrictedHistory = (id: string, eventId: string) =>
+  request(
+    `/intakes/${id}/history/${eventId}/restricted`,
+    undefined,
+    (v): v is RestrictedHistory =>
+      object(v) &&
+      v.event_id === eventId &&
+      (v.note === undefined || typeof v.note === 'string') &&
+      (v.reviewed_content === undefined || object(v.reviewed_content)) &&
+      (v.follow_up === undefined ||
+        (object(v.follow_up) &&
+          Object.keys(v.follow_up).every((key) =>
+            ['action', 'reason_code', 'reason_text', 'method', 'outcome', 'time_zone'].includes(key),
+          ) &&
+          ['needs_follow_up', 'reschedule', 'reassign', 'attempt'].includes(
+            typeof v.follow_up.action === 'string' ? v.follow_up.action : '',
+          ) &&
+          typeof v.follow_up.reason_text === 'string' &&
+          typeof v.follow_up.time_zone === 'string' &&
+          (v.follow_up.reason_code === undefined ||
+            ['missing_information', 'clarification', 'other'].includes(
+              typeof v.follow_up.reason_code === 'string' ? v.follow_up.reason_code : '',
+            )) &&
+          (v.follow_up.method === undefined ||
+            ['phone', 'email', 'in_person', 'other'].includes(
+              typeof v.follow_up.method === 'string' ? v.follow_up.method : '',
+            )) &&
+          (v.follow_up.outcome === undefined ||
+            [
+              'no_answer',
+              'voicemail_left',
+              'callback_requested',
+              'contact_reached_information_pending',
+              'invalid_contact_information',
+              'information_received',
+              'other',
+            ].includes(typeof v.follow_up.outcome === 'string' ? v.follow_up.outcome : '')))),
   );

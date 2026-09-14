@@ -24,7 +24,7 @@ def test_partial_content_normalizes_and_clears():
         {"full_name": ""},
         {"extra": "a"},
         {"phone": "123"},
-        {"interests": {"selections": []}},
+        {"interests": {"selections": [{"interest_id": "invalid", "catalog_version": 1}]}},
         {"residential_address": {"line1": "X"}},
     ],
 )

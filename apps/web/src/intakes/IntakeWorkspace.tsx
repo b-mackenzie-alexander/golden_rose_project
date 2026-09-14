@@ -11,6 +11,9 @@ import type {
 import { useLanguage } from '../i18n/LanguageProvider';
 import { AddressFields, IntakeFields } from './IntakeFields';
 import { intakeMessages } from './messages';
+import { IntakeWorkflow } from './IntakeWorkflow';
+import { IntakeHistory } from './IntakeHistory';
+import { workflowLabel } from './workflowMessages';
 import {
   allSaved,
   editSection,
@@ -33,6 +36,7 @@ const addressSections = (kind: IntakeKind): AddressSection[] =>
 function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind }) {
   const { language } = useLanguage();
   const m = intakeMessages[language];
+  const t = (key: string) => workflowLabel(key, language);
   const [state, setState] = useState<EditorState>(() => ({
     detail: null,
     sections: { content: { ...initialSection({}), status: 'unsaved' } },
@@ -195,7 +199,7 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
   }
   async function save(name: string) {
     const s = current.current;
-    const section = s.sections[name];
+    const section = s.sections[name] ?? (name === 'workflow' ? initialSection({}) : undefined);
     if (
       !section ||
       section.readPending ||
@@ -206,21 +210,52 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
     )
       return;
     const intakeId = s.detail?.summary.intake_id;
-    const path = !intakeId
-      ? '/intakes'
-      : name === 'content'
-        ? `/intakes/${intakeId}/revisions`
-        : `/intakes/${intakeId}/addresses/${name}/revisions`;
+    const workflow = name === 'workflow';
+    if (
+      workflow &&
+      !section.command &&
+      section.value.operation !== 'follow-ups' &&
+      !Object.entries(s.sections)
+        .filter(([key]) => key !== 'workflow')
+        .every(([, value]) => value.status === 'saved' && !value.readPending)
+    )
+      return;
+    const path = workflow
+      ? `/intakes/${intakeId ?? ''}/${section.value.operation === 'follow-ups' ? 'follow-ups' : 'reviews'}`
+      : !intakeId
+        ? '/intakes'
+        : name === 'content'
+          ? `/intakes/${intakeId}/revisions`
+          : `/intakes/${intakeId}/addresses/${name}/revisions`;
     const pending = section.command
       ? { ...section, status: 'saving' as const }
-      : submitSection(
-          section,
-          crypto.randomUUID(),
-          s.detail?.summary.version ?? 0,
-          path,
-          name !== 'content',
-          intakeId ? undefined : kind,
-        );
+      : workflow
+        ? {
+            ...section,
+            status: 'saving' as const,
+            command: Object.freeze({
+              key: crypto.randomUUID(),
+              path,
+              generation: section.generation,
+              body: structuredClone({
+                expected_version: s.detail?.summary.version ?? 0,
+                ...Object.fromEntries(
+                  Object.entries(section.value).filter(([key]) => key !== 'operation'),
+                ),
+                ...(section.value.operation !== 'follow-ups' && !section.value.outcome
+                  ? { outcome: 'intake_reviewed' }
+                  : {}),
+              }),
+            }),
+          }
+        : submitSection(
+            section,
+            crypto.randomUUID(),
+            s.detail?.summary.version ?? 0,
+            path,
+            name !== 'content',
+            intakeId ? undefined : kind,
+          );
     update((previous) => ({ ...previous, sections: { ...previous.sections, [name]: pending } }));
     if (!pending.command) return;
     const result = await saveIntake(pending.command);
@@ -267,7 +302,10 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
         confirmedConflict: true,
         sections: {
           ...Object.fromEntries(
-            Object.entries(previous.sections).map(([key, value]) => [key, { ...value, readPending: false }]),
+            Object.entries(previous.sections).map(([key, value]) => [
+              key,
+              { ...value, readPending: false },
+            ]),
           ),
           [name]: { ...finishSection(previous.sections[name] ?? section, 'saved'), readPending: false },
         },
@@ -282,7 +320,7 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
         detail,
         sections: {
           ...previous.sections,
-          ...(name !== 'content' && previous.sections.content?.status === 'saved'
+          ...(!workflow && name !== 'content' && previous.sections.content?.status === 'saved'
             ? { content: initialSection(detail.candidate) }
             : {}),
           ...(!intakeId
@@ -296,15 +334,19 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
           [name]:
             name === 'content' && finished.status === 'saved'
               ? { ...finished, value: detail.candidate }
-              : name !== 'content'
-                ? { ...own, status: 'saving' as const }
-                : finished,
+              : workflow
+                ? finished.status === 'saved'
+                  ? initialSection({})
+                  : finished
+                : name !== 'content'
+                  ? { ...own, status: 'saving' as const }
+                  : finished,
         },
       };
     });
     if (!intakeId) {
       for (const address of addressSections(kind)) await loadAddress(address);
-    } else if (name !== 'content') {
+    } else if (name !== 'content' && !workflow) {
       const address = await getIntakeAddress(intakeId, name as AddressSection);
       update((previous) => {
         const own = finishSection(previous.sections[name] ?? section, 'saved');
@@ -321,7 +363,8 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
           };
         return {
           ...previous,
-          error: address.value.version !== previous.detail?.summary.version ? 'conflict' : previous.error,
+          error:
+            address.value.version !== previous.detail?.summary.version ? 'conflict' : previous.error,
           sections: {
             ...previous.sections,
             [name]: own.status === 'saved' ? { ...own, value: address.value.candidate ?? {} } : own,
@@ -344,7 +387,8 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
           <Link to={`/staff/intakes/${kind === 'worker' ? 'workers' : 'employers'}`}>{m.back}</Link>
           <p>
             {m.version} {state.detail.summary.version} ·{' '}
-            {state.detail.summary.complete ? m.complete : m.incomplete} · {m.unreviewed}
+            {state.detail.summary.complete ? m.complete : m.incomplete} ·{' '}
+            {t(state.detail.summary.review_status)}
           </p>
           <p className="intake-reference">
             <Link to={`/staff/intakes/${state.detail.summary.intake_id}`}>
@@ -354,7 +398,9 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
         </>
       ) : null}
       <p role="status" className="intake-save-banner">
-        {!state.error && allSaved(Object.values(state.sections)) && state.detail ? m.allSaved : m.pending}
+        {!state.error && allSaved(Object.values(state.sections)) && state.detail
+          ? m.allSaved
+          : m.pending}
       </p>
       {!allSaved(Object.values(state.sections)) ? (
         <ul>
@@ -362,7 +408,12 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
             .filter(([, section]) => section.status !== 'saved')
             .map(([name, section]) => (
               <li key={name}>
-                {name === 'content' ? m.content : addressTitle(name)}: {m[section.status]}
+                {name === 'content'
+                  ? m.content
+                  : name === 'workflow'
+                    ? t('workflow')
+                    : addressTitle(name)}
+                : {m[section.status]}
               </li>
             ))}
         </ul>
@@ -429,7 +480,10 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
                     <button
                       type="button"
                       onClick={() => {
-                        change(name, structuredClone(current.current.sections.party_address?.value ?? {}));
+                        change(
+                          name,
+                          structuredClone(current.current.sections.party_address?.value ?? {}),
+                        );
                       }}
                     >
                       {m.copyAddress}
@@ -469,6 +523,30 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
           );
         })
       )}
+      {state.detail ? (
+        <>
+          <IntakeWorkflow
+            detail={state.detail}
+            section={state.sections.workflow ?? initialSection({})}
+            ready={
+              !state.error &&
+              Object.entries(state.sections)
+                .filter(([key]) => key !== 'workflow')
+                .every(([, section]) => section.status === 'saved' && !section.readPending)
+            }
+            locked={locked}
+            change={(value) => {
+              change('workflow', value);
+            }}
+            save={() => void save('workflow')}
+          />
+          <IntakeHistory
+            key={`${state.detail.summary.intake_id}:${String(state.detail.summary.version)}`}
+            id={state.detail.summary.intake_id}
+            version={state.detail.summary.version}
+          />
+        </>
+      ) : null}
       {dirty ? <p>{m.unsaved}</p> : null}
     </section>
   );
@@ -478,6 +556,7 @@ export function IntakeWorkspace({ kind = 'worker' }: { kind?: IntakeKind }) {
   const { intakeId } = useParams();
   const { language } = useLanguage();
   const m = intakeMessages[language];
+  const t = (key: string) => workflowLabel(key, language);
   const [items, setItems] = useState<IntakeSummary[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -492,7 +571,10 @@ export function IntakeWorkspace({ kind = 'worker' }: { kind?: IntakeKind }) {
       appliedFilter.current = filter.trim()
         ? { [byReference ? 'reference' : 'name_query']: filter.trim() }
         : {};
-    const result = await queryIntakes(kind, { ...appliedFilter.current, ...(next ? { cursor: next } : {}) });
+    const result = await queryIntakes(kind, {
+      ...appliedFilter.current,
+      ...(next ? { cursor: next } : {}),
+    });
     if (request !== requestNumber.current) return;
     if (result.ok) {
       setItems(result.value.items);
@@ -585,9 +667,20 @@ export function IntakeWorkspace({ kind = 'worker' }: { kind?: IntakeKind }) {
                     {m.open}: {item.display_name || m.unnamed} — {item.intake_id}
                   </Link>
                   <span>
-                    {item.complete ? m.complete : m.incomplete} · {m.saved} · {m.unreviewed} · {m.version}{' '}
-                    {item.version}
+                    {item.complete ? m.complete : m.incomplete} · {m.saved} · {t(item.review_status)} ·{' '}
+                    {m.version} {item.version}
                   </span>
+                  {!item.complete ? (
+                    <span>
+                      {t('missing')}: {item.missing_fields.map((field) => t(field)).join(', ')}
+                    </span>
+                  ) : null}
+                  {item.follow_up ? (
+                    <span>
+                      {t('retained')}: {item.follow_up.next_follow_up_at}
+                      {item.follow_up.overdue ? ` · ${t('overdue')}` : ''}
+                    </span>
+                  ) : null}
                   {item.offer ? (
                     <span>
                       {typeof item.offer.minimum === 'string' ? item.offer.minimum : ''}

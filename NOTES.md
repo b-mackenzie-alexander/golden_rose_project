@@ -1,5 +1,15 @@
 # Golden Rose Operations Platform — Production Notes
 
+## 2026-09-14 — PR B local qualification and review complete
+
+**Validated (source candidate):** 1,253 backend tests passed with 95.64% combined coverage; 202 frontend tests and full lock/lint/typecheck/build/coverage gates passed. Real PostgreSQL evidence includes concurrency, rollback, both intake kinds, restricted snapshots, owner eligibility, catalog lifecycle and migration authority/downgrade boundaries. Fresh specification and quality reviews passed after RED/GREEN remediation, followed by an approved final integration review. Ruff, mypy, Bandit, Terraform static policy, dependency/SBOM validation and the candidate secret scan passed. Python audit found no known vulnerabilities; npm High gate passed with the inherited Moderate Vitest tooling advisory retained. The disposable PostgreSQL service and exact temporary cluster/socket were cleaned up. See the [PR B handoff](docs/review-handoffs/2026-09-14-staff-intake-pr-b-handoff.md).
+
+**Next:** Publish PR B and complete required CI before protected merge. The owner-requested polish note remains untracked for the next docs PR together with separate browser evidence `ee82615`; no cloud/runtime change or PR C/D activation is claimed.
+
+## 2026-09-14 — PR B activated after browser verification
+
+**Observed:** User requested preserving the minor polish follow-ups for the next docs-update PR and proceeding with PR B. Fresh fetch retained PR #102 integration tip `2783415dd19027428bf2036730b6c0d83f23ab3c`; separate branch `feat/staff-intake-review` starts there. Browser evidence commit `ee82615` remains on `test/staff-intake-browser-ux`. A dedicated untracked polish note is intentionally excluded from PR B. Implementation and local fictional PostgreSQL validation are active; no runtime/cloud/develop grant change is authorized or claimed. The trusted owner-choice query is a bounded UI support clarification to the accepted injected-directory contract, not directory administration.
+
 This is the concise, dated engineering and operational note log. It records observed evidence, decisions, verification, and handoffs. It is not a location for client personal data, credentials, raw exports, legal advice, or unapproved policy text.
 
 ## Evidence labels

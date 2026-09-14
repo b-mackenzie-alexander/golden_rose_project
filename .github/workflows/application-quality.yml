@@ -131,7 +131,9 @@ jobs:
           engine = create_engine(os.environ["GOLDEN_ROSE_DATABASE_URL"])
           with engine.connect() as connection:
               for table in ("intakes", "intake_addresses", "intake_links", "command_results",
-                            "command_receipts", "audit_events", "entity_authorities"):
+                            "command_receipts", "audit_events", "entity_authorities",
+                            "intake_reviews", "intake_review_payloads", "intake_follow_up_events",
+                            "intake_history_payloads", "work_interests", "work_interest_versions"):
                   assert connection.execute(text(f"SELECT count(*) FROM {table}")).scalar_one() == 0
           engine.dispose()
           PYCODE

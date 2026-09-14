@@ -171,7 +171,7 @@ def test_migration_runtime_bootstraps_clean_database_before_assuming_schema_owne
     with engine.connect() as connection:
         assert (
             connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-            == "0006_intake_drafts"
+            == "0007_intake_review_follow_up"
         )
         assert connection.execute(
             text("SELECT pg_has_role(CURRENT_USER, 'golden_rose_migrator', 'member')")

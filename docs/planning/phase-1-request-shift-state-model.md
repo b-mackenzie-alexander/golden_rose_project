@@ -5,6 +5,14 @@
 **Decision owner:** Beatrice, technical delivery owner
 **Operational evidence:** No-shows reportedly occur at the agency, so active shift coverage must be reversible and historically attributable.
 
+## 2026-09-14 staff-intake amendment — narrow proposed supersession
+
+**Status:** Proposed technical publication amendment under `../adr/ADR-0017-staff-intake-workflows.md`; docs-only approval is not implementation or live-use authorization. On accepted publication this section controls only the named staff-intake delta; the earlier baseline remains authoritative everywhere else.
+
+`staff-intake-contract.md` §§2–3 and 5 adds a separate Intake lifecycle (`draft`→`finalized`) and current-content review dispositions (`needs_follow_up`, `intake_reviewed`); these are not aliases for request/shift states. Follow-up alone changes aggregate version, not content version; candidate/link edits or changed canonical dependencies invalidate current review. Finalization requires complete resolved facts and an explicitly selected current review, rechecked under locks.
+
+Employer finalization creates exactly one **draft** StaffingRequest, with new or explicitly reused Employer/contact/address/worksite records; no ShiftNeed is created, even for a concrete supplied schedule. “To be discussed” is structurally accepted intake evidence, never a fabricated timed shift. Existing request `draft→pending_review` child guard, shift start/end/timezone/count guard, request required-for-open review and parent-open guard for active shifts all remain unchanged. Worker finalization creates/reuses only the profile outputs in §5, not assignments/coverage. This supersedes only treating all intake review as request review and the worker-profile deferral for these bounded outputs; no demand transition or ordinary review right is superseded.
+
 ## Decision
 
 Phase 1 uses explicit, server-enforced state machines for `StaffingRequest` and `ShiftNeed`. State transitions are authoritative operations, not freely editable labels. Every transition appends an `AuditEvent` and preserves prior meaning.

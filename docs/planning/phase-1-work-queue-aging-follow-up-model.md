@@ -5,6 +5,14 @@
 **Decision owner:** Beatrice, technical delivery owner
 **Policy posture:** Clock semantics and queue behavior are accepted. Numeric thresholds and no-response attempt rules are provisional review triggers requiring client validation before production; they are not SLAs, legal deadlines, or staff-performance standards.
 
+## 2026-09-14 staff-intake amendment — narrow proposed supersession
+
+**Status:** Proposed technical publication amendment under `../adr/ADR-0017-staff-intake-workflows.md`; docs-only approval is not implementation or live-use authorization. On accepted publication this section controls only the named staff-intake delta; the earlier baseline remains authoritative everywhere else.
+
+The existing request `needs_information`, business-calendar aging, provisional no-response and ordinary request ownership rules remain unchanged. For new Intake only, `staff-intake-contract.md` §§2, 4 and 6 defines `needs_follow_up` as a review disposition requiring a reason, active scoped owner and RFC3339 due instant with explicit timezone. Shared intake queries do not inherit private ownership or request/shift queue lanes, counters or business-time thresholds.
+
+Authorized reschedule, reassignment (mandatory reason) and reported contact attempts append history while preserving prior owner/due/actor/time. A contact attempt sends nothing and does not auto-review, finalize, close or change canonical demand. Passing due time derives overdue attention only; no domain write, messaging or automatic closure. A later current review supersedes the prior needs-follow-up disposition, retaining its history and independently displayed follow-up deadline; bookkeeping alone cannot assert reviewed completeness. Finalized snapshots remain immutable while attributable follow-up bookkeeping can continue. This narrowly supersedes unspecified intake-specific follow-up requiredness and worker-profile deferral only for the new intake surface; request no-response policy is not an intake closure policy.
+
 ## Decision
 
 Phase 1 uses separate, transparent measures for record age, agency-controlled review time, employer follow-up, and shift coverage urgency. The work queue is a derived, authorization-scoped view over authoritative request, shift, ownership, follow-up, and audit records. It is not a separate status store.

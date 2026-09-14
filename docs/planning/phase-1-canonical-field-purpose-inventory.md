@@ -4,6 +4,14 @@
 **Accepted:** 2026-08-03
 **Decision owner:** Beatrice, technical delivery owner; client validation may refine operational terminology, staged requiredness, and permitted visibility before implementation
 
+## 2026-09-14 staff-intake amendment — narrow proposed supersession
+
+**Status:** Proposed technical publication amendment under `../adr/ADR-0017-staff-intake-workflows.md`; docs-only approval is not implementation or live-use authorization. On accepted publication this section controls only the named staff-intake delta; the earlier baseline remains authoritative everywhere else.
+
+For staff intake only, the employer-demand-only inventory is extended by `staff-intake-contract.md` §§2–5: durable incomplete worker/employer candidate facts, Worker/WorkerContact/WorkerResidence/WorkerPreferences, governed interests and self-reported availability, separate ContactDetails/EmployerAddress, structured offered pay and schedule evidence. These are new intake/canonical field purposes, not worker assignment or demand approval. Draft requiredness and finalization requiredness are different. All new canonical records require explicit authorized finalization of complete current-reviewed intake; existing Employer create/revise/contact APIs retain their prior requiredness, DTOs and permissions and are not replaced by that rule.
+
+Precise worker residence, party address and worksite address have independent restricted rights. Lists may expose authorized name and structured offer summary, never precise addresses, phones, narrative terms, protected traits or preference filters. No phone search, export, external disclosure, geocoding, verification or matching is added. Candidate snapshots preserve history; explicit reused canonical IDs remain current authority with no overwrite. New canonical outputs are read-only after creation; further correction paths remain deferred except the existing Employer draft revision. This narrowly supersedes worker-identity deferral and unspecified intake requiredness only for the fields/output set in the new contract, not assignment/coverage/referral/payment, retention or live-data gates.
+
 ## Decision
 
 Phase 1 uses one canonical employer-demand structure:

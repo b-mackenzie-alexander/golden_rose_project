@@ -5,10 +5,18 @@ Golden Rose is a seven-week, evidence-led, compliance-conscious operations-platf
 
 ## Delivery lock — v28 deployed develop testing environment
 - **Staffing:** One independent developer; fresh agent review and automated checks supply quality evidence.
-- **Human-visible outcome:** Private SQL, the application database, restricted logins, migration job, Cloud Run service, expiring Basic access, automated qualification evidence, and browser handoff evidence exist for protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e`. Human testers can use the private Obsidian access note.
-- **Gate budget:** The v28 one-use deployment packet is complete and consumed. Continue from the running service. Separate approvals remain mandatory for live data, production promotion, destructive recovery/state editing, unreviewed IAM expansion, or materially different authority boundaries.
-- **Next executable action:** Merge the accepted Wave 1 Employer workspace UX plan with the v28 continuity repair, then implement the complete remediation as one coding branch and one implementation PR. Start with the production Spanish-toggle defect, include the bounded v28 qualification-harness normalizations, and do not reintroduce prominent synthetic/develop disclaimers into the stakeholder-facing workspace.
+- **Human-visible outcome:** Historical v28 evidence records the private fictional-synthetic Cloud Run/Cloud SQL staff workspace and browser handoff at protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e`. Availability and expiring access were not newly checked on 2026-09-14. The improved UI is an unmerged predecessor, and intake is not implemented or deployed.
+- **Gate budget:** The v28 one-use deployment packet is complete and consumed. This is docs-only planning, not authority to inspect or mutate the runtime. Any future synthetic deployment uses a fresh bounded packet; live data, production, destructive recovery/state editing and materially different authority remain separately scoped.
+- **Next executable action:** Review and publish the docs-only staff-intake planning packet to protected `develop`; complete and merge the preserved Wave 1 improved-UI predecessor before intake coding, then rebaseline a separate implementation branch from the exact merged integration tip. This lane authorizes no implementation, service start, cloud inspection/mutation, live data, or production.
 - **Do not regress:** Never recreate completed resources or credentials, restore bootstrap access, copy URL/password material into source control, admit live data, or revive production-only gates as prerequisites for feedback. Keep immutable image admission, private SQL, restricted application logins, expiring Basic access, one-instance scaling, and log qualification.
+
+## 2026-09-14 — Staff intake planning boundary
+
+The proposed outcome has ordered PRs A–D, including bounded canonical corrections/current-facts re-review under contract §9. Immutable original finalized intake/review/output links remain; correction is not deferred or silently applied through intake. Section-local saves isolate immutable keys/status/dirty buffers and prohibit aggregate all-saved during another section's dirty/unknown state. Docs-only publication is independent of UI merge; both accepted planning and preserved UI merges gate coding. These repairs require fresh semantic rereview and approval for mechanical verification; no implementation or runtime authority follows.
+
+Accepted conversational direction is durable shared worker/employer intake with explicit save/resume, version-bound review and follow-up, restricted addresses, deliberate existing-party links without overwrite, and atomic finalization only after complete current review. Technical details remain proposed source contracts, not deployed functionality or new client/counsel policy. See [Staff intake contract](docs/planning/staff-intake-contract.md), [outcome-scale plan](.hermes/plans/2026-09-14-staff-intake-workflows-plan.md), and proposed [ADR-0017](docs/adr/ADR-0017-staff-intake-workflows.md).
+
+The improved Wave 1 UI is the preserved uncommitted predecessor in `/Users/genie/Desktop/golden_rose_project` on `feat/staff-intake-workflows`; do not reset, stash, copy over, or mix it into this docs-only planning worktree. Complete and merge that predecessor and the accepted planning packet before intake coding. V28 deployment/browser evidence is historical and its packet consumed; this audit did not recheck runtime availability or access expiry. The last recorded formal status remains `not_qualified`. No cloud, live-data, public-plane, implementation, or service-start authority is granted here.
 
 ## Authoritative working surfaces
 1. `CURRENT_WORK.md` — active lane, current objective, next steps, and stop boundaries.
@@ -51,7 +59,7 @@ Classify claims as Observed, Reported, Proposed, or Validated. Client documents,
 
 ## Current implementation boundaries
 
-**Latest delivery lock (2026-09-13):** Protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e` is deployed and human-visible in GCP for private fictional-synthetic testing. The v28 packet is complete and consumed; private Obsidian evidence contains the renderable access note and browser handoff note. Older deployment locks below are historical unless they describe still-active guardrails.
+**Historical delivery lock (2026-09-13; not a new availability check):** Protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e` is deployed and human-visible in GCP for private fictional-synthetic testing. The v28 packet is complete and consumed; private Obsidian evidence contains the renderable access note and browser handoff note. Older deployment locks below are historical unless they describe still-active guardrails.
 The completed first implementation slice is the synthetic/local staff-only create tracer in ADR-0002 and `.hermes/plans/2026-08-04_phase-1-first-slice-plan.md`: the approved backend toolchain accepts only `employer_type` and `display_name` for one draft `Employer`, authorizes a synthetic staff principal through `employer:draft:create`, and atomically appends `employer.created` audit history.
 
 The completed second implementation slice is the synthetic/local Employer detail and bounded-search tracer in ADR-0004 and `.hermes/plans/2026-08-04_phase-1-employer-read-search-plan.md`, merged by PR #11. It adds one `employer:read` permission, exact UUID detail, and privacy-conscious POST search requiring a bounded name fragment with optional employer type, filter-bound keyset pagination, minimized no-store responses, and no read-side domain/audit writes.
@@ -64,7 +72,7 @@ ADR-0015's ownership-separation design remains future production/handoff guidanc
 
 Every later implementation tranche requires an accepted merged outcome-scale plan; one plan may authorize several predeclared implementation PRs under ADR-0014 without a new planning PR between them. ADR-0016's 2026-09-09 addendum permits the exact synthetic-`develop` deployment operations to run under one bounded approval packet while retaining internal stop/readback boundaries. Live-data admission, production, destructive recovery/state editing, and actions outside that packet remain separately approved. Always rebaseline from the exact merged integration tip.
 
-## Latest operational continuation — v28
+## Historical operational continuation — v28 (not rechecked 2026-09-14)
 
 **Validated:** Protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e` is deployed and human-visible behind private expiring Basic access. The private v28 Obsidian packet contains renderable access and browser handoff notes. The next work should improve the visible product and source-control the observed follow-up debt rather than reopening completed deployment gates.
 

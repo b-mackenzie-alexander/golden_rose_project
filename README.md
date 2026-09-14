@@ -7,7 +7,15 @@ authority foundation are merged into `develop`.
 This is not a public portal, production deployment, or
 automated hiring, matching, ranking, eligibility, or referral system.
 
-## Current tracer boundary
+## 2026-09-14 — Staff intake planning boundary
+
+The proposed outcome spans PRs A–D, including bounded canonical correction and current-facts re-review (contract §9), not read-only-after-finalization maintenance. Original intake/review/output links remain immutable; corrections use separate reasoned, permission/version-checked, audited commands. Saves are section-local with independent keys/status and aggregate unsaved indication. Docs-only publication is independent of UI merge; both accepted planning and preserved UI merges gate coding. These are proposed contracts, not implemented or verified functionality.
+
+Accepted conversational direction is durable shared worker/employer intake with explicit save/resume, version-bound review and follow-up, restricted addresses, deliberate existing-party links without overwrite, and atomic finalization only after complete current review. Technical details remain proposed source contracts, not deployed functionality or new client/counsel policy. See [Staff intake contract](docs/planning/staff-intake-contract.md), [outcome-scale plan](.hermes/plans/2026-09-14-staff-intake-workflows-plan.md), and proposed [ADR-0017](docs/adr/ADR-0017-staff-intake-workflows.md).
+
+The improved Wave 1 UI is the preserved uncommitted predecessor in `/Users/genie/Desktop/golden_rose_project` on `feat/staff-intake-workflows`; do not reset, stash, copy over, or mix it into this docs-only planning worktree. Complete and merge that predecessor and the accepted planning packet before intake coding. V28 deployment/browser evidence is historical and its packet consumed; this audit did not recheck runtime availability or access expiry. The last recorded formal status remains `not_qualified`. No cloud, live-data, public-plane, implementation, or service-start authority is granted here.
+
+## Current tracer boundary (implemented predecessor, not intake scope)
 
 - Exposes `POST /api/staff/v1/employers`, `GET /api/staff/v1/employers/{employer_id}`,
   bounded `POST /api/staff/v1/employers/search`, and bounded
@@ -108,7 +116,8 @@ automated hiring, matching, ranking, eligibility, or referral system.
 - Automated frontend parity/accessibility evidence exists, and the v28 browser
   handoff exposed a production Spanish-toggle defect plus severe workspace UX
   deficiencies. Manual accessibility/fluent-language qualification remains open;
-  the accepted Wave 1 plan repairs the complete frontend surface in one later PR.
+  the Wave 1 improved-UI candidate must finish review/qualification and merge
+  as the separate predecessor before staff-intake implementation begins.
 
 ## Local verification
 

@@ -6,6 +6,14 @@
 **Decision owners:** Golden Rose client for the operational role model; Beatrice for technical delivery and security boundaries. Named actors, delegated capabilities, and operational access-review owners are discovered and recorded before live use.
 **Scope:** Agency-staff employer-demand workflow and bounded technical support; no public-plane, worker, document, export, or production-infrastructure authorization
 
+## 2026-09-14 staff-intake amendment — narrow proposed supersession
+
+**Status:** Proposed technical publication amendment under `../adr/ADR-0017-staff-intake-workflows.md`; docs-only approval is not implementation or live-use authorization. On accepted publication this section controls only the named staff-intake delta; the earlier baseline remains authoritative everywhere else.
+
+The ordinary request/shift review row remains **Allow for Operations Staff**. No existing Employer/contact capability, DTO or scope is revoked or broadened. For new staff intake only, `staff-intake-contract.md` §4 supplies the exact named permissions: shared read/save/revise/link/follow-up is separate from `intake:review` and `intake:finalize`. Owner may perform either; Manager and Operations Staff require explicit delegation for each. Review never automatically grants finalization; self-review/finalization is allowed within current authority. Platform Administrator receives no operational grant.
+
+Worker identity/contact reads and worker-residence/party-address/worksite-address capture/reveal are newly scoped additions, not inherited from ordinary queue/worker/calendar visibility. Each restricted field requires independent read and write checks; review/finalize require the relevant restricted reads and creating restricted outputs also requires writes. Review history additionally requires restricted-history and field rights. Record scope and current revocation are checked before query, mutation or replay; follow-up ownership is not private access. This narrowly supersedes worker-data deferral for the §4 and §9 surfaces only. PR D's exact canonical correction permissions and `canonical:review` are separate proposed capabilities: Owner Allow, Manager/Operations explicit delegation, Platform Administrator Deny. Correction requires target read and, for restricted fields, independent read plus write; review requires all reviewed-field reads. Neither capability inherits the other, and neither changes original intake/review links or old Employer/contact permissions. The synthetic directory tests these contracts without provisioning named roles, production identity or real access delegations.
+
 ## Decision
 
 Phase 1 staff authorization is permission-based, server-enforced, attributable, and evaluated before records, fields, search results, counts, calendar/map projections, filters, drill-downs, or commands are returned or performed. A role is a bundle of named permissions; it is not a generic administrative bypass.

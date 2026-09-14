@@ -1,6 +1,18 @@
 # Security — Golden Rose Operations Platform
 
-## 2026-09-13 — v28 private synthetic develop runtime boundary
+## 2026-09-14 — Staff intake planning boundary
+
+Accepted conversational direction is durable shared worker/employer intake with explicit save/resume, version-bound review and follow-up, restricted addresses, deliberate existing-party links without overwrite, and atomic finalization only after complete current review. Technical details remain proposed source contracts, not deployed functionality or new client/counsel policy. See [Staff intake contract](docs/planning/staff-intake-contract.md), [outcome-scale plan](.hermes/plans/2026-09-14-staff-intake-workflows-plan.md), and proposed [ADR-0017](docs/adr/ADR-0017-staff-intake-workflows.md).
+
+The improved Wave 1 UI is the preserved uncommitted predecessor in `/Users/genie/Desktop/golden_rose_project` on `feat/staff-intake-workflows`; do not reset, stash, copy over, or mix it into this docs-only planning worktree. Complete and merge that predecessor and the accepted planning packet before intake coding. V28 deployment/browser evidence is historical and its packet consumed; this audit did not recheck runtime availability or access expiry. The last recorded formal status remains `not_qualified`. No cloud, live-data, public-plane, implementation, or service-start authority is granted here.
+
+## Intake-specific proposed security boundary
+
+Ordered PRs A–D now include §9 bounded canonical corrections/current-facts re-review. Exact target versions, mandatory reason, protected before/after history, same-key retry and current delegated action plus independent restricted read/write rights are mandatory; old intake/review/output links never change. Correction grants do not imply review, restricted reveal, legacy API expansion or runtime/IAM authority. Section-local command/status isolation prevents a successful section from concealing another section's dirty/unknown state or round-tripping concealed fields. Docs-only publication is independent of UI merge; both accepted planning and preserved UI merges gate coding.
+
+New intake permissions are explicit additions, not grants deployed by this document. Separate review/finalize rights permit self-review where authorized; they do not revoke the existing Operations Staff request/shift-review permission. Worker residence, party address, and worksite address each require their own field authority and stay out of routine lists/search/logs. Platform Administrator has no implied operational access. Current-content/dependency-version review, immutable review history, command idempotency, atomic finalization and typed parent/FK authority must be proven before implementation closeout. Linking never overwrites canonical records; contact attempts send nothing. No real identity/RBAC rollout, uploads/OCR, public entry, live data, matching, geocoder or vendor is admitted.
+
+## Historical 2026-09-13 — v28 private synthetic develop runtime boundary
 
 **Validated:** Protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e` is running as a private fictional-synthetic staff tracer service with private Cloud SQL, restricted application database logins, immutable image admission, one-instance service bounds, expiring Basic access, service readiness evidence, automated qualification evidence, and browser handoff evidence.
 

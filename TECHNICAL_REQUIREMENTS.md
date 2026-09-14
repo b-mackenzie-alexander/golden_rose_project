@@ -1,6 +1,12 @@
 # Technical Requirements — Golden Rose Operations Platform
 
-**Status:** Protected `develop@3414818b44d5e790f2d11c7fe4d7a48ebeb6241e` is deployed with private SQL/database authority, restricted migration/runtime logins, a ready staff service, expiring Basic access, automated qualification, and browser handoff. Formal status is `not_qualified` because the production Spanish toggle failed and required manual accessibility/usability/fluent-language rows remain open. Wave 1 is the accepted source-remediation lane; future cloud mutation, live data, and production remain separately approved.
+**Status:** Documentation-only staff-intake planning. The new contract is proposed implementation scope, not implemented or deployed. Preserve and merge the improved-UI predecessor before coding; docs-only publication is independent, and both planning and UI merges gate coding. V28 remains historical evidence with last recorded status `not_qualified`; no live check occurred in this audit.
+
+## 2026-09-14 — Staff intake planning boundary
+
+Accepted conversational direction is durable shared worker/employer intake with explicit save/resume, version-bound review and follow-up, restricted addresses, deliberate existing-party links without overwrite, and atomic finalization only after complete current review. Technical details remain proposed source contracts, not deployed functionality or new client/counsel policy. See [Staff intake contract](docs/planning/staff-intake-contract.md), [outcome-scale plan](.hermes/plans/2026-09-14-staff-intake-workflows-plan.md), and proposed [ADR-0017](docs/adr/ADR-0017-staff-intake-workflows.md).
+
+The improved Wave 1 UI is the preserved uncommitted predecessor in `/Users/genie/Desktop/golden_rose_project` on `feat/staff-intake-workflows`; do not reset, stash, copy over, or mix it into this docs-only planning worktree. Complete and merge that predecessor and the accepted planning packet before intake coding. V28 deployment/browser evidence is historical and its packet consumed; this audit did not recheck runtime availability or access expiry. The last recorded formal status remains `not_qualified`. No cloud, live-data, public-plane, implementation, or service-start authority is granted here.
 
 ## Product outcome
 Provide agency staff a reliable browser-based operations workspace that replaces fragmented paper/form/spreadsheet employer-demand handling, supports governed operational reporting, and later supports transparent staff review of worker-to-employer/job compatibility.
@@ -19,7 +25,15 @@ Provide agency staff a reliable browser-based operations workspace that replaces
 - Comparison aid exposes only approved, job-relevant, explainable signals and missing information for staff review.
 - The aid must not rank people, make eligibility/hiring/referral decisions, or use unapproved protected-trait/proxy fields.
 
-### Follow-on release: worker profile
+### Near-term exception: staff-operated worker/employer intake
+- Ordered PRs A–D include bounded canonical correction and current-facts re-review under contract §9, not a post-finalization correction deferral. Correct worker phone/residence/preferences/availability, current employer contact/address, worksite and request descriptions with reason/version/permission/audit/retry controls; immutable original intake/review/output links are never overwritten.
+- Save controls are section-local with immutable command keys, independent status and preserved dirty buffers. Aggregate saved is forbidden while another section is dirty/pending/failed/unknown; exact success-then-unknown-and-later-edits integration/browser tests are required.
+- `docs/planning/staff-intake-contract.md` defines shared partial drafts, explicit save/resume, validation of supplied values without invented names/contact data, version-bound review, accountable due-instant follow-up, and explicit linking/finalization.
+- Save, completeness, current review, and finalization are distinct states. The same authorized staff member may review and finalize; permissions remain separate.
+- Review/finalize require complete current facts and restricted-field access. Finalization creates the exact canonical outputs atomically and does not open demand or create ShiftNeed, worker assignment, referral, placement, or agreed pay.
+- This is a bounded exception to worker-profile deferral and predecessor-only backend exclusions; the broader worker/public release remains deferred.
+
+### Follow-on release: broader worker profile
 - Worker records use staged, inclusive, bilingual onboarding and explicit agency review.
 - Self-reported skills/preferences remain unverified unless a separately governed verification procedure establishes otherwise.
 - Employer visibility and referral content are controlled and snapshot-capable.
@@ -38,7 +52,7 @@ Provide agency staff a reliable browser-based operations workspace that replaces
 - Core workflow supports correction, cancellation, and replacement as atomic attributable events under the accepted correction/audit contract. Referral/delivery history remains follow-on scope.
 - Policy/legal/business-controlled copy is versioned, owned, and approved before production use. Public-source legal research supplies suggested candidate controls only; legal behavior becomes validated software only after counsel documentation is translated into approved versioned requirements and acceptance tests.
 
-## Accepted Phase 1 domain model
+## Accepted employer-demand baseline and proposed follow-on domain model
 ```text
 Employer → EmployerContact
          → Worksite → WorksiteZoneMembership → ServiceZone
@@ -52,7 +66,7 @@ WorkerAssignment → ReferralOrDeliveryEvent
 All Phase 1 material actions → AuditEvent
 ```
 
-The Phase 1 employer-demand structure and field purposes are accepted in `docs/planning/phase-1-canonical-field-purpose-inventory.md`. `Employer` is the neutral household/business hiring-party record; employer type controls approved extensions without separate stores. Worksite-to-zone and worksite-to-map-area relationships are explicit versioned association records, not a direct `Worksite.service_zone_id` shortcut. `MapAreaDatasetVersion`, `MapArea`, `ServiceZoneComposition`, and `WorksiteMapAreaAssignment` preserve pinned public-geography provenance and evolving client-managed zones. Workflow-state requiredness, retention, named role assignments, and client terminology remain tracked operational discoveries. Worker, assignment, referral, and delivery records remain follow-on proposals.
+The Phase 1 employer-demand structure and field purposes are accepted in `docs/planning/phase-1-canonical-field-purpose-inventory.md`. `Employer` is the neutral household/business hiring-party record; employer type controls approved extensions without separate stores. Worksite-to-zone and worksite-to-map-area relationships are explicit versioned association records, not a direct `Worksite.service_zone_id` shortcut. `MapAreaDatasetVersion`, `MapArea`, `ServiceZoneComposition`, and `WorksiteMapAreaAssignment` preserve pinned public-geography provenance and evolving client-managed zones. Workflow-state requiredness, retention, named role assignments, and client terminology remain tracked operational discoveries. The bounded staff-intake contract now proposes Worker/contact/residence/preferences outputs; broader worker management, assignment, referral, and delivery remain follow-on proposals.
 
 Request and shift lifecycle is controlled by `docs/planning/phase-1-request-shift-state-model.md`. Shift coverage is part of the active shift state and may reverse when coverage changes or a no-show occurs. Terminal shift outcomes are `completed`, `unfulfilled`, and `cancelled`; request `closed` never erases or replaces those outcomes. No state transition implies automated matching, referral, placement, payment, or worker discipline.
 

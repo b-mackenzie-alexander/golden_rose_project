@@ -20,8 +20,9 @@ function createCommandId() {
 
 type EmployerCreateFormProps = {
   onAuthorityChange?: (state: { owner: 'create' | null; locked: boolean }) => void;
-  onCreateSuccess?: () => void;
+  onCreateSuccess?: (detail: EmployerDetail) => void;
   resetSignal?: number;
+  searchCheckpoint?: 'empty' | 'none' | 'results';
   workspaceCommandOwner?: 'create' | 'revision' | null;
 };
 
@@ -31,6 +32,7 @@ export function EmployerCreateForm({
   onAuthorityChange,
   onCreateSuccess,
   resetSignal = 0,
+  searchCheckpoint = 'none',
   workspaceCommandOwner = null,
 }: EmployerCreateFormProps) {
   const { messages } = useLanguage();
@@ -59,6 +61,12 @@ export function EmployerCreateForm({
   const authorityLocked =
     pendingAttempt !== null || unknownAttempt !== null || conflictAttempt !== null || isAbandonSearchPending;
   const blockedByWorkspace = workspaceCommandOwner !== null && workspaceCommandOwner !== 'create';
+  const searchCheckpointMessage =
+    searchCheckpoint === 'empty'
+      ? messages.employerCreateSearchCheckpointEmpty
+      : searchCheckpoint === 'results'
+        ? messages.employerCreateSearchCheckpointResults
+        : messages.employerCreateSearchCheckpointNoSearch;
 
   useEffect(() => {
     if (lastAuthorityLockedRef.current === authorityLocked) {
@@ -186,7 +194,7 @@ export function EmployerCreateForm({
         setCreatedDetail(result.value);
         setEmployerType('');
         setDisplayName('');
-        onCreateSuccess?.();
+        onCreateSuccess?.(result.value);
         return;
       }
 
@@ -316,13 +324,14 @@ export function EmployerCreateForm({
   return (
     <form
       aria-label={messages.employerCreateHeading}
-      className="workspace-panel"
+      className="workspace-form"
       onSubmit={(event) => {
         void handleSubmit(event);
       }}
     >
-      <h3>{messages.employerCreateHeading}</h3>
+      <h3 id="employer-create-heading">{messages.employerCreateHeading}</h3>
       <p>{messages.employerCreateWarning}</p>
+      <p className="workflow-note">{searchCheckpointMessage}</p>
       {formError === null ? null : (
         <section aria-label={messages.employerCreateHeading} aria-live="assertive">
           <p role="alert">{formError}</p>
@@ -353,7 +362,7 @@ export function EmployerCreateForm({
       <div>
         <label htmlFor="create-employer-type">{messages.employerCreateTypeLabel}</label>
         <select
-          className="focus-ring"
+          className="focus-ring control-44"
           id="create-employer-type"
           name="createEmployerType"
           disabled={blockedByWorkspace || pendingAttempt !== null || unknownAttempt !== null || conflictAttempt !== null || isAbandonSearchPending}
@@ -373,7 +382,7 @@ export function EmployerCreateForm({
           autoCapitalize="none"
           autoComplete="off"
           autoCorrect="off"
-          className="focus-ring"
+          className="focus-ring control-44"
           id="create-employer-name"
           name="createEmployerName"
           disabled={blockedByWorkspace || pendingAttempt !== null || unknownAttempt !== null || conflictAttempt !== null || isAbandonSearchPending}
@@ -386,7 +395,7 @@ export function EmployerCreateForm({
       </div>
 
       <button
-        className="focus-ring"
+        className="focus-ring control-44"
         disabled={blockedByWorkspace || pendingAttempt !== null || unknownAttempt !== null || conflictAttempt !== null || isAbandonSearchPending}
         type="submit"
       >
@@ -398,7 +407,7 @@ export function EmployerCreateForm({
           <h3>{messages.employerCreateConflictHeading}</h3>
           <p>{messages.employerCreateAbandonBody}</p>
           <button
-            className="focus-ring"
+            className="focus-ring control-44"
             disabled={pendingAttempt !== null || isAbandonSearchPending}
             onClick={() => {
               void handleAbandonConflictAttempt();
@@ -415,7 +424,7 @@ export function EmployerCreateForm({
           <h3>{messages.employerCreateUnknownHeading}</h3>
           <p>{messages.employerCreateUnknownBody}</p>
           <button
-            className="focus-ring"
+            className="focus-ring control-44"
             disabled={pendingAttempt !== null || isAbandonSearchPending}
             onClick={() => {
               if (pendingAttempt !== null || isAbandonSearchPending) {
@@ -429,7 +438,7 @@ export function EmployerCreateForm({
           </button>
           <p>{messages.employerCreateAbandonBody}</p>
           <button
-            className="focus-ring"
+            className="focus-ring control-44"
             disabled={pendingAttempt !== null || isAbandonSearchPending}
             onClick={() => {
               void handleAbandonUnknownAttempt();

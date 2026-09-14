@@ -62,15 +62,15 @@ describe('EmployerWorkspace', () => {
       </LanguageProvider>,
     );
 
-    await user.selectOptions(screen.getByLabelText('Create employer type'), 'business');
-    await user.type(screen.getByLabelText('Create employer name'), 'Late Success Rose');
+    await user.selectOptions(screen.getByLabelText('Draft employer type'), 'business');
+    await user.type(screen.getByLabelText('Draft employer display name'), 'Late Success Rose');
     await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
 
     act(() => {
       window.dispatchEvent(new Event('pagehide'));
     });
 
-    expect(screen.getByLabelText('Create employer name')).toHaveValue('');
+    expect(screen.getByLabelText('Draft employer display name')).toHaveValue('');
 
     await act(async () => {
       deferredCreate.resolve({
@@ -87,7 +87,7 @@ describe('EmployerWorkspace', () => {
     });
 
     expect(screen.queryByRole('heading', { name: 'Draft employer created' })).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Create employer name')).toHaveValue('');
+    expect(screen.getByLabelText('Draft employer display name')).toHaveValue('');
     expect(screen.queryByDisplayValue('Late Success Rose')).not.toBeInTheDocument();
   });
 
@@ -106,8 +106,8 @@ describe('EmployerWorkspace', () => {
       </LanguageProvider>,
     );
 
-    await user.selectOptions(screen.getByLabelText('Create employer type'), 'business');
-    await user.type(screen.getByLabelText('Create employer name'), 'Late Unknown Rose');
+    await user.selectOptions(screen.getByLabelText('Draft employer type'), 'business');
+    await user.type(screen.getByLabelText('Draft employer display name'), 'Late Unknown Rose');
     await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
 
     act(() => {
@@ -123,7 +123,7 @@ describe('EmployerWorkspace', () => {
 
     expect(screen.queryByRole('heading', { name: 'Create outcome is unknown' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Retry same create attempt' })).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Create employer name')).toHaveValue('');
+    expect(screen.getByLabelText('Draft employer display name')).toHaveValue('');
   });
 
   it('retires create authority synchronously on pagehide before parent reset effects', async () => {
@@ -140,8 +140,8 @@ describe('EmployerWorkspace', () => {
       </LanguageProvider>,
     );
 
-    await user.selectOptions(screen.getByLabelText('Create employer type'), 'business');
-    await user.type(screen.getByLabelText('Create employer name'), 'Synchronous Pagehide Rose');
+    await user.selectOptions(screen.getByLabelText('Draft employer type'), 'business');
+    await user.type(screen.getByLabelText('Draft employer display name'), 'Synchronous Pagehide Rose');
     await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
 
     window.dispatchEvent(new Event('pagehide'));
@@ -164,6 +164,318 @@ describe('EmployerWorkspace', () => {
     expect(screen.queryByRole('heading', { name: 'Draft employer created' })).not.toBeInTheDocument();
   });
 
+  it('renders overview search create and detail regions in operational order', () => {
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    const workspace = screen.getByRole('region', { name: 'Employers workspace' });
+    const headings = within(workspace).getAllByRole('heading').map((heading) => heading.textContent);
+
+    expect(headings.slice(0, 8)).toEqual([
+      'Employer workspace',
+      'Workspace overview',
+      'Workflow guide',
+      'Search first',
+      'Create only if needed',
+      'Review and revise',
+      'Find an employer',
+      'Create a draft employer',
+    ]);
+    expect(within(workspace).getByRole('region', { name: 'Workspace overview' })).toBeInTheDocument();
+    expect(within(workspace).getByRole('region', { name: 'Workflow guide' })).toBeInTheDocument();
+    expect(within(workspace).getByRole('region', { name: 'Find an employer' })).toBeInTheDocument();
+    expect(within(workspace).getByRole('region', { name: 'Create a draft employer' })).toBeInTheDocument();
+    expect(within(workspace).getByRole('region', { name: 'Work area' })).toBeInTheDocument();
+  });
+
+  it('shows the current employer workflow without prominent environment copy', () => {
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    const workflowGuide = screen.getByRole('region', { name: 'Workflow guide' });
+
+    expect(within(workflowGuide).getByRole('heading', { name: 'Search first' })).toBeInTheDocument();
+    expect(within(workflowGuide).getByText('Use a name fragment and optional type to check for an existing draft.')).toBeInTheDocument();
+    expect(within(workflowGuide).getByRole('heading', { name: 'Create only if needed' })).toBeInTheDocument();
+    expect(
+      within(workflowGuide).getByText('Add a draft employer only after the current search does not find the right record.'),
+    ).toBeInTheDocument();
+    expect(within(workflowGuide).getByRole('heading', { name: 'Review and revise' })).toBeInTheDocument();
+    expect(
+      within(workflowGuide).getByText('Select a draft to review current details, then save only intentional revisions.'),
+    ).toBeInTheDocument();
+    expect(within(workflowGuide).getByText('Current step')).toBeInTheDocument();
+    expect(screen.getByText('Create a draft only after search confirms this employer is not already listed.')).toBeInTheDocument();
+    expect(screen.queryByText(/fictional synthetic/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/local staff workspace/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/test-harness/i)).not.toBeInTheDocument();
+  });
+
+  it('updates create guidance from the current search checkpoint', async () => {
+    const user = userEvent.setup();
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    searchEmployersMock.mockReset();
+    searchEmployersMock
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { items: [], nextCursor: null },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          items: [
+            {
+              employerId: '31313131-3131-4131-8131-313131313131',
+              employerType: 'business',
+              displayName: 'Checkpoint Rose',
+              lifecycleStatus: 'draft',
+            },
+          ],
+          nextCursor: null,
+        },
+      });
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    expect(screen.getByText('Search first before creating a new draft employer.')).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Employer name'), 'No Match Rose');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await screen.findByRole('heading', { name: 'No matching employers' });
+
+    expect(
+      screen.getByText('No matching draft was found for the current search. Create a draft if this is the employer you need.'),
+    ).toBeInTheDocument();
+    const workflowGuide = screen.getByRole('region', { name: 'Workflow guide' });
+    const searchStep = within(workflowGuide).getByRole('heading', { name: 'Search first' }).closest('li');
+    const createStep = within(workflowGuide).getByRole('heading', { name: 'Create only if needed' }).closest('li');
+    const reviewStep = within(workflowGuide).getByRole('heading', { name: 'Review and revise' }).closest('li');
+
+    expect(searchStep).toHaveTextContent('Completed this session');
+    expect(createStep).toHaveTextContent('Current step');
+    expect(reviewStep).not.toHaveTextContent('Current step');
+
+    await user.type(screen.getByLabelText('Employer name'), ' Candidate');
+
+    expect(screen.getByText('Search first before creating a new draft employer.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await screen.findByRole('heading', { name: 'Search results' });
+
+    expect(
+      screen.getByText('Search returned draft employers. Select a matching draft, or create only if none is correct.'),
+    ).toBeInTheDocument();
+    expect(searchStep).toHaveTextContent('Completed this session');
+    expect(createStep).not.toHaveTextContent('Current step');
+    expect(reviewStep).toHaveTextContent('Current step');
+  });
+
+  it('uses natural visible labels and unique accessible form names', () => {
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    const searchForm = screen.getByRole('form', { name: 'Employer search' });
+    const createForm = screen.getByRole('form', { name: 'Create a draft employer' });
+
+    expect(within(searchForm).getByLabelText('Employer name')).toBeInTheDocument();
+    expect(within(searchForm).getByLabelText('Employer type')).toBeInTheDocument();
+    expect(within(createForm).getByLabelText('Draft employer type')).toBeInTheDocument();
+    expect(within(createForm).getByLabelText('Draft employer display name')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Create employer type')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Create employer name')).not.toBeInTheDocument();
+  });
+
+  it('updates current work and session activity after create select and revision', async () => {
+    const user = userEvent.setup();
+    const randomUuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('41414141-4141-4141-8141-414141414141');
+    vi.mocked(createEmployer).mockReset();
+    vi.mocked(searchEmployers).mockReset();
+    vi.mocked(getEmployer).mockReset();
+    vi.mocked(reviseEmployer).mockReset();
+    vi.mocked(createEmployer).mockResolvedValue({
+      ok: true,
+      value: {
+        employerId: '41414141-4141-4141-8141-414141414141',
+        employerType: 'business',
+        displayName: 'Session Created Rose',
+        lifecycleStatus: 'draft',
+        sourceChannel: 'staff_entry',
+      },
+    });
+    vi.mocked(searchEmployers).mockResolvedValue({
+      ok: true,
+      value: {
+        items: [
+          {
+            employerId: '51515151-5151-4151-8151-515151515151',
+            employerType: 'household',
+            displayName: 'Session Selected Rose',
+            lifecycleStatus: 'draft',
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+    vi.mocked(getEmployer)
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          employerId: '51515151-5151-4151-8151-515151515151',
+          employerType: 'household',
+          displayName: 'Session Selected Rose',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 3,
+          updatedAt: '2026-09-13T20:00:00Z',
+        },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          employerId: '51515151-5151-4151-8151-515151515151',
+          employerType: 'business',
+          displayName: 'Session Revised Rose',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 4,
+          updatedAt: '2026-09-13T20:05:00Z',
+        },
+      });
+    vi.mocked(reviseEmployer).mockResolvedValue({
+      ok: true,
+      value: {
+        detail: {
+          employerId: '51515151-5151-4151-8151-515151515151',
+          employerType: 'business',
+          displayName: 'Session Revised Rose',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 4,
+          updatedAt: '2026-09-13T20:05:00Z',
+        },
+        resultVersion: 4,
+        replayed: false,
+      },
+    });
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    const currentWork = screen.getByRole('region', { name: 'Current work' });
+    expect(within(currentWork).getByText('No current employer selected in this browser session.')).toBeInTheDocument();
+    expect(within(currentWork).getByText('Start by searching for an employer before creating or revising a draft.')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Current-session activity' })).toHaveTextContent('No session activity yet.');
+
+    await user.selectOptions(screen.getByLabelText('Draft employer type'), 'business');
+    await user.type(screen.getByLabelText('Draft employer display name'), 'Session Created Rose');
+    await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
+    await screen.findByRole('heading', { name: 'Draft employer created' });
+
+    expect(currentWork).toHaveTextContent('Session Created Rose');
+    expect(within(currentWork).getByText('Created draft employer in this session.')).toBeInTheDocument();
+    expect(
+      within(currentWork).getByText('Search again or select the created draft when you are ready to review current details.'),
+    ).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Workflow guide' })).getByText('Review and revise')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Workflow guide' })).getByText('Current step')).toBeInTheDocument();
+    const sessionActivity = screen.getByRole('region', { name: 'Current-session activity' });
+    expect(sessionActivity).toHaveTextContent('Created — Session Created Rose');
+
+    await user.type(screen.getByLabelText('Employer name'), 'Session');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await screen.findByRole('heading', { name: 'Search results' });
+    await user.click(screen.getByRole('button', { name: 'Session Selected Rose' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+
+    expect(currentWork).toHaveTextContent('Session Selected Rose');
+    expect(within(currentWork).getByText('Reviewing selected draft employer.')).toBeInTheDocument();
+    expect(
+      within(currentWork).getByText('Use Edit draft employer only when the current detail needs a deliberate revision.'),
+    ).toBeInTheDocument();
+    expect(sessionActivity).toHaveTextContent('Selected — Session Selected Rose');
+
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.selectOptions(screen.getByLabelText('Revision employer type'), 'business');
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Session Revised Rose');
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+    await screen.findByRole('heading', { name: 'Draft employer revision saved' });
+
+    expect(currentWork).toHaveTextContent('Session Revised Rose');
+    expect(within(currentWork).getByText('Revision saved in this session.')).toBeInTheDocument();
+    expect(
+      within(currentWork).getByText('The draft is refreshed after save; continue reviewing current detail before another change.'),
+    ).toBeInTheDocument();
+    expect(sessionActivity).toHaveTextContent('Revised — Session Revised Rose');
+    expect(currentWork).not.toHaveTextContent(/assigned|queue|timeline|metric|complete/i);
+    randomUuidSpy.mockRestore();
+  });
+
+  it('clears current work and activity on pagehide', async () => {
+    const user = userEvent.setup();
+    const randomUuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('61616161-6161-4161-8161-616161616161');
+    vi.mocked(createEmployer).mockReset();
+    vi.mocked(createEmployer).mockResolvedValue({
+      ok: true,
+      value: {
+        employerId: '61616161-6161-4161-8161-616161616161',
+        employerType: 'business',
+        displayName: 'Pagehide Current Rose',
+        lifecycleStatus: 'draft',
+        sourceChannel: 'staff_entry',
+      },
+    });
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.selectOptions(screen.getByLabelText('Draft employer type'), 'business');
+    await user.type(screen.getByLabelText('Draft employer display name'), 'Pagehide Current Rose');
+    await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
+    await screen.findByRole('heading', { name: 'Draft employer created' });
+    expect(screen.getByRole('region', { name: 'Current-session activity' })).toHaveTextContent('Created — Pagehide Current Rose');
+
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+
+    expect(screen.getByRole('region', { name: 'Current work' })).toHaveTextContent('No current employer selected in this browser session.');
+    expect(screen.getByRole('region', { name: 'Current-session activity' })).toHaveTextContent('No session activity yet.');
+    expect(screen.queryByText('Pagehide Current Rose')).not.toBeInTheDocument();
+    randomUuidSpy.mockRestore();
+  });
+
   it('shows search instructions without fetching on mount', () => {
     const fetchMock = vi.fn<typeof fetch>();
     vi.stubGlobal('fetch', fetchMock);
@@ -176,9 +488,9 @@ describe('EmployerWorkspace', () => {
       </LanguageProvider>,
     );
 
-    expect(screen.getByRole('heading', { name: 'Search for an employer' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Find an employer' })).toBeInTheDocument();
     expect(
-      screen.getByText('Use a bounded employer name fragment to begin a staff-only synthetic search.'),
+      screen.getByText('Use a bounded employer name fragment to find an existing draft employer before creating another one.'),
     ).toBeInTheDocument();
     expect(screen.getByLabelText('Employer name')).toBeInTheDocument();
     expect(screen.getByLabelText('Employer type')).toBeInTheDocument();
@@ -368,6 +680,47 @@ describe('EmployerWorkspace', () => {
     expect(screen.queryByText('11111111-1111-4111-8111-111111111111')).not.toBeInTheDocument();
     expect(screen.queryByText('2026-08-05T07:15:00Z')).not.toBeInTheDocument();
     expect(document.querySelector('img')).toBeNull();
+  });
+
+  it('disambiguates duplicate result names for assistive technology', async () => {
+    const user = userEvent.setup();
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    searchEmployersMock.mockReset();
+    searchEmployersMock.mockResolvedValue({
+      ok: true,
+      value: {
+        items: [
+          {
+            employerId: '24242424-2424-4242-8242-242424242424',
+            employerType: 'business',
+            displayName: 'Duplicate Rose',
+            lifecycleStatus: 'draft',
+          },
+          {
+            employerId: '25252525-2525-4252-8252-252525252525',
+            employerType: 'household',
+            displayName: 'Duplicate Rose',
+            lifecycleStatus: 'draft',
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(screen.getByLabelText('Employer name'), 'Duplicate');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+
+    expect(await screen.findByRole('button', { name: 'Duplicate Rose, Business, Draft' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Duplicate Rose, Household, Draft' })).toBeInTheDocument();
+    expect(screen.queryAllByRole('button', { name: 'Duplicate Rose' })).toHaveLength(0);
   });
 
   it('maps search failures to bounded localized states', async () => {
@@ -1060,8 +1413,12 @@ describe('EmployerWorkspace', () => {
     const detailCall = getEmployerMock.mock.calls[0];
     expect(detailCall?.[0]).toBe('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
     expect(detailCall?.[1]?.signal).toBeInstanceOf(AbortSignal);
-    expect(screen.getByRole('heading', { name: 'Employer detail' })).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('Loading employer detail.');
+    const workArea = screen.getByRole('region', { name: 'Work area' });
+    const findEmployer = screen.getByRole('region', { name: 'Find an employer' });
+    const loadingDetail = within(workArea).getByRole('region', { name: 'Employer detail' });
+    expect(within(loadingDetail).getByRole('heading', { name: 'Employer detail' })).toBeInTheDocument();
+    expect(within(loadingDetail).getByRole('status')).toHaveTextContent('Loading employer detail.');
+    expect(within(findEmployer).queryByRole('region', { name: 'Employer detail' })).not.toBeInTheDocument();
 
     await act(async () => {
       deferredDetail.resolve(null);
@@ -1119,6 +1476,11 @@ describe('EmployerWorkspace', () => {
     expect(detailHeading).toHaveFocus();
 
     const detailRegion = screen.getByRole('region', { name: 'Employer detail' });
+    const workArea = screen.getByRole('region', { name: 'Work area' });
+    const findEmployer = screen.getByRole('region', { name: 'Find an employer' });
+
+    expect(within(workArea).getByRole('region', { name: 'Employer detail' })).toBe(detailRegion);
+    expect(within(findEmployer).queryByRole('region', { name: 'Employer detail' })).not.toBeInTheDocument();
     expect(within(detailRegion).getByText('Name')).toBeInTheDocument();
     expect(within(detailRegion).getByText('<img src=x onerror=alert(1)> Detail Rendering Rose')).toBeInTheDocument();
     expect(within(detailRegion).getByText('Type')).toBeInTheDocument();
@@ -1263,8 +1625,8 @@ describe('EmployerWorkspace', () => {
     await user.clear(screen.getByLabelText('Revision employer name'));
     await user.type(screen.getByLabelText('Revision employer name'), 'Workspace Revision Attempt');
 
-    await user.selectOptions(screen.getByLabelText('Create employer type'), 'household');
-    await user.type(screen.getByLabelText('Create employer name'), 'Workspace Create Attempt');
+    await user.selectOptions(screen.getByLabelText('Draft employer type'), 'household');
+    await user.type(screen.getByLabelText('Draft employer display name'), 'Workspace Create Attempt');
     await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
 
     expect(createEmployerMock).toHaveBeenCalledTimes(1);
@@ -1315,8 +1677,8 @@ describe('EmployerWorkspace', () => {
       employerType: 'business',
       displayName: 'Workspace Revision Attempt',
     });
-    expect(screen.getByLabelText('Create employer type')).toBeDisabled();
-    expect(screen.getByLabelText('Create employer name')).toBeDisabled();
+    expect(screen.getByLabelText('Draft employer type')).toBeDisabled();
+    expect(screen.getByLabelText('Draft employer display name')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Create draft employer' })).toBeDisabled();
 
     await act(async () => {
@@ -1413,8 +1775,8 @@ describe('EmployerWorkspace', () => {
 
     await user.clear(revisionNameInput);
     await user.type(revisionNameInput, 'Blocked Revision Attempt');
-    await user.selectOptions(screen.getByLabelText('Create employer type'), 'business');
-    await user.type(screen.getByLabelText('Create employer name'), 'Create Lock Attempt');
+    await user.selectOptions(screen.getByLabelText('Draft employer type'), 'business');
+    await user.type(screen.getByLabelText('Draft employer display name'), 'Create Lock Attempt');
     await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
 
     expect(createEmployerMock).toHaveBeenCalledTimes(1);
@@ -1449,8 +1811,8 @@ describe('EmployerWorkspace', () => {
     expect(revisionNameInput).not.toBeDisabled();
     expect(revisionSubmitButton).not.toBeDisabled();
 
-    await user.selectOptions(screen.getByLabelText('Create employer type'), 'business');
-    await user.type(screen.getByLabelText('Create employer name'), 'Create Conflict Attempt');
+    await user.selectOptions(screen.getByLabelText('Draft employer type'), 'business');
+    await user.type(screen.getByLabelText('Draft employer display name'), 'Create Conflict Attempt');
     await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
 
     const conflictHeading = await screen.findByRole('heading', { name: 'Create is blocked until you search first' });
@@ -1531,8 +1893,8 @@ describe('EmployerWorkspace', () => {
     await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
 
     expect(reviseEmployerMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByLabelText('Create employer type')).toBeDisabled();
-    expect(screen.getByLabelText('Create employer name')).toBeDisabled();
+    expect(screen.getByLabelText('Draft employer type')).toBeDisabled();
+    expect(screen.getByLabelText('Draft employer display name')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Create draft employer' })).toBeDisabled();
 
     await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
@@ -1546,8 +1908,8 @@ describe('EmployerWorkspace', () => {
     const unknownHeading = await screen.findByRole('heading', { name: 'Revision outcome is unknown' });
     const unknownRegion = unknownHeading.closest('section');
     expect(unknownRegion).not.toBeNull();
-    expect(screen.getByLabelText('Create employer type')).toBeDisabled();
-    expect(screen.getByLabelText('Create employer name')).toBeDisabled();
+    expect(screen.getByLabelText('Draft employer type')).toBeDisabled();
+    expect(screen.getByLabelText('Draft employer display name')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Create draft employer' })).toBeDisabled();
 
     await user.click(within(unknownRegion as HTMLElement).getByRole('button', { name: 'Reload current employer detail' }));
@@ -1563,8 +1925,8 @@ describe('EmployerWorkspace', () => {
     });
     const conflictRegion = conflictHeading.closest('section');
     expect(conflictRegion).not.toBeNull();
-    expect(screen.getByLabelText('Create employer type')).toBeDisabled();
-    expect(screen.getByLabelText('Create employer name')).toBeDisabled();
+    expect(screen.getByLabelText('Draft employer type')).toBeDisabled();
+    expect(screen.getByLabelText('Draft employer display name')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Create draft employer' })).toBeDisabled();
 
     await user.click(within(conflictRegion as HTMLElement).getByRole('button', { name: 'Reload current employer detail' }));
@@ -1579,8 +1941,8 @@ describe('EmployerWorkspace', () => {
       name: 'Revision requires current employer detail before editing can continue',
     });
     expect(staleHeading).toBeInTheDocument();
-    expect(screen.getByLabelText('Create employer type')).toBeDisabled();
-    expect(screen.getByLabelText('Create employer name')).toBeDisabled();
+    expect(screen.getByLabelText('Draft employer type')).toBeDisabled();
+    expect(screen.getByLabelText('Draft employer display name')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Create draft employer' })).toBeDisabled();
     expect(createEmployerMock).not.toHaveBeenCalled();
 
@@ -1647,8 +2009,8 @@ describe('EmployerWorkspace', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Edit draft employer' }));
     await userEvent.clear(screen.getByLabelText('Revision employer name'));
     await userEvent.type(screen.getByLabelText('Revision employer name'), 'Blocked Same Tick Revision');
-    await userEvent.selectOptions(screen.getByLabelText('Create employer type'), 'business');
-    await userEvent.type(screen.getByLabelText('Create employer name'), 'Same Tick Create Attempt');
+    await userEvent.selectOptions(screen.getByLabelText('Draft employer type'), 'business');
+    await userEvent.type(screen.getByLabelText('Draft employer display name'), 'Same Tick Create Attempt');
 
     const createSubmitButton = screen.getByRole('button', { name: 'Create draft employer' });
     const revisionSubmitButton = screen.getByRole('button', { name: 'Save draft employer revision' });
@@ -1735,8 +2097,8 @@ describe('EmployerWorkspace', () => {
     const unknownHeading = await screen.findByRole('heading', { name: 'Revision outcome is unknown' });
     expect(unknownHeading).toBeInTheDocument();
 
-    expect(screen.getByLabelText('Create employer type')).toBeDisabled();
-    expect(screen.getByLabelText('Create employer name')).toBeDisabled();
+    expect(screen.getByLabelText('Draft employer type')).toBeDisabled();
+    expect(screen.getByLabelText('Draft employer display name')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Create draft employer' })).toBeDisabled();
     expect(screen.getByLabelText('Employer name')).toBeDisabled();
     expect(screen.getByLabelText('Employer type')).toBeDisabled();
@@ -1960,6 +2322,109 @@ describe('EmployerWorkspace', () => {
     const refreshedDetailRegion = await screen.findByRole('region', { name: 'Employer detail' });
     expect(within(refreshedDetailRegion).getByText('Refresh Current Truth Draft Revised')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Search results' })).not.toBeInTheDocument();
+
+    randomUuidSpy.mockRestore();
+  });
+
+  it('confirmed revision refresh failure does not overstate refreshed current work', async () => {
+    const user = userEvent.setup();
+    const searchEmployersMock = vi.mocked(searchEmployers);
+    const getEmployerMock = vi.mocked(getEmployer);
+    const reviseEmployerMock = vi.mocked(reviseEmployer);
+    searchEmployersMock.mockReset();
+    getEmployerMock.mockReset();
+    reviseEmployerMock.mockReset();
+
+    const refreshDetail = createDeferredPromise<Awaited<ReturnType<typeof getEmployer>>>();
+    const pendingRevision = createDeferredPromise<Awaited<ReturnType<typeof reviseEmployer>>>();
+
+    searchEmployersMock.mockResolvedValue({
+      ok: true,
+      value: {
+        items: [
+          {
+            employerId: '92929292-9292-4292-8292-929292929292',
+            employerType: 'business',
+            displayName: 'Refresh Failure Draft',
+            lifecycleStatus: 'draft',
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+    getEmployerMock
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          employerId: '92929292-9292-4292-8292-929292929292',
+          employerType: 'business',
+          displayName: 'Refresh Failure Draft',
+          lifecycleStatus: 'draft',
+          sourceChannel: 'staff_entry',
+          version: 4,
+          updatedAt: '2026-08-11T06:10:00Z',
+        },
+      })
+      .mockReturnValueOnce(refreshDetail.promise);
+    reviseEmployerMock.mockReturnValueOnce(pendingRevision.promise);
+
+    const randomUuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('82828282-8282-4828-8828-828282828282');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(screen.getByLabelText('Employer name'), 'Refresh');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+    await screen.findByRole('heading', { name: 'Search results' });
+    await user.click(screen.getByRole('button', { name: 'Refresh Failure Draft' }));
+    await screen.findByRole('region', { name: 'Employer detail' });
+
+    const currentWork = screen.getByRole('region', { name: 'Current work' });
+    expect(within(currentWork).getByText('Reviewing selected draft employer.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Edit draft employer' }));
+    await user.clear(screen.getByLabelText('Revision employer name'));
+    await user.type(screen.getByLabelText('Revision employer name'), 'Refresh Failure Draft Revised');
+    await user.click(screen.getByRole('button', { name: 'Save draft employer revision' }));
+
+    await act(async () => {
+      pendingRevision.resolve({
+        ok: true,
+        value: {
+          detail: {
+            employerId: '92929292-9292-4292-8292-929292929292',
+            employerType: 'business',
+            displayName: 'Refresh Failure Draft Revised',
+            lifecycleStatus: 'draft',
+            sourceChannel: 'staff_entry',
+            version: 5,
+            updatedAt: '2026-08-11T06:15:00Z',
+          },
+          resultVersion: 5,
+          replayed: false,
+        },
+      });
+      await pendingRevision.promise;
+    });
+
+    await act(async () => {
+      refreshDetail.resolve({ ok: false, failure: { kind: 'unavailable' } });
+      await refreshDetail.promise;
+    });
+
+    expect(await screen.findByRole('heading', { name: 'Current employer detail could not be refreshed' })).toBeInTheDocument();
+    expect(currentWork).toHaveTextContent('Refresh Failure Draft');
+    expect(within(currentWork).getByText('Reviewing selected draft employer.')).toBeInTheDocument();
+    expect(
+      within(currentWork).getByText('Use Edit draft employer only when the current detail needs a deliberate revision.'),
+    ).toBeInTheDocument();
+    expect(within(currentWork).queryByText('Revision saved in this session.')).not.toBeInTheDocument();
+    expect(within(currentWork).queryByText(/refreshed after save/i)).not.toBeInTheDocument();
 
     randomUuidSpy.mockRestore();
   });
@@ -2505,8 +2970,8 @@ describe('EmployerWorkspace', () => {
     expect(screen.queryByRole('form', { name: 'Revise draft employer' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Revision outcome is unknown' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Retry same revision attempt' })).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Create employer type')).toBeEnabled();
-    expect(screen.getByLabelText('Create employer name')).toBeEnabled();
+    expect(screen.getByLabelText('Draft employer type')).toBeEnabled();
+    expect(screen.getByLabelText('Draft employer display name')).toBeEnabled();
 
     await user.click(screen.getByRole('button', { name: 'Search employers' }));
     await screen.findByRole('button', { name: 'Replacement Selected Draft' });
@@ -2874,8 +3339,8 @@ describe('EmployerWorkspace', () => {
     const unknownHeading = await screen.findByRole('heading', { name: 'Revision outcome is unknown' });
     const unknownRegion = unknownHeading.closest('section');
     expect(unknownRegion).not.toBeNull();
-    expect(screen.getByLabelText('Create employer type')).toBeDisabled();
-    expect(screen.getByLabelText('Create employer name')).toBeDisabled();
+    expect(screen.getByLabelText('Draft employer type')).toBeDisabled();
+    expect(screen.getByLabelText('Draft employer display name')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Create draft employer' })).toBeDisabled();
 
     await user.click(within(unknownRegion as HTMLElement).getByRole('button', { name: 'Reload current employer detail' }));
@@ -3682,9 +4147,10 @@ describe('EmployerWorkspace', () => {
     );
 
     expect(screen.getByRole('heading', { name: 'Create a draft employer' })).toBeInTheDocument();
-    expect(screen.getByText('Create only fictional synthetic draft employers in this local staff workspace.')).toBeInTheDocument();
-    expect(screen.getByLabelText('Create employer type')).toBeInTheDocument();
-    expect(screen.getByLabelText('Create employer name')).toBeInTheDocument();
+    expect(screen.getByText('Create a draft only after search confirms this employer is not already listed.')).toBeInTheDocument();
+    expect(screen.getByText('Search first before creating a new draft employer.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Draft employer type')).toBeInTheDocument();
+    expect(screen.getByLabelText('Draft employer display name')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create draft employer' })).toBeInTheDocument();
 
     expect(screen.queryByLabelText('Employer contact')).not.toBeInTheDocument();
@@ -3710,8 +4176,8 @@ describe('EmployerWorkspace', () => {
       </LanguageProvider>,
     );
 
-    const typeSelect = screen.getByLabelText('Create employer type');
-    const nameInput = screen.getByLabelText('Create employer name');
+    const typeSelect = screen.getByLabelText('Draft employer type');
+    const nameInput = screen.getByLabelText('Draft employer display name');
     const submitButton = screen.getByRole('button', { name: 'Create draft employer' });
 
     await user.selectOptions(typeSelect, 'business');
@@ -3778,8 +4244,8 @@ describe('EmployerWorkspace', () => {
       </LanguageProvider>,
     );
 
-    const typeSelect = screen.getByLabelText('Create employer type');
-    const nameInput = screen.getByLabelText('Create employer name');
+    const typeSelect = screen.getByLabelText('Draft employer type');
+    const nameInput = screen.getByLabelText('Draft employer display name');
     const submitButton = screen.getByRole('button', { name: 'Create draft employer' });
 
     await user.selectOptions(typeSelect, 'business');
@@ -3837,8 +4303,8 @@ describe('EmployerWorkspace', () => {
       </LanguageProvider>,
     );
 
-    const typeSelect = screen.getByLabelText('Create employer type');
-    const nameInput = screen.getByLabelText('Create employer name');
+    const typeSelect = screen.getByLabelText('Draft employer type');
+    const nameInput = screen.getByLabelText('Draft employer display name');
     const submitButton = screen.getByRole('button', { name: 'Create draft employer' });
 
     await user.selectOptions(typeSelect, 'household');
@@ -3882,8 +4348,8 @@ describe('EmployerWorkspace', () => {
       </LanguageProvider>,
     );
 
-    const typeSelect = screen.getByLabelText('Create employer type');
-    const nameInput = screen.getByLabelText('Create employer name');
+    const typeSelect = screen.getByLabelText('Draft employer type');
+    const nameInput = screen.getByLabelText('Draft employer display name');
     const submitButton = screen.getByRole('button', { name: 'Create draft employer' });
 
     await user.selectOptions(typeSelect, 'business');
@@ -3947,8 +4413,8 @@ describe('EmployerWorkspace', () => {
       </LanguageProvider>,
     );
 
-    await user.selectOptions(screen.getByLabelText('Create employer type'), 'business');
-    await user.type(screen.getByLabelText('Create employer name'), 'Serialized Unknown Rose');
+    await user.selectOptions(screen.getByLabelText('Draft employer type'), 'business');
+    await user.type(screen.getByLabelText('Draft employer display name'), 'Serialized Unknown Rose');
     await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
 
     const warningHeading = await screen.findByRole('heading', { name: 'Create outcome is unknown' });
@@ -4019,8 +4485,8 @@ describe('EmployerWorkspace', () => {
       </LanguageProvider>,
     );
 
-    await user.selectOptions(screen.getByLabelText('Create employer type'), 'business');
-    await user.type(screen.getByLabelText('Create employer name'), 'Pending Create Rose');
+    await user.selectOptions(screen.getByLabelText('Draft employer type'), 'business');
+    await user.type(screen.getByLabelText('Draft employer display name'), 'Pending Create Rose');
     await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
 
     const beforeUnloadEvent = new Event('beforeunload', { cancelable: true });
@@ -4053,8 +4519,8 @@ describe('EmployerWorkspace', () => {
       </LanguageProvider>,
     );
 
-    await user.selectOptions(screen.getByLabelText('Create employer type'), 'business');
-    await user.type(screen.getByLabelText('Create employer name'), 'Late Abandonment Rose');
+    await user.selectOptions(screen.getByLabelText('Draft employer type'), 'business');
+    await user.type(screen.getByLabelText('Draft employer display name'), 'Late Abandonment Rose');
     await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
 
     const warningHeading = await screen.findByRole('heading', { name: 'Create outcome is unknown' });
@@ -4079,7 +4545,7 @@ describe('EmployerWorkspace', () => {
         'The required follow-up search could not complete. Retry the search before starting a changed create attempt.',
       ),
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Create employer name')).toHaveValue('');
+    expect(screen.getByLabelText('Draft employer display name')).toHaveValue('');
 
     confirmSpy.mockRestore();
   });
@@ -4103,8 +4569,8 @@ describe('EmployerWorkspace', () => {
       </LanguageProvider>,
     );
 
-    const typeSelect = screen.getByLabelText('Create employer type');
-    const nameInput = screen.getByLabelText('Create employer name');
+    const typeSelect = screen.getByLabelText('Draft employer type');
+    const nameInput = screen.getByLabelText('Draft employer display name');
     const submitButton = screen.getByRole('button', { name: 'Create draft employer' });
 
     await user.selectOptions(typeSelect, 'business');
@@ -4157,8 +4623,8 @@ describe('EmployerWorkspace', () => {
       </LanguageProvider>,
     );
 
-    const typeSelect = screen.getByLabelText('Create employer type');
-    const nameInput = screen.getByLabelText('Create employer name');
+    const typeSelect = screen.getByLabelText('Draft employer type');
+    const nameInput = screen.getByLabelText('Draft employer display name');
     const submitButton = screen.getByRole('button', { name: 'Create draft employer' });
 
     await user.selectOptions(typeSelect, 'business');
@@ -4223,8 +4689,8 @@ describe('EmployerWorkspace', () => {
       </LanguageProvider>,
     );
 
-    const typeSelect = screen.getByLabelText('Create employer type');
-    const nameInput = screen.getByLabelText('Create employer name');
+    const typeSelect = screen.getByLabelText('Draft employer type');
+    const nameInput = screen.getByLabelText('Draft employer display name');
     const submitButton = screen.getByRole('button', { name: 'Create draft employer' });
 
     await user.selectOptions(typeSelect, 'business');
@@ -4323,8 +4789,8 @@ describe('EmployerWorkspace', () => {
       </LanguageProvider>,
     );
 
-    const typeSelect = screen.getByLabelText('Create employer type');
-    const nameInput = screen.getByLabelText('Create employer name');
+    const typeSelect = screen.getByLabelText('Draft employer type');
+    const nameInput = screen.getByLabelText('Draft employer display name');
     const submitButton = screen.getByRole('button', { name: 'Create draft employer' });
 
     await user.selectOptions(typeSelect, 'business');
@@ -4396,8 +4862,8 @@ describe('EmployerWorkspace', () => {
       </LanguageProvider>,
     );
 
-    const typeSelect = screen.getByLabelText('Create employer type');
-    const nameInput = screen.getByLabelText('Create employer name');
+    const typeSelect = screen.getByLabelText('Draft employer type');
+    const nameInput = screen.getByLabelText('Draft employer display name');
     const submitButton = screen.getByRole('button', { name: 'Create draft employer' });
 
     await user.selectOptions(typeSelect, 'household');
@@ -4461,8 +4927,8 @@ describe('EmployerWorkspace', () => {
       </LanguageProvider>,
     );
 
-    const typeSelect = screen.getByLabelText('Create employer type');
-    const nameInput = screen.getByLabelText('Create employer name');
+    const typeSelect = screen.getByLabelText('Draft employer type');
+    const nameInput = screen.getByLabelText('Draft employer display name');
     const submitButton = screen.getByRole('button', { name: 'Create draft employer' });
 
     await user.selectOptions(typeSelect, 'business');
@@ -4517,8 +4983,8 @@ describe('EmployerWorkspace', () => {
     replaceStateSpy.mockClear();
     pushStateSpy.mockClear();
 
-    const typeSelect = await screen.findByLabelText('Create employer type');
-    const nameInput = screen.getByLabelText('Create employer name');
+    const typeSelect = await screen.findByLabelText('Draft employer type');
+    const nameInput = screen.getByLabelText('Draft employer display name');
     const submitButton = screen.getByRole('button', { name: 'Create draft employer' });
 
     expect(nameInput).toHaveAttribute('autocomplete', 'off');
@@ -4775,8 +5241,8 @@ describe('EmployerWorkspace', () => {
 
     expect(screen.getByRole('status')).toHaveTextContent('Loading employer detail.');
 
-    await user.selectOptions(screen.getByLabelText('Create employer type'), 'business');
-    await user.type(screen.getByLabelText('Create employer name'), 'Authoritative Create Rose');
+    await user.selectOptions(screen.getByLabelText('Draft employer type'), 'business');
+    await user.type(screen.getByLabelText('Draft employer display name'), 'Authoritative Create Rose');
     await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
 
     const successHeading = await screen.findByRole('heading', { name: 'Draft employer created' });
@@ -4864,8 +5330,8 @@ describe('EmployerWorkspace', () => {
     await user.click(screen.getByRole('button', { name: 'Load more employers' }));
     expect(screen.getByRole('status')).toHaveTextContent('Loading employer detail.');
 
-    await user.selectOptions(screen.getByLabelText('Create employer type'), 'business');
-    await user.type(screen.getByLabelText('Create employer name'), 'BFCache Unknown Rose');
+    await user.selectOptions(screen.getByLabelText('Draft employer type'), 'business');
+    await user.type(screen.getByLabelText('Draft employer display name'), 'BFCache Unknown Rose');
     await user.click(screen.getByRole('button', { name: 'Create draft employer' }));
 
     const unknownHeading = await screen.findByRole('heading', { name: 'Create outcome is unknown' });
@@ -4883,7 +5349,7 @@ describe('EmployerWorkspace', () => {
     expect(screen.queryByRole('heading', { name: 'Search results' })).not.toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Create outcome is unknown' })).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Create employer name')).toHaveValue('');
+    expect(screen.getByLabelText('Draft employer display name')).toHaveValue('');
 
     const pageShowEvent = new Event('pageshow');
     Object.defineProperty(pageShowEvent, 'persisted', { configurable: true, value: true });
@@ -4918,7 +5384,7 @@ describe('EmployerWorkspace', () => {
     expect(screen.queryByRole('heading', { name: 'Employer detail is unavailable' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Create outcome is unknown' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Retry same create attempt' })).not.toBeInTheDocument();
-    expect(screen.getByText('Use a bounded employer name fragment to begin a staff-only synthetic search.')).toBeInTheDocument();
+    expect(screen.getByText('Use a bounded employer name fragment to find an existing draft employer before creating another one.')).toBeInTheDocument();
 
     randomUuidSpy.mockRestore();
     confirmSpy.mockRestore();
@@ -5060,7 +5526,7 @@ describe('EmployerWorkspace', () => {
 
     expect(workspaceRegion).toHaveClass('workspace-stack');
     expect(workspaceRegion).toHaveAttribute('data-motion-safe', 'true');
-    expect(createForm).toHaveClass('workspace-panel');
-    expect(searchForm).toHaveClass('workspace-panel');
+    expect(createForm).toHaveClass('workspace-form');
+    expect(searchForm).toHaveClass('workspace-form');
   });
 });

@@ -8,7 +8,7 @@ import re
 import secrets
 import stat
 import subprocess
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import suppress
 from pathlib import Path
 from typing import Any
@@ -38,16 +38,58 @@ DEMO_CHALLENGE = 'Basic realm="Golden Rose synthetic develop", charset="UTF-8"'
 WRONG_DEMO_PASSWORD = "intentionally-wrong-demo-password"
 
 
+def _canonical_header_name(name: str) -> str:
+    reviewed_names = {
+        "cache-control": "Cache-Control",
+        "idempotency-replayed": "Idempotency-Replayed",
+        "idempotency-result-version": "Idempotency-Result-Version",
+        "www-authenticate": "WWW-Authenticate",
+    }
+    normalized_name = name.strip().casefold()
+    if not normalized_name:
+        raise QualificationError("malformed response header boundary failed")
+    return reviewed_names.get(
+        normalized_name,
+        "-".join(part.capitalize() for part in normalized_name.split("-")),
+    )
+
+
+def _canonicalize_response_headers(headers: Any) -> dict[str, str]:
+    if isinstance(headers, Mapping):
+        items = headers.items()
+    else:
+        header_items = getattr(headers, "items", None)
+        if not callable(header_items):
+            raise QualificationError("requester returned an unsupported response shape")
+        items = header_items()
+
+    canonical_headers: dict[str, str] = {}
+    seen_header_names: set[str] = set()
+    try:
+        for raw_name, raw_value in items:
+            header_name = _canonical_header_name(str(raw_name))
+            normalized_name = header_name.casefold()
+            if normalized_name in seen_header_names:
+                raise QualificationError("duplicate response header boundary failed")
+            seen_header_names.add(normalized_name)
+            canonical_headers[header_name] = str(raw_value)
+    except QualificationError:
+        raise
+    except (TypeError, ValueError) as exc:
+        raise QualificationError("requester returned an unsupported response shape") from exc
+    return canonical_headers
+
+
 def _normalize_response(response: Any) -> tuple[int, dict[str, str], dict[str, Any]]:
     if isinstance(response, tuple) and len(response) == 3:
         status_code, headers, payload = response
-        return int(status_code), dict(headers), dict(payload)
+        return int(status_code), _canonicalize_response_headers(headers), dict(payload)
 
     status_code = getattr(response, "status_code", None)
     headers = getattr(response, "headers", None)
     payload = getattr(response, "payload", None)
-    if isinstance(status_code, int) and isinstance(headers, dict) and isinstance(payload, dict):
-        return status_code, headers, payload
+    if isinstance(status_code, int) and isinstance(payload, dict):
+        return status_code, _canonicalize_response_headers(headers), payload
 
     raise QualificationError("requester returned an unsupported response shape")
 
@@ -204,8 +246,7 @@ def _request_json(
     try:
         with opener.open(req, timeout=30) as response:
             raw_body = response.read().decode("utf-8")
-            response_headers = dict(response.headers.items())
-            return int(response.status), response_headers, json.loads(raw_body)
+            return int(response.status), response.headers, json.loads(raw_body)
     except error.HTTPError as exc:
         if 300 <= int(exc.code) < 400:
             raise QualificationError(
@@ -215,7 +256,7 @@ def _request_json(
             response_body = json.loads(exc.read().decode("utf-8"))
         except Exception:
             response_body = {}
-        return int(exc.code), dict(exc.headers.items()), response_body
+        return int(exc.code), exc.headers, response_body
     except error.URLError as exc:
         raise QualificationError(f"request failed for {path}: {exc.reason}") from exc
 
@@ -236,7 +277,30 @@ def _verify_log_export_is_safe(
     *,
     prohibited_values: Sequence[str],
 ) -> str:
-    normalized_export = log_export.casefold()
+    try:
+        decoded_export = json.loads(log_export)
+    except json.JSONDecodeError as exc:
+        raise QualificationError("log export boundary failed") from exc
+    if not isinstance(decoded_export, list):
+        raise QualificationError("log export boundary failed")
+
+    admitted_records: list[dict[str, Any]] = []
+    for entry in decoded_export:
+        if not isinstance(entry, dict):
+            raise QualificationError("log export boundary failed")
+        admitted_record: dict[str, Any] = {}
+        for key in ("jsonPayload", "textPayload", "httpRequest", "severity"):
+            if key in entry:
+                admitted_record[key] = entry[key]
+        if admitted_record:
+            admitted_records.append(admitted_record)
+        elif "protoPayload" not in entry:
+            raise QualificationError("log export boundary failed")
+
+    if not admitted_records:
+        raise QualificationError("log export boundary failed")
+
+    normalized_export = json.dumps(admitted_records, sort_keys=True).casefold()
     fixed_markers = ("authorization", "basic ", "credential", "password")
     value_markers = tuple(value.strip().casefold() for value in prohibited_values if value.strip())
     if any(marker in normalized_export for marker in (*fixed_markers, *value_markers)):
@@ -664,7 +728,7 @@ def qualify_develop_deployment(
             {
                 "expected_version": employer_version,
                 "employer_type": "business",
-                "display_name": f"{revised_display_name} Stale",
+                "display_name": revised_display_name,
             },
         )
     )
@@ -679,8 +743,8 @@ def qualify_develop_deployment(
             revise_headers,
             {
                 "expected_version": employer_version,
-                "employer_type": "business",
-                "display_name": f"{revised_display_name} Changed",
+                "employer_type": "household",
+                "display_name": revised_display_name,
             },
         )
     )

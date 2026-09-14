@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type SyntheticEvent } from 'react';
+import { createPortal } from 'react-dom';
 
 import { getEmployer, searchEmployers } from '../api/employerClient';
 import type {
@@ -33,6 +34,8 @@ function isValidName(value: string) {
 }
 
 type EmployerSearchProps = {
+  detailOutletId?: string;
+  onSearchCheckpointChange?: (checkpoint: 'empty' | 'none' | 'results') => void;
   onSelectedDetailChange?: (detail: RevisionEmployerDetail | null) => void;
   onRefreshRequestSettled?: (resolution: { token: number; outcome: 'success' | 'not_found' | 'failure' }) => void;
   refreshRequest?: {
@@ -53,6 +56,8 @@ type DetailRequestOptions = {
 };
 
 export function EmployerSearch({
+  detailOutletId,
+  onSearchCheckpointChange,
   onSelectedDetailChange,
   onRefreshRequestSettled,
   refreshRequest = null,
@@ -103,6 +108,20 @@ export function EmployerSearch({
     submittedSearch?.displayNameQuery === currentSearch.displayNameQuery &&
     submittedSearch.employerType === currentSearch.employerType;
   const blockedByWorkspace = workspaceCommandOwner === 'revision';
+  const detailOutlet =
+    detailOutletId === undefined || typeof document === 'undefined' ? null : document.getElementById(detailOutletId);
+  const duplicateResultNames = useMemo(() => {
+    const resultNameCounts = new Map<string, number>();
+    for (const result of results) {
+      resultNameCounts.set(result.displayName, (resultNameCounts.get(result.displayName) ?? 0) + 1);
+    }
+
+    return new Set(
+      Array.from(resultNameCounts.entries())
+        .filter(([, count]) => count > 1)
+        .map(([displayName]) => displayName),
+    );
+  }, [results]);
 
   const submittedSearchSummary =
     searchState === 'empty' || submittedSearch === null
@@ -259,11 +278,12 @@ export function EmployerSearch({
     setPaginationFailureState(null);
     invalidatePendingDetail({ preserveSelectedDetail: options?.preserveSelectedDetail });
     pendingResultsFocusIdRef.current = null;
+    onSearchCheckpointChange?.('none');
 
     if (options?.preserveSubmittedSearch === false) {
       setSubmittedSearch(null);
     }
-  }, [invalidatePendingDetail]);
+  }, [invalidatePendingDetail, onSearchCheckpointChange]);
 
   useEffect(() => {
     return () => {
@@ -448,6 +468,7 @@ export function EmployerSearch({
           setResults(result.value.items);
           pendingResultsFocusIdRef.current = null;
           setSearchState(result.value.items.length === 0 ? 'empty' : 'results');
+          onSearchCheckpointChange?.(result.value.items.length === 0 ? 'empty' : 'results');
         }
         return;
       }
@@ -467,6 +488,7 @@ export function EmployerSearch({
         setResults([]);
         setFailureState({ kind: result.failure.kind });
         setSearchState('failure');
+        onSearchCheckpointChange?.('none');
       }
     } finally {
       if (activeSearchControllerRef.current === controller) {
@@ -546,10 +568,40 @@ export function EmployerSearch({
   }
 
   const shouldRenderStandaloneDetail = searchState !== 'results' && (detail !== null || detailFailureState !== null || refreshFailure || isDetailLoading);
+  const shouldRenderDetailPresentation = searchState === 'results' || shouldRenderStandaloneDetail;
   const detailAutoFocus = !showRevisionSuccess;
+  const detailPresentation = !shouldRenderDetailPresentation ? null : (
+    refreshFailure ? (
+      <section aria-live="assertive">
+        <h3 ref={refreshFailureHeadingRef} tabIndex={-1}>
+          {messages.employerRevisionRefreshFailureHeading}
+        </h3>
+        <p>{messages.employerRevisionRefreshFailureBody}</p>
+      </section>
+    ) : (
+      <>
+        {!showRevisionSuccess ? null : (
+          <section aria-live="polite">
+            <h3 ref={revisionSuccessHeadingRef} tabIndex={-1}>
+              {messages.employerRevisionSuccessHeading}
+            </h3>
+            <p>{messages.employerRevisionSuccessBody}</p>
+          </section>
+        )}
+        <EmployerDetail
+          autoFocus={detailAutoFocus}
+          detail={detail}
+          failureKind={detailFailureState?.kind ?? null}
+          isLoading={isDetailLoading}
+        />
+      </>
+    )
+  );
+  const renderedDetailPresentation =
+    detailPresentation === null ? null : detailOutlet === null ? detailPresentation : createPortal(detailPresentation, detailOutlet);
 
   return (
-    <form aria-label={messages.employerSearchFormLabel} autoComplete="off" className="workspace-panel" onSubmit={handleSubmit}>
+    <form aria-label={messages.employerSearchFormLabel} autoComplete="off" className="workspace-form" onSubmit={handleSubmit}>
       <div>
         <label htmlFor="employer-name-query">{messages.employerSearchNameLabel}</label>
         <input
@@ -558,7 +610,7 @@ export function EmployerSearch({
           autoCapitalize="none"
           autoComplete="off"
           autoCorrect="off"
-          className="focus-ring"
+          className="focus-ring control-44"
           id="employer-name-query"
           name="displayNameQuery"
           disabled={blockedByWorkspace}
@@ -602,7 +654,7 @@ export function EmployerSearch({
           </h3>
           <p>{failureCopy.body}</p>
           {failureCopy.retryable ? (
-            <button className="focus-ring" onClick={handleRetry} type="button">
+            <button className="focus-ring control-44" onClick={handleRetry} type="button">
               {messages.employerSearchRetry}
             </button>
           ) : null}
@@ -618,7 +670,14 @@ export function EmployerSearch({
             {results.map((result) => (
               <li key={result.employerId}>
                 <button
-                  className="focus-ring"
+                  aria-label={
+                    duplicateResultNames.has(result.displayName)
+                      ? `${result.displayName}, ${
+                          result.employerType === 'business' ? messages.employerTypeBusiness : messages.employerTypeHousehold
+                        }, ${messages.employerLifecycleDraft}`
+                      : undefined
+                  }
+                  className="focus-ring control-44"
                   disabled={blockedByWorkspace}
                   onClick={() => {
                     void handleSelectEmployer(result.employerId);
@@ -633,10 +692,12 @@ export function EmployerSearch({
                   }}
                   type="button"
                 >
-                  {result.displayName}
+                  <span className="result-row__name">{result.displayName}</span>
+                  <span aria-hidden="true" className="result-row__meta">
+                    <span>{result.employerType === 'business' ? messages.employerTypeBusiness : messages.employerTypeHousehold}</span>
+                    <span>{messages.employerLifecycleDraft}</span>
+                  </span>
                 </button>
-                <p>{result.employerType === 'business' ? messages.employerTypeBusiness : messages.employerTypeHousehold}</p>
-                <p>{messages.employerLifecycleDraft}</p>
               </li>
             ))}
           </ul>
@@ -645,59 +706,32 @@ export function EmployerSearch({
               <h4>{paginationFailureCopy.heading}</h4>
               <p>{paginationFailureCopy.body}</p>
               {paginationFailureCopy.retryable ? (
-                <button className="focus-ring" onClick={handleRetryLoadMore} type="button">
+                <button className="focus-ring control-44" onClick={handleRetryLoadMore} type="button">
                   {messages.employerSearchRetryLoadMore}
                 </button>
               ) : null}
             </div>
           )}
           {nextCursor === null || paginationFailureCopy !== null ? null : (
-            <button className="focus-ring" disabled={blockedByWorkspace || isLoadingMore} onClick={handleLoadMore} type="button">
+            <button className="focus-ring control-44" disabled={blockedByWorkspace || isLoadingMore} onClick={handleLoadMore} type="button">
               {messages.employerSearchLoadMore}
             </button>
           )}
-          <EmployerDetail detail={detail} failureKind={detailFailureState?.kind ?? null} isLoading={isDetailLoading} />
         </section>
       )}
 
-      {!shouldRenderStandaloneDetail ? null : (
-        refreshFailure ? (
-          <section aria-live="assertive">
-            <h3 ref={refreshFailureHeadingRef} tabIndex={-1}>
-              {messages.employerRevisionRefreshFailureHeading}
-            </h3>
-            <p>{messages.employerRevisionRefreshFailureBody}</p>
-          </section>
-        ) : (
-          <>
-            {!showRevisionSuccess ? null : (
-              <section aria-live="polite">
-                <h3 ref={revisionSuccessHeadingRef} tabIndex={-1}>
-                  {messages.employerRevisionSuccessHeading}
-                </h3>
-                <p>{messages.employerRevisionSuccessBody}</p>
-              </section>
-            )}
-            <EmployerDetail
-              autoFocus={detailAutoFocus}
-              detail={detail}
-              failureKind={detailFailureState?.kind ?? null}
-              isLoading={isDetailLoading}
-            />
-          </>
-        )
-      )}
+      {renderedDetailPresentation}
 
       <div>
         <label htmlFor="employer-type">{messages.employerSearchTypeLabel}</label>
-        <select className="focus-ring" disabled={blockedByWorkspace} id="employer-type" name="employerType" onChange={handleTypeChange} value={employerType}>
+        <select className="focus-ring control-44" disabled={blockedByWorkspace} id="employer-type" name="employerType" onChange={handleTypeChange} value={employerType}>
           <option value="">{messages.employerSearchTypeAnyOption}</option>
           <option value="business">{messages.employerTypeBusiness}</option>
           <option value="household">{messages.employerTypeHousehold}</option>
         </select>
       </div>
 
-      <button className="focus-ring" disabled={blockedByWorkspace || isDuplicatePendingSearch} type="submit">
+      <button className="focus-ring control-44" disabled={blockedByWorkspace || isDuplicatePendingSearch} type="submit">
         {messages.employerSearchSubmit}
       </button>
     </form>

@@ -1,5 +1,16 @@
 # Golden Rose Operations Platform — Production Notes
 
+## 2026-09-15 — PR D published as PR #105
+
+- **Staffing:** One independent developer; tests and fresh agent repair reviews provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** [PR #105](https://github.com/b-mackenzie-alexander/golden_rose_project/pull/105) is open to `develop` from `feat/staff-intake-corrections`. Source commit `81aed49` passed the recorded automated and bounded production-build browser checks. Required remote CI is pending at this entry; no deployment or shared-target qualification occurred.
+- **Gate budget:** Owner explicitly approved resumed local verification and PR publication after it passed. No cloud/live/production or default permission activation.
+- **Next executable action:** Complete required PR CI and owner protected merge. Keep the complete PR D/A–D delivery items open until merge; preserve deferred human/shared-target acceptance.
+- **Do not regress:** Original finalization/history and retries, independent dirty buffers, restricted permissions, bilingual parity, applied migrations, owner's separate preview and deferred UX note.
+
+Publication used an explicit 65-path inventory. Exact outgoing-range whitespace and redacted secret checks passed; the separate UX note is not committed. The bounded browser observations and additional-review usage-limit limitation are recorded in the [handoff](docs/review-handoffs/2026-09-15-staff-intake-pr-d-handoff.md). Earlier uncommitted/unpublished and browser-blocked entries are historical.
+
+
 ## 2026-09-15 — PR D bounded browser verification passed; publication authorized
 
 - **Staffing:** One independent developer; automated checks and fresh agent repair reviews are quality evidence, not independent-human authorization.

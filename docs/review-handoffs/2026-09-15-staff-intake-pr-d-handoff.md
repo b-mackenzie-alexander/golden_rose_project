@@ -1,9 +1,9 @@
 # PR D — canonical corrections and current-facts review
 
 - **Staffing:** One independent developer. Fresh agent reviews and automated tests are quality evidence, not independent-human authorization.
-- **Human-visible outcome:** PR #104 merged PR C at `develop@50f2ac86621329f12680e706bd8d224e76833c22`. PR D is an uncommitted source candidate on `feat/staff-intake-corrections`. The production-build local test app rendered the employer workspace and canonical worker screen without reported browser errors. The bounded production-build correction/review walkthrough passed on 2026-09-15; manual/fluent-language and shared-target acceptance remain separate. The owner's separate preview remains untouched. No new cloud availability or qualification claim follows.
+- **Human-visible outcome:** PR #104 merged PR C at `develop@50f2ac86621329f12680e706bd8d224e76833c22`. PR D is published as PR #105 from `feat/staff-intake-corrections`, source commit `81aed49`. The production-build local test app rendered the employer workspace and canonical worker screen without reported browser errors. The bounded production-build correction/review walkthrough passed on 2026-09-15; manual/fluent-language and shared-target acceptance remain separate. The owner's separate preview remains untouched. No new cloud availability or qualification claim follows.
 - **Gate budget:** Owner authorized current-origin rebaseline and PR D implementation; disposable fictional PostgreSQL testing remains authorized. Cloud, live/client data, production and default permission activation remain outside scope.
-- **Next executable action:** Complete exact outgoing-range hygiene/secret checks, publish the reviewed PR D candidate, and complete required CI before owner protected merge.
+- **Next executable action:** Complete required PR #105 CI on the final published head, then owner protected merge. Publication and outgoing-range checks are complete.
 - **Do not regress:** Immutable original intake/review/finalization identities and versions; exact command retry keys/payloads; independent dirty buffers; field/record permissions; English/Spanish parity; applied migration bytes; the separate untracked UX-polish note; owner preview and private cloud boundaries.
 
 ## Implemented candidate
@@ -48,4 +48,8 @@ PR C and its employer-finalization/worker-read completion rows now reflect merge
 
 ## Temporary resources
 
-The separate PR D test app and Unix-socket PostgreSQL cluster were stopped after qualification; cleanup approval succeeded. The owner's original preview was not stopped or modified. Disposable database files, logs, production-build copy and two screenshots remain under `/private/tmp/golden-rose-pr-d.wwqiXi` for controlled continuation. No database or screenshot artifact is staged for source publication. The isolated browser session may remain open at its now-stopped loopback URL; closing it was not attempted through an alternate tool after the browser-action rejection.
+The separate PR D test app and Unix-socket PostgreSQL cluster were stopped after qualification; cleanup approval succeeded. The owner's original preview was not stopped or modified. Disposable database files, logs, production-build copy and two screenshots remain under `/private/tmp/golden-rose-pr-d.wwqiXi` for controlled continuation. No database or screenshot artifact is staged for source publication. After the owner-approved resumed walkthrough, both isolated browser sessions, the PR D application and its test cluster were closed/stopped successfully.
+
+## Publication readback
+
+PR #105 is open to `develop`: https://github.com/b-mackenzie-alexander/golden_rose_project/pull/105. Source commit `81aed49` contains the verified candidate. Required remote CI was pending at publication; owner protected merge remains separate. Explicit outgoing inventory, whitespace and redacted Gitleaks range scans passed. The untracked UX-polish note remains excluded.

@@ -1,5 +1,15 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-09-15 - PR C publication prepared; remote approval blocked
+
+- **Staffing:** One independent developer; fresh agent reviews and automated/browser checks provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** Qualified source is committed locally as `ffe44dd` on `feat/staff-intake-finalization`, from refreshed `origin/develop@f653260d2de9a991159a1e8e5d88068631f129f0`. The local qualification services/data remain stopped/removed. No push, PR creation, remote CI, merge or deployment occurred in this publication attempt; historical v28 remains `not_qualified` and was not rechecked.
+- **Gate budget:** Automatic approval review rejected the push because it did not find explicit authorization to export the private 140-file source change to the GitHub repository. No retry or alternate publication path was attempted. Explicit owner approval for that destination is now needed; cloud/live/production authority remains separate.
+- **Next executable action:** Obtain approval to push `feat/staff-intake-finalization` to `b-mackenzie-alexander/golden_rose_project` and open a PR targeting `develop`, then complete required CI. Protected owner merge remains later.
+- **Do not regress:** Reviewed source/migration bytes, immutable original references/retries, independent dirty buffers, canonical access boundaries, bilingual parity and private cloud protections. The separate untracked UX-polish note is excluded.
+
+**Validated publication inventory:** 140 explicitly staged source/documentation files; all 135 qualified source paths matched the browser manifest. No tracked unstaged edits remained at source commit. Fresh Ruff (398 files), mypy (202 files), Bandit and lock checks passed. The exact one-commit outgoing range passed diff hygiene, confidential-path guards and redacted secret scanning. The PR description is prepared locally. This does not claim remote publication or required CI.
+
 ## 2026-09-15 - PR C bounded browser qualification passed
 
 - **Staffing:** One independent developer; agent-operated browser/visual/keyboard checks and fresh repair reviews, not independent-human or fluent-language sign-off.

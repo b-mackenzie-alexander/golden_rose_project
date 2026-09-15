@@ -61,7 +61,10 @@ export function WorkInterestPicker({
 }) {
   const { language } = useLanguage(),
     catalog = useCatalog(true);
+  const [selectedInterest, setSelectedInterest] = useState('');
   const t = (key: string) => workflowLabel(key, language);
+  const m = intakeMessages[language];
+  const activeItems = catalog.items.filter((entry) => entry.active);
   const selections = (Array.isArray(value.selections) ? value.selections : []).filter(
     (item): item is { interest_id: string; catalog_version: number } =>
       !!item &&
@@ -79,10 +82,41 @@ export function WorkInterestPicker({
         : remaining,
     });
   }
+  function addSelected() {
+    const entry = catalog.items.find((item) => item.interest_id === selectedInterest);
+    if (!entry) return;
+    select(entry, true);
+    setSelectedInterest('');
+  }
   return (
     <fieldset>
       <legend>{t('interests')}</legend>
       {catalog.unavailable ? <p role="status">{t('unavailable')}</p> : null}
+      <div className="intake-field">
+        <label htmlFor="work-interest-catalog">{m.catalogInterest}</label>
+        <select
+          id="work-interest-catalog"
+          value={selectedInterest}
+          disabled={activeItems.length === 0 || selections.length >= 20}
+          onChange={(event) => {
+            setSelectedInterest(event.target.value);
+          }}
+        >
+          <option value="">{activeItems.length ? m.choose : m.empty}</option>
+          {activeItems.map((entry) => (
+              <option
+                key={entry.interest_id}
+                value={entry.interest_id}
+                disabled={selections.some((selection) => selection.interest_id === entry.interest_id)}
+              >
+                {language === 'en' ? entry.label_en : entry.label_es}
+              </option>
+            ))}
+        </select>
+      </div>
+      <button type="button" disabled={!selectedInterest || selections.length >= 20} onClick={addSelected}>
+        {m.addInterest}
+      </button>
       {selections
         .filter(
           (s) =>
@@ -114,25 +148,36 @@ export function WorkInterestPicker({
             </button>
           </div>
         ))}
-      {catalog.items.map((entry) => {
-        const checked = selections.some(
-          (s) => s.interest_id === entry.interest_id && s.catalog_version === entry.version,
-        );
-        return (
-          <label key={entry.interest_id}>
-            <input
-              type="checkbox"
-              checked={checked}
-              disabled={!entry.active || (!checked && selections.length >= 20)}
-              onChange={(e) => {
-                select(entry, e.target.checked);
-              }}
-            />
-            {language === 'en' ? entry.label_en : entry.label_es} · {entry.version}
-            {entry.active ? '' : ` · ${t('retired')}`}
-          </label>
-        );
-      })}
+      {selections.filter((selection) =>
+        catalog.items.some((item) => item.active && item.interest_id === selection.interest_id),
+      ).length ? (
+        <ul>
+          {selections
+            .filter((selection) =>
+              catalog.items.some((item) => item.active && item.interest_id === selection.interest_id),
+            )
+            .map((selection) => {
+            const entry = catalog.items.find((item) => item.interest_id === selection.interest_id);
+            return (
+              <li key={selection.interest_id}>
+                {entry ? (language === 'en' ? entry.label_en : entry.label_es) : selection.interest_id} ·{' '}
+                {selection.catalog_version}{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    change({
+                      ...value,
+                      selections: selections.filter((item) => item.interest_id !== selection.interest_id),
+                    });
+                  }}
+                >
+                  {language === 'en' ? 'Remove selection' : 'Eliminar selección'}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
       {catalog.cursor ? (
         <button type="button" onClick={() => void catalog.more()}>
           {t('more')}

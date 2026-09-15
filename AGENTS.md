@@ -1,5 +1,15 @@
 # AGENTS.md — Golden Rose Operations Platform
 
+## 2026-09-15 — PR D merged; next-step investigation
+
+- **Staffing:** One independent developer; agent reviews and automated/browser checks provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #105 merged into `develop` at `2736c48b4835a0201a2e0a64dd6a297a375517f8`. Its final-head application, build validation, hygiene and branch-policy checks passed. Ordered PRs A–D are merged; recorded bounded local browser evidence remains valid for its exercised scope. No shared-runtime availability or human/fluent-language acceptance was newly checked.
+- **Gate budget:** Current work is post-merge investigation and documentation. The historical cloud packet remains consumed; any shared synthetic rollout needs one fresh bounded packet. No cloud, live-data, production or default permission activation follows.
+- **Next executable action:** Review the [post-intake next-step investigation](docs/planning/2026-09-15-post-intake-next-steps.md): prioritize the deferred employer-workspace/navigation, local-time controls and intake feedback improvements, then plan the request/shift demand workflow. These are proposed next steps, not a new implementation activation.
+- **Do not regress:** Immutable original intake/review/output history; exact retries; independent dirty buffers; restricted addresses and permissions; bilingual parity; applied migrations; owner preview and private access custody.
+
+This entry supersedes pending PR #105 publication/CI/merge statements below. The source implementation is complete; broader human/shared-target qualification remains open.
+
 ## 2026-09-15 — PR D published as PR #105
 
 - **Staffing:** One independent developer; tests and fresh agent repair reviews provide quality evidence, not independent-human authorization.

@@ -1,5 +1,23 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-09-15 - Owner direction: finish PR C, then PR D
+
+- **Staffing:** One independent developer; owner feedback guides product sequencing, with agent review and automated checks as quality evidence.
+- **Human-visible outcome:** The owner reviewed the local preview and reported improvement. Local preview remains available as recorded below; this is not formal human accessibility/fluent-language or cloud qualification.
+- **Gate budget:** Continue bounded source delivery for PR C, then PR D under the accepted intake plan. No timezone/navigation redesign is added to PR C. Existing remote-publication approval enforcement and protected merge apply; no cloud/live/production authority follows.
+- **Next executable action:** Complete PR C publication/required CI and protected owner merge; rebaseline PR D from that exact merged tip. Reassess employer navigation/revision UX and timezone configuration after PR D.
+- **Do not regress:** Qualified PR C source, applied migrations, original references/retries, dirty buffers, restricted rights, bilingual parity and private runtime boundaries. Deferred UX note stays excluded from PR C.
+
+**Deferred direction:** User-configurable display/input timezone, initially Eastern Time with date-aware EST/EDT conversion to UTC, ordinary local date/time controls and localized history. Preserve date-only values and handle daylight-saving edge cases explicitly. Employers should be evaluated as the ongoing record workspace once PR D adds canonical corrections; intake remains onboarding/review. These decisions are captured in the separate deferred UX note.
+
+## 2026-09-15 - Owner-requested local preview running
+
+- **Staffing:** One independent developer; owner can now explore the local application. Agent smoke checks do not constitute human acceptance.
+- **Human-visible outcome:** Production build is running on loopback port 8771 with a fresh disposable PostgreSQL database, restricted runtime login and explicit local demo principal. Eight fictional intake examples include partial drafts, complete drafts, current reviews and finalized worker/household/business outputs; three bilingual work-interest entries are available. Runtime files live in the machine temporary directory `golden-rose-local-preview.wi8q6xqr`. This preview is intentionally left running for owner feedback; it is separate from the cleaned-up qualification cluster. Historical cloud v28 is not rechecked.
+- **Gate budget:** Owner explicitly requested a local running preview before publication. No push, PR, cloud, live/client data, default permission activation or applied migration edit. Publication approval remains pending.
+- **Next executable action:** Owner explores the local employer/intake screens and provides feedback. Preserve preview data until the owner is finished; then stop the app and disposable database before cleanup. Resume publication only on explicit destination approval.
+- **Do not regress:** Reviewed source, original retries/reviews/outputs, dirty section buffers, bilingual parity, restricted addresses and private cloud protections; leave deferred UX polish separate.
+
 ## 2026-09-15 - PR C publication prepared; remote approval blocked
 
 - **Staffing:** One independent developer; fresh agent reviews and automated/browser checks provide quality evidence, not independent-human authorization.

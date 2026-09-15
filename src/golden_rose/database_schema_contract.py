@@ -1,9 +1,5 @@
 # ruff: noqa: E501
-"""Reviewed PostgreSQL 16 catalog contract through 0008c.
-
-Captured from a fresh disposable migration chain; contains schema definitions only.
-Do not refresh expectations from a deployed database to make drift pass.
-"""
+"""PostgreSQL 16 schema contract through 0009a, captured from disposable migrations."""
 
 EXPECTED_INTAKE_CONSTRAINTS = {
     "alembic_version.alembic_version_pkc": "PRIMARY KEY (version_num)",
@@ -13,65 +9,99 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "audit_events.ck_audit_events_entity_sequence_matches_new_record_version": "CHECK "
     "(entity_sequence = "
     "new_record_version)",
-    "audit_events.ck_audit_events_entity_type": "CHECK (entity_type::text = ANY "
-    "(ARRAY['employer'::character varying, "
-    "'employer_contact'::character varying, "
-    "'intake'::character varying, "
-    "'work_interest'::character varying, "
-    "'worker'::character varying, "
-    "'worker_contact'::character varying, "
-    "'worker_residence'::character varying, "
-    "'worker_preferences'::character varying, "
-    "'employer_contact_details'::character varying, "
-    "'employer_address'::character varying, "
-    "'worksite'::character varying, "
-    "'staffing_request'::character varying]::text[]))",
-    "audit_events.ck_audit_events_event_type": "CHECK (event_type::text = ANY "
-    "(ARRAY['employer.created'::character varying, "
-    "'employer_contact.created'::character varying, "
-    "'employer.draft_revised'::character varying, "
-    "'intake.created'::character varying, "
-    "'intake.revised'::character varying, "
-    "'intake.reviewed'::character varying, "
-    "'intake.follow_up_recorded'::character varying, "
-    "'work_interest.created'::character varying, "
-    "'work_interest.revised'::character varying, "
-    "'intake.finalized'::character varying, "
-    "'worker.created'::character varying, "
-    "'worker_contact.created'::character varying, "
-    "'worker_residence.created'::character varying, "
-    "'worker_preferences.created'::character varying, "
+    "audit_events.ck_audit_events_entity_type": "CHECK ((entity_type::text = ANY "
+    "(ARRAY['employer'::character varying::text, "
+    "'employer_contact'::character varying::text, "
+    "'intake'::character varying::text, "
+    "'work_interest'::character varying::text, "
+    "'worker'::character varying::text, "
+    "'worker_contact'::character varying::text, "
+    "'worker_residence'::character varying::text, "
+    "'worker_preferences'::character varying::text, "
+    "'employer_contact_details'::character varying::text, "
+    "'employer_address'::character varying::text, "
+    "'worksite'::character varying::text, "
+    "'staffing_request'::character varying::text])) OR "
+    "entity_type::text = 'canonical_output_review'::text)",
+    "audit_events.ck_audit_events_event_type": "CHECK ((event_type::text = ANY "
+    "(ARRAY['employer.created'::character varying::text, "
+    "'employer_contact.created'::character varying::text, "
+    "'employer.draft_revised'::character varying::text, "
+    "'intake.created'::character varying::text, "
+    "'intake.revised'::character varying::text, "
+    "'intake.reviewed'::character varying::text, "
+    "'intake.follow_up_recorded'::character varying::text, "
+    "'work_interest.created'::character varying::text, "
+    "'work_interest.revised'::character varying::text, "
+    "'intake.finalized'::character varying::text, "
+    "'worker.created'::character varying::text, "
+    "'worker_contact.created'::character varying::text, "
+    "'worker_residence.created'::character varying::text, "
+    "'worker_preferences.created'::character "
+    "varying::text, "
     "'employer_contact_details.created'::character "
-    "varying, 'employer_address.created'::character "
-    "varying, 'worksite.created'::character varying, "
-    "'staffing_request.created'::character varying, "
-    "'intake.linked'::character varying]::text[]))",
+    "varying::text, 'employer_address.created'::character "
+    "varying::text, 'worksite.created'::character "
+    "varying::text, 'staffing_request.created'::character "
+    "varying::text, 'intake.linked'::character "
+    "varying::text])) OR (event_type::text = ANY "
+    "(ARRAY['worker.corrected'::character varying::text, "
+    "'worker_contact.corrected'::character varying::text, "
+    "'worker_residence.corrected'::character "
+    "varying::text, "
+    "'worker_preferences.corrected'::character "
+    "varying::text, "
+    "'employer_contact_details.corrected'::character "
+    "varying::text, "
+    "'employer_address.corrected'::character "
+    "varying::text, 'worksite.corrected'::character "
+    "varying::text, "
+    "'staffing_request.corrected'::character "
+    "varying::text])) OR event_type::text = "
+    "'canonical_output_review.reviewed'::text)",
     "audit_events.ck_audit_events_one_step_version_advance": "CHECK (new_record_version = "
     "(prior_record_version + 1))",
     "audit_events.ck_audit_events_payload_classification": "CHECK (payload_classification::text = "
     "'sensitive_operational'::text)",
     "audit_events.ck_audit_events_schema_matches_type": "CHECK (event_schema_name::text = "
     "event_type::text)",
-    "audit_events.ck_audit_events_schema_name": "CHECK (event_schema_name::text = ANY "
-    "(ARRAY['employer.created'::character varying, "
-    "'employer_contact.created'::character varying, "
-    "'employer.draft_revised'::character varying, "
-    "'intake.created'::character varying, "
-    "'intake.revised'::character varying, "
-    "'intake.reviewed'::character varying, "
-    "'intake.follow_up_recorded'::character varying, "
-    "'work_interest.created'::character varying, "
-    "'work_interest.revised'::character varying, "
-    "'intake.finalized'::character varying, "
-    "'worker.created'::character varying, "
-    "'worker_contact.created'::character varying, "
-    "'worker_residence.created'::character varying, "
-    "'worker_preferences.created'::character varying, "
+    "audit_events.ck_audit_events_schema_name": "CHECK ((event_schema_name::text = ANY "
+    "(ARRAY['employer.created'::character varying::text, "
+    "'employer_contact.created'::character varying::text, "
+    "'employer.draft_revised'::character varying::text, "
+    "'intake.created'::character varying::text, "
+    "'intake.revised'::character varying::text, "
+    "'intake.reviewed'::character varying::text, "
+    "'intake.follow_up_recorded'::character "
+    "varying::text, 'work_interest.created'::character "
+    "varying::text, 'work_interest.revised'::character "
+    "varying::text, 'intake.finalized'::character "
+    "varying::text, 'worker.created'::character "
+    "varying::text, 'worker_contact.created'::character "
+    "varying::text, 'worker_residence.created'::character "
+    "varying::text, "
+    "'worker_preferences.created'::character "
+    "varying::text, "
     "'employer_contact_details.created'::character "
-    "varying, 'employer_address.created'::character "
-    "varying, 'worksite.created'::character varying, "
-    "'staffing_request.created'::character varying, "
-    "'intake.linked'::character varying]::text[]))",
+    "varying::text, 'employer_address.created'::character "
+    "varying::text, 'worksite.created'::character "
+    "varying::text, 'staffing_request.created'::character "
+    "varying::text, 'intake.linked'::character "
+    "varying::text])) OR (event_schema_name::text = ANY "
+    "(ARRAY['worker.corrected'::character varying::text, "
+    "'worker_contact.corrected'::character varying::text, "
+    "'worker_residence.corrected'::character "
+    "varying::text, "
+    "'worker_preferences.corrected'::character "
+    "varying::text, "
+    "'employer_contact_details.corrected'::character "
+    "varying::text, "
+    "'employer_address.corrected'::character "
+    "varying::text, 'worksite.corrected'::character "
+    "varying::text, "
+    "'staffing_request.corrected'::character "
+    "varying::text])) OR event_schema_name::text = "
+    "'canonical_output_review.reviewed'::text)",
     "audit_events.ck_audit_events_schema_version": "CHECK (event_schema_version = 1)",
     "audit_events.ck_audit_events_source_type": "CHECK (source_type::text = 'staff_api'::text)",
     "audit_events.fk_audit_events_command_result": "FOREIGN KEY (command_id, entity_type, entity_id, "
@@ -91,27 +121,234 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "audit_events.uq_audit_events_entity_sequence": "UNIQUE (entity_type, entity_id, entity_sequence)",
     "audit_events.uq_audit_events_result_authority": "UNIQUE (command_id, entity_id, "
     "new_record_version, event_type, actor_id)",
-    "command_receipts.ck_command_receipts_command_type": "CHECK (command_type::text = ANY "
+    "canonical_correction_payloads.canonical_correction_payloads_after_check": "CHECK "
+    "(jsonb_typeof(after) "
+    "= 'object'::text)",
+    "canonical_correction_payloads.canonical_correction_payloads_before_check": "CHECK "
+    "(jsonb_typeof(before) "
+    "= 'object'::text)",
+    "canonical_correction_payloads.canonical_correction_payloads_check": "CHECK (before IS DISTINCT "
+    "FROM after)",
+    "canonical_correction_payloads.canonical_correction_payloads_check1": "CHECK "
+    "(octet_length(before::text) "
+    "<= 65536 AND "
+    "octet_length(after::text) "
+    "<= 65536)",
+    "canonical_correction_payloads.canonical_correction_payloads_event_id_fkey": "FOREIGN KEY "
+    "(event_id) "
+    "REFERENCES "
+    "canonical_corrections(event_id) "
+    "DEFERRABLE "
+    "INITIALLY DEFERRED",
+    "canonical_correction_payloads.canonical_correction_payloads_pkey": "PRIMARY KEY (event_id)",
+    "canonical_correction_payloads.canonical_correction_payloads_reason_text_check": "CHECK "
+    "(btrim(reason_text::text) "
+    "<> ''::text)",
+    "canonical_correction_payloads.guard_correction_evidence": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
+    "canonical_corrections.canonical_corrections_check": "CHECK (result_version = (previous_version + "
+    "1))",
+    "canonical_corrections.canonical_corrections_check1": "CHECK (corrects_event_id IS DISTINCT FROM "
+    "event_id)",
+    "canonical_corrections.canonical_corrections_command_id_fkey": "FOREIGN KEY (command_id) "
+    "REFERENCES "
+    "command_receipts(command_id) "
+    "DEFERRABLE INITIALLY DEFERRED",
+    "canonical_corrections.canonical_corrections_command_id_key": "UNIQUE (command_id)",
+    "canonical_corrections.canonical_corrections_corrects_event_id_entity_type_entity_fkey": "FOREIGN "
+    "KEY "
+    "(corrects_event_id, "
+    "entity_type, "
+    "entity_id) "
+    "REFERENCES "
+    "canonical_corrections(event_id, "
+    "entity_type, "
+    "entity_id)",
+    "canonical_corrections.canonical_corrections_entity_type_entity_id_fkey": "FOREIGN KEY "
+    "(entity_type, "
+    "entity_id) REFERENCES "
+    "entity_authorities(entity_type, "
+    "entity_id)",
+    "canonical_corrections.canonical_corrections_entity_type_entity_id_result_version_key": "UNIQUE "
+    "(entity_type, "
+    "entity_id, "
+    "result_version)",
+    "canonical_corrections.canonical_corrections_event_id_entity_type_entity_id_key": "UNIQUE "
+    "(event_id, "
+    "entity_type, "
+    "entity_id)",
+    "canonical_corrections.canonical_corrections_event_id_fkey": "FOREIGN KEY (event_id) REFERENCES "
+    "audit_events(audit_event_id) "
+    "DEFERRABLE INITIALLY DEFERRED",
+    "canonical_corrections.canonical_corrections_pkey": "PRIMARY KEY (event_id)",
+    "canonical_corrections.canonical_corrections_previous_version_check": "CHECK (previous_version >= "
+    "1)",
+    "canonical_corrections.ck_canonical_correction_command": "CHECK (command_type::text = "
+    "'correct_worker'::text AND "
+    "entity_type::text = 'worker'::text OR "
+    "command_type::text = "
+    "'correct_worker_contact'::text AND "
+    "entity_type::text = "
+    "'worker_contact'::text OR "
+    "command_type::text = "
+    "'correct_worker_residence'::text AND "
+    "entity_type::text = "
+    "'worker_residence'::text OR "
+    "command_type::text = "
+    "'correct_worker_preferences'::text AND "
+    "entity_type::text = "
+    "'worker_preferences'::text OR "
+    "command_type::text = "
+    "'correct_contact_details'::text AND "
+    "entity_type::text = "
+    "'employer_contact_details'::text OR "
+    "command_type::text = "
+    "'correct_contact_address'::text AND "
+    "entity_type::text = "
+    "'employer_contact_details'::text OR "
+    "command_type::text = "
+    "'correct_employer_address'::text AND "
+    "entity_type::text = "
+    "'employer_address'::text OR "
+    "command_type::text = "
+    "'correct_worksite_address'::text AND "
+    "entity_type::text = 'worksite'::text OR "
+    "command_type::text = "
+    "'correct_staffing_request'::text AND "
+    "entity_type::text = "
+    "'staffing_request'::text)",
+    "canonical_corrections.guard_correction_evidence": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
+    "canonical_output_review_payloads.canonical_output_review_payloads_note_check": "CHECK (note IS "
+    "NULL OR "
+    "btrim(note::text) "
+    "<> ''::text)",
+    "canonical_output_review_payloads.canonical_output_review_payloads_pkey": "PRIMARY KEY "
+    "(review_id)",
+    "canonical_output_review_payloads.canonical_output_review_payloads_review_id_fkey": "FOREIGN KEY "
+    "(review_id) "
+    "REFERENCES "
+    "canonical_output_reviews(review_id) "
+    "DEFERRABLE "
+    "INITIALLY "
+    "DEFERRED",
+    "canonical_output_review_payloads.canonical_output_review_payloads_reviewed_content_check": "CHECK "
+    "(jsonb_typeof(reviewed_content) "
+    "= "
+    "'object'::text)",
+    "canonical_output_review_payloads.canonical_output_review_payloads_reviewed_content_check1": "CHECK "
+    "(octet_length(reviewed_content::text) "
+    "<= "
+    "65536)",
+    "canonical_output_review_payloads.guard_canonical_review": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
+    "canonical_output_reviews.canonical_output_reviews_command_id_fkey": "FOREIGN KEY (command_id) "
+    "REFERENCES "
+    "command_receipts(command_id) "
+    "DEFERRABLE INITIALLY "
+    "DEFERRED",
+    "canonical_output_reviews.canonical_output_reviews_command_id_key": "UNIQUE (command_id)",
+    "canonical_output_reviews.canonical_output_reviews_dependencies_check": "CHECK "
+    "(jsonb_typeof(dependencies) "
+    "= 'object'::text)",
+    "canonical_output_reviews.canonical_output_reviews_event_id_fkey": "FOREIGN KEY (event_id) "
+    "REFERENCES "
+    "audit_events(audit_event_id) "
+    "DEFERRABLE INITIALLY DEFERRED",
+    "canonical_output_reviews.canonical_output_reviews_event_id_key": "UNIQUE (event_id)",
+    "canonical_output_reviews.canonical_output_reviews_intake_id_fkey": "FOREIGN KEY (intake_id) "
+    "REFERENCES "
+    "canonical_review_heads(intake_id)",
+    "canonical_output_reviews.canonical_output_reviews_intake_id_result_version_key": "UNIQUE "
+    "(intake_id, "
+    "result_version)",
+    "canonical_output_reviews.canonical_output_reviews_intake_id_review_id_key": "UNIQUE (intake_id, "
+    "review_id)",
+    "canonical_output_reviews.canonical_output_reviews_original_review_id_fkey": "FOREIGN KEY "
+    "(original_review_id) "
+    "REFERENCES "
+    "intake_reviews(review_id)",
+    "canonical_output_reviews.canonical_output_reviews_pkey": "PRIMARY KEY (review_id)",
+    "canonical_output_reviews.canonical_output_reviews_result_version_check": "CHECK (result_version "
+    ">= 1)",
+    "canonical_output_reviews.guard_canonical_review": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
+    "canonical_review_heads.canonical_review_heads_check": "CHECK (canonical_output_review_id = "
+    "intake_id)",
+    "canonical_review_heads.canonical_review_heads_check1": "CHECK (version = 0 AND latest_review_id "
+    "IS NULL AND updated_by IS NULL AND "
+    "updated_at IS NULL OR version > 0 AND "
+    "latest_review_id IS NOT NULL AND "
+    "updated_by IS NOT NULL AND updated_at IS "
+    "NOT NULL)",
+    "canonical_review_heads.canonical_review_heads_intake_id_fkey": "FOREIGN KEY (intake_id) "
+    "REFERENCES "
+    "intake_finalizations(intake_id)",
+    "canonical_review_heads.canonical_review_heads_intake_id_key": "UNIQUE (intake_id)",
+    "canonical_review_heads.canonical_review_heads_intake_id_latest_review_id_fkey": "FOREIGN KEY "
+    "(intake_id, "
+    "latest_review_id) "
+    "REFERENCES "
+    "canonical_output_reviews(intake_id, "
+    "review_id) "
+    "DEFERRABLE "
+    "INITIALLY "
+    "DEFERRED",
+    "canonical_review_heads.canonical_review_heads_pkey": "PRIMARY KEY (canonical_output_review_id)",
+    "canonical_review_heads.canonical_review_heads_version_check": "CHECK (version >= 0)",
+    "canonical_review_heads.guard_canonical_review": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
+    "command_receipts.ck_command_receipts_command_type": "CHECK ((command_type::text = ANY "
     "(ARRAY['create_draft_employer'::character "
-    "varying, "
+    "varying::text, "
     "'create_employer_contact'::character "
-    "varying, 'revise_draft_employer'::character "
-    "varying, 'create_intake'::character "
-    "varying, 'revise_intake'::character "
-    "varying, 'revise_intake_address'::character "
-    "varying, 'review_intake'::character "
-    "varying, 'follow_up_intake'::character "
-    "varying, 'create_work_interest'::character "
-    "varying, 'revise_work_interest'::character "
-    "varying, 'finalize_intake'::character "
-    "varying, 'link_intake'::character "
-    "varying]::text[]))",
-    "command_receipts.ck_command_receipts_entity_type": "CHECK (result_entity_type::text = ANY "
-    "(ARRAY['employer'::character varying, "
-    "'employer_contact'::character varying, "
-    "'intake'::character varying, "
-    "'work_interest'::character "
-    "varying]::text[]))",
+    "varying::text, "
+    "'revise_draft_employer'::character "
+    "varying::text, 'create_intake'::character "
+    "varying::text, 'revise_intake'::character "
+    "varying::text, "
+    "'revise_intake_address'::character "
+    "varying::text, 'review_intake'::character "
+    "varying::text, "
+    "'follow_up_intake'::character "
+    "varying::text, "
+    "'create_work_interest'::character "
+    "varying::text, "
+    "'revise_work_interest'::character "
+    "varying::text, 'finalize_intake'::character "
+    "varying::text, 'link_intake'::character "
+    "varying::text])) OR (command_type::text = "
+    "ANY (ARRAY['correct_worker'::character "
+    "varying::text, "
+    "'correct_worker_contact'::character "
+    "varying::text, "
+    "'correct_worker_residence'::character "
+    "varying::text, "
+    "'correct_worker_preferences'::character "
+    "varying::text, "
+    "'correct_contact_details'::character "
+    "varying::text, "
+    "'correct_contact_address'::character "
+    "varying::text, "
+    "'correct_employer_address'::character "
+    "varying::text, "
+    "'correct_worksite_address'::character "
+    "varying::text, "
+    "'correct_staffing_request'::character "
+    "varying::text])) OR command_type::text = "
+    "'review_canonical_outputs'::text)",
+    "command_receipts.ck_command_receipts_entity_type": "CHECK ((result_entity_type::text = ANY "
+    "(ARRAY['employer'::character varying::text, "
+    "'employer_contact'::character varying::text, "
+    "'intake'::character varying::text, "
+    "'work_interest'::character varying::text])) "
+    "OR (result_entity_type::text = ANY "
+    "(ARRAY['worker'::character varying::text, "
+    "'worker_contact'::character varying::text, "
+    "'worker_residence'::character varying::text, "
+    "'worker_preferences'::character "
+    "varying::text, "
+    "'employer_contact_details'::character "
+    "varying::text, 'employer_address'::character "
+    "varying::text, 'worksite'::character "
+    "varying::text, 'staffing_request'::character "
+    "varying::text])) OR result_entity_type::text "
+    "= 'canonical_output_review'::text)",
     "command_receipts.ck_command_receipts_request_fingerprint_len": "CHECK "
     "(octet_length(request_fingerprint) "
     "= 32)",
@@ -145,9 +382,9 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "result_record_version = 1 OR "
     "(command_type::text = ANY "
     "(ARRAY['revise_intake'::character "
-    "varying, "
+    "varying::text, "
     "'revise_intake_address'::character "
-    "varying]::text[])) AND "
+    "varying::text])) AND "
     "result_entity_type::text = "
     "'intake'::text AND "
     "result_event_type::text = "
@@ -194,7 +431,77 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "'intake'::text AND "
     "result_event_type::text = "
     "'intake.linked'::text AND "
-    "result_record_version >= 2)",
+    "result_record_version >= 2 OR "
+    "command_type::text = "
+    "'correct_worker'::text AND "
+    "result_entity_type::text = "
+    "'worker'::text AND "
+    "result_event_type::text = "
+    "'worker.corrected'::text AND "
+    "result_record_version >= 2 OR "
+    "command_type::text = "
+    "'correct_worker_contact'::text "
+    "AND result_entity_type::text = "
+    "'worker_contact'::text AND "
+    "result_event_type::text = "
+    "'worker_contact.corrected'::text "
+    "AND result_record_version >= 2 OR "
+    "command_type::text = "
+    "'correct_worker_residence'::text "
+    "AND result_entity_type::text = "
+    "'worker_residence'::text AND "
+    "result_event_type::text = "
+    "'worker_residence.corrected'::text "
+    "AND result_record_version >= 2 OR "
+    "command_type::text = "
+    "'correct_worker_preferences'::text "
+    "AND result_entity_type::text = "
+    "'worker_preferences'::text AND "
+    "result_event_type::text = "
+    "'worker_preferences.corrected'::text "
+    "AND result_record_version >= 2 OR "
+    "command_type::text = "
+    "'correct_contact_details'::text "
+    "AND result_entity_type::text = "
+    "'employer_contact_details'::text "
+    "AND result_event_type::text = "
+    "'employer_contact_details.corrected'::text "
+    "AND result_record_version >= 2 OR "
+    "command_type::text = "
+    "'correct_contact_address'::text "
+    "AND result_entity_type::text = "
+    "'employer_contact_details'::text "
+    "AND result_event_type::text = "
+    "'employer_contact_details.corrected'::text "
+    "AND result_record_version >= 2 OR "
+    "command_type::text = "
+    "'correct_employer_address'::text "
+    "AND result_entity_type::text = "
+    "'employer_address'::text AND "
+    "result_event_type::text = "
+    "'employer_address.corrected'::text "
+    "AND result_record_version >= 2 OR "
+    "command_type::text = "
+    "'correct_worksite_address'::text "
+    "AND result_entity_type::text = "
+    "'worksite'::text AND "
+    "result_event_type::text = "
+    "'worksite.corrected'::text AND "
+    "result_record_version >= 2 OR "
+    "command_type::text = "
+    "'correct_staffing_request'::text "
+    "AND result_entity_type::text = "
+    "'staffing_request'::text AND "
+    "result_event_type::text = "
+    "'staffing_request.corrected'::text "
+    "AND result_record_version >= 2 OR "
+    "command_type::text = "
+    "'review_canonical_outputs'::text "
+    "AND result_entity_type::text = "
+    "'canonical_output_review'::text "
+    "AND result_event_type::text = "
+    "'canonical_output_review.reviewed'::text "
+    "AND result_record_version >= 1)",
     "command_receipts.ck_command_receipts_result_record_version_positive": "CHECK "
     "(result_record_version >= "
     "1)",
@@ -225,6 +532,8 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "entity_authorities(entity_type, "
     "entity_id) DEFERRABLE INITIALLY "
     "DEFERRED",
+    "command_receipts.guard_canonical_review": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
+    "command_receipts.guard_correction_evidence": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
     "command_receipts.guard_finalization_results": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
     "command_receipts.uq_command_receipts_actor_command": "UNIQUE (command_id, actor_id, "
     "command_type)",
@@ -258,9 +567,10 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "event_type::text = 'intake.created'::text "
     "AND result_version = 1 OR "
     "(command_type::text = ANY "
-    "(ARRAY['revise_intake'::character varying, "
+    "(ARRAY['revise_intake'::character "
+    "varying::text, "
     "'revise_intake_address'::character "
-    "varying]::text[])) AND entity_type::text = "
+    "varying::text])) AND entity_type::text = "
     "'intake'::text AND event_type::text = "
     "'intake.revised'::text AND result_version "
     ">= 2 OR command_type::text = "
@@ -330,7 +640,67 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "entity_type::text = "
     "'staffing_request'::text AND "
     "event_type::text = "
-    "'staffing_request.created'::text))",
+    "'staffing_request.created'::text) OR "
+    "command_type::text = "
+    "'correct_worker'::text AND "
+    "entity_type::text = 'worker'::text AND "
+    "event_type::text = "
+    "'worker.corrected'::text AND "
+    "result_version >= 2 OR command_type::text "
+    "= 'correct_worker_contact'::text AND "
+    "entity_type::text = 'worker_contact'::text "
+    "AND event_type::text = "
+    "'worker_contact.corrected'::text AND "
+    "result_version >= 2 OR command_type::text "
+    "= 'correct_worker_residence'::text AND "
+    "entity_type::text = "
+    "'worker_residence'::text AND "
+    "event_type::text = "
+    "'worker_residence.corrected'::text AND "
+    "result_version >= 2 OR command_type::text "
+    "= 'correct_worker_preferences'::text AND "
+    "entity_type::text = "
+    "'worker_preferences'::text AND "
+    "event_type::text = "
+    "'worker_preferences.corrected'::text AND "
+    "result_version >= 2 OR command_type::text "
+    "= 'correct_contact_details'::text AND "
+    "entity_type::text = "
+    "'employer_contact_details'::text AND "
+    "event_type::text = "
+    "'employer_contact_details.corrected'::text "
+    "AND result_version >= 2 OR "
+    "command_type::text = "
+    "'correct_contact_address'::text AND "
+    "entity_type::text = "
+    "'employer_contact_details'::text AND "
+    "event_type::text = "
+    "'employer_contact_details.corrected'::text "
+    "AND result_version >= 2 OR "
+    "command_type::text = "
+    "'correct_employer_address'::text AND "
+    "entity_type::text = "
+    "'employer_address'::text AND "
+    "event_type::text = "
+    "'employer_address.corrected'::text AND "
+    "result_version >= 2 OR command_type::text "
+    "= 'correct_worksite_address'::text AND "
+    "entity_type::text = 'worksite'::text AND "
+    "event_type::text = "
+    "'worksite.corrected'::text AND "
+    "result_version >= 2 OR command_type::text "
+    "= 'correct_staffing_request'::text AND "
+    "entity_type::text = "
+    "'staffing_request'::text AND "
+    "event_type::text = "
+    "'staffing_request.corrected'::text AND "
+    "result_version >= 2 OR command_type::text "
+    "= 'review_canonical_outputs'::text AND "
+    "entity_type::text = "
+    "'canonical_output_review'::text AND "
+    "event_type::text = "
+    "'canonical_output_review.reviewed'::text "
+    "AND result_version >= 1)",
     "command_results.ck_command_results_version_positive": "CHECK (result_version >= 1)",
     "command_results.command_results_pkey": "PRIMARY KEY (command_id, entity_type, entity_id)",
     "command_results.fk_command_results_entity_authority": "FOREIGN KEY (entity_type, entity_id) "
@@ -355,8 +725,6 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "command_results.uq_command_results_exact_authority": "UNIQUE (command_id, entity_type, "
     "entity_id, result_version, event_type, "
     "actor_id)",
-    "employer_addresses.employer_addresses_check": "CHECK (created_at = updated_at AND created_by = "
-    "updated_by)",
     "employer_addresses.employer_addresses_check1": "CHECK (line1 IS NOT NULL AND btrim(line1::text) "
     "<> ''::text AND locality IS NOT NULL AND "
     "btrim(locality::text) <> ''::text AND country IS "
@@ -372,10 +740,9 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "employers(employer_id)",
     "employer_addresses.employer_addresses_pkey": "PRIMARY KEY (employer_address_id)",
     "employer_addresses.employer_addresses_purpose_check": "CHECK (purpose::text = 'business'::text)",
-    "employer_addresses.employer_addresses_version_check": "CHECK (version = 1)",
+    "employer_addresses.employer_addresses_version_check": "CHECK (version >= 1)",
+    "employer_addresses.guard_canonical_correction": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
     "employer_addresses.guard_employer_output": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
-    "employer_contact_details.employer_contact_details_check": "CHECK (created_at = updated_at AND "
-    "created_by = updated_by)",
     "employer_contact_details.employer_contact_details_check1": "CHECK (line1 IS NOT NULL AND "
     "btrim(line1::text) <> ''::text AND "
     "locality IS NOT NULL AND "
@@ -410,7 +777,8 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "employer_contact_details.employer_contact_details_representative_name_check": "CHECK "
     "(btrim(representative_name::text) "
     "<> ''::text)",
-    "employer_contact_details.employer_contact_details_version_check": "CHECK (version = 1)",
+    "employer_contact_details.employer_contact_details_version_check": "CHECK (version >= 1)",
+    "employer_contact_details.guard_canonical_correction": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
     "employer_contact_details.guard_employer_output": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
     "employer_contact_details.uq_contact_details_link_parent": "UNIQUE (employer_id, "
     "employer_contact_id, "
@@ -433,21 +801,30 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "employers.ck_employers_version_positive": "CHECK (version >= 1)",
     "employers.employers_pkey": "PRIMARY KEY (employer_id)",
     "employers.guard_employer_output": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
-    "entity_authorities.ck_entity_authorities_entity_type": "CHECK (entity_type::text = ANY "
-    "(ARRAY['employer'::character varying, "
-    "'employer_contact'::character varying, "
-    "'intake'::character varying, "
-    "'work_interest'::character varying, "
-    "'worker'::character varying, "
-    "'worker_contact'::character varying, "
-    "'worker_residence'::character varying, "
-    "'worker_preferences'::character varying, "
+    "entity_authorities.ck_entity_authorities_entity_type": "CHECK ((entity_type::text = ANY "
+    "(ARRAY['employer'::character "
+    "varying::text, "
+    "'employer_contact'::character "
+    "varying::text, 'intake'::character "
+    "varying::text, "
+    "'work_interest'::character "
+    "varying::text, 'worker'::character "
+    "varying::text, "
+    "'worker_contact'::character "
+    "varying::text, "
+    "'worker_residence'::character "
+    "varying::text, "
+    "'worker_preferences'::character "
+    "varying::text, "
     "'employer_contact_details'::character "
-    "varying, 'employer_address'::character "
-    "varying, 'worksite'::character varying, "
+    "varying::text, "
+    "'employer_address'::character "
+    "varying::text, 'worksite'::character "
+    "varying::text, "
     "'staffing_request'::character "
-    "varying]::text[]))",
-    "entity_authorities.ck_entity_authorities_exactly_one_concrete_id": "CHECK (entity_type::text = "
+    "varying::text])) OR entity_type::text = "
+    "'canonical_output_review'::text)",
+    "entity_authorities.ck_entity_authorities_exactly_one_concrete_id": "CHECK ((entity_type::text = "
     "'employer'::text AND "
     "employer_id IS NOT NULL AND "
     "employer_id = entity_id AND "
@@ -662,7 +1039,39 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "employer_contact_details_id "
     "IS NULL AND "
     "employer_address_id IS NULL "
-    "AND worksite_id IS NULL)",
+    "AND worksite_id IS NULL) AND "
+    "canonical_output_review_id "
+    "IS NULL OR entity_type::text "
+    "= "
+    "'canonical_output_review'::text "
+    "AND "
+    "canonical_output_review_id = "
+    "entity_id AND "
+    "canonical_output_review_id "
+    "IS NOT NULL AND employer_id "
+    "IS NULL AND "
+    "employer_contact_id IS NULL "
+    "AND intake_id IS NULL AND "
+    "work_interest_id IS NULL AND "
+    "worker_id IS NULL AND "
+    "worker_contact_id IS NULL "
+    "AND worker_residence_id IS "
+    "NULL AND "
+    "worker_preferences_id IS "
+    "NULL AND "
+    "employer_contact_details_id "
+    "IS NULL AND "
+    "employer_address_id IS NULL "
+    "AND worksite_id IS NULL AND "
+    "staffing_request_id IS NULL)",
+    "entity_authorities.entity_authorities_canonical_output_review_id_fkey": "FOREIGN KEY "
+    "(canonical_output_review_id) "
+    "REFERENCES "
+    "canonical_review_heads(canonical_output_review_id) "
+    "DEFERRABLE INITIALLY "
+    "DEFERRED",
+    "entity_authorities.entity_authorities_canonical_output_review_id_key": "UNIQUE "
+    "(canonical_output_review_id)",
     "entity_authorities.entity_authorities_employer_address_id_fkey": "FOREIGN KEY "
     "(employer_address_id) "
     "REFERENCES "
@@ -1302,9 +1711,8 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "intakes.uq_intakes_employer_link": "UNIQUE (intake_id, employer_id)",
     "intakes.uq_intakes_id_kind": "UNIQUE (intake_id, kind)",
     "intakes.uq_intakes_worker_link": "UNIQUE (intake_id, worker_id)",
+    "staffing_requests.guard_canonical_correction": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
     "staffing_requests.guard_employer_output": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
-    "staffing_requests.staffing_requests_check": "CHECK (created_at = updated_at AND created_by = "
-    "updated_by)",
     "staffing_requests.staffing_requests_check1": "CHECK (received_at = created_at)",
     "staffing_requests.staffing_requests_check2": "CHECK ((request_type::text = 'household'::text) = "
     "(employer_address_id IS NULL))",
@@ -1357,7 +1765,7 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "'specified'::text])) IS TRUE)",
     "staffing_requests.staffing_requests_source_channel_check": "CHECK (source_channel::text = "
     "'staff_entry'::text)",
-    "staffing_requests.staffing_requests_version_check": "CHECK (version = 1)",
+    "staffing_requests.staffing_requests_version_check": "CHECK (version >= 1)",
     "staffing_requests.staffing_requests_worker_count_check": "CHECK (worker_count >= 1 AND "
     "worker_count <= 1000)",
     "work_interest_versions.guard_work_interest_authority": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
@@ -1382,18 +1790,17 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "work_interests.work_interests_label_es_check": "CHECK (btrim(label_es::text) <> ''::text)",
     "work_interests.work_interests_pkey": "PRIMARY KEY (interest_id)",
     "work_interests.work_interests_version_check": "CHECK (version >= 1)",
+    "worker_contacts.guard_canonical_correction": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
     "worker_contacts.guard_worker_output": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
-    "worker_contacts.worker_contacts_check": "CHECK (created_at = updated_at AND created_by = "
-    "updated_by)",
     "worker_contacts.worker_contacts_phone_check": "CHECK (btrim(phone::text) <> ''::text)",
     "worker_contacts.worker_contacts_pkey": "PRIMARY KEY (worker_contact_id)",
-    "worker_contacts.worker_contacts_version_check": "CHECK (version = 1)",
+    "worker_contacts.worker_contacts_version_check": "CHECK (version >= 1)",
     "worker_contacts.worker_contacts_worker_id_fkey": "FOREIGN KEY (worker_id) REFERENCES "
     "workers(worker_id)",
     "worker_contacts.worker_contacts_worker_id_key": "UNIQUE (worker_id)",
     "worker_contacts.worker_contacts_worker_id_worker_contact_id_key": "UNIQUE (worker_id, "
     "worker_contact_id)",
-    "worker_interest_selections.guard_worker_output": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
+    "worker_interest_selections.guard_worker_selection": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
     "worker_interest_selections.worker_interest_selections_interest_id_catalog_version_fkey": "FOREIGN "
     "KEY "
     "(interest_id, "
@@ -1408,6 +1815,7 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "(worker_preferences_id) "
     "REFERENCES "
     "worker_preferences(worker_preferences_id)",
+    "worker_preferences.guard_canonical_correction": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
     "worker_preferences.guard_worker_output": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
     "worker_preferences.worker_preferences_availability_check": "CHECK (jsonb_typeof(availability) = "
     "'object'::text)",
@@ -1416,8 +1824,6 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "'mode'::text) = ANY "
     "(ARRAY['flexible'::text, "
     "'weekly'::text]))) IS TRUE)",
-    "worker_preferences.worker_preferences_check": "CHECK (created_at = updated_at AND created_by = "
-    "updated_by)",
     "worker_preferences.worker_preferences_check1": "CHECK (octet_length(interests::text) <= 32768 "
     "AND octet_length(availability::text) <= 32768)",
     "worker_preferences.worker_preferences_interests_check": "CHECK (jsonb_typeof(interests) = "
@@ -1434,15 +1840,14 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "'selections'::text) <= 20) IS TRUE)",
     "worker_preferences.worker_preferences_pkey": "PRIMARY KEY (worker_preferences_id)",
     "worker_preferences.worker_preferences_self_reported_check": "CHECK (self_reported)",
-    "worker_preferences.worker_preferences_version_check": "CHECK (version = 1)",
+    "worker_preferences.worker_preferences_version_check": "CHECK (version >= 1)",
     "worker_preferences.worker_preferences_worker_id_fkey": "FOREIGN KEY (worker_id) REFERENCES "
     "workers(worker_id)",
     "worker_preferences.worker_preferences_worker_id_key": "UNIQUE (worker_id)",
     "worker_preferences.worker_preferences_worker_id_worker_preferences_id_key": "UNIQUE (worker_id, "
     "worker_preferences_id)",
+    "worker_residences.guard_canonical_correction": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
     "worker_residences.guard_worker_output": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
-    "worker_residences.worker_residences_check": "CHECK (created_at = updated_at AND created_by = "
-    "updated_by)",
     "worker_residences.worker_residences_check1": "CHECK (country::text <> 'US'::text OR region IS "
     "NOT NULL AND btrim(region::text) <> ''::text AND "
     "postal_code IS NOT NULL AND "
@@ -1451,19 +1856,19 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "worker_residences.worker_residences_line1_check": "CHECK (btrim(line1::text) <> ''::text)",
     "worker_residences.worker_residences_locality_check": "CHECK (btrim(locality::text) <> ''::text)",
     "worker_residences.worker_residences_pkey": "PRIMARY KEY (worker_residence_id)",
-    "worker_residences.worker_residences_version_check": "CHECK (version = 1)",
+    "worker_residences.worker_residences_version_check": "CHECK (version >= 1)",
     "worker_residences.worker_residences_worker_id_fkey": "FOREIGN KEY (worker_id) REFERENCES "
     "workers(worker_id)",
     "worker_residences.worker_residences_worker_id_key": "UNIQUE (worker_id)",
     "worker_residences.worker_residences_worker_id_worker_residence_id_key": "UNIQUE (worker_id, "
     "worker_residence_id)",
+    "workers.guard_canonical_correction": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
     "workers.guard_worker_output": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
-    "workers.workers_check": "CHECK (created_at = updated_at AND created_by = updated_by)",
     "workers.workers_full_name_check": "CHECK (btrim(full_name::text) <> ''::text)",
     "workers.workers_pkey": "PRIMARY KEY (worker_id)",
-    "workers.workers_version_check": "CHECK (version = 1)",
+    "workers.workers_version_check": "CHECK (version >= 1)",
+    "worksites.guard_canonical_correction": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
     "worksites.guard_employer_output": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
-    "worksites.worksites_check": "CHECK (created_at = updated_at AND created_by = updated_by)",
     "worksites.worksites_check1": "CHECK (line1 IS NOT NULL AND btrim(line1::text) <> ''::text AND "
     "locality IS NOT NULL AND btrim(locality::text) <> ''::text AND "
     "country IS NOT NULL AND country::text ~ '^[A-Z]{2}$'::text AND "
@@ -1480,7 +1885,7 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "worksites.worksites_pkey": "PRIMARY KEY (worksite_id)",
     "worksites.worksites_service_area_status_check": "CHECK (service_area_status::text = "
     "'unassigned'::text)",
-    "worksites.worksites_version_check": "CHECK (version = 1)",
+    "worksites.worksites_version_check": "CHECK (version >= 1)",
 }
 
 EXPECTED_INTAKE_TRIGGERS = {
@@ -1489,12 +1894,43 @@ EXPECTED_INTAKE_TRIGGERS = {
     "audit_events.guard_intake_link_event": ("guard_intake_link_event", True),
     "audit_events.guard_intake_workflow_authority": ("guard_intake_workflow_authority", True),
     "audit_events.guard_work_interest_authority": ("guard_work_interest_authority", True),
+    "canonical_correction_payloads.deny_mutation_canonical_correction_payloads": (
+        "deny_mutation_on_append_only_tables",
+        False,
+    ),
+    "canonical_correction_payloads.guard_correction_evidence": ("guard_correction_evidence", True),
+    "canonical_corrections.deny_mutation_canonical_corrections": (
+        "deny_mutation_on_append_only_tables",
+        False,
+    ),
+    "canonical_corrections.guard_correction_evidence": ("guard_correction_evidence", True),
+    "canonical_output_review_payloads.deny_mutation_canonical_output_review_payloads": (
+        "deny_mutation_on_append_only_tables",
+        False,
+    ),
+    "canonical_output_review_payloads.guard_canonical_review": ("guard_canonical_review", True),
+    "canonical_output_reviews.deny_mutation_canonical_output_reviews": (
+        "deny_mutation_on_append_only_tables",
+        False,
+    ),
+    "canonical_output_reviews.guard_canonical_review": ("guard_canonical_review", True),
+    "canonical_review_heads.deny_mutation_canonical_review_heads": (
+        "deny_mutation_on_append_only_tables",
+        False,
+    ),
+    "canonical_review_heads.guard_canonical_review": ("guard_canonical_review", True),
+    "canonical_review_heads.guard_canonical_review_identity": (
+        "guard_canonical_review_identity",
+        False,
+    ),
     "command_receipts.command_receipts_no_delete": ("deny_mutation_on_append_only_tables", False),
     "command_receipts.command_receipts_no_update": ("deny_mutation_on_append_only_tables", False),
     "command_receipts.command_receipts_revision_compatibility_defaults": (
         "populate_command_receipt_revision_compatibility_fields",
         False,
     ),
+    "command_receipts.guard_canonical_review": ("guard_canonical_review", True),
+    "command_receipts.guard_correction_evidence": ("guard_correction_evidence", True),
     "command_receipts.guard_finalization_results": ("guard_finalization_results", True),
     "command_receipts.populate_legacy_command_result": ("populate_legacy_command_result", False),
     "command_results.deny_mutation_command_results": ("deny_mutation_on_append_only_tables", False),
@@ -1503,11 +1939,15 @@ EXPECTED_INTAKE_TRIGGERS = {
         "deny_mutation_on_append_only_tables",
         False,
     ),
+    "employer_addresses.guard_canonical_correction": ("guard_canonical_correction", True),
+    "employer_addresses.guard_canonical_identity": ("guard_canonical_identity", False),
     "employer_addresses.guard_employer_output": ("guard_employer_output", True),
     "employer_contact_details.deny_mutation_employer_contact_details": (
         "deny_mutation_on_append_only_tables",
         False,
     ),
+    "employer_contact_details.guard_canonical_correction": ("guard_canonical_correction", True),
+    "employer_contact_details.guard_canonical_identity": ("guard_canonical_identity", False),
     "employer_contact_details.guard_employer_output": ("guard_employer_output", True),
     "employer_contacts.guard_employer_output": ("guard_employer_output", True),
     "employers.employers_revision_compatibility_defaults": (
@@ -1563,6 +2003,8 @@ EXPECTED_INTAKE_TRIGGERS = {
         "deny_mutation_on_append_only_tables",
         False,
     ),
+    "staffing_requests.guard_canonical_correction": ("guard_canonical_correction", True),
+    "staffing_requests.guard_canonical_identity": ("guard_canonical_identity", False),
     "staffing_requests.guard_employer_output": ("guard_employer_output", True),
     "work_interest_versions.deny_mutation_work_interest_versions": (
         "deny_mutation_on_append_only_tables",
@@ -1573,26 +2015,67 @@ EXPECTED_INTAKE_TRIGGERS = {
     "work_interests.guard_work_interest_authority": ("guard_work_interest_authority", True),
     "work_interests.guard_work_interest_identity": ("guard_work_interest_identity", False),
     "worker_contacts.deny_mutation_worker_contacts": ("deny_mutation_on_append_only_tables", False),
+    "worker_contacts.guard_canonical_correction": ("guard_canonical_correction", True),
+    "worker_contacts.guard_canonical_identity": ("guard_canonical_identity", False),
     "worker_contacts.guard_worker_output": ("guard_worker_output", True),
     "worker_interest_selections.deny_mutation_worker_interest_selections": (
         "deny_mutation_on_append_only_tables",
         False,
     ),
-    "worker_interest_selections.guard_worker_output": ("guard_worker_output", True),
+    "worker_interest_selections.guard_worker_selection": ("guard_worker_selection", True),
     "worker_preferences.deny_mutation_worker_preferences": (
         "deny_mutation_on_append_only_tables",
         False,
     ),
+    "worker_preferences.guard_canonical_correction": ("guard_canonical_correction", True),
+    "worker_preferences.guard_canonical_identity": ("guard_canonical_identity", False),
     "worker_preferences.guard_worker_output": ("guard_worker_output", True),
     "worker_residences.deny_mutation_worker_residences": (
         "deny_mutation_on_append_only_tables",
         False,
     ),
+    "worker_residences.guard_canonical_correction": ("guard_canonical_correction", True),
+    "worker_residences.guard_canonical_identity": ("guard_canonical_identity", False),
     "worker_residences.guard_worker_output": ("guard_worker_output", True),
     "workers.deny_mutation_workers": ("deny_mutation_on_append_only_tables", False),
+    "workers.guard_canonical_correction": ("guard_canonical_correction", True),
+    "workers.guard_canonical_identity": ("guard_canonical_identity", False),
     "workers.guard_worker_output": ("guard_worker_output", True),
     "worksites.deny_mutation_worksites": ("deny_mutation_on_append_only_tables", False),
+    "worksites.guard_canonical_correction": ("guard_canonical_correction", True),
+    "worksites.guard_canonical_identity": ("guard_canonical_identity", False),
     "worksites.guard_employer_output": ("guard_employer_output", True),
+}
+
+EXPECTED_FUNCTION_HASHES = {
+    "canonical_correction_section(text, jsonb)": "979959c10181080d46247451413bfac49ccd6e99346902fbff3bfe784e7bc31e",
+    "canonical_current_facts(uuid)": "ceaac29b900a833a456a640342236c65f8dcd548c1ffb7f52a21a5378825bca8",
+    "canonical_details_complete(text, jsonb)": "8bc001e1f5274d3eaef5bbd94ff4ace6db4273e087417cb034f712b20beccb3a",
+    "deny_mutation_on_append_only_tables()": "9fcd9dd2284343c0077c314e8b8749be31a66413591df02ea9487fdb3c9732ba",
+    "guard_canonical_correction()": "7832b059628865d42bd3acc0b2a2b97d29530087ef2f554da1b3e4cb625c2b88",
+    "guard_canonical_identity()": "b392b9406a029abf618a1a1dec104068862f329a6d0bab06fdebc8946a1aabec",
+    "guard_canonical_review()": "368b981d3edd1d14d5f5637bfa0a4bff4ce9703d87c9a0308f6ec0439ec6618e",
+    "guard_canonical_review_identity()": "c5e2e5278346fc2d0123c0a1b7bf3a5d5e2ef63984439dad768fd098589897f6",
+    "guard_correction_evidence()": "2f234a59e00db11c15355c84ff8da43b7cbdde75c9f468940efc7dc379718ac1",
+    "guard_employer_output()": "7a7cf9b344a37250e28029a07a9129486ebe0f53407a665c21467d4b88f2b6f3",
+    "guard_finalization_results()": "9d47698402a27977b18499a0dc97e953488c4b89db87fec3a62b598e43169375",
+    "guard_intake_address_authority()": "47e030480919160c7a63fb7d159c0adec69e497ffb36bf04b4fdb840fa73a9c0",
+    "guard_intake_identity()": "0fd1221d4d55acaca292163c903191776acc530528a088f086b9670da95410c6",
+    "guard_intake_link_event()": "74ccc0538d9d4ef762cbc181c440e2679ddb466e6373c8d87c380b160c786011",
+    "guard_intake_link_once()": "aee89d395953850380c017a082baf657d724c9e92137dbeac44c907294427284",
+    "guard_intake_links()": "37816690ee3ba88ae514352767aa964714bb81102f4298cbe92e222335440466",
+    "guard_intake_workflow_authority()": "cbcba7fceba6b749ba3974c91430713c57c90147310ce9b05d6fa10f178a6a35",
+    "guard_intake_write_authority()": "26f547b0c18f3db97ed3a4e43a4a271857ae8602cb7600972953c8a46394bf0f",
+    "guard_work_interest_authority()": "de664918f8177bcc7213334c97d99743e159ac24e85a36f0438b4ae56b35c355",
+    "guard_work_interest_identity()": "649cfbb47d70d1b22a944219996dfce183dfd5e1643186b378d1cc4a64357590",
+    "guard_worker_output()": "3d025f918dc182d9dd84c8962de75ca452dc2e695154e5d99326eac203881edc",
+    "guard_worker_selection()": "33a379e2d9676e1e4c52582596b832efb70965b0118b1f9e8bbb2f86195ee86a",
+    "intake_canonical_record(text, uuid)": "d9f5b2bc60e835ec63dc0f4fe120770de49c273e0696693db120c366f7b1934d",
+    "intake_effective_snapshot(uuid)": "8fb41ff7e57951108b8bd6928e9e698355ea116962774246458754e6e76102ef",
+    "intake_link_refs(uuid)": "d27438e2ee115ba40ebd46c2abcbed31755c99f6e6bca5bacc28f3c9961475c0",
+    "populate_command_receipt_revision_compatibility_fields()": "7a6e9a3a156344ecc76103331d2e6c7844edb9a8f8600ebb415ae4b547adbded",
+    "populate_employer_revision_compatibility_fields()": "b0b862c8bb628e3f487c7e16702041299e8ba4bd9d0a32d23e276e56a1635e95",
+    "populate_legacy_command_result()": "b457a7d46f8eb29006f720592dafdd5c85cd9150071634f69f37833cc0d3337d",
 }
 
 EXPECTED_TRIGGER_DEFINITIONS = {
@@ -1615,6 +2098,81 @@ EXPECTED_TRIGGER_DEFINITIONS = {
     "audit_events DEFERRABLE INITIALLY DEFERRED FOR "
     "EACH ROW EXECUTE FUNCTION "
     "guard_work_interest_authority()",
+    "canonical_correction_payloads.deny_mutation_canonical_correction_payloads": "CREATE TRIGGER "
+    "deny_mutation_canonical_correction_payloads "
+    "BEFORE DELETE OR "
+    "UPDATE OR TRUNCATE "
+    "ON "
+    "canonical_correction_payloads "
+    "FOR EACH STATEMENT "
+    "EXECUTE FUNCTION "
+    "deny_mutation_on_append_only_tables()",
+    "canonical_correction_payloads.guard_correction_evidence": "CREATE CONSTRAINT TRIGGER "
+    "guard_correction_evidence AFTER "
+    "INSERT ON "
+    "canonical_correction_payloads "
+    "DEFERRABLE INITIALLY DEFERRED FOR "
+    "EACH ROW EXECUTE FUNCTION "
+    "guard_correction_evidence()",
+    "canonical_corrections.deny_mutation_canonical_corrections": "CREATE TRIGGER "
+    "deny_mutation_canonical_corrections "
+    "BEFORE DELETE OR UPDATE OR TRUNCATE "
+    "ON canonical_corrections FOR EACH "
+    "STATEMENT EXECUTE FUNCTION "
+    "deny_mutation_on_append_only_tables()",
+    "canonical_corrections.guard_correction_evidence": "CREATE CONSTRAINT TRIGGER "
+    "guard_correction_evidence AFTER INSERT ON "
+    "canonical_corrections DEFERRABLE INITIALLY "
+    "DEFERRED FOR EACH ROW EXECUTE FUNCTION "
+    "guard_correction_evidence()",
+    "canonical_output_review_payloads.deny_mutation_canonical_output_review_payloads": "CREATE "
+    "TRIGGER "
+    "deny_mutation_canonical_output_review_payloads "
+    "BEFORE DELETE "
+    "OR UPDATE OR "
+    "TRUNCATE ON "
+    "canonical_output_review_payloads "
+    "FOR EACH "
+    "STATEMENT "
+    "EXECUTE "
+    "FUNCTION "
+    "deny_mutation_on_append_only_tables()",
+    "canonical_output_review_payloads.guard_canonical_review": "CREATE CONSTRAINT TRIGGER "
+    "guard_canonical_review AFTER INSERT "
+    "ON canonical_output_review_payloads "
+    "DEFERRABLE INITIALLY DEFERRED FOR "
+    "EACH ROW EXECUTE FUNCTION "
+    "guard_canonical_review()",
+    "canonical_output_reviews.deny_mutation_canonical_output_reviews": "CREATE TRIGGER "
+    "deny_mutation_canonical_output_reviews "
+    "BEFORE DELETE OR UPDATE OR "
+    "TRUNCATE ON "
+    "canonical_output_reviews FOR "
+    "EACH STATEMENT EXECUTE "
+    "FUNCTION "
+    "deny_mutation_on_append_only_tables()",
+    "canonical_output_reviews.guard_canonical_review": "CREATE CONSTRAINT TRIGGER "
+    "guard_canonical_review AFTER INSERT ON "
+    "canonical_output_reviews DEFERRABLE INITIALLY "
+    "DEFERRED FOR EACH ROW EXECUTE FUNCTION "
+    "guard_canonical_review()",
+    "canonical_review_heads.deny_mutation_canonical_review_heads": "CREATE TRIGGER "
+    "deny_mutation_canonical_review_heads "
+    "BEFORE DELETE OR TRUNCATE ON "
+    "canonical_review_heads FOR EACH "
+    "STATEMENT EXECUTE FUNCTION "
+    "deny_mutation_on_append_only_tables()",
+    "canonical_review_heads.guard_canonical_review": "CREATE CONSTRAINT TRIGGER "
+    "guard_canonical_review AFTER UPDATE ON "
+    "canonical_review_heads DEFERRABLE INITIALLY "
+    "DEFERRED FOR EACH ROW EXECUTE FUNCTION "
+    "guard_canonical_review()",
+    "canonical_review_heads.guard_canonical_review_identity": "CREATE TRIGGER "
+    "guard_canonical_review_identity BEFORE "
+    "INSERT OR UPDATE ON "
+    "canonical_review_heads FOR EACH ROW "
+    "EXECUTE FUNCTION "
+    "guard_canonical_review_identity()",
     "command_receipts.command_receipts_no_delete": "CREATE TRIGGER command_receipts_no_delete BEFORE "
     "DELETE ON command_receipts FOR EACH ROW EXECUTE "
     "FUNCTION deny_mutation_on_append_only_tables()",
@@ -1627,6 +2185,15 @@ EXPECTED_TRIGGER_DEFINITIONS = {
     "command_receipts FOR EACH "
     "ROW EXECUTE FUNCTION "
     "populate_command_receipt_revision_compatibility_fields()",
+    "command_receipts.guard_canonical_review": "CREATE CONSTRAINT TRIGGER guard_canonical_review "
+    "AFTER INSERT ON command_receipts DEFERRABLE INITIALLY "
+    "DEFERRED FOR EACH ROW EXECUTE FUNCTION "
+    "guard_canonical_review()",
+    "command_receipts.guard_correction_evidence": "CREATE CONSTRAINT TRIGGER "
+    "guard_correction_evidence AFTER INSERT ON "
+    "command_receipts DEFERRABLE INITIALLY DEFERRED FOR "
+    "EACH ROW EXECUTE FUNCTION "
+    "guard_correction_evidence()",
     "command_receipts.guard_finalization_results": "CREATE CONSTRAINT TRIGGER "
     "guard_finalization_results AFTER INSERT ON "
     "command_receipts DEFERRABLE INITIALLY DEFERRED "
@@ -1647,22 +2214,40 @@ EXPECTED_TRIGGER_DEFINITIONS = {
     "guard_finalization_results()",
     "employer_addresses.deny_mutation_employer_addresses": "CREATE TRIGGER "
     "deny_mutation_employer_addresses BEFORE "
-    "DELETE OR UPDATE OR TRUNCATE ON "
-    "employer_addresses FOR EACH STATEMENT "
-    "EXECUTE FUNCTION "
+    "DELETE OR TRUNCATE ON employer_addresses "
+    "FOR EACH STATEMENT EXECUTE FUNCTION "
     "deny_mutation_on_append_only_tables()",
+    "employer_addresses.guard_canonical_correction": "CREATE CONSTRAINT TRIGGER "
+    "guard_canonical_correction AFTER UPDATE ON "
+    "employer_addresses DEFERRABLE INITIALLY "
+    "DEFERRED FOR EACH ROW EXECUTE FUNCTION "
+    "guard_canonical_correction('employer_address')",
+    "employer_addresses.guard_canonical_identity": "CREATE TRIGGER guard_canonical_identity BEFORE "
+    "INSERT OR UPDATE ON employer_addresses FOR EACH "
+    "ROW EXECUTE FUNCTION "
+    "guard_canonical_identity('employer_address')",
     "employer_addresses.guard_employer_output": "CREATE CONSTRAINT TRIGGER guard_employer_output "
     "AFTER INSERT ON employer_addresses DEFERRABLE "
     "INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION "
     "guard_employer_output('employer_address')",
     "employer_contact_details.deny_mutation_employer_contact_details": "CREATE TRIGGER "
     "deny_mutation_employer_contact_details "
-    "BEFORE DELETE OR UPDATE OR "
-    "TRUNCATE ON "
+    "BEFORE DELETE OR TRUNCATE ON "
     "employer_contact_details FOR "
     "EACH STATEMENT EXECUTE "
     "FUNCTION "
     "deny_mutation_on_append_only_tables()",
+    "employer_contact_details.guard_canonical_correction": "CREATE CONSTRAINT TRIGGER "
+    "guard_canonical_correction AFTER UPDATE "
+    "ON employer_contact_details DEFERRABLE "
+    "INITIALLY DEFERRED FOR EACH ROW EXECUTE "
+    "FUNCTION "
+    "guard_canonical_correction('employer_contact_details')",
+    "employer_contact_details.guard_canonical_identity": "CREATE TRIGGER guard_canonical_identity "
+    "BEFORE INSERT OR UPDATE ON "
+    "employer_contact_details FOR EACH ROW "
+    "EXECUTE FUNCTION "
+    "guard_canonical_identity('employer_contact_details')",
     "employer_contact_details.guard_employer_output": "CREATE CONSTRAINT TRIGGER "
     "guard_employer_output AFTER INSERT ON "
     "employer_contact_details DEFERRABLE INITIALLY "
@@ -1775,10 +2360,18 @@ EXPECTED_TRIGGER_DEFINITIONS = {
     "guard_intake_write_authority()",
     "staffing_requests.deny_mutation_staffing_requests": "CREATE TRIGGER "
     "deny_mutation_staffing_requests BEFORE "
-    "DELETE OR UPDATE OR TRUNCATE ON "
-    "staffing_requests FOR EACH STATEMENT "
-    "EXECUTE FUNCTION "
+    "DELETE OR TRUNCATE ON staffing_requests FOR "
+    "EACH STATEMENT EXECUTE FUNCTION "
     "deny_mutation_on_append_only_tables()",
+    "staffing_requests.guard_canonical_correction": "CREATE CONSTRAINT TRIGGER "
+    "guard_canonical_correction AFTER UPDATE ON "
+    "staffing_requests DEFERRABLE INITIALLY DEFERRED "
+    "FOR EACH ROW EXECUTE FUNCTION "
+    "guard_canonical_correction('staffing_request')",
+    "staffing_requests.guard_canonical_identity": "CREATE TRIGGER guard_canonical_identity BEFORE "
+    "INSERT OR UPDATE ON staffing_requests FOR EACH ROW "
+    "EXECUTE FUNCTION "
+    "guard_canonical_identity('staffing_request')",
     "staffing_requests.guard_employer_output": "CREATE CONSTRAINT TRIGGER guard_employer_output AFTER "
     "INSERT ON staffing_requests DEFERRABLE INITIALLY "
     "DEFERRED FOR EACH ROW EXECUTE FUNCTION "
@@ -1810,80 +2403,96 @@ EXPECTED_TRIGGER_DEFINITIONS = {
     "EACH ROW EXECUTE FUNCTION "
     "guard_work_interest_identity()",
     "worker_contacts.deny_mutation_worker_contacts": "CREATE TRIGGER deny_mutation_worker_contacts "
-    "BEFORE DELETE OR UPDATE OR TRUNCATE ON "
-    "worker_contacts FOR EACH STATEMENT EXECUTE "
-    "FUNCTION deny_mutation_on_append_only_tables()",
+    "BEFORE DELETE OR TRUNCATE ON worker_contacts "
+    "FOR EACH STATEMENT EXECUTE FUNCTION "
+    "deny_mutation_on_append_only_tables()",
+    "worker_contacts.guard_canonical_correction": "CREATE CONSTRAINT TRIGGER "
+    "guard_canonical_correction AFTER UPDATE ON "
+    "worker_contacts DEFERRABLE INITIALLY DEFERRED FOR "
+    "EACH ROW EXECUTE FUNCTION "
+    "guard_canonical_correction('worker_contact')",
+    "worker_contacts.guard_canonical_identity": "CREATE TRIGGER guard_canonical_identity BEFORE "
+    "INSERT OR UPDATE ON worker_contacts FOR EACH ROW "
+    "EXECUTE FUNCTION "
+    "guard_canonical_identity('worker_contact')",
     "worker_contacts.guard_worker_output": "CREATE CONSTRAINT TRIGGER guard_worker_output AFTER "
     "INSERT ON worker_contacts DEFERRABLE INITIALLY DEFERRED "
     "FOR EACH ROW EXECUTE FUNCTION "
     "guard_worker_output('worker_contact')",
     "worker_interest_selections.deny_mutation_worker_interest_selections": "CREATE TRIGGER "
     "deny_mutation_worker_interest_selections "
-    "BEFORE DELETE OR UPDATE "
-    "OR TRUNCATE ON "
+    "BEFORE UPDATE OR TRUNCATE "
+    "ON "
     "worker_interest_selections "
     "FOR EACH STATEMENT "
     "EXECUTE FUNCTION "
     "deny_mutation_on_append_only_tables()",
-    "worker_interest_selections.guard_worker_output": "CREATE CONSTRAINT TRIGGER guard_worker_output "
-    "AFTER INSERT ON worker_interest_selections "
+    "worker_interest_selections.guard_worker_selection": "CREATE CONSTRAINT TRIGGER "
+    "guard_worker_selection AFTER INSERT OR "
+    "DELETE ON worker_interest_selections "
     "DEFERRABLE INITIALLY DEFERRED FOR EACH ROW "
-    "EXECUTE FUNCTION "
-    "guard_worker_output('worker_preferences')",
+    "EXECUTE FUNCTION guard_worker_selection()",
     "worker_preferences.deny_mutation_worker_preferences": "CREATE TRIGGER "
     "deny_mutation_worker_preferences BEFORE "
-    "DELETE OR UPDATE OR TRUNCATE ON "
-    "worker_preferences FOR EACH STATEMENT "
-    "EXECUTE FUNCTION "
+    "DELETE OR TRUNCATE ON worker_preferences "
+    "FOR EACH STATEMENT EXECUTE FUNCTION "
     "deny_mutation_on_append_only_tables()",
+    "worker_preferences.guard_canonical_correction": "CREATE CONSTRAINT TRIGGER "
+    "guard_canonical_correction AFTER UPDATE ON "
+    "worker_preferences DEFERRABLE INITIALLY "
+    "DEFERRED FOR EACH ROW EXECUTE FUNCTION "
+    "guard_canonical_correction('worker_preferences')",
+    "worker_preferences.guard_canonical_identity": "CREATE TRIGGER guard_canonical_identity BEFORE "
+    "INSERT OR UPDATE ON worker_preferences FOR EACH "
+    "ROW EXECUTE FUNCTION "
+    "guard_canonical_identity('worker_preferences')",
     "worker_preferences.guard_worker_output": "CREATE CONSTRAINT TRIGGER guard_worker_output AFTER "
     "INSERT ON worker_preferences DEFERRABLE INITIALLY "
     "DEFERRED FOR EACH ROW EXECUTE FUNCTION "
     "guard_worker_output('worker_preferences')",
     "worker_residences.deny_mutation_worker_residences": "CREATE TRIGGER "
     "deny_mutation_worker_residences BEFORE "
-    "DELETE OR UPDATE OR TRUNCATE ON "
-    "worker_residences FOR EACH STATEMENT "
-    "EXECUTE FUNCTION "
+    "DELETE OR TRUNCATE ON worker_residences FOR "
+    "EACH STATEMENT EXECUTE FUNCTION "
     "deny_mutation_on_append_only_tables()",
+    "worker_residences.guard_canonical_correction": "CREATE CONSTRAINT TRIGGER "
+    "guard_canonical_correction AFTER UPDATE ON "
+    "worker_residences DEFERRABLE INITIALLY DEFERRED "
+    "FOR EACH ROW EXECUTE FUNCTION "
+    "guard_canonical_correction('worker_residence')",
+    "worker_residences.guard_canonical_identity": "CREATE TRIGGER guard_canonical_identity BEFORE "
+    "INSERT OR UPDATE ON worker_residences FOR EACH ROW "
+    "EXECUTE FUNCTION "
+    "guard_canonical_identity('worker_residence')",
     "worker_residences.guard_worker_output": "CREATE CONSTRAINT TRIGGER guard_worker_output AFTER "
     "INSERT ON worker_residences DEFERRABLE INITIALLY "
     "DEFERRED FOR EACH ROW EXECUTE FUNCTION "
     "guard_worker_output('worker_residence')",
-    "workers.deny_mutation_workers": "CREATE TRIGGER deny_mutation_workers BEFORE DELETE OR UPDATE OR "
-    "TRUNCATE ON workers FOR EACH STATEMENT EXECUTE FUNCTION "
+    "workers.deny_mutation_workers": "CREATE TRIGGER deny_mutation_workers BEFORE DELETE OR TRUNCATE "
+    "ON workers FOR EACH STATEMENT EXECUTE FUNCTION "
     "deny_mutation_on_append_only_tables()",
+    "workers.guard_canonical_correction": "CREATE CONSTRAINT TRIGGER guard_canonical_correction AFTER "
+    "UPDATE ON workers DEFERRABLE INITIALLY DEFERRED FOR EACH "
+    "ROW EXECUTE FUNCTION guard_canonical_correction('worker')",
+    "workers.guard_canonical_identity": "CREATE TRIGGER guard_canonical_identity BEFORE INSERT OR "
+    "UPDATE ON workers FOR EACH ROW EXECUTE FUNCTION "
+    "guard_canonical_identity('worker')",
     "workers.guard_worker_output": "CREATE CONSTRAINT TRIGGER guard_worker_output AFTER INSERT ON "
     "workers DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE "
     "FUNCTION guard_worker_output('worker')",
     "worksites.deny_mutation_worksites": "CREATE TRIGGER deny_mutation_worksites BEFORE DELETE OR "
-    "UPDATE OR TRUNCATE ON worksites FOR EACH STATEMENT EXECUTE "
-    "FUNCTION deny_mutation_on_append_only_tables()",
+    "TRUNCATE ON worksites FOR EACH STATEMENT EXECUTE FUNCTION "
+    "deny_mutation_on_append_only_tables()",
+    "worksites.guard_canonical_correction": "CREATE CONSTRAINT TRIGGER guard_canonical_correction "
+    "AFTER UPDATE ON worksites DEFERRABLE INITIALLY DEFERRED "
+    "FOR EACH ROW EXECUTE FUNCTION "
+    "guard_canonical_correction('worksite')",
+    "worksites.guard_canonical_identity": "CREATE TRIGGER guard_canonical_identity BEFORE INSERT OR "
+    "UPDATE ON worksites FOR EACH ROW EXECUTE FUNCTION "
+    "guard_canonical_identity('worksite')",
     "worksites.guard_employer_output": "CREATE CONSTRAINT TRIGGER guard_employer_output AFTER INSERT "
     "ON worksites DEFERRABLE INITIALLY DEFERRED FOR EACH ROW "
     "EXECUTE FUNCTION guard_employer_output('worksite')",
-}
-
-EXPECTED_FUNCTION_HASHES = {
-    "deny_mutation_on_append_only_tables()": "9fcd9dd2284343c0077c314e8b8749be31a66413591df02ea9487fdb3c9732ba",
-    "guard_employer_output()": "7a7cf9b344a37250e28029a07a9129486ebe0f53407a665c21467d4b88f2b6f3",
-    "guard_finalization_results()": "9d47698402a27977b18499a0dc97e953488c4b89db87fec3a62b598e43169375",
-    "guard_intake_address_authority()": "47e030480919160c7a63fb7d159c0adec69e497ffb36bf04b4fdb840fa73a9c0",
-    "guard_intake_identity()": "0fd1221d4d55acaca292163c903191776acc530528a088f086b9670da95410c6",
-    "guard_intake_link_event()": "74ccc0538d9d4ef762cbc181c440e2679ddb466e6373c8d87c380b160c786011",
-    "guard_intake_link_once()": "aee89d395953850380c017a082baf657d724c9e92137dbeac44c907294427284",
-    "guard_intake_links()": "37816690ee3ba88ae514352767aa964714bb81102f4298cbe92e222335440466",
-    "guard_intake_workflow_authority()": "cbcba7fceba6b749ba3974c91430713c57c90147310ce9b05d6fa10f178a6a35",
-    "guard_intake_write_authority()": "26f547b0c18f3db97ed3a4e43a4a271857ae8602cb7600972953c8a46394bf0f",
-    "guard_work_interest_authority()": "de664918f8177bcc7213334c97d99743e159ac24e85a36f0438b4ae56b35c355",
-    "guard_work_interest_identity()": "649cfbb47d70d1b22a944219996dfce183dfd5e1643186b378d1cc4a64357590",
-    "guard_worker_output()": "3d025f918dc182d9dd84c8962de75ca452dc2e695154e5d99326eac203881edc",
-    "intake_canonical_record(text, uuid)": "8b071153612b4e98287842c9da882d58dcfa5772e5285df226cfbcd5849a1550",
-    "intake_effective_snapshot(uuid)": "6d5a094a12d2d1587f133a5b00f32243ed9c5197f9ba1221c714e203f48899a1",
-    "intake_link_refs(uuid)": "d27438e2ee115ba40ebd46c2abcbed31755c99f6e6bca5bacc28f3c9961475c0",
-    "populate_command_receipt_revision_compatibility_fields()": "7a6e9a3a156344ecc76103331d2e6c7844edb9a8f8600ebb415ae4b547adbded",
-    "populate_employer_revision_compatibility_fields()": "b0b862c8bb628e3f487c7e16702041299e8ba4bd9d0a32d23e276e56a1635e95",
-    "populate_legacy_command_result()": "b457a7d46f8eb29006f720592dafdd5c85cd9150071634f69f37833cc0d3337d",
 }
 
 EXPECTED_UNIQUE_INDEXES = {
@@ -1891,6 +2500,50 @@ EXPECTED_UNIQUE_INDEXES = {
     "btree (version_num)",
     "audit_events_pkey": "CREATE UNIQUE INDEX audit_events_pkey ON public.audit_events USING btree "
     "(audit_event_id)",
+    "canonical_correction_payloads_pkey": "CREATE UNIQUE INDEX canonical_correction_payloads_pkey ON "
+    "public.canonical_correction_payloads USING btree "
+    "(event_id)",
+    "canonical_corrections_command_id_key": "CREATE UNIQUE INDEX canonical_corrections_command_id_key "
+    "ON public.canonical_corrections USING btree (command_id)",
+    "canonical_corrections_entity_type_entity_id_result_version_key": "CREATE UNIQUE INDEX "
+    "canonical_corrections_entity_type_entity_id_result_version_key "
+    "ON "
+    "public.canonical_corrections "
+    "USING btree (entity_type, "
+    "entity_id, result_version)",
+    "canonical_corrections_event_id_entity_type_entity_id_key": "CREATE UNIQUE INDEX "
+    "canonical_corrections_event_id_entity_type_entity_id_key "
+    "ON public.canonical_corrections "
+    "USING btree (event_id, entity_type, "
+    "entity_id)",
+    "canonical_corrections_pkey": "CREATE UNIQUE INDEX canonical_corrections_pkey ON "
+    "public.canonical_corrections USING btree (event_id)",
+    "canonical_output_review_payloads_pkey": "CREATE UNIQUE INDEX "
+    "canonical_output_review_payloads_pkey ON "
+    "public.canonical_output_review_payloads USING btree "
+    "(review_id)",
+    "canonical_output_reviews_command_id_key": "CREATE UNIQUE INDEX "
+    "canonical_output_reviews_command_id_key ON "
+    "public.canonical_output_reviews USING btree "
+    "(command_id)",
+    "canonical_output_reviews_event_id_key": "CREATE UNIQUE INDEX "
+    "canonical_output_reviews_event_id_key ON "
+    "public.canonical_output_reviews USING btree (event_id)",
+    "canonical_output_reviews_intake_id_result_version_key": "CREATE UNIQUE INDEX "
+    "canonical_output_reviews_intake_id_result_version_key "
+    "ON public.canonical_output_reviews "
+    "USING btree (intake_id, result_version)",
+    "canonical_output_reviews_intake_id_review_id_key": "CREATE UNIQUE INDEX "
+    "canonical_output_reviews_intake_id_review_id_key "
+    "ON public.canonical_output_reviews USING "
+    "btree (intake_id, review_id)",
+    "canonical_output_reviews_pkey": "CREATE UNIQUE INDEX canonical_output_reviews_pkey ON "
+    "public.canonical_output_reviews USING btree (review_id)",
+    "canonical_review_heads_intake_id_key": "CREATE UNIQUE INDEX canonical_review_heads_intake_id_key "
+    "ON public.canonical_review_heads USING btree (intake_id)",
+    "canonical_review_heads_pkey": "CREATE UNIQUE INDEX canonical_review_heads_pkey ON "
+    "public.canonical_review_heads USING btree "
+    "(canonical_output_review_id)",
     "command_receipts_pkey": "CREATE UNIQUE INDEX command_receipts_pkey ON public.command_receipts "
     "USING btree (command_id)",
     "command_results_pkey": "CREATE UNIQUE INDEX command_results_pkey ON public.command_results USING "
@@ -1919,6 +2572,10 @@ EXPECTED_UNIQUE_INDEXES = {
     "USING btree (employer_contact_id)",
     "employers_pkey": "CREATE UNIQUE INDEX employers_pkey ON public.employers USING btree "
     "(employer_id)",
+    "entity_authorities_canonical_output_review_id_key": "CREATE UNIQUE INDEX "
+    "entity_authorities_canonical_output_review_id_key "
+    "ON public.entity_authorities USING btree "
+    "(canonical_output_review_id)",
     "entity_authorities_employer_address_id_key": "CREATE UNIQUE INDEX "
     "entity_authorities_employer_address_id_key ON "
     "public.entity_authorities USING btree "

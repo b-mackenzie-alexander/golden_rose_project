@@ -21,11 +21,22 @@ CANONICAL_TABLES = {
 }
 
 
-def test_prc_tables_are_owned_append_only_and_have_no_runtime_update() -> None:
+def test_canonical_tables_retain_ownership_with_only_declared_correction_columns() -> None:
     for table in CANONICAL_TABLES:
         assert table in EXPECTED_SCHEMA_OWNER_OBJECTS
-        assert EXPECTED_RUNTIME_TABLE_PRIVILEGES[table] == {"INSERT", "SELECT"}
-        assert EXPECTED_RUNTIME_UPDATE_COLUMNS[table] == set()
+        assert EXPECTED_RUNTIME_TABLE_PRIVILEGES[table] == (
+            {"INSERT", "SELECT", "DELETE"}
+            if table == "worker_interest_selections"
+            else {"INSERT", "SELECT"}
+        )
+        if table in {"intake_finalizations", "worker_interest_selections"}:
+            assert EXPECTED_RUNTIME_UPDATE_COLUMNS[table] == set()
+        else:
+            assert {"version", "updated_at", "updated_by"} <= EXPECTED_RUNTIME_UPDATE_COLUMNS[table]
+            assert (
+                not {"created_at", "created_by", "worker_id", "employer_id"}
+                & EXPECTED_RUNTIME_UPDATE_COLUMNS[table]
+            )
         assert f"{table}.deny_mutation_{table}" in EXPECTED_INTAKE_TRIGGERS
 
 

@@ -110,8 +110,10 @@ export function IntakeFields({
   kind,
   value,
   change,
+  sectionOnly = false,
 }: {
   kind: IntakeKind;
+  sectionOnly?: boolean;
   value: DraftObject;
   change: (value: DraftObject) => void;
 }) {
@@ -138,7 +140,7 @@ export function IntakeFields({
   const ranges = Array.isArray(availability.ranges) ? availability.ranges.map(obj) : [];
   return (
     <>
-      <div className="intake-fields">
+      {!sectionOnly ? <div className="intake-fields">
         {kind === 'worker' ? (
           field('full_name', ['Full name', 'Nombre completo'])
         ) : (
@@ -159,7 +161,7 @@ export function IntakeFields({
           </>
         )}
         {field('phone', ['Phone', 'Teléfono'], 'tel', 40)}
-      </div>
+      </div> : null}
       {kind === 'worker' ? (
         <>
           <p>{m.selfReported}</p>

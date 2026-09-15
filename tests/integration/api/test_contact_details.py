@@ -40,6 +40,7 @@ def test_canonical_contact_sections_without_history_writes(client, session, kind
         "employer_contact_id": refs["contact"]["id"],
         "version": 1,
         "phone": content(kind)["phone"],
+        "representative_name": content(kind)["representative_name"],
     }
     address = client.get(path + "/address")
     assert address.status_code == (200 if kind == "household" else 404), address.text

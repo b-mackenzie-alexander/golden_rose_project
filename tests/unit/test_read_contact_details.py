@@ -86,6 +86,7 @@ def test_phone_projection_is_parent_scoped_without_address_or_writes():
         "employer_contact_id",
         "version",
         "phone",
+        "representative_name",
     }
     assert {employer_id, contact_id, "draft"} <= set(statement.compile().params.values())
     session.commit.assert_not_called()

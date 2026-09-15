@@ -1,5 +1,37 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-09-15 — PR D bounded browser verification passed; publication authorized
+
+- **Staffing:** One independent developer; automated checks and fresh agent repair reviews are quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR D production-build local walkthrough passed correction/re-review in English and Spanish, exact unknown retry with later dirty edits, second-browser persistence and revoked-read clearing. Employer contact axe returned zero violations and 390px reflow had no horizontal overflow. No cloud qualification or human/fluent-language acceptance is claimed.
+- **Gate budget:** Owner explicitly approved resumed bounded local verification and publication after it passes. No cloud/live/production or default permission activation.
+- **Next executable action:** Complete publication hygiene and publish PR D to `develop`, then read required CI before owner protected merge.
+- **Do not regress:** Original finalized references/history, exact retry identity, independent buffers, restricted permissions, bilingual parity, applied migration bytes, owner preview and deferred UX note.
+
+Automated baseline remains 2,055 backend tests at 95.22% coverage, 26 subsequent focused tests and 344 frontend tests/full verification. No product code changed during the resumed walkthrough. Earlier fresh reviews/rereviews passed; an additional final agent attempt hit its usage limit and is not claimed as completed. See [PR D handoff](docs/review-handoffs/2026-09-15-staff-intake-pr-d-handoff.md).
+
+
+## 2026-09-15 — PR D implemented candidate; browser/publication pending
+
+- **Staffing:** One independent developer; fresh agent reviews and automated checks supply quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR C is merged at `develop@50f2ac86621329f12680e706bd8d224e76833c22`. PR D source is implemented locally on `feat/staff-intake-corrections`; the production build rendered the local workspace and canonical detail. Interactive correction/review browser qualification remains incomplete. Owner preview is untouched; no cloud availability recheck occurred.
+- **Gate budget:** Owner-authorized PR D source work and disposable fictional testing; no cloud/live/production or default permission activation.
+- **Next executable action:** Resume the bounded browser walkthrough when approval tooling is available, resolve any observed defects, finish integration review and outgoing-range hygiene/secret checks, then publish PR D and complete required CI before owner merge. Automatic approval review rejected the next browser action due to account usage limits; no workaround was attempted.
+- **Do not regress:** Original finalized references/history, exact retry identities, independent dirty buffers, restricted permissions, bilingual parity, applied migration bytes, owner preview and deferred UX note.
+
+**Validated:** 2,055 full backend tests at 95.22% coverage; 26 subsequent focused tests including runtime-role correction routes and populated migration preservation; 344 frontend tests with all coverage thresholds, lock checks, lint, typecheck and production build. Fresh agent rereviews cleared the repaired bounded findings. PR D remains uncommitted/unpublished, and complete-PR-D / complete-A–D checklist items remain open. See [PR D handoff](docs/review-handoffs/2026-09-15-staff-intake-pr-d-handoff.md).
+
+
+## 2026-09-15 - PR C merged; PR D implementation active
+
+- **Staffing:** One independent developer; fresh agent reviews and automated checks supply quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #104 is confirmed merged at `develop@50f2ac86621329f12680e706bd8d224e76833c22`; GitHub reports successful application, branch-policy, hygiene and image-build checks. PR C bounded local browser evidence remains recorded; the owner preview is preserved and its availability was not rechecked. No new cloud qualification occurred.
+- **Gate budget:** Owner authorized rebasing from current `origin/develop` and continuing implementation through PR D. Existing disposable fictional local test approval applies; cloud/live/production authority remains separately scoped.
+- **Next executable action:** Implement contract §9 canonical corrections and current-facts re-review on `feat/staff-intake-corrections` from the exact merged tip, then complete fresh review and qualification before publication.
+- **Do not regress:** Immutable original intake/review/finalization references and command retries, independent dirty buffers, restricted canonical permissions, bilingual parity, applied migration bytes and private runtime boundaries. Preserve the deferred UX note and owner preview data.
+
+**Observed rebaseline:** The pre-rebase PR C branch and merged `origin/develop` had identical trees. Rebase skipped already-squashed commits and completed at `50f2ac8`; the PR D branch starts there. PR D remains incomplete. This entry supersedes older pending-publication/CI/merge statements below.
+
 ## 2026-09-15 - PR C published as PR #104
 
 - **Staffing:** One independent developer; fresh agent reviews and automated/browser checks provide quality evidence, not independent-human authorization.
@@ -183,17 +215,18 @@ The improved Wave 1 UI is the preserved uncommitted predecessor in `/Users/genie
 - [x] Wave 1 improved-UI source merged through PR #101 at `9a6b667`; bounded local browser verification followed PR #102, with manual/tool limits recorded separately.
 - [x] PR A: shared worker/employer draft save/resume and bounded queries merged through PR #102 at `2783415`.
 - [x] PR B: governed work interests, current-version review and accountable append-only follow-up merged through PR #103 at `f653260`. Prior local qualification: 1,253 backend tests / 95.64% coverage and 202 frontend tests.
-- [ ] PR C (in progress): worker/employer finalization, canonical reads/queries, linked projections, review freshness, reuse orchestration and local/test link HTTP are implemented. Additive authority, bounded linked/parent concurrency, same-parent pagination and link HTTP have owner-reported PostgreSQL acceptance. Bilingual selection/finalization controls and finalized references/history are implemented; canonical output screens/navigation are implemented; exact database-verifier parity and backend checks now have passing full/focused evidence. Final integration review and automated backend/frontend checks pass; bounded local browser qualification now passes with documented human/tool limits; publication and required CI remain. Default application permissions are unchanged; no automatic overwrite, ShiftNeed, open demand or placement.
-- [ ] PR D: implement bounded canonical corrections and current-facts re-review under contract §9; preserve original finalized intake/review/output links and never overwrite through intake.
-- [ ] PR C employer finalization: new-group migration/HTTP behavior, canonical reads/queries, selective reuse, bounded concurrency and same-parent pagination have owner-reported PostgreSQL passes. Reuse preserves chosen rows and creates only missing outputs plus one request; Bilingual controls/output screens and backend checks have automated evidence; final review passes; bounded local browser qualification passes with documented limits; publication and CI remain pending. Applied migrations stay unchanged.
-- [ ] PR C canonical worker reads: exact identity/contact/residence/preferences reads and bounded cursor-based discovery are implemented with separate field permissions and trusted worker scope. Owner PostgreSQL evidence is nine read cases and six query cases passing. UI integration and backend checks have automated evidence; final review passes; browser/manual qualification and CI remain pending; default application permissions are unchanged.
+- [x] PR C: canonical linking/finalization, worker/employer reads and queries, reuse, bilingual output screens and exact database authority merged through PR #104 at `50f2ac8`. Fresh source reviews, bounded local browser qualification and required remote CI passed. No automatic overwrite, ShiftNeed, open demand or placement; default application permissions remain unchanged.
+- [ ] PR D delivery: canonical correction/current-review source is implemented and automated qualification passes; bounded interactive browser evidence passed; complete final publication checks, PR/required CI and owner merge. Original finalized intake/review/output links remain immutable.
+- [x] PR D bounded source/automated milestone: nine correction routes, protected history, separate current-review authority, narrow migrations/grants, exact retries and bilingual UI; 2,055 backend tests (95.22% coverage), 26 subsequent focused tests and 344 frontend tests/full verification passed. This does not close browser qualification or publication.
+- [x] PR C employer finalization: selective reuse and atomic creation of missing canonical outputs plus one draft request, bounded concurrency, same-parent pagination and bilingual output screens merged in PR #104. Local database/browser evidence and required CI passed; applied migrations remain unchanged.
+- [x] PR C canonical worker reads: exact identity/contact/residence/preferences projections and bounded scoped discovery, bilingual UI integration and browser qualification merged in PR #104 with required CI passed. Separate field permissions and trusted worker scope remain enforced.
 - [x] PR C bounded local browser/durable qualification: five UI-finalized worker/household/business intakes, deliberate reuse, real unknown-response retry, ten clean axe states and keyboard/reflow checks; two browser-found defects repaired and rereviewed. Human/fluent-language/shared-target sign-off is not claimed.
-- [x] PR C final source integration review: three P2 defects repaired and rereviewed; full backend 1988 passes at 96.06% coverage, frontend 316 passes. Bounded local browser/durable application-process qualification now passes; publication, required CI and separately identified human/shared-target evidence remain open.
-- [x] PR C database-verifier parity: reviewed constraints/triggers/function bodies/unique indexes and least-privilege grants through `0008c`; all 32 real database-authority cases passed. Full/focused backend evidence covers 1,978 cases at 96.02% coverage; final review, browser/manual evidence and required CI remain open.
-- [x] PR C bounded durable link/reuse database acceptance: owner applied `0008c` and reports all 24 new real-reference/authority cases plus 36 finalization regressions passing. Preserve applied `0008`/`0008a`/`0008b`/`0008c`. Full PR C qualification remains incomplete.
+- [x] PR C final source integration review: three P2 defects repaired and rereviewed; full backend 1,988 passes at 96.06% coverage. Subsequent narrow browser repairs passed 28 backend response-schema tests and final frontend 319 tests with coverage gates. Required CI passed and PR #104 merged; separately identified human/shared-target evidence remains open.
+- [x] PR C database-verifier parity: reviewed constraints/triggers/function bodies/unique indexes and least-privilege grants through `0008c`; all 32 real database-authority cases passed. Full/focused backend evidence covers 1,978 cases at 96.02% coverage; subsequent source review, bounded browser qualification and required CI passed. Human/manual limits remain recorded separately.
+- [x] PR C bounded durable link/reuse database acceptance: owner applied `0008c` and reports all 24 new real-reference/authority cases plus 36 finalization regressions passing. Preserve applied `0008`/`0008a`/`0008b`/`0008c`. Subsequent bounded PR C qualification and required CI passed; PR #104 merged.
 - [x] PR C bounded link HTTP acceptance: owner reports 12 API cases and 38 authority/concurrency regressions passing, including current permission/scope checks, original retries, projection rollback and worker/employer reuse flows. No deployment or default permission activation.
 - [x] PR C bounded concurrency and same-parent pagination acceptance: ten linked-command contention cases, four canonical-parent ordering cases and five returned-cursor pagination cases passed in owner-run PostgreSQL batches; latest combined regression batch is 60 passes in 21.40s. This is not full PR C qualification.
-- [ ] Complete ordered PRs A–D, preserving section-local Save status/key isolation and success-then-unknown-with-later-dirty-edits coverage. Planning and UI predecessors plus PRs A/B are merged; PRs C/D remain.
+- [ ] Complete ordered PRs A–D, preserving section-local Save status/key isolation and success-then-unknown-with-later-dirty-edits coverage. Planning and UI predecessors plus PRs A/B/C are merged; PR D remains.
 - [ ] Qualify bilingual/accessibility/privacy/concurrency/replay behavior under the accepted plan; obtain fresh scoped approval for any later runtime deployment.
 
 ## Historical 2026-09-13 — v28 human-visible develop deployment
@@ -223,7 +256,7 @@ The improved Wave 1 UI is the preserved uncommitted predecessor in `/Users/genie
 - [x] Source-controlled Spanish-toggle correction and v28 qualification-harness normalizations merged through PR #101; cloud deployment/requalification remains separate.
 - [x] Accept the Wave 1 product direction: repair the production language provider, establish an intentional responsive workspace shell, separate Employer create/search/detail/revision flows, and add honest session-derived orientation without prominent environment disclaimers or fake metrics.
 - [x] Merge `.hermes/plans/2026-09-13_131919-wave-1-employer-workspace-ux-remediation-plan.md` with the v28 continuity repair through protected `develop`.
-- [x] Merge the PR #100 staff-intake contract/ADR-0017/outcome-scale plan through protected `develop` at `ce38fb0`; PR C now rebaselines from PR #103 at `f653260`.
+- [x] Merge the PR #100 staff-intake contract/ADR-0017/outcome-scale plan through protected `develop` at `ce38fb0`; PR C merged in PR #104 at `50f2ac8`; PR D now rebaselines from that exact integration tip.
 - [x] Implement, verify, review and merge the Wave 1 UI and qualification-harness package through PR #101 at `9a6b667`. Bounded local browser verification followed PR #102; separate evidence and manual/tool limits remain recorded in `ee82615`.
 
 ## Delivery-method governance
@@ -351,8 +384,8 @@ The improved Wave 1 UI is the preserved uncommitted predecessor in `/Users/genie
 - [x] Independently review and formally accept ADR-0008 plus `.hermes/plans/2026-08-12_111500-phase-1-employer-contact-authority-foundation-plan.md`: after remediation, exact-artifact API/security and persistence/migration/TDD closure rereviews passed with no Blocker, High, or Medium findings; Beatrice accepted the planning boundary on 2026-08-12.
 - [x] Publish the accepted ADR-0008 packet through a protected planning-only PR and merge it to `develop` before any EmployerContact implementation branch begins from the resulting exact tip. PR #19 merged the packet into protected `develop` at `745f9e8`, and the separately authorized coding lane rebaselined from that exact tip onto `feat/employer-contact-authority-foundation`.
 - [x] Complete, independently review, qualify, and merge the EmployerContact authority foundation. PR #20 merged the backend-only nested create, bounded parent query, exact read, and typed receipt/audit authority implementation into protected `develop` at `6eb05d5`; its prior handoff is now historical evidence.
-- [ ] Define household and general-labor request extensions without creating separate workflows or data stores.
-- [ ] Use fictional synthetic fixtures only for the current tracers—never copy, transform, hash, or derive them from client/live records; any later de-identified-data procedure requires separate approval.
+- [x] Define household and general-labor request extensions through the accepted ADR-0017 intake contract. PR #104 implements one employer intake/finalization path with household or business party-address handling and one draft StaffingRequest; broader shift and demand-queue implementation remains open.
+- [x] Use fictional synthetic fixtures only for the current tracers. PRs A–C and PR D qualification use generated fictional records; this remains a continuing guardrail. Never copy, transform, hash, or derive fixtures from client/live records; any later de-identified-data procedure requires separate approval.
 - [ ] Implement staff authentication and authorization boundary.
 - [ ] Implement employer/contact/worksite/request/shift persistence with migration-managed schema.
 - [ ] Implement staff request entry, detail, correction, and an authorized demand work queue as a mandatory service-time capability.
@@ -394,7 +427,7 @@ The near-term staff-intake contract is an explicit bounded exception: it propose
 - [ ] Validate record retrieval, audit, retention, and export requirements with client/counsel.
 
 ## Phase 5 — Production qualification and rollout
-- [ ] Record the interim billing arrangement: Beatrice pays approved infrastructure charges until final contract payment, after which billing responsibility transfers to the client through a documented handoff.
+- [x] Record the interim billing arrangement (already accepted in Phase 0.5): Beatrice pays approved infrastructure charges until final contract payment, after which billing responsibility transfers to the client through a documented handoff. Actual transfer/custody qualification remains open.
 - [ ] Approve client-owned account/project, billing, domain/DNS, support, recovery, and emergency-access ownership at handoff; identify an effective transfer date and confirm service continuity.
 - [ ] Qualify isolated environments, secrets, backups/restore, monitoring, and incident response.
 - [ ] Complete security/privacy review and production-data gate for each rollout increment.

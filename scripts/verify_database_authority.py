@@ -141,6 +141,37 @@ EXPECTED_SCHEMA_OWNER_FUNCTIONS: set[str] = {
     "guard_intake_write_authority",
     "guard_intake_address_authority",
 }
+# PR D exact additions; no broad canonical UPDATE privilege.
+_CANONICAL_EVIDENCE_TABLES = {
+    "canonical_corrections",
+    "canonical_correction_payloads",
+    "canonical_review_heads",
+    "canonical_output_reviews",
+    "canonical_output_review_payloads",
+}
+EXPECTED_SCHEMA_OWNER_OBJECTS.update(_CANONICAL_EVIDENCE_TABLES)
+for _table in _CANONICAL_EVIDENCE_TABLES:
+    EXPECTED_RUNTIME_TABLE_PRIVILEGES[_table] = {"INSERT", "SELECT"}
+EXPECTED_RUNTIME_TABLE_PRIVILEGES["worker_interest_selections"].add("DELETE")
+for _function in (
+    "canonical_details_complete",
+    "canonical_correction_section",
+    "guard_canonical_identity",
+    "guard_canonical_correction",
+    "guard_correction_evidence",
+    "guard_worker_selection",
+    "canonical_current_facts",
+    "guard_canonical_review_identity",
+    "guard_canonical_review",
+):
+    EXPECTED_SCHEMA_OWNER_FUNCTIONS.add(_function)
+    EXPECTED_RUNTIME_FUNCTION_PRIVILEGES[_function] = (
+        {"EXECUTE"}
+        if _function
+        in {"canonical_details_complete", "canonical_correction_section", "canonical_current_facts"}
+        else set()
+    )
+
 DEFAULT_PRIVILEGE_OBJECT_TYPE_MAP: dict[str, str] = {
     "r": "tables",
     "S": "sequences",
@@ -210,7 +241,7 @@ TABLE_OWNER_QUERY = text(
         'employer_contacts',
         'entity_authorities',
         'command_receipts',
-        'audit_events', 'intakes', 'intake_addresses', 'intake_links', 'command_results', 'work_interests','work_interest_versions','intake_reviews','intake_review_payloads','intake_follow_up_events','intake_history_payloads','workers','worker_contacts','worker_residences','worker_preferences','worker_interest_selections','intake_finalizations','employer_contact_details','employer_addresses','worksites','staffing_requests'
+        'audit_events', 'intakes', 'intake_addresses', 'intake_links', 'command_results', 'work_interests','work_interest_versions','intake_reviews','intake_review_payloads','intake_follow_up_events','intake_history_payloads','workers','worker_contacts','worker_residences','worker_preferences','worker_interest_selections','intake_finalizations','employer_contact_details','employer_addresses','worksites','staffing_requests','canonical_corrections','canonical_correction_payloads','canonical_review_heads','canonical_output_reviews','canonical_output_review_payloads'
       )
     """
 )
@@ -236,7 +267,7 @@ PUBLIC_TABLE_PRIVILEGE_QUERY = text(
       AND class.relname IN (
         'alembic_version', 'employers', 'employer_contacts',
         'entity_authorities', 'command_receipts', 'audit_events',
-        'intakes', 'intake_addresses', 'intake_links', 'command_results', 'work_interests','work_interest_versions','intake_reviews','intake_review_payloads','intake_follow_up_events','intake_history_payloads','workers','worker_contacts','worker_residences','worker_preferences','worker_interest_selections','intake_finalizations','employer_contact_details','employer_addresses','worksites','staffing_requests'
+        'intakes', 'intake_addresses', 'intake_links', 'command_results', 'work_interests','work_interest_versions','intake_reviews','intake_review_payloads','intake_follow_up_events','intake_history_payloads','workers','worker_contacts','worker_residences','worker_preferences','worker_interest_selections','intake_finalizations','employer_contact_details','employer_addresses','worksites','staffing_requests','canonical_corrections','canonical_correction_payloads','canonical_review_heads','canonical_output_reviews','canonical_output_review_payloads'
       )
       AND acl.grantee = 0
     """
@@ -251,7 +282,7 @@ RUNTIME_TABLE_PRIVILEGE_QUERY = text(
             ('employer_contacts'),
             ('entity_authorities'),
             ('command_receipts'),
-            ('audit_events'), ('intakes'), ('intake_addresses'), ('intake_links'), ('command_results'), ('work_interests'),('work_interest_versions'),('intake_reviews'),('intake_review_payloads'),('intake_follow_up_events'),('intake_history_payloads'),('workers'),('worker_contacts'),('worker_residences'),('worker_preferences'),('worker_interest_selections'),('intake_finalizations'),('employer_contact_details'),('employer_addresses'),('worksites'),('staffing_requests')
+            ('audit_events'), ('intakes'), ('intake_addresses'), ('intake_links'), ('command_results'), ('work_interests'),('work_interest_versions'),('intake_reviews'),('intake_review_payloads'),('intake_follow_up_events'),('intake_history_payloads'),('workers'),('worker_contacts'),('worker_residences'),('worker_preferences'),('worker_interest_selections'),('intake_finalizations'),('employer_contact_details'),('employer_addresses'),('worksites'),('staffing_requests'),('canonical_corrections'),('canonical_correction_payloads'),('canonical_review_heads'),('canonical_output_reviews'),('canonical_output_review_payloads')
     ),
     privileges(privilege_type) AS (
         VALUES
@@ -305,7 +336,16 @@ RUNTIME_FUNCTION_PRIVILEGE_QUERY = text(
             ('guard_worker_output', 'public.guard_worker_output()'),
             ('intake_canonical_record', 'public.intake_canonical_record(text, uuid)'),
             ('intake_effective_snapshot', 'public.intake_effective_snapshot(uuid)'),
-            ('intake_link_refs', 'public.intake_link_refs(uuid)')
+            ('intake_link_refs', 'public.intake_link_refs(uuid)'),
+            ('canonical_correction_section', 'public.canonical_correction_section(text, jsonb)'),
+            ('canonical_details_complete', 'public.canonical_details_complete(text, jsonb)'),
+            ('guard_canonical_identity', 'public.guard_canonical_identity()'),
+            ('guard_canonical_correction', 'public.guard_canonical_correction()'),
+            ('guard_correction_evidence', 'public.guard_correction_evidence()'),
+            ('guard_worker_selection', 'public.guard_worker_selection()'),
+            ('canonical_current_facts', 'public.canonical_current_facts(uuid)'),
+            ('guard_canonical_review_identity', 'public.guard_canonical_review_identity()'),
+            ('guard_canonical_review', 'public.guard_canonical_review()')
     ) AS functions(function_name, signature)
     """
 )
@@ -397,6 +437,27 @@ EXPECTED_RUNTIME_UPDATE_COLUMNS = {
     },
     "command_results": set(),
 }
+for _table in _CANONICAL_EVIDENCE_TABLES:
+    EXPECTED_RUNTIME_UPDATE_COLUMNS[_table] = set()
+_ADDRESS_COLUMNS = {"line1", "line2", "locality", "region", "postal_code", "country"}
+for _table, _fields in {
+    "workers": {"full_name"},
+    "worker_contacts": {"phone"},
+    "worker_residences": _ADDRESS_COLUMNS,
+    "worker_preferences": {"interests", "availability"},
+    "employer_contact_details": _ADDRESS_COLUMNS | {"representative_name", "phone"},
+    "employer_addresses": _ADDRESS_COLUMNS,
+    "worksites": _ADDRESS_COLUMNS,
+    "staffing_requests": {"role_title", "duties_summary", "worker_count", "schedule", "offer"},
+}.items():
+    EXPECTED_RUNTIME_UPDATE_COLUMNS[_table] = _fields | {"version", "updated_at", "updated_by"}
+EXPECTED_RUNTIME_UPDATE_COLUMNS["canonical_review_heads"] = {
+    "version",
+    "latest_review_id",
+    "updated_at",
+    "updated_by",
+}
+
 INTAKE_CONSTRAINT_QUERY = text("""
     SELECT t.relname||'.'||c.conname AS key,
       pg_get_constraintdef(c.oid,true) AS definition, c.convalidated

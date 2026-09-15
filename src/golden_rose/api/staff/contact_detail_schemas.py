@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from golden_rose.application.intake_contracts import Address, IntakeValue, Phone
+from golden_rose.application.intake_contracts import Address, IntakeValue, Phone, Text200
 
 
 class ContactDetails(IntakeValue):
@@ -12,6 +12,7 @@ class ContactDetails(IntakeValue):
     employer_id: UUID
     employer_contact_id: UUID
     version: int = Field(ge=1, le=2147483647)
+    representative_name: Text200
     phone: Phone
 
 

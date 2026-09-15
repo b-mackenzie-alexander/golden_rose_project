@@ -9,6 +9,8 @@ from golden_rose.api.environment import router as environment_router
 from golden_rose.api.errors import install_exception_handlers
 from golden_rose.api.health import router as health_router
 from golden_rose.api.intake_transport import IntakeTransportMiddleware, intake_problem
+from golden_rose.api.staff.canonical_corrections import router as canonical_corrections_router
+from golden_rose.api.staff.canonical_reviews import router as canonical_reviews_router
 from golden_rose.api.staff.contact_details import router as staff_contact_details_router
 from golden_rose.api.staff.employer_outputs import router as staff_employer_outputs_router
 from golden_rose.api.staff.employers import router as staff_employers_router
@@ -66,6 +68,8 @@ def create_app(
     app.include_router(staff_intakes_router)
     app.include_router(staff_intake_workflows_router)
     app.include_router(staff_workers_router)
+    app.include_router(canonical_corrections_router)
+    app.include_router(canonical_reviews_router)
     if settings.static_assets_path is not None:
         app.include_router(create_static_assets_router(Path(settings.static_assets_path)))
     return app

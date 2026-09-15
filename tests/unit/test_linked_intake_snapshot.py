@@ -131,7 +131,11 @@ def employer_data(kind="business") -> tuple[Any, ...]:
         "employer": {"employer_type": kind, "display_name": "Canonical Employer"},
         "employer_address": {**address, "purpose": "business"},
         "employer_contact": {"full_name": "Canonical Representative"},
-        "employer_contact_details": {**address, "phone": "202-555-0151"},
+        "employer_contact_details": {
+            **address,
+            "phone": "202-555-0151",
+            "representative_name": "Canonical Representative",
+        },
         "worksite": address,
     }
     return refs, [{**values[name], f"{name}_id": refs[name]["id"], "version": 1} for name in names]

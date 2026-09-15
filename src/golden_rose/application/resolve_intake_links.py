@@ -81,7 +81,7 @@ def resolve_link_dependencies(
     statement = select(*columns).where(table.c[id_name] == party_id)
     if kind == "employer":
         statement = statement.where(table.c.lifecycle_status == "draft").with_for_update()
-    parent = session.execute(statement).mappings().one_or_none()
+    parent = session.execute(statement.with_for_update()).mappings().one_or_none()
     if parent is None:
         raise IntakeError("not_found", 404)
     if parent["version"] != request.party.version:
@@ -103,7 +103,11 @@ def resolve_link_dependencies(
             query = query.where(table.c[column] == target)
         if contact_id is not None:
             query = query.where(table.c.employer_contact_id == contact_id)
-        row = session.execute(query).mappings().one_or_none()
+        row = (
+            session.execute(query if name == "employer_contact" else query.with_for_update())
+            .mappings()
+            .one_or_none()
+        )
         if row is None:
             raise IntakeError(missing, 404 if missing == "not_found" else 409)
         if expected is not None and row["version"] != expected:
@@ -113,13 +117,21 @@ def resolve_link_dependencies(
     if kind == "worker":
         for table, name in (
             (worker_contacts, "worker_contact"),
-            (worker_residences, "worker_residence"),
             (worker_preferences, "worker_preferences"),
+            (worker_residences, "worker_residence"),
         ):
             child(table, name)
         return result
     if request.business_address and parent["employer_type"] != "business":
         raise IntakeError("invalid_request", 422)
+    if request.business_address:
+        child(
+            employer_addresses,
+            "employer_address",
+            target=request.business_address.id,
+            expected=request.business_address.version,
+            missing="not_found",
+        )
     if request.contact:
         child(
             employer_contacts,
@@ -135,14 +147,6 @@ def resolve_link_dependencies(
             "worksite",
             target=request.worksite.id,
             expected=request.worksite.version,
-            missing="not_found",
-        )
-    if request.business_address:
-        child(
-            employer_addresses,
-            "employer_address",
-            target=request.business_address.id,
-            expected=request.business_address.version,
             missing="not_found",
         )
     return result

@@ -63,6 +63,8 @@ class IntakeTransportMiddleware:
             "/api/staff/v1/intakes",
             "/api/staff/v1/work-interests",
             "/api/staff/v1/workers",
+            "/api/staff/v1/intake-finalizations",
+            "/api/staff/v1/canonical-corrections",
         )
         parts = path.rstrip("/").split("/")
         employer_outputs = (

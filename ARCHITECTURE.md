@@ -1,5 +1,12 @@
 # Architecture — Golden Rose Operations Platform
 
+## 2026-09-15 — PR D canonical correction source candidate
+
+PR #104 merged PR C at `develop@50f2ac86621329f12680e706bd8d224e76833c22`. PR D proceeds on `feat/staff-intake-corrections` under accepted ADR-0017. The source adds nine explicit section correction commands with current field permissions, expected versions, required reasons, immutable retries, same-target correction references, and protected before/after evidence. Separate current-facts review binds the original output identities/dispositions to current row versions; original intake reviews and finalizations remain immutable.
+
+Migrations `0009_canonical_corrections` and `0009a_canonical_reviews` retain applied predecessors, narrow runtime column grants, invoker-only guards, exact typed receipt/result/audit authority and downgrade refusal with protected history. Current-purpose address and structured schedule/availability checks apply in both application and SQL authority. Browser buffers retain later edits and exact unknown retries, serialize shared-row commands, and block router history traversal while unresolved; the router's optional transition cache uses inert storage. No default permission activation, cloud inspection/mutation, deployment, live/client data or production authority follows. See [the intake contract](docs/planning/staff-intake-contract.md) and [the PR D handoff](docs/review-handoffs/2026-09-15-staff-intake-pr-d-handoff.md) for qualification and publication status.
+
+
 ## 2026-09-14 — PR B source implementation
 
 PR #102 merged durable intake drafts at `develop@2783415dd19027428bf2036730b6c0d83f23ab3c`. The owner completed the bounded local browser-verification step and authorized PR B on `feat/staff-intake-review`. Review/follow-up, protected history and governed bilingual work interests are now implemented in the source candidate. Fresh specification/quality and final integration reviews approved source publication; local qualification passed 1,253 backend tests (95.64% coverage) and 202 frontend tests. Required CI and protected merge remain; this is not deployed functionality. The browser evidence remains separately preserved in `ee82615` on `test/staff-intake-browser-ux`, and the requested minor-polish note is reserved for the next docs PR.

@@ -91,6 +91,8 @@ export const workflowText = {
   'intake.revised': ['Draft revised', 'Borrador modificado'],
   'intake.reviewed': ['Review recorded', 'Revisión registrada'],
   'intake.follow_up_recorded': ['Follow-up recorded', 'Seguimiento registrado'],
+  'intake.linked': ['Selection saved', 'Selección guardada'],
+  'intake.finalized': ['Intake finalized', 'Admisión finalizada'],
   full_name: ['Full name', 'Nombre completo'],
   display_name: ['Employer name', 'Nombre del empleador'],
   employer_type: ['Employer type', 'Tipo de empleador'],
@@ -115,6 +117,19 @@ export function workflowLabel(key: string, language: 'en' | 'es'): string {
 }
 
 export const snapshotLabels: Record<string, readonly [string, string]> = {
+  version: ['Current version', 'Versión actual'], address: ['Restricted address', 'Dirección restringida'],
+  worker_id: ['Worker reference', 'Referencia del trabajador'], worker_contact_id: ['Contact reference', 'Referencia del contacto'],
+  worker_residence_id: ['Residence reference', 'Referencia de la residencia'], worker_preferences_id: ['Preferences reference', 'Referencia de preferencias'],
+  contact_id: ['Contact reference', 'Referencia del contacto'], residence_id: ['Residence reference', 'Referencia de la residencia'],
+  preferences_id: ['Preferences reference', 'Referencia de preferencias'], employer_id: ['Employer reference', 'Referencia del empleador'],
+  employer_contact_id: ['Contact reference', 'Referencia del contacto'], contact_details_id: ['Contact details reference', 'Referencia de datos de contacto'],
+  employer_address_id: ['Business address reference', 'Referencia de dirección comercial'], worksite_id: ['Worksite reference', 'Referencia del lugar de trabajo'],
+  staffing_request_id: ['Request reference', 'Referencia de la solicitud'], full_name: ['Full name', 'Nombre completo'],
+  created_at: ['Created at', 'Fecha de creación'], updated_at: ['Updated at', 'Fecha de actualización'], received_at: ['Received at', 'Fecha de recepción'],
+  self_reported: ['Self-reported', 'Autodeclarado'], lifecycle_status: ['Record status', 'Estado del registro'],
+  source_channel: ['Source', 'Origen'], purpose: ['Address purpose', 'Uso de la dirección'], request_type: ['Request type', 'Tipo de solicitud'],
+  request_status: ['Request status', 'Estado de la solicitud'], location_verification_status: ['Location verification', 'Verificación de ubicación'],
+  service_area_status: ['Service area', 'Área de servicio'], map_area_status: ['Map area', 'Área del mapa'],
   kind: ['Intake kind', 'Tipo de registro'],
   content: ['Supplied details', 'Datos proporcionados'],
   addresses: ['Restricted addresses', 'Direcciones restringidas'],
@@ -149,6 +164,12 @@ export const snapshotLabels: Record<string, readonly [string, string]> = {
 };
 
 export const snapshotEnums: Record<string, Record<string, readonly [string, string]>> = {
+  lifecycle_status: { draft: ['Draft', 'Borrador'] }, request_status: { draft: ['Draft', 'Borrador'] },
+  source_channel: { staff_entry: ['Entered by staff', 'Ingresado por el personal'] },
+  purpose: { business: ['Business', 'Comercial'] },
+  request_type: { household: ['Household', 'Hogar'], general_labor: ['General labor', 'Trabajo general'] },
+  location_verification_status: { supplied: ['Supplied, not verified', 'Proporcionada, sin verificar'] },
+  service_area_status: { unassigned: ['Unassigned', 'Sin asignar'] }, map_area_status: { pending: ['Pending', 'Pendiente'] },
   kind: { worker: ['Worker', 'Trabajador'], employer: ['Employer', 'Empleador'] },
   employer_type: { household: ['Household', 'Hogar'], business: ['Business', 'Empresa'] },
   mode: {

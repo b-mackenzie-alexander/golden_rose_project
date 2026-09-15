@@ -1,4 +1,4 @@
-"""Explicit review/follow-up and governed catalogs for local synthetic staff."""
+"""Review/follow-up, new-party finalization and local synthetic catalogs."""
 
 from typing import Annotated, Any
 from uuid import UUID
@@ -7,6 +7,10 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from golden_rose.api.dependencies import get_settings, get_staff_directory
+from golden_rose.api.staff.intake_finalization_schemas import (
+    FinalizeIntakeRequest,
+    LinkIntakeRequest,
+)
 from golden_rose.api.staff.intake_review_schemas import (
     CreateWorkInterestRequest,
     FollowUpIntakeRequest,
@@ -22,6 +26,7 @@ from golden_rose.api.staff.intake_review_schemas import (
 )
 from golden_rose.api.staff.intake_schemas import IntakeCommandResponse
 from golden_rose.api.staff.intakes import ClockDep, KeyDep, PrincipalDep, SessionDep
+from golden_rose.application.finalize_intake import execute_new_intake_finalization
 from golden_rose.application.intake_access import record_intake_access
 from golden_rose.application.intake_errors import IntakeError
 from golden_rose.application.intake_history import (
@@ -29,6 +34,7 @@ from golden_rose.application.intake_history import (
     query_history,
     read_restricted_history,
 )
+from golden_rose.application.link_intake import execute_link_intake
 from golden_rose.application.review_intake import execute_review
 from golden_rose.application.work_interests import execute_work_interest, query_work_interests
 from golden_rose.auth.staff_directory import StaffDirectory
@@ -69,6 +75,32 @@ def mutation_response(
     return JSONResponse(body, status_code=status, headers=headers)
 
 
+@router.post(
+    "/intakes/{intake_id}/links",
+    response_model=IntakeCommandResponse,
+    response_model_exclude_unset=True,
+)
+def link(
+    intake_id: UUID,
+    body: LinkIntakeRequest,
+    session: SessionDep,
+    principal: PrincipalDep,
+    command_id: KeyDep,
+    clock: ClockDep,
+    settings: SettingsDep,
+):
+    local_only(settings)
+    result, replayed = execute_link_intake(
+        session=session,
+        principal=principal,
+        command_id=command_id,
+        intake_id=intake_id,
+        request=body,
+        clock=clock,
+    )
+    return mutation_response(result, replayed)
+
+
 @router.post("/intakes/{intake_id}/reviews", response_model=IntakeCommandResponse)
 def review(
     intake_id: UUID,
@@ -91,6 +123,33 @@ def review(
         intake_id=intake_id,
     )
     return mutation_response(result, replayed)
+
+
+@router.post(
+    "/intakes/{intake_id}/finalizations",
+    response_model=IntakeCommandResponse,
+    response_model_exclude_unset=True,
+    responses={201: {"model": IntakeCommandResponse}},
+)
+def finalize(
+    intake_id: UUID,
+    body: FinalizeIntakeRequest,
+    session: SessionDep,
+    principal: PrincipalDep,
+    command_id: KeyDep,
+    clock: ClockDep,
+    settings: SettingsDep,
+):
+    local_only(settings)
+    result, replayed = execute_new_intake_finalization(
+        session=session,
+        principal=principal,
+        command_id=command_id,
+        request=body,
+        clock=clock,
+        intake_id=intake_id,
+    )
+    return mutation_response(result, replayed, create_location=f"/api/staff/v1/intakes/{intake_id}")
 
 
 @router.post("/intakes/{intake_id}/follow-ups", response_model=IntakeCommandResponse)

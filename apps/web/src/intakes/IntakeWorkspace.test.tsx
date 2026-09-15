@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppRoutes } from '../app/App';
 import { LanguageProvider } from '../i18n/LanguageProvider';
 import * as api from '../api/intakeClient';
+import * as discovery from '../api/canonicalDiscovery';
 import type { IntakeDetail, IntakeCommandResult, Result, AddressDetail } from '../api/intakeContracts';
 import { runAxe } from '../test/axe';
 vi.mock('../api/intakeClient');
@@ -59,7 +60,7 @@ beforeEach(() => {
     value: { items: [], next_cursor: null },
   });
   vi.mocked(api.queryIntakes).mockResolvedValue({ ok: true, value: { items: [], next_cursor: null } });
-  vi.mocked(api.getIntake).mockResolvedValue({ ok: true, value: detail() });
+  vi.mocked(api.getCanonicalIntake).mockResolvedValue({ ok: true, value: detail() });
   vi.mocked(api.getIntakeAddress).mockResolvedValue({
     ok: true,
     value: { intake_id: id, version: 1, section: 'worker_residence', candidate: null, resolved: null },
@@ -84,7 +85,7 @@ describe('staff intake drafts', () => {
       expect.objectContaining({ body: { kind: 'worker', content: { full_name: 'Fictional Person' } } }),
     );
     view.unmount();
-    vi.mocked(api.getIntake).mockResolvedValue({ ok: true, value: detail(4, 'Authoritative name') });
+    vi.mocked(api.getCanonicalIntake).mockResolvedValue({ ok: true, value: detail(4, 'Authoritative name') });
     vi.mocked(api.getIntakeAddress).mockResolvedValue({
       ok: true,
       value: { intake_id: id, version: 4, section: 'worker_residence', candidate: null, resolved: null },
@@ -317,7 +318,7 @@ describe('staff intake drafts', () => {
     const employer = detail();
     employer.summary.kind = 'employer';
     employer.candidate = { display_name: 'Fictional Employer' };
-    vi.mocked(api.getIntake).mockResolvedValue({ ok: true, value: employer });
+    vi.mocked(api.getCanonicalIntake).mockResolvedValue({ ok: true, value: employer });
     vi.mocked(api.getIntakeAddress).mockImplementation((_id, section) =>
       Promise.resolve({
         ok: true,
@@ -548,7 +549,7 @@ it('records an explicit current-content review without editing facts', async () 
   const complete = detail();
   complete.summary.complete = true;
   complete.summary.missing_fields = [];
-  vi.mocked(api.getIntake).mockResolvedValue({ ok: true, value: complete });
+  vi.mocked(api.getCanonicalIntake).mockResolvedValue({ ok: true, value: complete });
   const reviewed = {
     ...complete,
     summary: { ...complete.summary, version: 2, review_status: 'current' as const },
@@ -585,7 +586,7 @@ it('records an explicit current-content review without editing facts', async () 
 it('keeps unknown review identity and later notes while blocking every section save', async () => {
   const complete = detail();
   complete.summary.complete = true;
-  vi.mocked(api.getIntake).mockResolvedValue({ ok: true, value: complete });
+  vi.mocked(api.getCanonicalIntake).mockResolvedValue({ ok: true, value: complete });
   vi.mocked(api.saveIntake).mockResolvedValue({ ok: false, failure: 'unknown' });
   mount(`/staff/intakes/${id}`);
   await screen.findByLabelText('Address line 1');
@@ -665,7 +666,7 @@ it.each(['reschedule', 'reassign', 'attempt'])(
       overdue: true,
     };
     follow.summary.review_status = 'current';
-    vi.mocked(api.getIntake).mockResolvedValue({ ok: true, value: follow });
+    vi.mocked(api.getCanonicalIntake).mockResolvedValue({ ok: true, value: follow });
     vi.mocked(api.queryFollowUpOwners).mockResolvedValue({
       ok: true,
       value: { items: [{ staff_id: id, display_name: 'Fictional owner' }], next_cursor: null },
@@ -680,6 +681,7 @@ it.each(['reschedule', 'reassign', 'attempt'])(
     if (!actions[1]) throw new Error('Missing action control');
     fireEvent.change(actions[1], { target: { value: action } });
     fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Fictional bookkeeping' } });
+    await screen.findByRole('option', { name: 'Fictional owner' });
     fireEvent.change(screen.getByLabelText('Follow-up owner'), { target: { value: id } });
     fireEvent.change(screen.getByLabelText('Due instant (include UTC offset)'), {
       target: { value: '2026-09-14T12:00:00Z' },
@@ -711,7 +713,7 @@ it.each(['reschedule', 'reassign', 'attempt'])(
 it('blocks current review while details are dirty and clears denied review notes', async () => {
   const complete = detail();
   complete.summary.complete = true;
-  vi.mocked(api.getIntake).mockResolvedValue({ ok: true, value: complete });
+  vi.mocked(api.getCanonicalIntake).mockResolvedValue({ ok: true, value: complete });
   mount(`/staff/intakes/${id}`);
   await screen.findByLabelText('Address line 1');
   fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Later' } });
@@ -737,7 +739,7 @@ it('blocks current review while details are dirty and clears denied review notes
 it('requires fresh review confirmation after a section save advances the displayed version', async () => {
   const complete = detail();
   complete.summary.complete = true;
-  vi.mocked(api.getIntake).mockResolvedValue({ ok: true, value: complete });
+  vi.mocked(api.getCanonicalIntake).mockResolvedValue({ ok: true, value: complete });
   const revised = {
     ...complete,
     summary: { ...complete.summary, version: 2 },
@@ -767,6 +769,7 @@ it('retains the selected trusted owner across pages and invalidates confirmation
   mount(`/staff/intakes/${id}`);
   await screen.findByLabelText('Address line 1');
   fireEvent.change(screen.getByLabelText('Review outcome'), { target: { value: 'needs_follow_up' } });
+  await screen.findByRole('option', { name: 'First fictional owner' });
   fireEvent.change(screen.getByLabelText('Follow-up owner'), { target: { value: id } });
   vi.mocked(api.queryFollowUpOwners).mockResolvedValue({
     ok: true,
@@ -796,4 +799,203 @@ it('retains the selected trusted owner across pages and invalidates confirmation
   expect(screen.queryByRole('option', { name: 'First fictional owner' })).not.toBeInTheDocument();
   expect(screen.getByLabelText('Confirm this recorded action')).not.toBeChecked();
   expect(screen.getByRole('button', { name: 'Record review' })).toBeDisabled();
+});
+
+describe('canonical workspace integration', () => {
+  const reviewId = '11111111-1111-4111-8111-111111111111';
+  function reviewed(): IntakeDetail {
+    const value = detail();
+    return { ...value, summary: { ...value.summary, complete: true, missing_fields: [], review_status: 'current' },
+      latest_review: { review_id: reviewId, reviewed_record_version: 1, reviewed_content_version: 1,
+        outcome: 'intake_reviewed', actor_id: reviewId, actor_display_name: 'Fictional Staff', occurred_at: '' } };
+  }
+  function finalized(): IntakeDetail {
+    const value = reviewed(), ref = { id: reviewId, version: 1, disposition: 'created' as const };
+    return { ...value, summary: { ...value.summary, version: 2, lifecycle: 'finalized' },
+      finalization: { kind: 'worker', worker: ref, contact: ref, residence: ref, preferences: ref } };
+  }
+  it('preserves the original unknown finalization retry and prevents later edits', async () => {
+    vi.mocked(api.getCanonicalIntake).mockResolvedValue({ ok: true, value: reviewed() });
+    vi.mocked(api.saveCanonicalIntake).mockResolvedValueOnce({ ok: false, failure: 'unknown' })
+      .mockImplementationOnce((command) => Promise.resolve({ ok: true, value: {
+        command_id: command.key, result_record_version: 2, current: finalized(), finalization: finalized().finalization,
+      } }));
+    mount(`/staff/intakes/${id}`);
+    await screen.findByText('All changes saved');
+    fireEvent.click(screen.getByLabelText(/I confirm/));
+    fireEvent.click(screen.getByRole('button', { name: 'Finalize intake' }));
+    const retry = await screen.findByRole('button', { name: /Retry/ });
+    expect(screen.getByLabelText('Full name')).toBeDisabled();
+    expect(screen.getByLabelText('Address line 1')).toBeDisabled();
+    fireEvent.click(retry);
+    await screen.findByRole('heading', { name: 'Finalized intake — read-only' });
+    expect(api.saveCanonicalIntake).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(api.saveCanonicalIntake).mock.calls[1]?.[0]).toEqual(vi.mocked(api.saveCanonicalIntake).mock.calls[0]?.[0]);
+    expect(screen.queryByLabelText('Full name')).not.toBeInTheDocument();
+    expect(api.saveIntake).not.toHaveBeenCalled();
+  });
+  it('reopens finalized detail without draft/address mutation controls or restricted reads', async () => {
+    vi.mocked(api.getCanonicalIntake).mockResolvedValue({ ok: true, value: finalized() });
+    mount(`/staff/intakes/${id}`);
+    await screen.findByRole('heading', { name: 'Finalized intake — read-only' });
+    expect(api.getIntakeAddress).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Finalize intake' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Original finalization references' })).toBeInTheDocument();
+  });
+  it('allows reconfirmation after a definite finalization failure', async () => {
+    vi.mocked(api.getCanonicalIntake).mockResolvedValue({ ok: true, value: reviewed() });
+    vi.mocked(api.saveCanonicalIntake).mockResolvedValue({ ok: false, failure: 'failed' });
+    mount(`/staff/intakes/${id}`); await screen.findByText('All changes saved');
+    fireEvent.click(screen.getByLabelText(/I confirm/));
+    fireEvent.click(screen.getByRole('button', { name: 'Finalize intake' }));
+    await waitFor(() => { expect(screen.getByRole('button', { name: 'Discard pending selection' })).toBeInTheDocument(); });
+    fireEvent.click(screen.getByLabelText(/I confirm/));
+    fireEvent.click(screen.getByRole('button', { name: 'Finalize intake' }));
+    await waitFor(() => { expect(api.saveCanonicalIntake).toHaveBeenCalledTimes(2); });
+  });
+  it('blocks finalization while an independent section is dirty', async () => {
+    vi.mocked(api.getCanonicalIntake).mockResolvedValue({ ok: true, value: reviewed() });
+    mount(`/staff/intakes/${id}`); await screen.findByText('All changes saved');
+    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Unsaved change' } });
+    fireEvent.click(screen.getByLabelText(/I confirm/));
+    expect(screen.getByRole('button', { name: 'Finalize intake' })).toBeDisabled();
+    expect(api.saveCanonicalIntake).not.toHaveBeenCalled();
+  });
+  it('saves explicit unlink using current version then refreshes address projections', async () => {
+    const value = detail(), ref = { id: reviewId, version: 1 };
+    vi.mocked(api.getCanonicalIntake).mockResolvedValue({ ok: true, value: { ...value,
+      links: { worker: ref, worker_contact: ref, worker_preferences: ref, worker_residence: ref },
+      resolved: { full_name: 'Canonical name' } } });
+    vi.mocked(api.saveCanonicalIntake).mockImplementation((command) => Promise.resolve({ ok: true, value: {
+      command_id: command.key, result_record_version: 2, current: detail(2),
+    } }));
+    mount(`/staff/intakes/${id}`); await screen.findByText('All changes saved');
+    expect(screen.getByDisplayValue('Canonical name')).toBeDisabled();
+    vi.mocked(api.getIntakeAddress).mockResolvedValue({ ok: true, value: {
+      intake_id: id, section: 'worker_residence', version: 2, candidate: null, resolved: null,
+    } });
+    fireEvent.click(screen.getByRole('button', { name: 'Remove saved selection' }));
+    await waitFor(() => { expect(api.saveCanonicalIntake).toHaveBeenCalledWith(expect.objectContaining({
+      path: `/intakes/${id}/links`, body: { expected_version: 1, party: null },
+    })); });
+    await screen.findByText(/Version 2/);
+    await screen.findByText('All changes saved');
+    expect(api.getIntakeAddress).toHaveBeenCalledTimes(2);
+  });
+});
+
+it('resets employer selection controls after saving and discarding without clearing candidate edits', async () => {
+  const employerId = '11111111-1111-4111-8111-111111111111';
+  const employer = (version = 1): IntakeDetail => ({ ...detail(version),
+    summary: { ...detail(version).summary, kind: 'employer' }, candidate: { display_name: 'Draft business', employer_type: 'business' } });
+  vi.mocked(api.getCanonicalIntake).mockResolvedValue({ ok: true, value: employer() });
+  let version = 1;
+  vi.mocked(api.getIntakeAddress).mockImplementation((_id, section) => Promise.resolve({ ok: true, value: {
+    intake_id: id, version, section, candidate: null, resolved: null,
+  } }));
+  vi.mocked(api.saveCanonicalIntake).mockImplementation((command) => {
+    version = 2;
+    return Promise.resolve({ ok: true, value: { command_id: command.key, result_record_version: 2, current: employer(2) } });
+  });
+  vi.spyOn(discovery, 'discover').mockResolvedValue({ ok: true, value: {
+    items: [{ id: employerId, version: 5, label: 'Fictional business', employerType: 'business' }], next_cursor: null } });
+  mount(`/staff/intakes/${id}`); await screen.findByText('All changes saved');
+  async function selectParent() {
+    fireEvent.change(screen.getByLabelText('Name to search'), { target: { value: 'Fictional' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Search existing records' }));
+    await screen.findByRole('option', { name: /Fictional business/ });
+    fireEvent.change(screen.getByLabelText('Choose explicitly'), { target: { value: employerId } });
+  }
+  await selectParent();
+  for (const title of ['Contact', 'Worksite', 'Business address']) {
+    fireEvent.change(within(screen.getByRole('group', { name: title })).getByLabelText('Choose explicitly'), { target: { value: 'new' } });
+  }
+  fireEvent.click(screen.getByRole('button', { name: 'Save selection' }));
+  await screen.findByText('All changes saved');
+  expect(screen.queryByRole('group', { name: 'Contact' })).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Name to search')).toHaveValue('');
+  await selectParent();
+  fireEvent.change(screen.getByLabelText('Employer name'), { target: { value: 'Retained candidate edit' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Discard pending selection' }));
+  expect(screen.queryByRole('group', { name: 'Contact' })).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Employer name')).toHaveValue('Retained candidate edit');
+  expect(screen.queryByText('All changes saved')).not.toBeInTheDocument();
+}, 15000);
+
+it('retains later candidate edits when an original link retry returns a subsequently finalized intake', async () => {
+  const ref = { id: '11111111-1111-4111-8111-111111111111', version: 1 };
+  vi.mocked(api.getCanonicalIntake).mockResolvedValue({ ok: true, value: { ...detail(),
+    links: { worker: ref, worker_contact: ref, worker_residence: ref, worker_preferences: ref },
+    resolved: { full_name: 'Canonical name' } } });
+  const output = { ...ref, disposition: 'created' as const };
+  vi.mocked(api.saveCanonicalIntake).mockResolvedValueOnce({ ok: false, failure: 'unknown' })
+    .mockImplementationOnce((command) => Promise.resolve({ ok: true, value: {
+      command_id: command.key, result_record_version: 2, current: { ...detail(3),
+        summary: { ...detail(3).summary, lifecycle: 'finalized' },
+        finalization: { kind: 'worker', worker: output, contact: output, residence: output, preferences: output } },
+    } }));
+  mount(`/staff/intakes/${id}`); await screen.findByText('All changes saved');
+  fireEvent.click(screen.getByRole('button', { name: 'Remove saved selection' }));
+  await screen.findByRole('button', { name: /Retry/ });
+  fireEvent.change(screen.getByDisplayValue('Fictional Person'), { target: { value: 'Keep this later edit' } });
+  fireEvent.click(screen.getByRole('button', { name: /Retry/ }));
+  await waitFor(() => { expect(api.saveCanonicalIntake).toHaveBeenCalledTimes(2); });
+  await waitFor(() => { expect(screen.queryByRole('button', { name: /Retry/ })).not.toBeInTheDocument(); });
+  expect(screen.getByDisplayValue('Keep this later edit')).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Finalized intake — read-only' })).not.toBeInTheDocument();
+});
+
+it('clears displayed resolved address facts when an address save is denied', async () => {
+  vi.mocked(api.getIntakeAddress).mockResolvedValue({ ok: true, value: {
+    intake_id: id, version: 1, section: 'worker_residence', candidate: null,
+    resolved: { line1: 'Fictional restricted address' },
+  } });
+  vi.mocked(api.saveIntake).mockResolvedValue({ ok: false, failure: 'forbidden' });
+  mount(`/staff/intakes/${id}`); await screen.findByText('All changes saved');
+  expect(screen.getByDisplayValue('Fictional restricted address')).toBeDisabled();
+  const fields = screen.getAllByLabelText('Address line 1');
+  const editable = fields.find((field) => !(field as HTMLInputElement).matches(':disabled'));
+  expect(editable).toBeDefined();
+  fireEvent.change(editable as HTMLElement, { target: { value: 'Fictional candidate address' } });
+  fireEvent.click(screen.getByRole('button', { name: /Save address/ }));
+  await waitFor(() => { expect(screen.queryByDisplayValue('Fictional restricted address')).not.toBeInTheDocument(); });
+});
+
+it('retains later candidate edits when an original revision retry returns a subsequently finalized intake', async () => {
+  const ref = { id: '11111111-1111-4111-8111-111111111111', version: 1 };
+  vi.mocked(api.getCanonicalIntake).mockResolvedValue({ ok: true, value: { ...detail(),
+    links: { worker: ref, worker_contact: ref, worker_residence: ref, worker_preferences: ref },
+    resolved: { full_name: 'Canonical name' } } });
+  const output = { ...ref, disposition: 'created' as const };
+  vi.mocked(api.saveIntake).mockResolvedValueOnce({ ok: false, failure: 'unknown' })
+    .mockImplementationOnce((command) => Promise.resolve({ ok: true, value: {
+      command_id: command.key, result_record_version: 2, current: { ...detail(3),
+        summary: { ...detail(3).summary, lifecycle: 'finalized' },
+        finalization: { kind: 'worker', worker: output, contact: output, residence: output, preferences: output } },
+    } }));
+  mount(`/staff/intakes/${id}`); await screen.findByText('All changes saved');
+  fireEvent.change(screen.getByDisplayValue('Fictional Person'), { target: { value: 'Submitted revision' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save details' }));
+  await screen.findByRole('button', { name: /Retry/ });
+  fireEvent.change(screen.getByDisplayValue('Submitted revision'), { target: { value: 'Keep this later edit' } });
+  fireEvent.click(screen.getByRole('button', { name: /Retry/ }));
+  await waitFor(() => { expect(api.saveIntake).toHaveBeenCalledTimes(2); });
+  await waitFor(() => { expect(screen.queryByRole('button', { name: /Retry/ })).not.toBeInTheDocument(); });
+  const calls = vi.mocked(api.saveIntake).mock.calls;
+  expect(calls[0]?.[0]).toBeDefined();
+  expect(calls[1]?.[0]).toEqual(calls[0]?.[0]);
+  expect(screen.getByDisplayValue('Keep this later edit')).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Finalized intake — read-only' })).not.toBeInTheDocument();
+});
+
+
+it.each(['en', 'es'])('shows unavailable linked completeness truthfully in %s recovery lists', async (language) => {
+  const summary = { ...detail().summary, display_name: undefined, complete: null, missing_fields: [] };
+  vi.mocked(api.queryIntakes).mockResolvedValue({ ok: true, value: { items: [summary], next_cursor: null } });
+  const view = mount();
+  if (language === 'es') fireEvent.click(screen.getByRole('button', { name: 'Cambiar a español' }));
+  await screen.findByText(language === 'en' ? /Completeness unavailable/ : /No se puede consultar si está completo/);
+  expect(screen.queryByText(/^(Incomplete|Incompleto) ·/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/^(Missing|Faltan):/)).not.toBeInTheDocument();
+  expect(await runAxe(view.container)).toEqual([]);
 });

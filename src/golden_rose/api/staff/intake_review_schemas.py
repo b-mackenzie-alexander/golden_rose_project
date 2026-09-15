@@ -168,7 +168,12 @@ class IntakeHistoryItem(WorkflowResponse):
     version: int = Field(ge=1, le=2147483647)
     content_version: int = Field(ge=1, le=2147483647)
     event_type: Literal[
-        "intake.created", "intake.revised", "intake.reviewed", "intake.follow_up_recorded"
+        "intake.created",
+        "intake.revised",
+        "intake.reviewed",
+        "intake.follow_up_recorded",
+        "intake.linked",
+        "intake.finalized",
     ]
     actor_id: UUID
     actor_display_name: Text200

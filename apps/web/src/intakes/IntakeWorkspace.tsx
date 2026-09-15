@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
-import { getIntake, getIntakeAddress, queryIntakes, saveIntake } from '../api/intakeClient';
+import { getCanonicalIntake, getIntakeAddress, queryIntakes, saveIntake, saveCanonicalIntake } from '../api/intakeClient';
 import type {
   AddressSection,
   DraftObject,
@@ -9,8 +9,10 @@ import type {
   IntakeSummary,
 } from '../api/intakeContracts';
 import { useLanguage } from '../i18n/LanguageProvider';
-import { AddressFields, IntakeFields } from './IntakeFields';
+import { AddressFields, Field, IntakeFields } from './IntakeFields';
 import { intakeMessages } from './messages';
+import { IntakeCanonical } from './IntakeCanonical';
+import { canonicalLabel, canonicalMessages } from './canonicalMessages';
 import { IntakeWorkflow } from './IntakeWorkflow';
 import { IntakeHistory } from './IntakeHistory';
 import { workflowLabel } from './workflowMessages';
@@ -29,6 +31,8 @@ type EditorState = {
   error: 'failure' | 'conflict' | null;
   confirmedConflict?: boolean;
   busy: boolean;
+  canonicalEpoch?: number;
+  resolvedAddresses?: Record<string, DraftObject | null>;
 };
 const addressSections = (kind: IntakeKind): AddressSection[] =>
   kind === 'worker' ? ['worker_residence'] : ['party_address', 'worksite_address'];
@@ -36,6 +40,7 @@ const addressSections = (kind: IntakeKind): AddressSection[] =>
 function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind }) {
   const { language } = useLanguage();
   const m = intakeMessages[language];
+  const cm = canonicalMessages[language];
   const t = (key: string) => workflowLabel(key, language);
   const [state, setState] = useState<EditorState>(() => ({
     detail: null,
@@ -104,7 +109,7 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
     if (!id) return;
     let cancelled = false;
     const isCancelled = () => cancelled || !active.current;
-    void getIntake(id).then(async (result) => {
+    void getCanonicalIntake(id).then(async (result) => {
       if (isCancelled()) return;
       if (!result.ok) {
         update((s) => ({ ...s, error: 'failure', busy: false }));
@@ -125,6 +130,7 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
           ),
         },
       }));
+      if (detail.summary.lifecycle === 'finalized') return;
       for (const section of addressSections(detail.summary.kind)) {
         const address = await getIntakeAddress(id, section);
         if (isCancelled()) return;
@@ -133,6 +139,7 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
             ? s
             : {
                 ...s,
+                resolvedAddresses: { ...s.resolvedAddresses, [section]: address.ok ? address.value.resolved : null },
                 ...(address.ok && address.value.version !== s.detail?.summary.version
                   ? { error: 'conflict' as const }
                   : {}),
@@ -192,6 +199,7 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
           : { ...initialSection({}), status: 'unavailable' };
       return {
         ...s,
+        resolvedAddresses: { ...s.resolvedAddresses, [section]: result.ok ? result.value.resolved : null },
         error: result.ok && result.value.version !== s.detail?.summary.version ? 'conflict' : s.error,
         sections: { ...s.sections, [section]: next },
       };
@@ -199,9 +207,10 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
   }
   async function save(name: string) {
     const s = current.current;
-    const section = s.sections[name] ?? (name === 'workflow' ? initialSection({}) : undefined);
+    const section = s.sections[name] ?? (['workflow', 'canonical'].includes(name) ? initialSection({}) : undefined);
     if (
       !section ||
+      s.detail?.summary.lifecycle === 'finalized' ||
       section.readPending ||
       s.error === 'conflict' ||
       Object.entries(s.sections).some(
@@ -210,17 +219,23 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
     )
       return;
     const intakeId = s.detail?.summary.intake_id;
-    const workflow = name === 'workflow';
+    const canonical = name === 'canonical';
+    const workflow = name === 'workflow' || canonical;
     if (
       workflow &&
       !section.command &&
       section.value.operation !== 'follow-ups' &&
       !Object.entries(s.sections)
-        .filter(([key]) => key !== 'workflow')
+        .filter(([key]) => key !== name)
         .every(([, value]) => value.status === 'saved' && !value.readPending)
     )
       return;
-    const path = workflow
+    if (canonical && !section.command && section.value.operation === 'finalizations' &&
+      (!s.detail?.summary.complete || s.detail.summary.review_status !== 'current' ||
+        s.detail.dependency_stale || s.detail.latest_review?.review_id !== section.value.review_id)) return;
+    const path = canonical
+      ? `/intakes/${intakeId ?? ''}/${section.value.operation === 'links' ? 'links' : 'finalizations'}`
+      : workflow
       ? `/intakes/${intakeId ?? ''}/${section.value.operation === 'follow-ups' ? 'follow-ups' : 'reviews'}`
       : !intakeId
         ? '/intakes'
@@ -242,7 +257,7 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
                 ...Object.fromEntries(
                   Object.entries(section.value).filter(([key]) => key !== 'operation'),
                 ),
-                ...(section.value.operation !== 'follow-ups' && !section.value.outcome
+                ...(!canonical && section.value.operation !== 'follow-ups' && !section.value.outcome
                   ? { outcome: 'intake_reviewed' }
                   : {}),
               }),
@@ -258,12 +273,14 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
           );
     update((previous) => ({ ...previous, sections: { ...previous.sections, [name]: pending } }));
     if (!pending.command) return;
-    const result = await saveIntake(pending.command);
+    const result = await (canonical ? saveCanonicalIntake : saveIntake)(pending.command);
     if (!active.current) return;
     if (!result.ok) {
       update((previous) => ({
         ...previous,
         error: result.failure === 'conflict' ? 'conflict' : previous.error,
+        resolvedAddresses: result.failure === 'forbidden' && !workflow
+          ? { ...previous.resolvedAddresses, [name]: null } : previous.resolvedAddresses,
         sections: {
           ...previous.sections,
           [name]:
@@ -291,7 +308,12 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
       return;
     }
     const detail = result.value.current;
-    if (detail.summary.version > result.value.result_record_version) {
+    if (detail.summary.lifecycle === 'finalized' && pending.command.path.endsWith('/finalizations')) {
+      addressReads.current = {};
+      update((previous) => ({ ...previous, detail, sections: {}, resolvedAddresses: {} }));
+      return;
+    }
+    if (detail.summary.version > result.value.result_record_version || detail.summary.lifecycle === 'finalized') {
       // The receipt confirms our command, but the newer aggregate version includes unseen edits.
       // Do not adopt it as an expected-version baseline for any retained local section.
       addressReads.current = {};
@@ -318,6 +340,7 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
       return {
         ...previous,
         detail,
+        canonicalEpoch: canonical ? (previous.canonicalEpoch ?? 0) + 1 : previous.canonicalEpoch,
         sections: {
           ...previous.sections,
           ...(!workflow && name !== 'content' && previous.sections.content?.status === 'saved'
@@ -344,7 +367,11 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
         },
       };
     });
-    if (!intakeId) {
+    if (canonical) {
+      update((previous) => ({ ...previous, resolvedAddresses: {}, sections: { ...previous.sections,
+        ...Object.fromEntries(addressSections(kind).map((address) => [address, { ...(previous.sections[address] ?? initialSection({})), status: 'loading' as const }])) } }));
+      for (const address of addressSections(kind)) await loadAddress(address);
+    } else if (!intakeId) {
       for (const address of addressSections(kind)) await loadAddress(address);
     } else if (name !== 'content' && !workflow) {
       const address = await getIntakeAddress(intakeId, name as AddressSection);
@@ -353,6 +380,7 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
         if (!address.ok)
           return {
             ...previous,
+            resolvedAddresses: { ...previous.resolvedAddresses, [name]: null },
             sections: {
               ...previous.sections,
               [name]:
@@ -363,6 +391,7 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
           };
         return {
           ...previous,
+          resolvedAddresses: { ...previous.resolvedAddresses, [name]: address.value.resolved },
           error:
             address.value.version !== previous.detail?.summary.version ? 'conflict' : previous.error,
           sections: {
@@ -376,10 +405,19 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
   const locked =
     state.error === 'conflict' ||
     Object.values(state.sections).some((s) => s.status === 'saving' || s.status === 'unknown');
+  const finalizing = !!state.sections.canonical?.command &&
+    state.sections.canonical.command.path.endsWith('/finalizations');
   const addressTitle = (name: string) =>
     name === 'worker_residence' ? m.residence : name === 'party_address' ? m.party : m.worksite;
   if (state.busy) return <p role="status">{m.loading}</p>;
   if (id && !state.detail) return <p role="alert">{m.failure}</p>;
+  if (state.detail?.summary.lifecycle === 'finalized') return <section>
+    <Link to={`/staff/intakes/${kind === 'worker' ? 'workers' : 'employers'}`}>{m.back}</Link>
+    <h2>{cm.finalized}</h2><p>{state.detail.summary.display_name}</p>
+    <h3>{cm.outputs}</h3><ul>{Object.entries(state.detail.finalization ?? {}).filter(([name]) => name !== 'kind').map(([name, ref]) =>
+      <li key={name}>{ref && typeof ref !== 'string' ? <Link to={`/staff/intakes/${state.detail?.summary.intake_id ?? ''}/outputs/${name}`}>{canonicalLabel(name, language)}</Link> : canonicalLabel(name, language)}: {ref && typeof ref !== 'string' ? `${ref.id} · ${cm.version} ${String(ref.version)} · ${cm[ref.disposition]}` : '—'}</li>)}</ul>
+    <IntakeHistory id={state.detail.summary.intake_id} version={state.detail.summary.version} />
+  </section>;
   return (
     <section className="intake-editor" aria-label={m.content}>
       {state.detail ? (
@@ -410,7 +448,7 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
               <li key={name}>
                 {name === 'content'
                   ? m.content
-                  : name === 'workflow'
+                  : name === 'canonical' ? cm.title : name === 'workflow'
                     ? t('workflow')
                     : addressTitle(name)}
                 : {m[section.status]}
@@ -423,7 +461,19 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
       {state.error === 'conflict' && state.detail ? (
         <a href={`/staff/intakes/${state.detail.summary.intake_id}`}>{m.open}</a>
       ) : null}
-      <fieldset>
+      {state.detail && Object.keys(state.detail.links).length ? <section>
+        <h3>{cm.saved}</h3><ul>{Object.entries(state.detail.links).map(([name, ref]) => <li key={name}>{canonicalLabel(name, language)}: {ref.id} · {cm.version} {ref.version}</li>)}</ul>
+        {state.detail.dependency_stale ? <p role="alert">{cm.stale}</p> : null}
+        <fieldset disabled><legend>{cm.resolved}</legend>{kind === 'worker' ? <IntakeFields kind={kind} value={state.detail.resolved} change={() => {}} /> :
+          Object.entries(state.detail.resolved).map(([key, value]) => <Field key={key}
+            label={key === 'employer_type' ? ['Employer type', 'Tipo de empleador'] : key === 'display_name'
+              ? ['Employer name', 'Nombre del empleador'] : key === 'phone' ? ['Phone', 'Teléfono']
+                : ['Representative name', 'Nombre del representante']}
+            value={value} change={() => {}}
+            {...(key === 'employer_type' ? { options: [['business', 'Business', 'Empresa'], ['household', 'Household', 'Hogar']] as const } : {})} />)}</fieldset>
+        <p>{cm.selection}</p><h3>{cm.candidate}</h3>
+      </section> : null}
+      <fieldset disabled={finalizing}>
         <legend>{m.content}</legend>
         {state.sections.content?.status === 'unavailable' ? (
           <p role="status">{m.unavailable}</p>
@@ -457,8 +507,10 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
         addressSections(kind).map((name) => {
           const section = state.sections[name];
           return (
-            <fieldset key={name}>
+            <fieldset key={name} disabled={finalizing}>
               <legend>{addressTitle(name)}</legend>
+              {state.resolvedAddresses?.[name] ? <fieldset disabled><legend>{cm.resolved}</legend>
+                <AddressFields value={state.resolvedAddresses[name]} change={() => {}} /></fieldset> : null}
               {!section || section.status === 'loading' || section.status === 'unavailable' ? (
                 <>
                   <p role="status">{section?.status === 'unavailable' ? m.unavailable : m.loading}</p>
@@ -525,6 +577,16 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
       )}
       {state.detail ? (
         <>
+          <IntakeCanonical
+            key={`${state.detail.summary.intake_id}:${String(state.canonicalEpoch ?? 0)}`}
+            detail={state.detail} section={state.sections.canonical ?? initialSection({})}
+            ready={!state.error && Object.entries(state.sections).filter(([key]) => key !== 'canonical')
+              .every(([, section]) => section.status === 'saved' && !section.readPending)}
+            locked={locked}
+            discard={() => { update((previous) => ({ ...previous, canonicalEpoch: (previous.canonicalEpoch ?? 0) + 1, sections: { ...previous.sections, canonical: initialSection({}) } })); }}
+            change={(value) => { change('canonical', value); }}
+            save={(value) => { if (value) change('canonical', value); void save('canonical'); }}
+          />
           <IntakeWorkflow
             detail={state.detail}
             section={state.sections.workflow ?? initialSection({})}
@@ -667,10 +729,10 @@ export function IntakeWorkspace({ kind = 'worker' }: { kind?: IntakeKind }) {
                     {m.open}: {item.display_name || m.unnamed} — {item.intake_id}
                   </Link>
                   <span>
-                    {item.complete ? m.complete : m.incomplete} · {m.saved} · {t(item.review_status)} ·{' '}
+                    {item.complete === null ? m.completenessUnavailable : item.complete ? m.complete : m.incomplete} · {m.saved} · {t(item.review_status)} ·{' '}
                     {m.version} {item.version}
                   </span>
-                  {!item.complete ? (
+                  {item.complete === false ? (
                     <span>
                       {t('missing')}: {item.missing_fields.map((field) => t(field)).join(', ')}
                     </span>

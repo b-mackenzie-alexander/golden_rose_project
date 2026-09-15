@@ -22,7 +22,7 @@ def test_verify_database_authority_script_exists_at_expected_path() -> None:
     assert script_path.exists()
 
 
-def _expected_snapshot() -> dict[str, object]:
+def _predecessor_snapshot() -> dict[str, object]:
     return {
         "intake_constraints": dict(EXPECTED_INTAKE_CONSTRAINTS),
         "intake_triggers": {
@@ -171,6 +171,36 @@ def _expected_snapshot() -> dict[str, object]:
             "functions": [],
         },
     }
+
+
+def _expected_snapshot() -> dict[str, object]:
+    from scripts import verify_database_authority as verifier
+
+    snapshot = _predecessor_snapshot()
+    snapshot.update(
+        {
+            "table_owners": dict.fromkeys(
+                verifier.EXPECTED_SCHEMA_OWNER_OBJECTS, verifier.SCHEMA_OWNER_ROLE
+            ),
+            "function_owners": dict.fromkeys(
+                verifier.EXPECTED_SCHEMA_OWNER_FUNCTIONS, verifier.SCHEMA_OWNER_ROLE
+            ),
+            "runtime_table_privileges": {
+                k: sorted(v) for k, v in verifier.EXPECTED_RUNTIME_TABLE_PRIVILEGES.items()
+            },
+            "runtime_function_privileges": {
+                k: sorted(v) for k, v in verifier.EXPECTED_RUNTIME_FUNCTION_PRIVILEGES.items()
+            },
+            "runtime_update_columns": {
+                k: sorted(v) for k, v in verifier.EXPECTED_RUNTIME_UPDATE_COLUMNS.items()
+            },
+            "public_function_privileges": [],
+            "trigger_definitions": dict(verifier.EXPECTED_TRIGGER_DEFINITIONS),
+            "function_hashes": dict(verifier.EXPECTED_FUNCTION_HASHES),
+            "unique_indexes": dict(verifier.EXPECTED_UNIQUE_INDEXES),
+        }
+    )
+    return snapshot
 
 
 def test_verify_database_authority_accepts_expected_snapshot() -> None:

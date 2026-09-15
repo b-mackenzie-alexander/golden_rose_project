@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 
 import { WorkInterestCatalog } from '../intakes/WorkInterests';
+import { CanonicalOutput } from '../intakes/CanonicalOutput';
 import { IntakeWorkspace } from '../intakes/IntakeWorkspace';
 import { AppShell } from './AppShell';
 import { NotFoundPage } from './NotFoundPage';
@@ -23,6 +24,7 @@ export function AppRoutes() {
           element={<IntakeWorkspace key="employer" kind="employer" />}
         />
         <Route path="staff/work-interests" element={<WorkInterestCatalog />} />
+        <Route path="staff/intakes/:intakeId/outputs/:output" element={<CanonicalOutput />} />
         <Route path="staff/intakes/:intakeId" element={<IntakeWorkspace />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>

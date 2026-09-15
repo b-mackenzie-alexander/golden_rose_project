@@ -72,7 +72,8 @@ select = ["E", "F", "I", "B", "UP", "N", "C4", "SIM"]
 "tests/unit/test_verify_gcp_foundation.py" = ["E501"]
 
 [tool.pytest.ini_options]
-addopts = "-ra"
+addopts = "-ra --import-mode=importlib"
+pythonpath = ["."]
 testpaths = ["tests"]
 markers = [
   "unit: fast unit tests without external services",

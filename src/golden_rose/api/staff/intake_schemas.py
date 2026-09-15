@@ -13,6 +13,7 @@ from golden_rose.application.intake_contracts import (
     IntakeValue,
     Money,
     Offer,
+    Phone,
     Text3,
     Text100,
     Text200,
@@ -150,14 +151,21 @@ class IntakeSummary(IntakeResponseValue):
     intake_id: UUID
     kind: Literal["worker", "employer"]
     version: int = Field(ge=1, le=2_147_483_647)
-    lifecycle: Literal["draft"]
+    lifecycle: Literal["draft", "finalized"]
     display_name: Text200 | None = None
-    complete: bool
+    # None means linked canonical completeness is unavailable to this reader.
+    complete: bool | None
     missing_fields: list[MissingIntakeField] = Field(max_length=15)
     review_status: Literal["unreviewed", "needs_follow_up", "current", "stale"]
     follow_up: FollowUpSummary | None = None
     updated_at: datetime
     offer: OfferSummary | None = None
+
+    @model_validator(mode="after")
+    def unavailable_summary_has_no_facts(self) -> "IntakeSummary":
+        if self.complete is None and (self.display_name is not None or self.missing_fields):
+            raise ValueError("Unavailable completeness cannot claim canonical facts")
+        return self
 
     @field_validator("updated_at", mode="before")
     @classmethod
@@ -169,20 +177,167 @@ class IntakeSummary(IntakeResponseValue):
         return value
 
 
+class CreatedCanonicalReference(IntakeValue):
+    id: UUID
+    version: int = Field(ge=1, le=1)
+    disposition: Literal["created"]
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def parse_id(cls, value: Any) -> Any:
+        return QueryIntakesRequest.parse_reference(value)
+
+
+class CanonicalLinkReference(IntakeValue):
+    id: UUID
+    version: int = Field(ge=1, le=2147483647)
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def parse_id(cls, value: Any) -> Any:
+        return QueryIntakesRequest.parse_reference(value)
+
+
+class ResolvedEmployerContent(IntakeValue):
+    employer_type: Literal["household", "business"] | None = None
+    display_name: Text200 | None = None
+    representative_name: Text200 | None = None
+    phone: Phone | None = None
+
+
+LinkEntity = Literal[
+    "worker",
+    "worker_contact",
+    "worker_residence",
+    "worker_preferences",
+    "employer",
+    "employer_contact",
+    "employer_contact_details",
+    "worksite",
+    "employer_address",
+]
+
+
+class WorkerFinalizationOutputs(IntakeValue):
+    kind: Literal["worker"]
+    worker: "CanonicalOutputReference"
+    contact: "CanonicalOutputReference"
+    residence: "CanonicalOutputReference"
+    preferences: "CanonicalOutputReference"
+
+    @model_validator(mode="after")
+    def whole_group_disposition(self) -> "WorkerFinalizationOutputs":
+        if (
+            len(
+                {
+                    ref.disposition
+                    for ref in (self.worker, self.contact, self.residence, self.preferences)
+                }
+            )
+            != 1
+        ):
+            raise ValueError("Worker outputs must all be created or all reused")
+        return self
+
+
+class CanonicalOutputReference(CanonicalLinkReference):
+    disposition: Literal["created", "reused"]
+
+    @model_validator(mode="after")
+    def created_version(self) -> "CanonicalOutputReference":
+        if self.disposition == "created" and self.version != 1:
+            raise ValueError("Created output must start at version one")
+        return self
+
+
+class EmployerFinalizationOutputs(IntakeValue):
+    kind: Literal["employer"]
+    employer: CanonicalOutputReference
+    contact: CanonicalOutputReference
+    contact_details: CanonicalOutputReference
+    worksite: CanonicalOutputReference
+    request: CreatedCanonicalReference
+    business_address: CanonicalOutputReference | None
+
+    @model_validator(mode="after")
+    def consistent_reuse(self) -> "EmployerFinalizationOutputs":
+        if self.contact.disposition != self.contact_details.disposition:
+            raise ValueError("Contact and details must be created or reused together")
+        children = (self.contact, self.contact_details, self.worksite, self.business_address)
+        if self.employer.disposition == "created" and any(
+            child is not None and child.disposition == "reused" for child in children
+        ):
+            raise ValueError("A new employer cannot reuse another employer's children")
+        return self
+
+
 class IntakeDetail(IntakeResponseValue):
     latest_review: LatestIntakeReview | None = None
     summary: IntakeSummary
     content_version: int = Field(ge=1, le=2_147_483_647)
     candidate: WorkerDraftContent | EmployerDraftContent
-    resolved: dict[str, Any] = Field(max_length=0)
-    links: dict[str, Any] = Field(max_length=0)
+    resolved: WorkerDraftContent | ResolvedEmployerContent
+    links: dict[LinkEntity, CanonicalLinkReference] = Field(max_length=5)
     dependency_stale: bool
+    finalization: WorkerFinalizationOutputs | EmployerFinalizationOutputs | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def select_resolved_kind(cls, value: Any) -> Any:
+        if isinstance(value, dict) and "resolved" in value:
+            summary = value.get("summary")
+            kind = (
+                summary.get("kind") if isinstance(summary, dict) else getattr(summary, "kind", None)
+            )
+            model = WorkerDraftContent if kind == "worker" else ResolvedEmployerContent
+            value = dict(value)
+            value["resolved"] = model.model_validate(value["resolved"])
+        return value
 
     @model_validator(mode="after")
-    def validate_pr_a_detail(self) -> "IntakeDetail":
+    def validate_detail(self) -> "IntakeDetail":
+        if self.summary.complete is None:
+            raise ValueError("Full detail requires authorized completeness")
         validate_content(self.summary.kind, self.candidate.to_content())
-        if self.dependency_stale:
-            raise ValueError("Draft-only response cannot contain linked dependencies")
+        names = set(self.links)
+        resolved = self.resolved.model_dump(exclude_unset=True)
+        if not names:
+            if resolved or self.dependency_stale:
+                raise ValueError(
+                    "Unlinked detail cannot contain resolved facts or stale dependencies"
+                )
+        elif self.summary.kind == "worker":
+            if names != {"worker", "worker_contact", "worker_residence", "worker_preferences"}:
+                raise ValueError("Worker links require the complete canonical group")
+            if not isinstance(self.resolved, WorkerDraftContent):
+                raise ValueError("Worker detail requires worker resolved facts")
+        else:
+            allowed = {
+                "employer",
+                "employer_contact",
+                "employer_contact_details",
+                "worksite",
+                "employer_address",
+            }
+            if "employer" not in names or not names <= allowed:
+                raise ValueError("Employer links require a matching parent")
+            if ("employer_contact" in names) != ("employer_contact_details" in names):
+                raise ValueError("Selected contact requires details")
+            if not isinstance(self.resolved, ResolvedEmployerContent):
+                raise ValueError("Employer detail requires employer resolved facts")
+            if "employer_contact" not in names and {"representative_name", "phone"} & set(resolved):
+                raise ValueError("Unselected contact facts cannot be resolved")
+            if (
+                self.resolved.employer_type == "household"
+                and "employer_address" in names
+                and not self.dependency_stale
+            ):
+                raise ValueError("Household cannot select a business address")
+        if self.summary.lifecycle == "finalized":
+            if self.finalization is None or self.finalization.kind != self.summary.kind:
+                raise ValueError("Finalized intake requires kind-matching output references")
+        elif self.finalization is not None:
+            raise ValueError("Draft cannot contain finalization outputs")
         return self
 
 
@@ -191,18 +346,28 @@ class IntakeAddressDetail(IntakeResponseValue):
     version: int = Field(ge=1, le=2_147_483_647)
     section: Literal["worker_residence", "party_address", "worksite_address"]
     candidate: Address | None
-    resolved: None
+    resolved: Address | None
+    source_ref: CanonicalLinkReference | None = None
+
+    @model_validator(mode="after")
+    def resolved_requires_source(self) -> "IntakeAddressDetail":
+        if self.resolved is not None and self.source_ref is None:
+            raise ValueError("Resolved address requires a canonical source reference")
+        return self
 
 
 class IntakeCommandResponse(IntakeResponseValue):
     command_id: UUID
     result_record_version: int = Field(ge=1, le=2_147_483_647)
     current: IntakeDetail
+    finalization: WorkerFinalizationOutputs | EmployerFinalizationOutputs | None = None
 
     @model_validator(mode="after")
     def current_covers_result(self) -> "IntakeCommandResponse":
         if self.current.summary.version < self.result_record_version:
             raise ValueError("Current version precedes command result")
+        if self.finalization is not None and self.finalization != self.current.finalization:
+            raise ValueError("Finalization references differ from current intake")
         return self
 
 

@@ -59,9 +59,27 @@ class IntakeTransportMiddleware:
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         path = scope.get("path", "")
-        prefixes = ("/api/staff/v1/intakes", "/api/staff/v1/work-interests")
-        if scope["type"] != "http" or not any(
-            path == prefix or path.startswith(prefix + "/") for prefix in prefixes
+        prefixes = (
+            "/api/staff/v1/intakes",
+            "/api/staff/v1/work-interests",
+            "/api/staff/v1/workers",
+        )
+        parts = path.rstrip("/").split("/")
+        employer_outputs = (
+            len(parts) >= 7
+            and parts[:5] == ["", "api", "staff", "v1", "employers"]
+            and parts[6] in {"addresses", "worksites", "requests"}
+        )
+        contact_details = (
+            len(parts) >= 9
+            and parts[:5] == ["", "api", "staff", "v1", "employers"]
+            and parts[6] == "contacts"
+            and parts[8] == "details"
+        )
+        if scope["type"] != "http" or not (
+            contact_details
+            or employer_outputs
+            or any(path == prefix or path.startswith(prefix + "/") for prefix in prefixes)
         ):
             await self.app(scope, receive, send)
             return

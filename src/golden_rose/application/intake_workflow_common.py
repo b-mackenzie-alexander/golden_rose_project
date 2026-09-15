@@ -1,4 +1,4 @@
-"""Transaction-local receipt primitives shared by review and catalog commands."""
+"""Transaction-local receipt, result and audit primitives for intake commands."""
 
 import hashlib
 import json
@@ -82,6 +82,42 @@ def write_authority(
             created_at=now,
         )
     )
+    write_result_authority(
+        session,
+        principal=principal,
+        command_id=command_id,
+        command_type=command_type,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        previous_version=previous_version,
+        event_type=event_type,
+        event_id=event_id,
+        now=now,
+        changed=changed,
+    )
+
+
+def write_result_authority(
+    session: Session,
+    *,
+    principal: StaffPrincipal,
+    command_id: UUID,
+    command_type: str,
+    entity_type: str,
+    entity_id: UUID,
+    previous_version: int,
+    event_type: str,
+    event_id: UUID,
+    now: datetime,
+    changed: list[str],
+) -> None:
+    """Append one result/event pair under the outer command's sole receipt.
+
+    Finalization uses this for created outputs only. Reused canonical records
+    receive no new creation event. Schema guards enforce allowed result sets;
+    the caller owns the transaction, concrete entity authority and rollback.
+    """
+    version = previous_version + 1
     insert_command_result(
         session=session,
         command_id=command_id,

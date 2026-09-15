@@ -4,6 +4,7 @@ import sys
 import pytest
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine.url import make_url
@@ -171,7 +172,7 @@ def test_migration_runtime_bootstraps_clean_database_before_assuming_schema_owne
     with engine.connect() as connection:
         assert (
             connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-            == "0007_intake_review_follow_up"
+            == ScriptDirectory.from_config(_alembic_config()).get_current_head()
         )
         assert connection.execute(
             text("SELECT pg_has_role(CURRENT_USER, 'golden_rose_migrator', 'member')")
@@ -638,3 +639,86 @@ def test_managed_bootstrap_can_be_deleted_before_restricted_migration(
             connection.commit()
         monkeypatch.setenv("GOLDEN_ROSE_DATABASE_URL", database_url)
         command.upgrade(_alembic_config(), "head")
+
+
+@pytest.mark.parametrize(
+    "drift_sql,expected",
+    [
+        (
+            "ALTER TABLE intakes ADD CONSTRAINT ck_intakes_links_not_available "
+            "CHECK(worker_id IS NULL AND employer_id IS NULL)",
+            "constraint inventory",
+        ),
+        (
+            "CREATE UNIQUE INDEX unreviewed_gate ON intake_finalizations(worker_id)",
+            "unique_indexes",
+        ),
+        (
+            "UPDATE pg_index SET indisvalid=false WHERE indexrelid="
+            "(SELECT indexrelid FROM pg_index WHERE indrelid='workers'::regclass "
+            "AND indisprimary)",
+            "unique_indexes",
+        ),
+        (
+            "CREATE UNIQUE INDEX unreviewed_invalid_gate ON intake_finalizations(worker_id); "
+            "UPDATE pg_index SET indisvalid=false "
+            "WHERE indexrelid='unreviewed_invalid_gate'::regclass",
+            "unique_indexes",
+        ),
+        ("GRANT UPDATE ON workers TO golden_rose_runtime", "runtime table privileges"),
+        ("GRANT UPDATE(full_name) ON workers TO golden_rose_runtime", "UPDATE columns"),
+        ("GRANT SELECT ON worker_residences TO PUBLIC", "PUBLIC table privileges"),
+        ("GRANT EXECUTE ON FUNCTION intake_link_refs(uuid) TO PUBLIC", "PUBLIC execution"),
+        (
+            "REVOKE EXECUTE ON FUNCTION intake_effective_snapshot(uuid) FROM golden_rose_runtime",
+            "runtime function privileges",
+        ),
+        (
+            "ALTER FUNCTION intake_canonical_record(text,uuid) OWNER TO golden_rose_runtime",
+            "function owner drifted",
+        ),
+        ("ALTER TABLE intake_links DISABLE TRIGGER guard_intake_link_once", "intake trigger"),
+        ("DROP TRIGGER guard_intake_links ON intake_links", "trigger_definitions"),
+        (
+            "ALTER TABLE intake_finalizations DROP CONSTRAINT ck_finalization_reuse_shape",
+            "intake constraint",
+        ),
+        (
+            "ALTER TABLE intake_finalizations DROP CONSTRAINT ck_finalization_reuse_shape; "
+            "ALTER TABLE intake_finalizations ADD CONSTRAINT ck_finalization_reuse_shape "
+            "CHECK (true)",
+            "intake constraint",
+        ),
+        (
+            "CREATE OR REPLACE FUNCTION intake_link_refs(target uuid) RETURNS jsonb "
+            "LANGUAGE plpgsql AS $$ BEGIN RETURN '{}'::jsonb; END $$",
+            "function_hashes",
+        ),
+    ],
+)
+def test_prc_verifier_rejects_live_schema_drift(
+    connection, authenticated_login_roles, drift_sql: str, expected: str
+) -> None:
+    command.upgrade(_alembic_config(), "head")
+    _create_authenticated_login_roles(connection)
+    try:
+        baseline = collect_authority_snapshot(
+            connection,
+            migration_login_role=MIGRATION_LOGIN_ROLE,
+            runtime_login_role=RUNTIME_LOGIN_ROLE,
+        )
+        assert evaluate_authority_snapshot(baseline) == []
+        connection.rollback()
+        transaction = connection.begin()
+        try:
+            connection.execute(text(drift_sql))
+            snapshot = collect_authority_snapshot(
+                connection,
+                migration_login_role=MIGRATION_LOGIN_ROLE,
+                runtime_login_role=RUNTIME_LOGIN_ROLE,
+            )
+            assert any(expected in error for error in evaluate_authority_snapshot(snapshot))
+        finally:
+            transaction.rollback()
+    finally:
+        _drop_authenticated_login_roles(connection)

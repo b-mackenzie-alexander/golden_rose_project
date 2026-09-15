@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 from collections import defaultdict
 from collections.abc import Iterable
@@ -10,6 +11,21 @@ from sqlalchemy.engine import Connection, create_engine
 from sqlalchemy.exc import SQLAlchemyError
 
 from golden_rose.database import get_database_url
+from golden_rose.database_schema_contract import (
+    EXPECTED_FUNCTION_HASHES as EXPECTED_FUNCTION_HASHES,
+)
+from golden_rose.database_schema_contract import (
+    EXPECTED_INTAKE_CONSTRAINTS as EXPECTED_INTAKE_CONSTRAINTS,
+)
+from golden_rose.database_schema_contract import (
+    EXPECTED_INTAKE_TRIGGERS as EXPECTED_INTAKE_TRIGGERS,
+)
+from golden_rose.database_schema_contract import (
+    EXPECTED_TRIGGER_DEFINITIONS as EXPECTED_TRIGGER_DEFINITIONS,
+)
+from golden_rose.database_schema_contract import (
+    EXPECTED_UNIQUE_INDEXES as EXPECTED_UNIQUE_INDEXES,
+)
 
 SCHEMA_OWNER_ROLE = "golden_rose_schema_owner"
 MIGRATOR_ROLE = "golden_rose_migrator"
@@ -17,6 +33,16 @@ RUNTIME_ROLE = "golden_rose_runtime"
 PUBLIC_ROLE = "PUBLIC"
 
 EXPECTED_RUNTIME_TABLE_PRIVILEGES: dict[str, set[str]] = {
+    "workers": {"INSERT", "SELECT"},
+    "worker_contacts": {"INSERT", "SELECT"},
+    "worker_residences": {"INSERT", "SELECT"},
+    "worker_preferences": {"INSERT", "SELECT"},
+    "worker_interest_selections": {"INSERT", "SELECT"},
+    "intake_finalizations": {"INSERT", "SELECT"},
+    "employer_contact_details": {"INSERT", "SELECT"},
+    "employer_addresses": {"INSERT", "SELECT"},
+    "worksites": {"INSERT", "SELECT"},
+    "staffing_requests": {"INSERT", "SELECT"},
     "work_interests": {"INSERT", "SELECT"},
     "work_interest_versions": {"INSERT", "SELECT"},
     "intake_reviews": {"INSERT", "SELECT"},
@@ -36,6 +62,15 @@ EXPECTED_RUNTIME_TABLE_PRIVILEGES: dict[str, set[str]] = {
 }
 EXPECTED_RUNTIME_SCHEMA_PRIVILEGES: set[str] = {"USAGE"}
 EXPECTED_RUNTIME_FUNCTION_PRIVILEGES: dict[str, set[str]] = {
+    "guard_employer_output": set(),
+    "guard_finalization_results": set(),
+    "guard_intake_link_event": set(),
+    "guard_intake_link_once": set(),
+    "guard_intake_links": set(),
+    "guard_worker_output": set(),
+    "intake_canonical_record": {"EXECUTE"},
+    "intake_effective_snapshot": {"EXECUTE"},
+    "intake_link_refs": {"EXECUTE"},
     "guard_intake_workflow_authority": set(),
     "guard_work_interest_identity": set(),
     "guard_work_interest_authority": set(),
@@ -58,6 +93,16 @@ EXPECTED_PUBLIC_DEFAULT_PRIVILEGES: dict[str, set[str]] = {
     "functions": set(),
 }
 EXPECTED_SCHEMA_OWNER_OBJECTS: set[str] = {
+    "workers",
+    "worker_contacts",
+    "worker_residences",
+    "worker_preferences",
+    "worker_interest_selections",
+    "intake_finalizations",
+    "employer_contact_details",
+    "employer_addresses",
+    "worksites",
+    "staffing_requests",
     "work_interests",
     "work_interest_versions",
     "intake_reviews",
@@ -76,6 +121,15 @@ EXPECTED_SCHEMA_OWNER_OBJECTS: set[str] = {
     "command_results",
 }
 EXPECTED_SCHEMA_OWNER_FUNCTIONS: set[str] = {
+    "guard_employer_output",
+    "guard_finalization_results",
+    "guard_intake_link_event",
+    "guard_intake_link_once",
+    "guard_intake_links",
+    "guard_worker_output",
+    "intake_canonical_record",
+    "intake_effective_snapshot",
+    "intake_link_refs",
     "guard_intake_workflow_authority",
     "guard_work_interest_identity",
     "guard_work_interest_authority",
@@ -156,7 +210,7 @@ TABLE_OWNER_QUERY = text(
         'employer_contacts',
         'entity_authorities',
         'command_receipts',
-        'audit_events', 'intakes', 'intake_addresses', 'intake_links', 'command_results', 'work_interests','work_interest_versions','intake_reviews','intake_review_payloads','intake_follow_up_events','intake_history_payloads'
+        'audit_events', 'intakes', 'intake_addresses', 'intake_links', 'command_results', 'work_interests','work_interest_versions','intake_reviews','intake_review_payloads','intake_follow_up_events','intake_history_payloads','workers','worker_contacts','worker_residences','worker_preferences','worker_interest_selections','intake_finalizations','employer_contact_details','employer_addresses','worksites','staffing_requests'
       )
     """
 )
@@ -167,7 +221,6 @@ FUNCTION_OWNER_QUERY = text(
     FROM pg_proc AS procedure
     JOIN pg_namespace AS namespace ON namespace.oid = procedure.pronamespace
     WHERE namespace.nspname = 'public'
-      AND procedure.pronargs = 0
       AND procedure.proname = ANY(:function_names)
     """
 )
@@ -183,7 +236,7 @@ PUBLIC_TABLE_PRIVILEGE_QUERY = text(
       AND class.relname IN (
         'alembic_version', 'employers', 'employer_contacts',
         'entity_authorities', 'command_receipts', 'audit_events',
-        'intakes', 'intake_addresses', 'intake_links', 'command_results', 'work_interests','work_interest_versions','intake_reviews','intake_review_payloads','intake_follow_up_events','intake_history_payloads'
+        'intakes', 'intake_addresses', 'intake_links', 'command_results', 'work_interests','work_interest_versions','intake_reviews','intake_review_payloads','intake_follow_up_events','intake_history_payloads','workers','worker_contacts','worker_residences','worker_preferences','worker_interest_selections','intake_finalizations','employer_contact_details','employer_addresses','worksites','staffing_requests'
       )
       AND acl.grantee = 0
     """
@@ -198,7 +251,7 @@ RUNTIME_TABLE_PRIVILEGE_QUERY = text(
             ('employer_contacts'),
             ('entity_authorities'),
             ('command_receipts'),
-            ('audit_events'), ('intakes'), ('intake_addresses'), ('intake_links'), ('command_results'), ('work_interests'),('work_interest_versions'),('intake_reviews'),('intake_review_payloads'),('intake_follow_up_events'),('intake_history_payloads')
+            ('audit_events'), ('intakes'), ('intake_addresses'), ('intake_links'), ('command_results'), ('work_interests'),('work_interest_versions'),('intake_reviews'),('intake_review_payloads'),('intake_follow_up_events'),('intake_history_payloads'),('workers'),('worker_contacts'),('worker_residences'),('worker_preferences'),('worker_interest_selections'),('intake_finalizations'),('employer_contact_details'),('employer_addresses'),('worksites'),('staffing_requests')
     ),
     privileges(privilege_type) AS (
         VALUES
@@ -243,7 +296,16 @@ RUNTIME_FUNCTION_PRIVILEGE_QUERY = text(
             ('guard_intake_identity', 'public.guard_intake_identity()'),
 ('guard_intake_workflow_authority', 'public.guard_intake_workflow_authority()'),('guard_work_interest_identity', 'public.guard_work_interest_identity()'),('guard_work_interest_authority', 'public.guard_work_interest_authority()'),
             ('guard_intake_write_authority', 'public.guard_intake_write_authority()'),
-            ('guard_intake_address_authority', 'public.guard_intake_address_authority()')
+            ('guard_intake_address_authority', 'public.guard_intake_address_authority()'),
+            ('guard_employer_output', 'public.guard_employer_output()'),
+            ('guard_finalization_results', 'public.guard_finalization_results()'),
+            ('guard_intake_link_event', 'public.guard_intake_link_event()'),
+            ('guard_intake_link_once', 'public.guard_intake_link_once()'),
+            ('guard_intake_links', 'public.guard_intake_links()'),
+            ('guard_worker_output', 'public.guard_worker_output()'),
+            ('intake_canonical_record', 'public.intake_canonical_record(text, uuid)'),
+            ('intake_effective_snapshot', 'public.intake_effective_snapshot(uuid)'),
+            ('intake_link_refs', 'public.intake_link_refs(uuid)')
     ) AS functions(function_name, signature)
     """
 )
@@ -286,487 +348,61 @@ DEFAULT_PRIVILEGE_QUERY = text(
 
 # UPDATE is column-scoped; granting whole-table UPDATE is deliberately rejected.
 EXPECTED_RUNTIME_UPDATE_COLUMNS = {
+    "workers": set(),
+    "worker_contacts": set(),
+    "worker_residences": set(),
+    "worker_preferences": set(),
+    "worker_interest_selections": set(),
+    "intake_finalizations": set(),
+    "employer_contact_details": set(),
+    "employer_addresses": set(),
+    "worksites": set(),
+    "staffing_requests": set(),
     "work_interest_versions": set(),
     "intake_reviews": set(),
     "intake_review_payloads": set(),
     "intake_follow_up_events": set(),
     "intake_history_payloads": set(),
     "work_interests": {"version", "label_en", "label_es", "active", "updated_at", "updated_by"},
-    "intakes": {"content", "version", "content_version", "updated_at", "updated_by"},
+    "intakes": {
+        "content",
+        "content_version",
+        "employer_id",
+        "employer_version",
+        "lifecycle_status",
+        "updated_at",
+        "updated_by",
+        "version",
+        "worker_id",
+        "worker_version",
+    },
     "intake_addresses": {"line1", "line2", "locality", "region", "postal_code", "country"},
-    "intake_links": set(),
+    "intake_links": {
+        "employer_address_id",
+        "employer_address_version",
+        "employer_contact_details_id",
+        "employer_contact_details_version",
+        "employer_contact_id",
+        "employer_contact_version",
+        "employer_id",
+        "worker_contact_id",
+        "worker_contact_version",
+        "worker_id",
+        "worker_preferences_id",
+        "worker_preferences_version",
+        "worker_residence_id",
+        "worker_residence_version",
+        "worksite_id",
+        "worksite_version",
+    },
     "command_results": set(),
 }
-# PostgreSQL 16 canonical definitions for the reviewed PR A/B constraint arms.
-# Compare definitions as well as names: a same-name permissive CHECK must fail.
-EXPECTED_INTAKE_CONSTRAINTS = {
-    "audit_events.ck_audit_events_entity_type": "CHECK (entity_type::text = ANY "
-    "(ARRAY['employer'::character varying, "
-    "'employer_contact'::character varying, "
-    "'intake'::character varying, "
-    "'work_interest'::character varying]::text[]))",
-    "audit_events.ck_audit_events_event_type": "CHECK (event_type::text = ANY "
-    "(ARRAY['employer.created'::character varying, "
-    "'employer_contact.created'::character varying, "
-    "'employer.draft_revised'::character varying, "
-    "'intake.created'::character varying, "
-    "'intake.revised'::character varying, "
-    "'intake.reviewed'::character varying, "
-    "'intake.follow_up_recorded'::character varying, "
-    "'work_interest.created'::character varying, "
-    "'work_interest.revised'::character "
-    "varying]::text[]))",
-    "audit_events.ck_audit_events_schema_name": "CHECK (event_schema_name::text = ANY "
-    "(ARRAY['employer.created'::character varying, "
-    "'employer_contact.created'::character varying, "
-    "'employer.draft_revised'::character varying, "
-    "'intake.created'::character varying, "
-    "'intake.revised'::character varying, "
-    "'intake.reviewed'::character varying, "
-    "'intake.follow_up_recorded'::character varying, "
-    "'work_interest.created'::character varying, "
-    "'work_interest.revised'::character "
-    "varying]::text[]))",
-    "audit_events.fk_audit_events_command_result": "FOREIGN KEY (command_id, entity_type, "
-    "entity_id, new_record_version, event_type, "
-    "actor_id) REFERENCES "
-    "command_results(command_id, entity_type, "
-    "entity_id, result_version, event_type, "
-    "actor_id) DEFERRABLE INITIALLY DEFERRED",
-    "audit_events.guard_intake_workflow_authority": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
-    "audit_events.guard_work_interest_authority": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
-    "command_receipts.ck_command_receipts_command_type": "CHECK (command_type::text = ANY "
-    "(ARRAY['create_draft_employer'::character "
-    "varying, "
-    "'create_employer_contact'::character "
-    "varying, "
-    "'revise_draft_employer'::character "
-    "varying, 'create_intake'::character "
-    "varying, 'revise_intake'::character "
-    "varying, "
-    "'revise_intake_address'::character "
-    "varying, 'review_intake'::character "
-    "varying, 'follow_up_intake'::character "
-    "varying, "
-    "'create_work_interest'::character "
-    "varying, "
-    "'revise_work_interest'::character "
-    "varying]::text[]))",
-    "command_receipts.ck_command_receipts_entity_type": "CHECK (result_entity_type::text = ANY "
-    "(ARRAY['employer'::character varying, "
-    "'employer_contact'::character varying, "
-    "'intake'::character varying, "
-    "'work_interest'::character "
-    "varying]::text[]))",
-    "command_receipts.ck_command_receipts_result_authority_shape": "CHECK (command_type::text = "
-    "'create_draft_employer'::text "
-    "AND result_entity_type::text = "
-    "'employer'::text AND "
-    "result_event_type::text = "
-    "'employer.created'::text AND "
-    "result_record_version = 1 OR "
-    "command_type::text = "
-    "'create_employer_contact'::text "
-    "AND result_entity_type::text = "
-    "'employer_contact'::text AND "
-    "result_event_type::text = "
-    "'employer_contact.created'::text "
-    "AND result_record_version = 1 "
-    "OR command_type::text = "
-    "'revise_draft_employer'::text "
-    "AND result_entity_type::text = "
-    "'employer'::text AND "
-    "result_event_type::text = "
-    "'employer.draft_revised'::text "
-    "AND result_record_version >= 2 "
-    "OR command_type::text = "
-    "'create_intake'::text AND "
-    "result_entity_type::text = "
-    "'intake'::text AND "
-    "result_event_type::text = "
-    "'intake.created'::text AND "
-    "result_record_version = 1 OR "
-    "(command_type::text = ANY "
-    "(ARRAY['revise_intake'::character "
-    "varying, "
-    "'revise_intake_address'::character "
-    "varying]::text[])) AND "
-    "result_entity_type::text = "
-    "'intake'::text AND "
-    "result_event_type::text = "
-    "'intake.revised'::text AND "
-    "result_record_version >= 2 OR "
-    "command_type::text = "
-    "'review_intake'::text AND "
-    "result_entity_type::text = "
-    "'intake'::text AND "
-    "result_event_type::text = "
-    "'intake.reviewed'::text AND "
-    "result_record_version >= 2 OR "
-    "command_type::text = "
-    "'follow_up_intake'::text AND "
-    "result_entity_type::text = "
-    "'intake'::text AND "
-    "result_event_type::text = "
-    "'intake.follow_up_recorded'::text "
-    "AND result_record_version >= 2 "
-    "OR command_type::text = "
-    "'create_work_interest'::text "
-    "AND result_entity_type::text = "
-    "'work_interest'::text AND "
-    "result_event_type::text = "
-    "'work_interest.created'::text "
-    "AND result_record_version = 1 "
-    "OR command_type::text = "
-    "'revise_work_interest'::text "
-    "AND result_entity_type::text = "
-    "'work_interest'::text AND "
-    "result_event_type::text = "
-    "'work_interest.revised'::text "
-    "AND result_record_version >= 2)",
-    "command_receipts.fk_command_receipts_primary_result": "FOREIGN KEY (command_id, "
-    "result_entity_type, result_entity_id, "
-    "result_record_version, "
-    "result_event_type, actor_id) REFERENCES "
-    "command_results(command_id, "
-    "entity_type, entity_id, result_version, "
-    "event_type, actor_id) DEFERRABLE "
-    "INITIALLY DEFERRED",
-    "command_results.ck_command_results_authority_shape": "CHECK (command_type::text = "
-    "'create_draft_employer'::text AND "
-    "entity_type::text = 'employer'::text AND "
-    "event_type::text = "
-    "'employer.created'::text AND "
-    "result_version = 1 OR command_type::text "
-    "= 'create_employer_contact'::text AND "
-    "entity_type::text = "
-    "'employer_contact'::text AND "
-    "event_type::text = "
-    "'employer_contact.created'::text AND "
-    "result_version = 1 OR command_type::text "
-    "= 'revise_draft_employer'::text AND "
-    "entity_type::text = 'employer'::text AND "
-    "event_type::text = "
-    "'employer.draft_revised'::text AND "
-    "result_version >= 2 OR "
-    "command_type::text = "
-    "'create_intake'::text AND "
-    "entity_type::text = 'intake'::text AND "
-    "event_type::text = "
-    "'intake.created'::text AND "
-    "result_version = 1 OR "
-    "(command_type::text = ANY "
-    "(ARRAY['revise_intake'::character "
-    "varying, "
-    "'revise_intake_address'::character "
-    "varying]::text[])) AND entity_type::text "
-    "= 'intake'::text AND event_type::text = "
-    "'intake.revised'::text AND "
-    "result_version >= 2 OR "
-    "command_type::text = "
-    "'review_intake'::text AND "
-    "entity_type::text = 'intake'::text AND "
-    "event_type::text = "
-    "'intake.reviewed'::text AND "
-    "result_version >= 2 OR "
-    "command_type::text = "
-    "'follow_up_intake'::text AND "
-    "entity_type::text = 'intake'::text AND "
-    "event_type::text = "
-    "'intake.follow_up_recorded'::text AND "
-    "result_version >= 2 OR "
-    "command_type::text = "
-    "'create_work_interest'::text AND "
-    "entity_type::text = "
-    "'work_interest'::text AND "
-    "event_type::text = "
-    "'work_interest.created'::text AND "
-    "result_version = 1 OR command_type::text "
-    "= 'revise_work_interest'::text AND "
-    "entity_type::text = "
-    "'work_interest'::text AND "
-    "event_type::text = "
-    "'work_interest.revised'::text AND "
-    "result_version >= 2)",
-    "command_results.ck_command_results_version_positive": "CHECK (result_version >= 1)",
-    "command_results.command_results_pkey": "PRIMARY KEY (command_id, entity_type, entity_id)",
-    "command_results.fk_command_results_entity_authority": "FOREIGN KEY (entity_type, entity_id) "
-    "REFERENCES "
-    "entity_authorities(entity_type, "
-    "entity_id) DEFERRABLE INITIALLY "
-    "DEFERRED",
-    "command_results.fk_command_results_exact_audit": "FOREIGN KEY (command_id, entity_id, "
-    "result_version, event_type, actor_id) "
-    "REFERENCES audit_events(command_id, "
-    "entity_id, new_record_version, event_type, "
-    "actor_id) DEFERRABLE INITIALLY DEFERRED",
-    "command_results.fk_command_results_receipt_actor_type": "FOREIGN KEY (command_id, actor_id, "
-    "command_type) REFERENCES "
-    "command_receipts(command_id, "
-    "actor_id, command_type) DEFERRABLE "
-    "INITIALLY DEFERRED",
-    "command_results.fk_command_results_typed_audit": "FOREIGN KEY (command_id, entity_type, "
-    "entity_id) REFERENCES "
-    "audit_events(command_id, entity_type, "
-    "entity_id) DEFERRABLE INITIALLY DEFERRED",
-    "command_results.uq_command_results_exact_authority": "UNIQUE (command_id, entity_type, "
-    "entity_id, result_version, event_type, "
-    "actor_id)",
-    "command_results.uq_command_results_single_result": "UNIQUE (command_id)",
-    "entity_authorities.ck_entity_authorities_entity_type": "CHECK (entity_type::text = ANY "
-    "(ARRAY['employer'::character varying, "
-    "'employer_contact'::character varying, "
-    "'intake'::character varying, "
-    "'work_interest'::character "
-    "varying]::text[]))",
-    "entity_authorities.ck_entity_authorities_exactly_one_concrete_id": "CHECK (entity_type::text = "
-    "'employer'::text AND "
-    "employer_id IS NOT NULL "
-    "AND employer_id = "
-    "entity_id AND "
-    "employer_contact_id IS "
-    "NULL AND intake_id IS NULL "
-    "AND work_interest_id IS "
-    "NULL OR entity_type::text "
-    "= 'employer_contact'::text "
-    "AND employer_contact_id IS "
-    "NOT NULL AND "
-    "employer_contact_id = "
-    "entity_id AND employer_id "
-    "IS NULL AND intake_id IS "
-    "NULL AND work_interest_id "
-    "IS NULL OR "
-    "entity_type::text = "
-    "'intake'::text AND "
-    "intake_id IS NOT NULL AND "
-    "intake_id = entity_id AND "
-    "employer_id IS NULL AND "
-    "employer_contact_id IS "
-    "NULL AND work_interest_id "
-    "IS NULL OR "
-    "entity_type::text = "
-    "'work_interest'::text AND "
-    "work_interest_id IS NOT "
-    "NULL AND work_interest_id "
-    "= entity_id AND "
-    "employer_id IS NULL AND "
-    "employer_contact_id IS "
-    "NULL AND intake_id IS "
-    "NULL)",
-    "entity_authorities.entity_authorities_work_interest_id_key": "UNIQUE (work_interest_id)",
-    "entity_authorities.fk_entity_authorities_intake": "FOREIGN KEY (intake_id) REFERENCES "
-    "intakes(intake_id) DEFERRABLE INITIALLY "
-    "DEFERRED",
-    "entity_authorities.fk_entity_authorities_work_interest": "FOREIGN KEY (work_interest_id) "
-    "REFERENCES "
-    "work_interests(interest_id) "
-    "DEFERRABLE INITIALLY DEFERRED",
-    "intake_addresses.ck_intake_addresses_country": "CHECK (country IS NULL OR country::text ~ "
-    "'^[A-Z]{2}$'::text)",
-    "intake_addresses.ck_intake_addresses_nonblank": "CHECK ((line1 IS NULL OR btrim(line1::text) "
-    "<> ''::text) AND (line2 IS NULL OR "
-    "btrim(line2::text) <> ''::text) AND (locality "
-    "IS NULL OR btrim(locality::text) <> ''::text) "
-    "AND (region IS NULL OR btrim(region::text) <> "
-    "''::text) AND (postal_code IS NULL OR "
-    "btrim(postal_code::text) <> ''::text))",
-    "intake_addresses.ck_intake_addresses_section": "CHECK (section::text = ANY "
-    "(ARRAY['worker_residence'::character varying, "
-    "'party_address'::character varying, "
-    "'worksite_address'::character "
-    "varying]::text[]))",
-    "intake_addresses.fk_intake_addresses_intake": "FOREIGN KEY (intake_id) REFERENCES "
-    "intakes(intake_id)",
-    "intake_addresses.guard_intake_address_authority": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
-    "intake_addresses.intake_addresses_pkey": "PRIMARY KEY (intake_id, section)",
-    "intake_follow_up_events.ck_intake_follow_up_shape": "CHECK (action::text = "
-    "'needs_follow_up'::text AND review_id IS "
-    "NOT NULL AND reason_code IS NOT NULL AND "
-    "(reason_code::text = ANY "
-    "(ARRAY['missing_information'::character "
-    "varying, 'clarification'::character "
-    "varying, 'other'::character "
-    "varying]::text[])) AND method IS NULL AND "
-    "outcome IS NULL OR (action::text = ANY "
-    "(ARRAY['reschedule'::character varying, "
-    "'reassign'::character varying]::text[])) "
-    "AND review_id IS NULL AND reason_code IS "
-    "NULL AND method IS NULL AND outcome IS "
-    "NULL OR action::text = 'attempt'::text "
-    "AND review_id IS NULL AND reason_code IS "
-    "NULL AND method IS NOT NULL AND "
-    "(method::text = ANY "
-    "(ARRAY['phone'::character varying, "
-    "'email'::character varying, "
-    "'in_person'::character varying, "
-    "'other'::character varying]::text[])) AND "
-    "outcome IS NOT NULL AND (outcome::text = "
-    "ANY (ARRAY['no_answer'::character "
-    "varying, 'voicemail_left'::character "
-    "varying, 'callback_requested'::character "
-    "varying, "
-    "'contact_reached_information_pending'::character "
-    "varying, "
-    "'invalid_contact_information'::character "
-    "varying, "
-    "'information_received'::character "
-    "varying, 'other'::character "
-    "varying]::text[])))",
-    "intake_follow_up_events.fk_intake_follow_up_required_payload": "FOREIGN KEY (event_id) "
-    "REFERENCES "
-    "intake_history_payloads(event_id) "
-    "DEFERRABLE INITIALLY DEFERRED",
-    "intake_follow_up_events.guard_intake_workflow_authority": "TRIGGER DEFERRABLE INITIALLY "
-    "DEFERRED",
-    "intake_follow_up_events.intake_follow_up_events_action_check": "CHECK (action::text = ANY "
-    "(ARRAY['needs_follow_up'::character "
-    "varying, "
-    "'reschedule'::character "
-    "varying, 'reassign'::character "
-    "varying, 'attempt'::character "
-    "varying]::text[]))",
-    "intake_follow_up_events.intake_follow_up_events_actor_display_name_check": "CHECK "
-    "(btrim(actor_display_name::text) "
-    "<> ''::text)",
-    "intake_follow_up_events.intake_follow_up_events_check": "CHECK (content_version >= 1 AND "
-    "content_version < version)",
-    "intake_follow_up_events.intake_follow_up_events_command_id_fkey": "FOREIGN KEY (command_id) "
-    "REFERENCES "
-    "command_receipts(command_id) "
-    "DEFERRABLE INITIALLY "
-    "DEFERRED",
-    "intake_follow_up_events.intake_follow_up_events_command_id_key": "UNIQUE (command_id)",
-    "intake_follow_up_events.intake_follow_up_events_event_id_fkey": "FOREIGN KEY (event_id) "
-    "REFERENCES "
-    "audit_events(audit_event_id) "
-    "DEFERRABLE INITIALLY DEFERRED",
-    "intake_follow_up_events.intake_follow_up_events_intake_id_fkey": "FOREIGN KEY (intake_id) "
-    "REFERENCES "
-    "intakes(intake_id)",
-    "intake_follow_up_events.intake_follow_up_events_intake_id_review_id_fkey": "FOREIGN KEY "
-    "(intake_id, "
-    "review_id) "
-    "REFERENCES "
-    "intake_reviews(intake_id, "
-    "review_id) "
-    "DEFERRABLE "
-    "INITIALLY DEFERRED",
-    "intake_follow_up_events.intake_follow_up_events_intake_id_version_key": "UNIQUE (intake_id, "
-    "version)",
-    "intake_follow_up_events.intake_follow_up_events_pkey": "PRIMARY KEY (event_id)",
-    "intake_follow_up_events.intake_follow_up_events_time_zone_check": "CHECK "
-    "(btrim(time_zone::text) <> "
-    "''::text)",
-    "intake_follow_up_events.intake_follow_up_events_version_check": "CHECK (version >= 2)",
-    "intake_history_payloads.guard_intake_workflow_authority": "TRIGGER DEFERRABLE INITIALLY "
-    "DEFERRED",
-    "intake_history_payloads.intake_history_payloads_event_id_fkey": "FOREIGN KEY (event_id) "
-    "REFERENCES "
-    "intake_follow_up_events(event_id) "
-    "DEFERRABLE INITIALLY DEFERRED",
-    "intake_history_payloads.intake_history_payloads_note_check": "CHECK (note IS NULL OR "
-    "btrim(note::text) <> ''::text)",
-    "intake_history_payloads.intake_history_payloads_pkey": "PRIMARY KEY (event_id)",
-    "intake_history_payloads.intake_history_payloads_reason_text_check": "CHECK "
-    "(btrim(reason_text::text) "
-    "<> ''::text)",
-    "intake_links.ck_intake_links_not_available": "CHECK (false)",
-    "intake_links.fk_intake_links_intake": "FOREIGN KEY (intake_id) REFERENCES intakes(intake_id)",
-    "intake_links.intake_links_pkey": "PRIMARY KEY (intake_id)",
-    "intake_review_payloads.guard_intake_workflow_authority": "TRIGGER DEFERRABLE INITIALLY "
-    "DEFERRED",
-    "intake_review_payloads.intake_review_payloads_dependency_refs_check": "CHECK (dependency_refs "
-    "= '{}'::jsonb)",
-    "intake_review_payloads.intake_review_payloads_note_check": "CHECK (note IS NULL OR "
-    "btrim(note::text) <> ''::text)",
-    "intake_review_payloads.intake_review_payloads_pkey": "PRIMARY KEY (review_id)",
-    "intake_review_payloads.intake_review_payloads_review_id_fkey": "FOREIGN KEY (review_id) "
-    "REFERENCES "
-    "intake_reviews(review_id) "
-    "DEFERRABLE INITIALLY DEFERRED",
-    "intake_review_payloads.intake_review_payloads_reviewed_content_check": "CHECK "
-    "(jsonb_typeof(reviewed_content) "
-    "= 'object'::text)",
-    "intake_reviews.fk_intake_reviews_required_payload": "FOREIGN KEY (review_id) REFERENCES "
-    "intake_review_payloads(review_id) "
-    "DEFERRABLE INITIALLY DEFERRED",
-    "intake_reviews.guard_intake_workflow_authority": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
-    "intake_reviews.intake_reviews_actor_display_name_check": "CHECK "
-    "(btrim(actor_display_name::text) <> "
-    "''::text)",
-    "intake_reviews.intake_reviews_check": "CHECK (reviewed_content_version >= 1 AND "
-    "reviewed_content_version <= reviewed_record_version)",
-    "intake_reviews.intake_reviews_check1": "CHECK (result_version = (reviewed_record_version + 1))",
-    "intake_reviews.intake_reviews_command_id_fkey": "FOREIGN KEY (command_id) REFERENCES "
-    "command_receipts(command_id) DEFERRABLE "
-    "INITIALLY DEFERRED",
-    "intake_reviews.intake_reviews_command_id_key": "UNIQUE (command_id)",
-    "intake_reviews.intake_reviews_event_id_fkey": "FOREIGN KEY (event_id) REFERENCES "
-    "audit_events(audit_event_id) DEFERRABLE "
-    "INITIALLY DEFERRED",
-    "intake_reviews.intake_reviews_event_id_key": "UNIQUE (event_id)",
-    "intake_reviews.intake_reviews_intake_id_fkey": "FOREIGN KEY (intake_id) REFERENCES "
-    "intakes(intake_id)",
-    "intake_reviews.intake_reviews_intake_id_result_version_key": "UNIQUE (intake_id, "
-    "result_version)",
-    "intake_reviews.intake_reviews_intake_id_review_id_key": "UNIQUE (intake_id, review_id)",
-    "intake_reviews.intake_reviews_outcome_check": "CHECK (outcome::text = ANY "
-    "(ARRAY['intake_reviewed'::character varying, "
-    "'needs_follow_up'::character varying]::text[]))",
-    "intake_reviews.intake_reviews_pkey": "PRIMARY KEY (review_id)",
-    "intake_reviews.intake_reviews_reviewed_record_version_check": "CHECK (reviewed_record_version "
-    ">= 1)",
-    "intakes.ck_intakes_content_kind": "CHECK (kind::text = 'worker'::text AND (content - "
-    "ARRAY['full_name'::text, 'phone'::text, 'interests'::text, "
-    "'availability'::text]) = '{}'::jsonb OR kind::text = "
-    "'employer'::text AND (content - "
-    "ARRAY['employer_type'::text, 'display_name'::text, "
-    "'representative_name'::text, 'phone'::text, "
-    "'role_title'::text, 'duties_summary'::text, "
-    "'worker_count'::text, 'schedule'::text, 'offer'::text]) = "
-    "'{}'::jsonb)",
-    "intakes.ck_intakes_content_object": "CHECK (jsonb_typeof(content) = 'object'::text)",
-    "intakes.ck_intakes_content_size": "CHECK (octet_length(content::text) <= 32768)",
-    "intakes.ck_intakes_content_version": "CHECK (content_version >= 1 AND content_version <= "
-    "version)",
-    "intakes.ck_intakes_kind": "CHECK (kind::text = ANY (ARRAY['worker'::character varying, "
-    "'employer'::character varying]::text[]))",
-    "intakes.ck_intakes_lifecycle_draft": "CHECK (lifecycle_status::text = 'draft'::text)",
-    "intakes.ck_intakes_schema_version": "CHECK (schema_version = 1)",
-    "intakes.ck_intakes_version_positive": "CHECK (version >= 1)",
-    "intakes.guard_intake_write_authority": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
-    "intakes.intakes_pkey": "PRIMARY KEY (intake_id)",
-    "intakes.uq_intakes_id_kind": "UNIQUE (intake_id, kind)",
-    "work_interest_versions.guard_work_interest_authority": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
-    "work_interest_versions.work_interest_versions_command_id_fkey": "FOREIGN KEY (command_id) "
-    "REFERENCES "
-    "command_receipts(command_id) "
-    "DEFERRABLE INITIALLY DEFERRED",
-    "work_interest_versions.work_interest_versions_command_id_key": "UNIQUE (command_id)",
-    "work_interest_versions.work_interest_versions_interest_id_fkey": "FOREIGN KEY (interest_id) "
-    "REFERENCES "
-    "work_interests(interest_id)",
-    "work_interest_versions.work_interest_versions_label_en_check": "CHECK (btrim(label_en::text) "
-    "<> ''::text)",
-    "work_interest_versions.work_interest_versions_label_es_check": "CHECK (btrim(label_es::text) "
-    "<> ''::text)",
-    "work_interest_versions.work_interest_versions_pkey": "PRIMARY KEY (interest_id, version)",
-    "work_interest_versions.work_interest_versions_version_check": "CHECK (version >= 1)",
-    "work_interests.ck_work_interests_code": "CHECK (code::text ~ '^[a-z0-9_]{1,64}$'::text)",
-    "work_interests.guard_work_interest_authority": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
-    "work_interests.work_interests_code_key": "UNIQUE (code)",
-    "work_interests.work_interests_label_en_check": "CHECK (btrim(label_en::text) <> ''::text)",
-    "work_interests.work_interests_label_es_check": "CHECK (btrim(label_es::text) <> ''::text)",
-    "work_interests.work_interests_pkey": "PRIMARY KEY (interest_id)",
-    "work_interests.work_interests_version_check": "CHECK (version >= 1)",
-}
-
 INTAKE_CONSTRAINT_QUERY = text("""
     SELECT t.relname||'.'||c.conname AS key,
       pg_get_constraintdef(c.oid,true) AS definition, c.convalidated
     FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid
     JOIN pg_namespace n ON n.oid=t.relnamespace
-    WHERE n.nspname='public' AND t.relname||'.'||c.conname = ANY(:names)
+    WHERE n.nspname='public' AND t.relname = ANY(:tables)
 """)
 
 RUNTIME_COLUMN_UPDATE_QUERY = text("""
@@ -783,58 +419,8 @@ INTAKE_TRIGGER_QUERY = text("""
     FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
     JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_proc p ON p.oid=t.tgfoid
     WHERE n.nspname='public' AND NOT t.tgisinternal
-      AND (c.relname = ANY(:table_names) OR t.tgname IN ('populate_legacy_command_result','guard_intake_workflow_authority','guard_work_interest_authority'))
+      AND c.relname = ANY(:table_names)
 """)
-EXPECTED_INTAKE_TRIGGERS = {
-    "audit_events.guard_intake_workflow_authority": ("guard_intake_workflow_authority", True),
-    "audit_events.guard_work_interest_authority": ("guard_work_interest_authority", True),
-    "command_receipts.populate_legacy_command_result": ("populate_legacy_command_result", False),
-    "command_results.deny_mutation_command_results": ("deny_mutation_on_append_only_tables", False),
-    "intake_addresses.deny_mutation_intake_addresses": (
-        "deny_mutation_on_append_only_tables",
-        False,
-    ),
-    "intake_addresses.guard_intake_address_authority": ("guard_intake_address_authority", True),
-    "intake_addresses.guard_intake_address_identity": ("guard_intake_identity", False),
-    "intake_follow_up_events.deny_mutation_intake_follow_up_events": (
-        "deny_mutation_on_append_only_tables",
-        False,
-    ),
-    "intake_follow_up_events.guard_intake_workflow_authority": (
-        "guard_intake_workflow_authority",
-        True,
-    ),
-    "intake_history_payloads.deny_mutation_intake_history_payloads": (
-        "deny_mutation_on_append_only_tables",
-        False,
-    ),
-    "intake_history_payloads.guard_intake_workflow_authority": (
-        "guard_intake_workflow_authority",
-        True,
-    ),
-    "intake_links.deny_mutation_intake_links": ("deny_mutation_on_append_only_tables", False),
-    "intake_review_payloads.deny_mutation_intake_review_payloads": (
-        "deny_mutation_on_append_only_tables",
-        False,
-    ),
-    "intake_review_payloads.guard_intake_workflow_authority": (
-        "guard_intake_workflow_authority",
-        True,
-    ),
-    "intake_reviews.deny_mutation_intake_reviews": ("deny_mutation_on_append_only_tables", False),
-    "intake_reviews.guard_intake_workflow_authority": ("guard_intake_workflow_authority", True),
-    "intakes.deny_mutation_intakes": ("deny_mutation_on_append_only_tables", False),
-    "intakes.guard_intake_identity": ("guard_intake_identity", False),
-    "intakes.guard_intake_write_authority": ("guard_intake_write_authority", True),
-    "work_interest_versions.deny_mutation_work_interest_versions": (
-        "deny_mutation_on_append_only_tables",
-        False,
-    ),
-    "work_interest_versions.guard_work_interest_authority": ("guard_work_interest_authority", True),
-    "work_interests.deny_mutation_work_interests": ("deny_mutation_on_append_only_tables", False),
-    "work_interests.guard_work_interest_authority": ("guard_work_interest_authority", True),
-    "work_interests.guard_work_interest_identity": ("guard_work_interest_identity", False),
-}
 
 
 def _as_set(values: object) -> set[str]:
@@ -972,7 +558,7 @@ def collect_authority_snapshot(
     intake_constraints = {
         row["key"]: row["definition"] if row["convalidated"] else None
         for row in connection.execute(
-            INTAKE_CONSTRAINT_QUERY, {"names": list(EXPECTED_INTAKE_CONSTRAINTS)}
+            INTAKE_CONSTRAINT_QUERY, {"tables": list(EXPECTED_SCHEMA_OWNER_OBJECTS)}
         ).mappings()
     }
     runtime_update_columns: dict[str, list[str]] = defaultdict(list)
@@ -994,10 +580,60 @@ def collect_authority_snapshot(
         for row in connection.execute(
             INTAKE_TRIGGER_QUERY,
             {
-                "table_names": list(EXPECTED_RUNTIME_UPDATE_COLUMNS),
+                "table_names": list(EXPECTED_SCHEMA_OWNER_OBJECTS),
             },
         ).mappings()
     }
+    trigger_definitions = dict(
+        connection.execute(
+            text("""
+        SELECT c.relname||'.'||t.tgname, pg_get_triggerdef(t.oid,true)
+        FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname='public' AND NOT t.tgisinternal AND c.relname=ANY(:tables)
+    """),
+            {"tables": list(EXPECTED_SCHEMA_OWNER_OBJECTS)},
+        )
+        .tuples()
+        .all()
+    )
+    function_hashes = {
+        row[0]: hashlib.sha256(row[1].encode()).hexdigest()
+        for row in connection.execute(
+            text("""
+            SELECT p.proname||'('||oidvectortypes(p.proargtypes)||')',pg_get_functiondef(p.oid)
+            FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+            WHERE n.nspname='public' AND p.proname=ANY(:names)
+        """),
+            {"names": list(EXPECTED_SCHEMA_OWNER_FUNCTIONS)},
+        )
+    }
+    unique_indexes = dict(
+        connection.execute(
+            text("""
+        SELECT ci.relname,pg_get_indexdef(i.indexrelid) ||
+            CASE WHEN i.indisvalid AND i.indisready THEN '' ELSE ' [invalid or unready]' END
+        FROM pg_index i JOIN pg_class ci ON ci.oid=i.indexrelid
+        JOIN pg_namespace n ON n.oid=ci.relnamespace
+        JOIN pg_class parent ON parent.oid=i.indrelid
+        WHERE n.nspname='public' AND parent.relname=ANY(:tables) AND i.indisunique
+    """),
+            {"tables": list(EXPECTED_SCHEMA_OWNER_OBJECTS)},
+        )
+        .tuples()
+        .all()
+    )
+    public_function_privileges = list(
+        connection.execute(
+            text("""
+        SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl,acldefault('f',p.proowner))) acl
+        WHERE n.nspname='public' AND p.proname=ANY(:names)
+          AND acl.grantee=0 AND acl.privilege_type='EXECUTE'
+    """),
+            {"names": list(EXPECTED_SCHEMA_OWNER_FUNCTIONS)},
+        ).scalars()
+    )
     security_definer_functions = (
         connection.execute(
             text("""
@@ -1011,6 +647,10 @@ def collect_authority_snapshot(
     )
 
     return {
+        "public_function_privileges": public_function_privileges,
+        "trigger_definitions": trigger_definitions,
+        "function_hashes": function_hashes,
+        "unique_indexes": unique_indexes,
         "intake_constraints": intake_constraints,
         "runtime_update_columns": dict(runtime_update_columns),
         "intake_triggers": intake_triggers,
@@ -1112,10 +752,21 @@ def _evaluate_membership_graph(
 def evaluate_authority_snapshot(snapshot: dict[str, object]) -> list[str]:
     violations: list[str] = []
 
+    for key, expected_catalog in (
+        ("trigger_definitions", EXPECTED_TRIGGER_DEFINITIONS),
+        ("function_hashes", EXPECTED_FUNCTION_HASHES),
+        ("unique_indexes", EXPECTED_UNIQUE_INDEXES),
+    ):
+        if snapshot.get(key) != expected_catalog:
+            violations.append(f"governed {key} drifted")
+    if snapshot.get("public_function_privileges") != []:
+        violations.append("governed functions must not grant PUBLIC execution")
     constraints = snapshot.get("intake_constraints")
     if not isinstance(constraints, dict):
         violations.append("snapshot missing intake constraint definitions")
     else:
+        if set(constraints) != set(EXPECTED_INTAKE_CONSTRAINTS):
+            violations.append("governed constraint inventory drifted")
         for key, definition in EXPECTED_INTAKE_CONSTRAINTS.items():
             if constraints.get(key) != definition:
                 violations.append(f"intake constraint drifted for {key}")

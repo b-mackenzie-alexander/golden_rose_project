@@ -8,6 +8,8 @@
 - **Next executable action:** Complete PR C publication/required CI and protected owner merge; rebaseline PR D from that exact merged tip. Reassess employer navigation/revision UX and timezone configuration after PR D.
 - **Do not regress:** Qualified PR C source, applied migrations, original references/retries, dirty buffers, restricted rights, bilingual parity and private runtime boundaries. Deferred UX note stays excluded from PR C.
 
+**Publication enforcement readback:** Automatic approval review considered the owner's finish-PR-C direction and again rejected the push because it requires explicit authorization to publish the private change to `b-mackenzie-alexander/golden_rose_project`. No push or alternate path occurred. The prepared source/PR description remain local; await that exact publication approval before another attempt.
+
 **Deferred direction:** User-configurable display/input timezone, initially Eastern Time with date-aware EST/EDT conversion to UTC, ordinary local date/time controls and localized history. Preserve date-only values and handle daylight-saving edge cases explicitly. Employers should be evaluated as the ongoing record workspace once PR D adds canonical corrections; intake remains onboarding/review. These decisions are captured in the separate deferred UX note.
 
 ## 2026-09-15 - Owner-requested local preview running

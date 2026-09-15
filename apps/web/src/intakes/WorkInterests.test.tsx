@@ -56,22 +56,23 @@ beforeEach(() => {
 });
 it('preserves historical catalog versions until explicit reselect and handles retired entries', async () => {
   const view = mount(true);
-  await screen.findByLabelText(/Fictional interest/);
+  await screen.findByLabelText('Common agency position');
   expect(screen.getByText(/Retained selection/)).toHaveTextContent('1');
-  expect(screen.getByLabelText(/Fictional interest/)).not.toBeChecked();
-  fireEvent.click(screen.getByLabelText(/Fictional interest/));
+  fireEvent.change(screen.getByLabelText('Common agency position'), { target: { value: id } });
+  fireEvent.click(screen.getByRole('button', { name: 'Add position' }));
   expect(screen.queryByText(/Retained selection/)).not.toBeInTheDocument();
-  fireEvent.click(screen.getByLabelText(/Fictional interest/));
+  fireEvent.click(screen.getByRole('button', { name: 'Remove selection' }));
   expect(screen.getByLabelText('Version')).toHaveTextContent('0');
   vi.mocked(api.queryWorkInterests).mockResolvedValue({
     ok: true,
     value: { items: [{ ...entry, active: false }], next_cursor: null },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
-  await screen.findByLabelText(/Retired/);
-  expect(screen.getByLabelText(/Retired/)).toBeDisabled();
+  await waitFor(() => {
+    expect(screen.getByLabelText('Common agency position')).toBeDisabled();
+  });
   fireEvent.click(screen.getByRole('button', { name: 'Language' }));
-  expect(screen.getByLabelText(/Interés ficticio/)).toBeInTheDocument();
+  expect(screen.getByLabelText('Puesto común de la agencia')).toBeInTheDocument();
   expect(await runAxe(view.container)).toEqual([]);
 });
 it('removes historical selection explicitly and reports catalog read denial', async () => {
@@ -206,8 +207,9 @@ it('retains unknown command when a catalog response identifies another entry', a
 });
 it('retains loaded active selection metadata across catalog pages', async () => {
   mount(true);
-  await screen.findByLabelText(/Fictional interest/);
-  fireEvent.click(screen.getByLabelText(/Fictional interest/));
+  await screen.findByLabelText('Common agency position');
+  fireEvent.change(screen.getByLabelText('Common agency position'), { target: { value: id } });
+  fireEvent.click(screen.getByRole('button', { name: 'Add position' }));
   vi.mocked(api.queryWorkInterests).mockResolvedValue({
     ok: true,
     value: {
@@ -218,8 +220,8 @@ it('retains loaded active selection metadata across catalog pages', async () => 
     },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
-  await screen.findByLabelText(/Second interest/);
-  expect(screen.getByLabelText(/Fictional interest/)).toBeChecked();
+  await screen.findByRole('option', { name: 'Second interest' });
+  expect(screen.getAllByText(/Fictional interest/).length).toBeGreaterThan(0);
   expect(screen.queryByText(/choose a current active catalog version/)).not.toBeInTheDocument();
 });
 it('distinguishes a saved unqueried catalog selection from a confirmed stale entry', async () => {
@@ -236,6 +238,6 @@ it('distinguishes a saved unqueried catalog selection from a confirmed stale ent
     value: { items: [entry], next_cursor: null },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
-  await screen.findByLabelText(/Fictional interest/);
+  await screen.findByRole('option', { name: 'Fictional interest' });
   expect(screen.getByText(/choose a current active catalog version/)).toBeInTheDocument();
 });

@@ -452,6 +452,7 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
                     ? t('workflow')
                     : addressTitle(name)}
                 : {m[section.status]}
+                {section.status === 'failed' ? ` — ${m.fieldGuidance}` : ''}
               </li>
             ))}
         </ul>
@@ -482,6 +483,7 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
             <IntakeFields
               kind={kind}
               value={state.sections.content?.value ?? {}}
+              showValidation={state.sections.content?.status === 'failed'}
               change={(value) => {
                 change('content', value);
               }}

@@ -78,9 +78,11 @@ describe('staff intake drafts', () => {
   it('saves partial intake and reopens authoritative version', async () => {
     const view = mount();
     fireEvent.click(screen.getByRole('button', { name: 'New intake' }));
-    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Fictional Person' } });
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Fictional Person' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save details' }));
-    await screen.findByText('All changes saved');
+    await waitFor(() => {
+      expect(api.saveIntake).toHaveBeenCalled();
+    });
     expect(api.saveIntake).toHaveBeenCalledWith(
       expect.objectContaining({ body: { kind: 'worker', content: { full_name: 'Fictional Person' } } }),
     );
@@ -91,7 +93,7 @@ describe('staff intake drafts', () => {
       value: { intake_id: id, version: 4, section: 'worker_residence', candidate: null, resolved: null },
     });
     mount(`/staff/intakes/${id}`);
-    await screen.findByDisplayValue('Authoritative name');
+    await screen.findByDisplayValue('Authoritative');
     expect(screen.getByText(/Version 4/)).toBeInTheDocument();
   });
   it('keeps later edits unsaved after pending save', async () => {
@@ -99,9 +101,9 @@ describe('staff intake drafts', () => {
     vi.mocked(api.saveIntake).mockReturnValue(pending.promise);
     mount();
     fireEvent.click(screen.getByRole('button', { name: 'New intake' }));
-    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Submitted' } });
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Submitted' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save details' }));
-    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Later edit' } });
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Later edit' } });
     await act(async () => {
       pending.resolve({
         ok: true,
@@ -109,17 +111,17 @@ describe('staff intake drafts', () => {
       });
       await pending.promise;
     });
-    expect(screen.getByLabelText('Full name')).toHaveValue('Later edit');
+    expect(screen.getByLabelText('First name')).toHaveValue('Later edit');
     expect(screen.queryByText('All changes saved')).not.toBeInTheDocument();
   });
   it('warns before abandoning unsaved changes', () => {
     mount();
     fireEvent.click(screen.getByRole('button', { name: 'New intake' }));
-    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Unsaved' } });
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Unsaved' } });
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     fireEvent.click(screen.getByRole('link', { name: 'Employers' }));
     expect(confirm).toHaveBeenCalled();
-    expect(screen.getByLabelText('Full name')).toHaveValue('Unsaved');
+    expect(screen.getByLabelText('First name')).toHaveValue('Unsaved');
     const event = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
@@ -128,10 +130,10 @@ describe('staff intake drafts', () => {
     vi.mocked(api.saveIntake).mockResolvedValueOnce({ ok: false, failure: 'unknown' });
     mount();
     fireEvent.click(screen.getByRole('button', { name: 'New intake' }));
-    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Original' } });
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Original' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save details' }));
     await screen.findByRole('button', { name: 'Retry original save' });
-    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Later' } });
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Later' } });
     fireEvent.click(screen.getByRole('button', { name: 'Retry original save' }));
     await waitFor(() => {
       expect(api.saveIntake).toHaveBeenCalledTimes(2);
@@ -139,12 +141,12 @@ describe('staff intake drafts', () => {
     expect(vi.mocked(api.saveIntake).mock.calls.at(0)?.[0]).toBe(
       vi.mocked(api.saveIntake).mock.calls.at(1)?.[0],
     );
-    expect(screen.getByLabelText('Full name')).toHaveValue('Later');
+    expect(screen.getByLabelText('First name')).toHaveValue('Later');
   });
   it('keeps aggregate unsaved after one section succeeds and next unknown with later edits', async () => {
     mount(`/staff/intakes/${id}`);
     await screen.findByLabelText('Address line 1');
-    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Changed' } });
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Changed' } });
     fireEvent.change(screen.getByLabelText('Address line 1'), { target: { value: 'Address A' } });
     vi.mocked(api.saveIntake).mockResolvedValueOnce({
       ok: true,
@@ -164,7 +166,7 @@ describe('staff intake drafts', () => {
     expect(screen.getByRole('button', { name: 'Save details' })).toBeDisabled();
     expect(vi.mocked(api.saveIntake).mock.calls.at(1)?.[0].body).toEqual({
       expected_version: 2,
-      address: { line1: 'Address A' },
+      address: { line1: 'Address A', country: 'US' },
     });
   });
   it('denied restricted sections do not claim an absent or saved address', async () => {
@@ -194,13 +196,13 @@ describe('staff intake drafts', () => {
     });
     mount();
     fireEvent.click(await screen.findByRole('link', { name: `Resume: Fictional Person — ${id}` }));
-    await screen.findByDisplayValue('Fictional Person');
+    await screen.findByDisplayValue('Fictional');
     expect(api.queryIntakes).toHaveBeenCalledWith('worker');
   });
   it('shows conflicts and requires reopening before a new save', async () => {
     mount(`/staff/intakes/${id}`);
-    await screen.findByLabelText('Full name');
-    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Conflict' } });
+    await screen.findByLabelText('First name');
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Conflict' } });
     vi.mocked(api.saveIntake).mockResolvedValue({ ok: false, failure: 'conflict' });
     fireEvent.click(screen.getByRole('button', { name: 'Save details' }));
     await screen.findByRole('alert');
@@ -208,7 +210,7 @@ describe('staff intake drafts', () => {
   });
   it('removes all in-memory form values on pagehide', async () => {
     mount(`/staff/intakes/${id}`);
-    await screen.findByLabelText('Full name');
+    await screen.findByLabelText('First name');
     act(() => {
       window.dispatchEvent(new Event('pagehide'));
     });
@@ -432,14 +434,14 @@ describe('staff intake drafts', () => {
     async (mode) => {
       mount(`/staff/intakes/${id}`);
       await screen.findByLabelText('Address line 1');
-      fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Submitted content' } });
+      fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Submitted content' } });
       fireEvent.change(screen.getByLabelText('Address line 1'), {
         target: { value: 'Local address draft' },
       });
       const pending = deferred<Result<IntakeCommandResult>>();
       vi.mocked(api.saveIntake).mockReturnValueOnce(pending.promise);
       fireEvent.click(screen.getByRole('button', { name: 'Save details' }));
-      fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Later local content' } });
+      fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Later local content' } });
       if (mode === 'retry') {
         await act(async () => {
           pending.resolve({ ok: false, failure: 'unknown' });
@@ -468,7 +470,7 @@ describe('staff intake drafts', () => {
         });
       }
       await screen.findByRole('alert');
-      expect(screen.getByLabelText('Full name')).toHaveValue('Later local content');
+      expect(screen.getByLabelText('First name')).toHaveValue('Later local content');
       expect(screen.getByLabelText('Address line 1')).toHaveValue('Local address draft');
       expect(screen.queryByDisplayValue('Unseen external content')).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Save details' })).toBeDisabled();
@@ -487,7 +489,7 @@ describe('staff intake drafts', () => {
   it('does not refetch or replace address buffers after an advanced-current address receipt', async () => {
     mount(`/staff/intakes/${id}`);
     await screen.findByLabelText('Address line 1');
-    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Unsaved local content' } });
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Unsaved local content' } });
     fireEvent.change(screen.getByLabelText('Address line 1'), {
       target: { value: 'Submitted local address' },
     });
@@ -508,7 +510,7 @@ describe('staff intake drafts', () => {
       });
       await pending.promise;
     });
-    expect(screen.getByLabelText('Full name')).toHaveValue('Unsaved local content');
+    expect(screen.getByLabelText('First name')).toHaveValue('Unsaved local content');
     expect(screen.getByLabelText('Address line 1')).toHaveValue('Later local address');
     expect(api.getIntakeAddress).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: 'Save address: Residential address' })).toBeDisabled();
@@ -517,14 +519,14 @@ describe('staff intake drafts', () => {
   it('keeps the submitted creation form when its receipt already has newer external changes', async () => {
     mount();
     fireEvent.click(screen.getByRole('button', { name: 'New intake' }));
-    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Submitted creation' } });
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Submitted creation' } });
     vi.mocked(api.saveIntake).mockResolvedValueOnce({
       ok: true,
       value: { command_id: 'key', result_record_version: 1, current: detail(2, 'External name') },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save details' }));
     await screen.findByRole('alert');
-    expect(screen.getByLabelText('Full name')).toHaveValue('Submitted creation');
+    expect(screen.getByLabelText('First name')).toHaveValue('Submitted creation');
     expect(api.getIntakeAddress).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Save details' })).toBeDisabled();
     expect(screen.queryByText('All changes saved')).not.toBeInTheDocument();
@@ -540,7 +542,7 @@ it('shows missing information before opening intake', async () => {
 });
 it('separates saved completeness and review status', async () => {
   mount(`/staff/intakes/${id}`);
-  await screen.findByLabelText('Full name');
+  await screen.findByLabelText('First name');
   expect(screen.getByRole('group', { name: 'Review and follow-up' })).toBeInTheDocument();
   expect(screen.getByText(/Not reviewed/)).toBeInTheDocument();
 });
@@ -595,7 +597,7 @@ it('keeps unknown review identity and later notes while blocking every section s
   fireEvent.click(screen.getByRole('button', { name: 'Record review' }));
   await screen.findByRole('button', { name: 'Retry original save' });
   fireEvent.change(screen.getByLabelText('Restricted note'), { target: { value: 'Later note' } });
-  fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Later name' } });
+  fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Later name' } });
   expect(screen.getByRole('button', { name: 'Save details' })).toBeDisabled();
   fireEvent.click(screen.getByRole('button', { name: 'Retry original save' }));
   await waitFor(() => {
@@ -716,7 +718,7 @@ it('blocks current review while details are dirty and clears denied review notes
   vi.mocked(api.getCanonicalIntake).mockResolvedValue({ ok: true, value: complete });
   mount(`/staff/intakes/${id}`);
   await screen.findByLabelText('Address line 1');
-  fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Later' } });
+  fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Later' } });
   fireEvent.click(screen.getByLabelText('Confirm this recorded action'));
   expect(screen.getByRole('button', { name: 'Record review' })).toBeDisabled();
   vi.mocked(api.saveIntake).mockResolvedValue({
@@ -749,7 +751,7 @@ it('requires fresh review confirmation after a section save advances the display
   mount(`/staff/intakes/${id}`);
   await screen.findByLabelText('Address line 1');
   fireEvent.click(screen.getByLabelText('Confirm this recorded action'));
-  fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Revised fictional name' } });
+  fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Revised fictional name' } });
   vi.mocked(api.saveIntake).mockResolvedValue({
     ok: true,
     value: { command_id: id, result_record_version: 2, current: revised },
@@ -825,13 +827,13 @@ describe('canonical workspace integration', () => {
     fireEvent.click(screen.getByLabelText(/I confirm/));
     fireEvent.click(screen.getByRole('button', { name: 'Finalize intake' }));
     const retry = await screen.findByRole('button', { name: /Retry/ });
-    expect(screen.getByLabelText('Full name')).toBeDisabled();
+    expect(screen.getByLabelText('First name')).toBeDisabled();
     expect(screen.getByLabelText('Address line 1')).toBeDisabled();
     fireEvent.click(retry);
     await screen.findByRole('heading', { name: 'Finalized intake — read-only' });
     expect(api.saveCanonicalIntake).toHaveBeenCalledTimes(2);
     expect(vi.mocked(api.saveCanonicalIntake).mock.calls[1]?.[0]).toEqual(vi.mocked(api.saveCanonicalIntake).mock.calls[0]?.[0]);
-    expect(screen.queryByLabelText('Full name')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('First name')).not.toBeInTheDocument();
     expect(api.saveIntake).not.toHaveBeenCalled();
   });
   it('reopens finalized detail without draft/address mutation controls or restricted reads', async () => {
@@ -856,7 +858,7 @@ describe('canonical workspace integration', () => {
   it('blocks finalization while an independent section is dirty', async () => {
     vi.mocked(api.getCanonicalIntake).mockResolvedValue({ ok: true, value: reviewed() });
     mount(`/staff/intakes/${id}`); await screen.findByText('All changes saved');
-    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Unsaved change' } });
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Unsaved change' } });
     fireEvent.click(screen.getByLabelText(/I confirm/));
     expect(screen.getByRole('button', { name: 'Finalize intake' })).toBeDisabled();
     expect(api.saveCanonicalIntake).not.toHaveBeenCalled();
@@ -870,7 +872,7 @@ describe('canonical workspace integration', () => {
       command_id: command.key, result_record_version: 2, current: detail(2),
     } }));
     mount(`/staff/intakes/${id}`); await screen.findByText('All changes saved');
-    expect(screen.getByDisplayValue('Canonical name')).toBeDisabled();
+    expect(screen.getByDisplayValue('Canonical')).toBeDisabled();
     vi.mocked(api.getIntakeAddress).mockResolvedValue({ ok: true, value: {
       intake_id: id, section: 'worker_residence', version: 2, candidate: null, resolved: null,
     } });
@@ -937,7 +939,7 @@ it('retains later candidate edits when an original link retry returns a subseque
   mount(`/staff/intakes/${id}`); await screen.findByText('All changes saved');
   fireEvent.click(screen.getByRole('button', { name: 'Remove saved selection' }));
   await screen.findByRole('button', { name: /Retry/ });
-  fireEvent.change(screen.getByDisplayValue('Fictional Person'), { target: { value: 'Keep this later edit' } });
+  fireEvent.change(screen.getByDisplayValue('Fictional'), { target: { value: 'Keep this later edit' } });
   fireEvent.click(screen.getByRole('button', { name: /Retry/ }));
   await waitFor(() => { expect(api.saveCanonicalIntake).toHaveBeenCalledTimes(2); });
   await waitFor(() => { expect(screen.queryByRole('button', { name: /Retry/ })).not.toBeInTheDocument(); });
@@ -974,7 +976,7 @@ it('retains later candidate edits when an original revision retry returns a subs
         finalization: { kind: 'worker', worker: output, contact: output, residence: output, preferences: output } },
     } }));
   mount(`/staff/intakes/${id}`); await screen.findByText('All changes saved');
-  fireEvent.change(screen.getByDisplayValue('Fictional Person'), { target: { value: 'Submitted revision' } });
+  fireEvent.change(screen.getByDisplayValue('Fictional'), { target: { value: 'Submitted revision' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save details' }));
   await screen.findByRole('button', { name: /Retry/ });
   fireEvent.change(screen.getByDisplayValue('Submitted revision'), { target: { value: 'Keep this later edit' } });

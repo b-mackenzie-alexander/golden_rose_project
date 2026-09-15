@@ -4,6 +4,16 @@ import type { HistoryItem, RestrictedHistory, DraftValue } from '../api/intakeCo
 import { useLanguage } from '../i18n/LanguageProvider';
 import { snapshotEnums, snapshotLabels, workflowLabel } from './workflowMessages';
 
+function localDateTime(value: string, language: 'en' | 'es') {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(language === 'en' ? 'en-US' : 'es-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    hour12: true,
+  }).format(date);
+}
+
 export function Snapshot({ value, field }: { value: DraftValue; field?: string }) {
   const { language } = useLanguage();
   if (value === null) return null;
@@ -116,18 +126,45 @@ export function IntakeHistory({ id, version }: { id: string; version: number }) 
       ) : null}
       <ul>
         {items?.map((item) => (
-          <li key={item.event_id}>
-            <p>
-              {t(item.event_type)} · {t('version')} {item.version} · {t('contentVersion')}{' '}
-              {item.content_version}
-            </p>
-            <p>
-              {t('actor')}: {item.actor_display_name} · <time>{item.occurred_at}</time>
-              {item.outcome ? ` · ${t(item.outcome)}` : ''}
-            </p>
+          <li className="intake-history-item" key={item.event_id}>
+            <p className="intake-history-event">{t(item.event_type)}</p>
+            <dl className="intake-history-meta">
+              <div>
+                <dt>{t('updatedAt')}</dt>
+                <dd>
+                  <time dateTime={item.occurred_at}>{localDateTime(item.occurred_at, language)}</time>
+                </dd>
+              </div>
+              <div>
+                <dt>{t('actor')}</dt>
+                <dd>{item.actor_display_name}</dd>
+              </div>
+              <div>
+                <dt>{t('version')}</dt>
+                <dd>{item.version}</dd>
+              </div>
+              <div>
+                <dt>{t('contentVersion')}</dt>
+                <dd>{item.content_version}</dd>
+              </div>
+              {item.outcome ? (
+                <div>
+                  <dt>{t('outcome')}</dt>
+                  <dd>{t(item.outcome)}</dd>
+                </div>
+              ) : null}
+            </dl>
             {item.owner_staff_id ? (
               <p>
-                {t('owner')}: {item.owner_staff_id} · {item.next_follow_up_at}
+                {t('owner')}: {item.owner_staff_id}
+                {item.next_follow_up_at ? (
+                  <>
+                    {' · '}
+                    <time dateTime={item.next_follow_up_at}>
+                      {localDateTime(item.next_follow_up_at, language)}
+                    </time>
+                  </>
+                ) : null}
               </p>
             ) : null}
             <button type="button" onClick={() => void reveal(item.event_id)}>

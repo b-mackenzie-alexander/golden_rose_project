@@ -65,6 +65,11 @@ describe('shared intake history', () => {
   it('shows follow-up history without granting private ownership', async () => {
     const view = mount();
     await screen.findByText(/Fictional recorder/);
+    expect(screen.getByText('Updated at')).toBeInTheDocument();
+    expect(screen.getByText('Record version')).toBeInTheDocument();
+    expect(screen.getByText('Content version')).toBeInTheDocument();
+    expect(screen.queryByText('2026-09-14T12:00:00Z')).not.toBeInTheDocument();
+    expect(screen.getAllByText(/\b(?:AM|PM)\b/).length).toBeGreaterThan(0);
     expect(screen.queryByText('Fictional restricted note')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Load restricted history' }));
     await screen.findByText('Fictional restricted note');
@@ -166,7 +171,7 @@ it.each(['needs_follow_up', 'attempt'] as const)(
     expect(screen.getByText('Separate fictional note')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Language' }));
     expect(screen.getByText('Categoría del motivo')).toBeInTheDocument();
-    expect(screen.getByText('Semanal')).toBeInTheDocument();
+    expect(screen.getByText('Días específicos')).toBeInTheDocument();
     if (action === 'attempt') expect(screen.getByText('Método de contacto')).toBeInTheDocument();
     else expect(screen.getByText('Requiere seguimiento')).toBeInTheDocument();
   },

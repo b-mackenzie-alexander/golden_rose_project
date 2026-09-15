@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
 import type { DraftObject } from '../api/intakeContracts';
@@ -21,29 +22,58 @@ function input(label: string, value: string) {
 }
 const captured = () => screen.getByLabelText('Captured fictional test values').textContent;
 describe('typed partial fields', () => {
-  it('captures worker other interests and explicit weekly availability, without guessed overnight', () => {
+  it('keeps middle-initial edits in the middle field while last name is empty', async () => {
+    const user = userEvent.setup();
     render(<Form kind="worker" />);
-    input('Full name', 'Fictional');
+    await user.type(screen.getByLabelText('First name'), 'Fictional');
+    await user.type(screen.getByLabelText('Middle initial'), 'Q');
+    expect(screen.getByLabelText('Middle initial')).toHaveValue('Q');
+    expect(screen.getByLabelText('Last name')).toHaveValue('');
+    expect(captured()).toContain('"full_name":"Fictional Q"');
+    await user.clear(screen.getByLabelText('Middle initial'));
+    expect(screen.getByLabelText('Middle initial')).toHaveValue('');
+    expect(screen.getByLabelText('Last name')).toHaveValue('');
+    await user.type(screen.getByLabelText('Last name'), 'Person');
+    await user.type(screen.getByLabelText('Middle initial'), 'R');
+    expect(screen.getByLabelText('Middle initial')).toHaveValue('R');
+    expect(screen.getByLabelText('Last name')).toHaveValue('Person');
+    expect(captured()).toContain('"full_name":"Fictional R Person"');
+  });
+  it('marks worker detail fields with inline errors after a failed save', () => {
+    render(<IntakeFields kind="worker" value={{}} change={() => {}} showValidation />);
+    expect(screen.getByTitle('Enter the worker’s first name.')).toHaveTextContent('?');
+    expect(screen.getByTitle('Enter the worker’s last name.')).toHaveTextContent('?');
+    expect(screen.getByRole('textbox', { name: /First name/ })).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('textbox', { name: /Last name/ })).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('textbox', { name: /Phone/ })).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('Choose at least one common agency position or enter another work interest.')).toBeInTheDocument();
+    expect(screen.getByText('Choose Unknown, Flexible, or Specific days.')).toBeInTheDocument();
+  });
+  it('captures worker manual interests and explicit day availability, without guessed overnight', () => {
+    render(<Form kind="worker" />);
+    input('First name', 'Fictional');
     input('Phone', '+1 555 555 0100');
-    input('Other work interests', 'Fictional interest');
+    input('Other work interest 1', 'Cooking');
+    input('Other work interest 2', 'Lawncare');
     input('Availability', 'weekly');
     input('IANA time zone', 'America/New_York');
-    fireEvent.click(screen.getByRole('button', { name: 'Add weekly range' }));
-    input('Weekday (Monday = 1, Sunday = 7)', '1');
+    fireEvent.click(screen.getByRole('button', { name: 'Add time block' }));
+    input('Day', '1');
     input('Start time', '20:00');
     input('End time', '04:00');
     input('Ends on', '1');
     input('Availability exception note', 'Fictional exception');
     expect(captured()).toContain('"end_day_offset":1');
-    expect(captured()).toContain('"other_description":"Fictional interest"');
+    expect(captured()).toContain('"other_description":"Cooking; Lawncare"');
     fireEvent.click(screen.getByRole('button', { name: 'Remove range' }));
     expect(captured()).toContain('"ranges":[]');
     input('Availability', 'flexible');
     expect(captured()).not.toContain('ranges');
     input('Availability exception note', '');
-    input('Other work interests', '');
+    input('Other work interest 1', '');
+    input('Other work interest 1', '');
     input('Phone', '');
-    input('Full name', '');
+    input('First name', '');
     input('Availability', '');
     expect(captured()).toBe('{"interests":{}}');
   });
@@ -82,17 +112,15 @@ describe('typed partial fields', () => {
     input('Requested schedule', '');
     expect(captured()).not.toContain('per_worker');
   });
-  it('offers pinned explicit country choices and partial address values', () => {
+  it('defaults address country to the agency service country without asking staff', () => {
     render(<Form kind="address" />);
     input('Address line 1', 'Fictional line');
     input('Address line 2', 'Fictional unit');
     input('City / locality', 'Fictional locality');
     input('State / region', 'Fictional region');
     input('Postal code', '00000');
-    const country = screen.getByLabelText('Country code (2 uppercase letters)');
-    expect(within(country).getAllByRole('option')).toHaveLength(250);
-    input('Country code (2 uppercase letters)', 'US');
     expect(captured()).toContain('"country":"US"');
+    expect(screen.queryByLabelText('Country code (2 uppercase letters)')).not.toBeInTheDocument();
     input('Address line 2', '');
     expect(captured()).not.toContain('line2');
   });

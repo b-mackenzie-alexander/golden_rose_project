@@ -51,6 +51,17 @@ beforeEach(() => {
   });
 });
 describe('shared intake history', () => {
+  it.each([
+    ['intake.linked', 'Selection saved', 'Selección guardada'],
+    ['intake.finalized', 'Intake finalized', 'Admisión finalizada'],
+  ])('labels %s history in both languages', async (eventType, english, spanish) => {
+    vi.mocked(api.queryIntakeHistory).mockResolvedValue({ ok: true,
+      value: { items: [{ ...event, event_type: eventType }], next_cursor: null } });
+    mount();
+    await screen.findByText(new RegExp(english));
+    fireEvent.click(screen.getByRole('button', { name: 'Language' }));
+    expect(screen.getByText(new RegExp(spanish))).toBeInTheDocument();
+  });
   it('shows follow-up history without granting private ownership', async () => {
     const view = mount();
     await screen.findByText(/Fictional recorder/);

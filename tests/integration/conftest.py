@@ -50,7 +50,10 @@ def clean_test_tables(connection) -> None:
         WHERE n.nspname='public' AND c.relname IN
           ('intakes','intake_addresses','intake_links','command_results',
            'work_interests','work_interest_versions','intake_reviews','intake_review_payloads',
-           'intake_follow_up_events','intake_history_payloads')
+           'intake_follow_up_events','intake_history_payloads',
+           'workers','worker_contacts','worker_residences','worker_preferences',
+           'worker_interest_selections','intake_finalizations','employer_contact_details',
+           'employer_addresses','worksites','staffing_requests')
     """)
         )
         .scalars()

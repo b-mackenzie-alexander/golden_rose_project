@@ -10,12 +10,16 @@ from sqlalchemy.orm import Session
 from golden_rose.api.staff.intake_review_schemas import FollowUpIntakeRequest, ReviewIntakeRequest
 from golden_rose.application.intake_commands import authorize_intake
 from golden_rose.application.intake_errors import IntakeError
+from golden_rose.application.intake_review_snapshot import (
+    build_review_snapshot,
+    review_dependencies,
+)
 from golden_rose.application.intake_workflow_common import begin_command, write_authority
 from golden_rose.auth.principal import StaffPrincipal
 from golden_rose.auth.staff_directory import StaffDirectory
 from golden_rose.clock import Clock
 from golden_rose.persistence.intake_review_state import latest_follow_up, selected_interests
-from golden_rose.persistence.intakes import get_address, get_intake, intake_detail, missing_fields
+from golden_rose.persistence.intakes import get_intake, intake_detail, missing_fields
 from golden_rose.persistence.models import (
     intake_follow_up_events,
     intake_history_payloads,
@@ -63,6 +67,7 @@ def execute_review(
         initial = get_intake(session, intake_id)
         if isinstance(request, ReviewIntakeRequest):
             authorize_review_content(principal, initial)
+            review_dependencies(session, principal, initial)
         actor = directory.resolve(principal.actor_id, intake_id, frozenset({"intake:read", action}))
         command_type = "review_intake" if reviewing else "follow_up_intake"
         fingerprint, receipt = begin_command(
@@ -77,12 +82,13 @@ def execute_review(
             current = get_intake(session, intake_id)
             if reviewing:
                 authorize_review_content(principal, current)
+                review_dependencies(session, principal, current)
             if current["version"] < receipt["result_record_version"]:
                 raise IntakeError("persistence_unavailable", 503)
             result = {
                 "command_id": str(command_id),
                 "result_record_version": receipt["result_record_version"],
-                "current": intake_detail(session, current),
+                "current": intake_detail(session, current, principal=principal),
             }
             session.rollback()
             return result, True
@@ -108,11 +114,18 @@ def execute_review(
                 raise IntakeError("invalid_request", 422)
             if request.action == "reassign" and request.owner_staff_id == prior["owner_staff_id"]:
                 raise IntakeError("no_change")
-        elif request.outcome == "intake_reviewed":
-            selected_interests(session, row["content"], lock=True, require_current=True)
-            missing = missing_fields(session, row)
-            if missing:
-                raise IntakeError("incomplete", 422, missing_fields=missing)
+        snapshot: dict[str, Any] = {}
+        dependencies: dict[str, Any] = {}
+        if isinstance(request, ReviewIntakeRequest):
+            dependencies = review_dependencies(session, principal, row)
+            snapshot = build_review_snapshot(session, principal, row, dependencies)
+            effective_row = {**row, "content": snapshot["content"]}
+            authorize_review_content(principal, effective_row)
+            if request.outcome == "intake_reviewed":
+                selected_interests(session, snapshot["content"], lock=True, require_current=True)
+                missing = missing_fields(session, effective_row, addresses=snapshot["addresses"])
+                if missing:
+                    raise IntakeError("incomplete", 422, missing_fields=missing)
         now, event_id, review_id = clock.now(), uuid4(), uuid4()
         previous = row["version"]
         row.update(version=previous + 1, updated_at=now, updated_by=principal.actor_id)
@@ -152,21 +165,12 @@ def execute_review(
                     occurred_at=now,
                 )
             )
-            snapshot = {
-                "kind": row["kind"],
-                "content": row["content"],
-                "addresses": {
-                    section: address
-                    for section in review_sections(row["kind"])
-                    if (address := get_address(session, intake_id, section)) is not None
-                },
-            }
             session.execute(
                 insert(intake_review_payloads).values(
                     review_id=review_id,
                     reviewed_content=snapshot,
                     note=request.note,
-                    dependency_refs={},
+                    dependency_refs=dependencies,
                 )
             )
         if follow_up:
@@ -202,7 +206,7 @@ def execute_review(
         result = {
             "command_id": str(command_id),
             "result_record_version": row["version"],
-            "current": intake_detail(session, row),
+            "current": intake_detail(session, row, principal=principal),
         }
         session.commit()
         return result, False

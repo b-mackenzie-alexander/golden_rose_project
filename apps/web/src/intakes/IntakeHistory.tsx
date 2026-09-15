@@ -4,7 +4,7 @@ import type { HistoryItem, RestrictedHistory, DraftValue } from '../api/intakeCo
 import { useLanguage } from '../i18n/LanguageProvider';
 import { snapshotEnums, snapshotLabels, workflowLabel } from './workflowMessages';
 
-function Snapshot({ value, field }: { value: DraftValue; field?: string }) {
+export function Snapshot({ value, field }: { value: DraftValue; field?: string }) {
   const { language } = useLanguage();
   if (value === null) return null;
   if (typeof value !== 'object')

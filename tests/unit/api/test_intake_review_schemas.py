@@ -4,7 +4,31 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from golden_rose.api.staff.intake_review_schemas import FollowUpIntakeRequest, ReviewIntakeRequest
+from golden_rose.api.staff.intake_review_schemas import (
+    FollowUpIntakeRequest,
+    IntakeHistoryPage,
+    ReviewIntakeRequest,
+)
+
+
+def test_linked_history_is_admitted_by_the_http_response_schema():
+    page = IntakeHistoryPage.model_validate(
+        {
+            "items": [
+                {
+                    "event_id": str(uuid4()),
+                    "version": 2,
+                    "content_version": 2,
+                    "event_type": "intake.linked",
+                    "actor_id": str(uuid4()),
+                    "actor_display_name": "Fictional reviewer",
+                    "occurred_at": "2026-09-15T12:00:00Z",
+                }
+            ],
+            "next_cursor": None,
+        }
+    )
+    assert page.items[0].event_type == "intake.linked"
 
 
 def test_review_requires_complete_follow_up_shape():

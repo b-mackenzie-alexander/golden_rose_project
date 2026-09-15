@@ -2475,6 +2475,22 @@ def test_openapi_exposes_only_approved_staff_employer_routes() -> None:
         assert openapi.status_code == 200
         paths = openapi.json()["paths"]
         assert set(paths) == {
+            "/api/staff/v1/intakes/{intake_id}/links",
+            "/api/staff/v1/intakes/{intake_id}/finalizations",
+            "/api/staff/v1/workers/query",
+            "/api/staff/v1/workers/{worker_id}",
+            "/api/staff/v1/workers/{worker_id}/contact",
+            "/api/staff/v1/workers/{worker_id}/residence",
+            "/api/staff/v1/workers/{worker_id}/preferences",
+            "/api/staff/v1/employers/{employer_id}/addresses/query",
+            "/api/staff/v1/employers/{employer_id}/worksites/query",
+            "/api/staff/v1/employers/{employer_id}/requests/query",
+            "/api/staff/v1/employers/{employer_id}/addresses/{address_id}",
+            "/api/staff/v1/employers/{employer_id}/worksites/{worksite_id}",
+            "/api/staff/v1/employers/{employer_id}/worksites/{worksite_id}/address",
+            "/api/staff/v1/employers/{employer_id}/requests/{request_id}",
+            "/api/staff/v1/employers/{employer_id}/contacts/{contact_id}/details",
+            "/api/staff/v1/employers/{employer_id}/contacts/{contact_id}/details/address",
             "/api/staff/v1/intakes/{intake_id}/reviews",
             "/api/staff/v1/intakes/{intake_id}/follow-ups",
             "/api/staff/v1/intakes/{intake_id}/history/query",
@@ -2523,6 +2539,8 @@ def test_staff_employer_contact_openapi_exposes_only_approved_contract() -> None
 
         contact_paths = {path: paths[path] for path in paths if "/contacts" in path}
         assert set(contact_paths) == {
+            "/api/staff/v1/employers/{employer_id}/contacts/{contact_id}/details",
+            "/api/staff/v1/employers/{employer_id}/contacts/{contact_id}/details/address",
             "/api/staff/v1/employers/{employer_id}/contacts",
             "/api/staff/v1/employers/{employer_id}/contacts/query",
             "/api/staff/v1/employers/{employer_id}/contacts/{employer_contact_id}",

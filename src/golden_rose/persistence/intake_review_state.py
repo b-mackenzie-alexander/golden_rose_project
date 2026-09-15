@@ -7,8 +7,10 @@ from sqlalchemy import select, tuple_
 from sqlalchemy.orm import Session
 
 from golden_rose.application.intake_errors import IntakeError
+from golden_rose.persistence.intake_dependency_state import dependencies_current
 from golden_rose.persistence.models import (
     intake_follow_up_events,
+    intake_review_payloads,
     intake_reviews,
     work_interest_versions,
     work_interests,
@@ -78,7 +80,11 @@ def review_projection(
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
     latest = (
         session.execute(
-            select(intake_reviews)
+            select(intake_reviews, intake_review_payloads.c.dependency_refs)
+            .outerjoin(
+                intake_review_payloads,
+                intake_review_payloads.c.review_id == intake_reviews.c.review_id,
+            )
             .where(intake_reviews.c.intake_id == row["intake_id"])
             .order_by(intake_reviews.c.result_version.desc())
             .limit(1)
@@ -89,6 +95,8 @@ def review_projection(
     result: dict[str, Any] = {"review_status": "unreviewed"}
     metadata = None
     if latest:
+        if latest["dependency_refs"] is None:
+            raise IntakeError("persistence_unavailable", 503)
         result["review_status"] = (
             "needs_follow_up"
             if latest["outcome"] == "needs_follow_up"
@@ -98,8 +106,13 @@ def review_projection(
                 else "stale"
             )
         )
+        if result["review_status"] == "current" and not dependencies_current(
+            session, row["kind"], latest["dependency_refs"]
+        ):
+            result["review_status"] = "stale"
         if (
             result["review_status"] == "current"
+            and not latest["dependency_refs"]
             and row["content"].get("interests", {}).get("selections")
             and not selected_interests(session, row["content"])
         ):

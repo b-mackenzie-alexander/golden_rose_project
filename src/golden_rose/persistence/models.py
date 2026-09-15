@@ -1,3 +1,5 @@
+from typing import Any
+
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
@@ -389,7 +391,6 @@ command_results = Table(
     Column("event_type", String(64), nullable=False),
     Column("actor_id", UUID(as_uuid=True), nullable=False),
     Column("command_type", String(64), nullable=False),
-    UniqueConstraint("command_id", name="uq_command_results_single_result"),
     UniqueConstraint(
         "command_id",
         "entity_type",
@@ -913,3 +914,178 @@ intake_history_payloads.append_constraint(
         initially="DEFERRED",
     )
 )
+
+
+# PR C's first slice supports creation of a complete new worker group only.
+def _canonical_attribution() -> list[Column[Any]]:
+    return [
+        Column("version", Integer, nullable=False),
+        Column("created_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("created_by", UUID(as_uuid=True), nullable=False),
+        Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("updated_by", UUID(as_uuid=True), nullable=False),
+    ]
+
+
+workers = Table(
+    "workers",
+    metadata,
+    Column("worker_id", UUID(as_uuid=True), primary_key=True),
+    Column("full_name", String(200), nullable=False),
+    *_canonical_attribution(),
+)
+worker_contacts = Table(
+    "worker_contacts",
+    metadata,
+    Column("worker_contact_id", UUID(as_uuid=True), primary_key=True),
+    Column("worker_id", UUID(as_uuid=True), nullable=False),
+    Column("phone", String(32), nullable=False),
+    *_canonical_attribution(),
+)
+worker_residences = Table(
+    "worker_residences",
+    metadata,
+    Column("worker_residence_id", UUID(as_uuid=True), primary_key=True),
+    Column("worker_id", UUID(as_uuid=True), nullable=False),
+    Column("line1", String(200), nullable=False),
+    Column("line2", String(200)),
+    Column("locality", String(100), nullable=False),
+    Column("region", String(100)),
+    Column("postal_code", String(32)),
+    Column("country", String(2), nullable=False),
+    *_canonical_attribution(),
+)
+worker_preferences = Table(
+    "worker_preferences",
+    metadata,
+    Column("worker_preferences_id", UUID(as_uuid=True), primary_key=True),
+    Column("worker_id", UUID(as_uuid=True), nullable=False),
+    Column("interests", JSONB, nullable=False),
+    Column("availability", JSONB, nullable=False),
+    Column("self_reported", Boolean, nullable=False),
+    *_canonical_attribution(),
+)
+worker_interest_selections = Table(
+    "worker_interest_selections",
+    metadata,
+    Column("worker_preferences_id", UUID(as_uuid=True), primary_key=True),
+    Column("interest_id", UUID(as_uuid=True), primary_key=True),
+    Column("catalog_version", Integer, nullable=False),
+)
+intake_finalizations = Table(
+    "intake_finalizations",
+    metadata,
+    Column("intake_id", UUID(as_uuid=True), primary_key=True),
+    Column("command_id", UUID(as_uuid=True), nullable=False),
+    Column("review_id", UUID(as_uuid=True), nullable=False),
+    Column("content_version", Integer, nullable=False),
+    Column("result_version", Integer, nullable=False),
+    Column("kind", String(32), nullable=False),
+    Column("actor_id", UUID(as_uuid=True), nullable=False),
+    Column("occurred_at", TIMESTAMP(timezone=True), nullable=False),
+)
+for _kind in ("worker", "worker_contact", "worker_residence", "worker_preferences"):
+    entity_authorities.append_column(Column(f"{_kind}_id", UUID(as_uuid=True)))
+    intake_finalizations.append_column(Column(f"{_kind}_id", UUID(as_uuid=True)))
+    intake_finalizations.append_column(Column(f"{_kind}_version", Integer))
+    intake_finalizations.append_column(Column(f"{_kind}_disposition", String(16)))
+
+
+def _employer_output_address(*, nullable: bool) -> list[Column[Any]]:
+    return [
+        Column("line1", String(200), nullable=nullable),
+        Column("line2", String(200)),
+        Column("locality", String(100), nullable=nullable),
+        Column("region", String(100)),
+        Column("postal_code", String(32)),
+        Column("country", String(2), nullable=nullable),
+    ]
+
+
+# Column mappings for the additive employer-finalization migration extension.
+employer_contact_details = Table(
+    "employer_contact_details",
+    metadata,
+    Column("employer_contact_details_id", UUID(as_uuid=True), primary_key=True),
+    Column("employer_id", UUID(as_uuid=True), nullable=False),
+    Column("employer_contact_id", UUID(as_uuid=True), nullable=False, unique=True),
+    Column("representative_name", String(200), nullable=False),
+    Column("phone", String(40), nullable=False),
+    *_employer_output_address(nullable=True),
+    *_canonical_attribution(),
+    ForeignKeyConstraint(
+        ["employer_id", "employer_contact_id"],
+        ["employer_contacts.employer_id", "employer_contacts.employer_contact_id"],
+    ),
+    UniqueConstraint("employer_id", "employer_contact_details_id"),
+)
+employer_addresses = Table(
+    "employer_addresses",
+    metadata,
+    Column("employer_address_id", UUID(as_uuid=True), primary_key=True),
+    Column("employer_id", UUID(as_uuid=True), nullable=False),
+    Column("purpose", String(32), nullable=False),
+    *_employer_output_address(nullable=False),
+    *_canonical_attribution(),
+    ForeignKeyConstraint(["employer_id"], ["employers.employer_id"]),
+    UniqueConstraint("employer_id", "employer_address_id"),
+)
+worksites = Table(
+    "worksites",
+    metadata,
+    Column("worksite_id", UUID(as_uuid=True), primary_key=True),
+    Column("employer_id", UUID(as_uuid=True), nullable=False),
+    Column("location_verification_status", String(32), nullable=False),
+    Column("service_area_status", String(32), nullable=False),
+    Column("map_area_status", String(32), nullable=False),
+    *_employer_output_address(nullable=False),
+    *_canonical_attribution(),
+    ForeignKeyConstraint(["employer_id"], ["employers.employer_id"]),
+    UniqueConstraint("employer_id", "worksite_id"),
+)
+staffing_requests = Table(
+    "staffing_requests",
+    metadata,
+    Column("staffing_request_id", UUID(as_uuid=True), primary_key=True),
+    Column("employer_id", UUID(as_uuid=True), nullable=False),
+    Column("employer_contact_id", UUID(as_uuid=True), nullable=False),
+    Column("worksite_id", UUID(as_uuid=True), nullable=False),
+    Column("employer_address_id", UUID(as_uuid=True)),
+    Column("request_type", String(32), nullable=False),
+    Column("request_status", String(32), nullable=False),
+    Column("source_channel", String(32), nullable=False),
+    Column("received_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("role_title", String(200), nullable=False),
+    Column("duties_summary", String(1000), nullable=False),
+    Column("worker_count", Integer, nullable=False),
+    Column("schedule", JSONB, nullable=False),
+    Column("offer", JSONB, nullable=False),
+    *_canonical_attribution(),
+    ForeignKeyConstraint(["employer_id"], ["employers.employer_id"]),
+    ForeignKeyConstraint(
+        ["employer_id", "employer_contact_id"],
+        ["employer_contacts.employer_id", "employer_contacts.employer_contact_id"],
+    ),
+    ForeignKeyConstraint(
+        ["employer_id", "worksite_id"], ["worksites.employer_id", "worksites.worksite_id"]
+    ),
+    ForeignKeyConstraint(
+        ["employer_id", "employer_address_id"],
+        ["employer_addresses.employer_id", "employer_addresses.employer_address_id"],
+    ),
+    UniqueConstraint("employer_id", "staffing_request_id"),
+)
+for _kind in ("employer_contact_details", "employer_address", "worksite", "staffing_request"):
+    entity_authorities.append_column(Column(f"{_kind}_id", UUID(as_uuid=True)))
+
+for _kind in (
+    "employer",
+    "employer_contact",
+    "employer_contact_details",
+    "employer_address",
+    "worksite",
+    "staffing_request",
+):
+    intake_finalizations.append_column(Column(f"{_kind}_id", UUID(as_uuid=True)))
+    intake_finalizations.append_column(Column(f"{_kind}_version", Integer))
+    intake_finalizations.append_column(Column(f"{_kind}_disposition", String(16)))

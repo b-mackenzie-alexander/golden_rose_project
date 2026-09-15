@@ -15,6 +15,10 @@ import type {
   Result,
 } from './intakeContracts';
 import type { Command } from '../intakes/saveState';
+import {
+  canonicalId, canonicalReference, canonicalVersion, finalizeBody, finalizationOutputs,
+  intakeLinks, linkBody, sameOutputs,
+} from './intakeCanonicalContracts';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
@@ -104,15 +108,16 @@ function content(value: unknown, kind: IntakeKind): value is DraftObject {
     return false;
   });
 }
-function summary(v: unknown): v is IntakeSummary {
+function summary(v: unknown, allowFinalized = false): v is IntakeSummary {
   return (
     object(v) &&
     typeof v.intake_id === 'string' &&
     uuid.test(v.intake_id) &&
     (v.kind === 'worker' || v.kind === 'employer') &&
-    positive(v.version) &&
-    v.lifecycle === 'draft' &&
-    typeof v.complete === 'boolean' &&
+    canonicalVersion(v.version) &&
+    (v.lifecycle === 'draft' || (allowFinalized && v.lifecycle === 'finalized')) &&
+    (typeof v.complete === 'boolean' || (v.complete === null && v.display_name === undefined &&
+      Array.isArray(v.missing_fields) && v.missing_fields.length === 0)) &&
     Array.isArray(v.missing_fields) &&
     v.missing_fields.every((x) => typeof x === 'string') &&
     ['unreviewed', 'needs_follow_up', 'current', 'stale'].includes(String(v.review_status)) &&
@@ -126,15 +131,25 @@ function summary(v: unknown): v is IntakeSummary {
     (v.display_name === undefined || v.display_name === null || typeof v.display_name === 'string')
   );
 }
-function detail(v: unknown): v is IntakeDetail {
+function detail(v: unknown, allowFinalized = false): v is IntakeDetail {
   return (
     object(v) &&
-    summary(v.summary) &&
-    positive(v.content_version) &&
+    Object.keys(v).every((key) => ['summary', 'content_version', 'candidate', 'resolved', 'links',
+      'dependency_stale', 'latest_review', 'finalization'].includes(key)) &&
+    summary(v.summary, allowFinalized) && v.summary.complete !== null &&
+    canonicalVersion(v.content_version) &&
+    v.content_version <= v.summary.version &&
     content(v.candidate, v.summary.kind) &&
-    object(v.resolved) &&
-    object(v.links) &&
+    content(v.resolved, v.summary.kind) &&
+    (v.summary.kind !== 'employer' || Object.keys(v.resolved).every((key) =>
+      ['employer_type', 'display_name', 'representative_name', 'phone'].includes(key))) &&
+    intakeLinks(v.links, v.summary.kind) &&
     typeof v.dependency_stale === 'boolean' &&
+    (Object.keys(v.links).length > 0 ||
+      (Object.keys(v.resolved).length === 0 && !v.dependency_stale)) &&
+    (v.summary.lifecycle === 'finalized'
+      ? finalizationOutputs(v.finalization, v.summary.kind)
+      : v.finalization === undefined) &&
     (v.latest_review === undefined ||
       (object(v.latest_review) &&
         typeof v.latest_review.review_id === 'string' &&
@@ -153,6 +168,7 @@ async function request<T>(
   body: DraftObject | undefined,
   validate: (value: unknown) => value is T,
   key?: string,
+  commandKind?: 'link' | 'finalize',
 ): Promise<Result<T>> {
   try {
     const response = await fetch(`/api/staff/v1${path}`, {
@@ -170,6 +186,16 @@ async function request<T>(
       referrerPolicy: 'no-referrer',
     });
     if (response.status !== 200 && response.status !== 201) {
+      if (commandKind === 'link' && response.status === 409 &&
+        /^application\/problem\+json(?:\s*;.*)?$/i.test(response.headers.get('Content-Type') ?? '')) {
+        try {
+          const problem: unknown = await response.json();
+          if (object(problem) && problem.status === 409 && problem.code === 'no_change' &&
+            problem.type === 'urn:golden-rose:intake:no_change')
+            return { ok: false, failure: 'failed' };
+        } catch { /* An unreadable conflict remains a conflict. */ }
+        return { ok: false, failure: 'conflict' };
+      }
       await response.body?.cancel();
       return {
         ok: false,
@@ -202,6 +228,9 @@ async function request<T>(
           : (candidate.current as unknown as WorkInterest).version) < candidate.result_record_version
       )
         return { ok: false, failure: 'unknown' };
+      if (commandKind && response.status !==
+        (commandKind === 'finalize' && replayed === 'false' ? 201 : 200))
+        return { ok: false, failure: 'unknown' };
     }
     return { ok: true, value };
   } catch {
@@ -216,7 +245,7 @@ export const queryIntakes = (kind: IntakeKind, filter: DraftObject = {}) =>
       object(v) &&
       Array.isArray(v.items) &&
       v.items.length <= 25 &&
-      v.items.every(summary) &&
+      v.items.every((item) => summary(item)) &&
       (v.next_cursor === null || typeof v.next_cursor === 'string'),
   );
 export const getIntake = (id: string) =>
@@ -246,8 +275,33 @@ export const getIntakeAddress = (id: string, section: AddressSection) =>
           'country',
         ])) &&
       (v.resolved === null ||
-        sectionObject(v.resolved, ['line1', 'line2', 'locality', 'region', 'postal_code', 'country'])),
+        sectionObject(v.resolved, ['line1', 'line2', 'locality', 'region', 'postal_code', 'country'])) &&
+      (v.source_ref === undefined || canonicalReference(v.source_ref)),
   );
+
+// Canonical detail admits finalized records for the read-only intake view.
+export const getCanonicalIntake = (id: string) =>
+  canonicalId(id)
+    ? request(`/intakes/${id}`, undefined,
+      (v): v is IntakeDetail => detail(v, true) && v.summary.intake_id === id)
+    : Promise.resolve<Result<IntakeDetail>>({ ok: false, failure: 'failed' });
+
+export const saveCanonicalIntake = (command: Command): Promise<Result<IntakeCommandResult>> => {
+  const match = /^\/intakes\/([^/]+)\/(links|finalizations)$/.exec(command.path);
+  if (!match || !canonicalId(match[1]) || !canonicalId(command.key) ||
+    !(match[2] === 'links' ? linkBody(command.body) : finalizeBody(command.body)))
+    return Promise.resolve({ ok: false, failure: 'failed' });
+  const target = match[1], finalize = match[2] === 'finalizations';
+  return request(command.path, command.body, (v): v is IntakeCommandResult =>
+    object(v) && canonicalId(v.command_id) && canonicalVersion(v.result_record_version) &&
+    Object.keys(v).every((key) => ['command_id', 'result_record_version', 'current', 'finalization'].includes(key)) &&
+    v.result_record_version === Number(command.body.expected_version) + 1 &&
+    detail(v.current, true) && v.current.summary.intake_id === target &&
+    (!finalize || (v.current.summary.lifecycle === 'finalized' &&
+      finalizationOutputs(v.finalization, v.current.summary.kind) &&
+      v.current.finalization !== undefined && sameOutputs(v.finalization, v.current.finalization))) &&
+    (finalize || v.finalization === undefined), command.key, finalize ? 'finalize' : 'link');
+};
 export const saveIntake = (command: Command) =>
   request(
     command.path,
@@ -256,7 +310,7 @@ export const saveIntake = (command: Command) =>
       object(v) &&
       typeof v.command_id === 'string' &&
       positive(v.result_record_version) &&
-      detail(v.current),
+      detail(v.current, true),
     command.key,
   );
 

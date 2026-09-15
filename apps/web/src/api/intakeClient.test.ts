@@ -290,3 +290,16 @@ it('validates structured protected follow-up context and rejects extra protected
   });
   expect((await getRestrictedHistory(id, id)).ok).toBe(true);
 });
+
+
+it('admits unavailable linked list completeness without accepting leaked facts or unavailable detail', async () => {
+  const unavailable = { ...detail.summary, complete: null, missing_fields: [] };
+  response({ items: [unavailable], next_cursor: null });
+  expect((await queryIntakes('worker')).ok).toBe(true);
+  for (const patch of [{ display_name: 'Hidden canonical name' }, { missing_fields: ['phone'] }]) {
+    response({ items: [{ ...unavailable, ...patch }], next_cursor: null });
+    expect((await queryIntakes('worker')).ok).toBe(false);
+  }
+  response({ ...detail, summary: unavailable });
+  expect((await getIntake(id)).ok).toBe(false);
+});

@@ -10,3 +10,5 @@ class StaffPrincipal:
     # None denotes the shared synthetic workspace. Explicit sets support bounded
     # record membership and revocation without inventing a production directory.
     intake_scope: frozenset[UUID] | None = None
+    # Canonical worker membership is independent of candidate intake membership.
+    worker_scope: frozenset[UUID] | None = None

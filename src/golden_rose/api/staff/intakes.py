@@ -30,6 +30,7 @@ from golden_rose.application.intake_access import record_intake_access
 from golden_rose.application.intake_commands import authorize_intake, execute_intake
 from golden_rose.application.intake_errors import IntakeError
 from golden_rose.application.query_intakes import query_intakes
+from golden_rose.application.read_linked_intake_address import read_linked_intake_address
 from golden_rose.auth.principal import StaffPrincipal
 from golden_rose.config import Settings
 from golden_rose.persistence.intakes import get_address, get_intake, intake_detail
@@ -95,7 +96,7 @@ def create_draft(
 def read_draft(intake_id: UUID, session: SessionDep, principal: PrincipalDep):
     authorize_intake(principal, "intake:read", intake_id=intake_id)
     try:
-        return intake_detail(session, get_intake(session, intake_id))
+        return intake_detail(session, get_intake(session, intake_id), principal=principal)
     except SQLAlchemyError as exc:
         raise IntakeError("persistence_unavailable", 503) from exc
 
@@ -130,6 +131,12 @@ def read_draft_address(
         if (row["kind"] == "worker") != (section == "worker_residence"):
             raise IntakeError("invalid_request", 422)
         value = get_address(session, intake_id, section)
+        linked = read_linked_intake_address(
+            session=session,
+            principal=principal,
+            row=row,
+            section=section,
+        )
         # Injected protected access sink; no payload or address is logged.
         sink = getattr(request.app.state, "intake_access_sink", record_intake_access)
         sink(actor_id=principal.actor_id, intake_id=intake_id, section=section)
@@ -138,7 +145,7 @@ def read_draft_address(
             "version": row["version"],
             "section": section,
             "candidate": value,
-            "resolved": None,
+            **linked,
         }
     except SQLAlchemyError as exc:
         raise IntakeError("persistence_unavailable", 503) from exc

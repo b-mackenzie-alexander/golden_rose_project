@@ -1,3 +1,5 @@
+import type { FinalizationOutputs, IntakeLinks, CanonicalReference } from './intakeCanonicalContracts';
+
 export type IntakeKind = 'worker' | 'employer';
 export type AddressSection = 'worker_residence' | 'party_address' | 'worksite_address';
 export type DraftValue = string | number | boolean | null | DraftObject | DraftValue[];
@@ -6,9 +8,9 @@ export type IntakeSummary = {
   intake_id: string;
   kind: IntakeKind;
   version: number;
-  lifecycle: 'draft';
+  lifecycle: 'draft' | 'finalized';
   display_name?: string;
-  complete: boolean;
+  complete: boolean | null;
   missing_fields: string[];
   review_status: 'unreviewed' | 'needs_follow_up' | 'current' | 'stale';
   follow_up?: { owner_staff_id: string; next_follow_up_at: string; overdue: boolean };
@@ -20,8 +22,9 @@ export type IntakeDetail = {
   content_version: number;
   candidate: DraftObject;
   resolved: DraftObject;
-  links: DraftObject;
+  links: IntakeLinks;
   dependency_stale: boolean;
+  finalization?: FinalizationOutputs;
   latest_review?: {
     review_id: string;
     reviewed_record_version: number;
@@ -38,11 +41,13 @@ export type AddressDetail = {
   section: AddressSection;
   candidate: DraftObject | null;
   resolved: DraftObject | null;
+  source_ref?: CanonicalReference;
 };
 export type IntakeCommandResult = {
   command_id: string;
   result_record_version: number;
   current: IntakeDetail;
+  finalization?: FinalizationOutputs;
 };
 export type Failure = 'unknown' | 'failed' | 'forbidden' | 'conflict';
 export type Result<T> = { ok: true; value: T } | { ok: false; failure: Failure };

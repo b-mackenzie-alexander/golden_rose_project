@@ -1,5 +1,6 @@
 """Schema successor grants and result migration checks against real PostgreSQL."""
 
+from collections.abc import Iterator
 from typing import Any
 from uuid import uuid4
 
@@ -55,7 +56,7 @@ def test_runtime_has_narrow_update_and_no_result_mutation(connection):
 
 
 @pytest.fixture
-def migration_database(database_url):
+def migration_database(database_url) -> Iterator[Any]:
     """A separate database in the expressly approved disposable test cluster."""
     name = "intake_migration_" + uuid4().hex
     admin = create_engine(
@@ -164,6 +165,7 @@ def test_populated_0005_upgrade_backfills_and_preserves_legacy(migration_databas
 def test_populated_intake_downgrade_refuses_before_ddl(migration_database):
     migrate(migration_database, "head")
     with migration_database.begin() as connection:
+        original_revision = connection.scalar(text("SELECT version_num FROM alembic_version"))
         insert_atomic_draft(connection)
     with pytest.raises(RuntimeError, match="before DDL"):
         migrate(migration_database, "0005_database_authority", downgrade=True)
@@ -171,7 +173,7 @@ def test_populated_intake_downgrade_refuses_before_ddl(migration_database):
         assert connection.execute(text("SELECT count(*) FROM intakes")).scalar_one() == 1
         assert (
             connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-            == "0007_intake_review_follow_up"
+            == original_revision
         )
         assert (
             connection.execute(text("SELECT to_regclass('public.command_results')")).scalar_one()
@@ -212,13 +214,14 @@ def test_intake_catalog_readback_matches_exact_contract(migration_database):
 def test_empty_successor_reaches_inherited_downgrade_guard(migration_database):
     migrate(migration_database, "head")
     with migration_database.connect() as connection:
+        original_revision = connection.scalar(text("SELECT version_num FROM alembic_version"))
         assert connection.execute(text("SELECT count(*) FROM intakes")).scalar_one() == 0
     with pytest.raises(RuntimeError, match="operator-reviewed role handoff"):
         migrate(migration_database, "base", downgrade=True)
     # Alembic's transactional DDL keeps the original head when 0005 refuses.
     with migration_database.connect() as connection:
         assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == (
-            "0007_intake_review_follow_up"
+            original_revision
         )
 
 

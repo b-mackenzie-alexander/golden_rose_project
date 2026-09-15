@@ -166,6 +166,7 @@ def test_populated_0006_upgrade_preserves_drafts_and_review_downgrade_stops(migr
         values = insert_atomic_draft(connection)
     migrate(migration_database, "head")
     with migration_database.begin() as connection:
+        original_revision = connection.scalar(text("SELECT version_num FROM alembic_version"))
         workflow(connection, values)
     with pytest.raises(RuntimeError, match="before DDL"):
         migrate(migration_database, "0006_intake_drafts", downgrade=True)
@@ -173,7 +174,7 @@ def test_populated_0006_upgrade_preserves_drafts_and_review_downgrade_stops(migr
         assert connection.execute(text("SELECT count(*) FROM intake_reviews")).scalar_one() == 1
         assert (
             connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-            == "0007_intake_review_follow_up"
+            == original_revision
         )
 
 

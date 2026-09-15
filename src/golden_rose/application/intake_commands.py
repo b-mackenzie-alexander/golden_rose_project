@@ -128,7 +128,7 @@ def execute_intake(
             response = {
                 "command_id": str(command_id),
                 "result_record_version": receipt["result_record_version"],
-                "current": intake_detail(session, current),
+                "current": intake_detail(session, current, principal=principal),
             }
             session.rollback()
             return response, True
@@ -289,7 +289,7 @@ def execute_intake(
         response = {
             "command_id": str(command_id),
             "result_record_version": row["version"],
-            "current": intake_detail(session, row),
+            "current": intake_detail(session, row, principal=principal),
         }
         session.commit()
         return response, False

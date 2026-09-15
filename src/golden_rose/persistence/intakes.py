@@ -4,16 +4,28 @@ from datetime import UTC
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, exists, select
 from sqlalchemy.orm import Session
 
 from golden_rose.application.intake_errors import IntakeError
+from golden_rose.auth.principal import StaffPrincipal
+from golden_rose.persistence.intake_outputs import finalization_outputs, get_finalization
 from golden_rose.persistence.intake_review_state import review_projection, selected_interests
-from golden_rose.persistence.models import audit_events, command_results, intake_addresses, intakes
+from golden_rose.persistence.models import (
+    audit_events,
+    command_results,
+    intake_addresses,
+    intake_links,
+    intakes,
+)
 
 
 def get_intake(session: Session, intake_id: UUID, *, lock: bool = False) -> dict[str, Any]:
-    stmt = select(intakes).where(intakes.c.intake_id == intake_id)
+    # The existence probe also works on predecessor schemas with closed link storage.
+    stmt = select(
+        intakes,
+        exists().where(intake_links.c.intake_id == intakes.c.intake_id).label("_has_link_row"),
+    ).where(intakes.c.intake_id == intake_id)
     if lock:
         stmt = stmt.with_for_update()
     row = session.execute(stmt).mappings().one_or_none()
@@ -75,7 +87,13 @@ def address_complete(address: dict[str, str] | None) -> bool:
     return all(address.get(field) for field in fields)
 
 
-def missing_fields(session: Session, row: dict[str, Any]) -> list[str]:
+def missing_fields(
+    session: Session,
+    row: dict[str, Any],
+    *,
+    addresses: dict[str, dict[str, str]] | None = None,
+    address_completeness: dict[str, bool] | None = None,
+) -> list[str]:
     content = row["content"]
     if row["kind"] == "worker":
         missing = [f for f in ("full_name", "phone") if not content.get(f)]
@@ -111,7 +129,16 @@ def missing_fields(session: Session, row: dict[str, Any]) -> list[str]:
             missing.append("offer")
         sections = ["party_address", "worksite_address"]
     for section in sections:
-        if not address_complete(get_address(session, row["intake_id"], section)):
+        if address_completeness is not None and section in address_completeness:
+            if not address_completeness[section]:
+                missing.append(section)
+            continue
+        address = (
+            get_address(session, row["intake_id"], section)
+            if addresses is None
+            else addresses.get(section)
+        )
+        if not address_complete(address):
             missing.append(section)
     return missing
 
@@ -137,7 +164,60 @@ def intake_summary(session: Session, row: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def intake_detail(session: Session, row: dict[str, Any]) -> dict[str, Any]:
+def _populate_linked_detail(
+    session: Session, row: dict[str, Any], principal: StaffPrincipal | None, result: dict[str, Any]
+) -> None:
+    # Import here to keep command/schema imports out of the base read module.
+    from golden_rose.application.intake_resolved_detail import resolved_detail_fields
+
+    if principal is None:
+        raise IntakeError("forbidden", 403)
+    resolved, complete, dependencies, stale = resolved_detail_fields(session, principal, row)
+    if dependencies:
+        content = dict(row["content"]) if row["kind"] == "employer" else {}
+        if row["kind"] == "employer":
+            for field in ("employer_type", "display_name"):
+                content.pop(field, None)
+            if "employer_contact" in dependencies:
+                for field in ("representative_name", "phone"):
+                    content.pop(field, None)
+        content.update(resolved)
+        missing = missing_fields(
+            session, {**row, "content": content}, address_completeness=complete
+        )
+        result.update(resolved=resolved, links=dependencies, dependency_stale=stale)
+        result["summary"].update(complete=not missing, missing_fields=missing)
+        display_name = resolved.get("full_name" if row["kind"] == "worker" else "display_name")
+        result["summary"].pop("display_name", None)
+        if display_name:
+            result["summary"]["display_name"] = display_name
+        if stale and result["summary"]["review_status"] == "current":
+            result["summary"]["review_status"] = "stale"
+
+
+def intake_query_summary(
+    session: Session, row: dict[str, Any], principal: StaffPrincipal
+) -> dict[str, Any]:
+    result = {"summary": intake_summary(session, row)}
+    if row.get("_has_link_row"):
+        try:
+            _populate_linked_detail(session, row, principal, result)
+        except IntakeError as error:
+            if error.status not in {403, 404}:
+                raise
+            # Retain authorized intake recovery metadata without substituting
+            # candidate completeness or leaking canonical names after revocation.
+            result["summary"].pop("display_name", None)
+            result["summary"].update(complete=None, missing_fields=[])
+    return result["summary"]
+
+
+def intake_detail(
+    session: Session,
+    row: dict[str, Any],
+    *,
+    principal: StaffPrincipal | None = None,
+) -> dict[str, Any]:
     result = {
         "summary": intake_summary(session, row),
         "content_version": row["content_version"],
@@ -147,7 +227,12 @@ def intake_detail(session: Session, row: dict[str, Any]) -> dict[str, Any]:
         "dependency_stale": False,
     }
 
+    if row.get("_has_link_row"):
+        _populate_linked_detail(session, row, principal, result)
+
     latest = review_projection(session, row)[1]
     if latest is not None:
         result["latest_review"] = latest
+    if row["lifecycle_status"] == "finalized":
+        result["finalization"] = finalization_outputs(get_finalization(session, row["intake_id"]))
     return result

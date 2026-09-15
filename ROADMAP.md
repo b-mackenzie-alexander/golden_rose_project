@@ -1,5 +1,15 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-09-15 - PR C published as PR #104
+
+- **Staffing:** One independent developer; fresh agent reviews and automated/browser checks provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** Owner explicitly approved publication. [PR #104](https://github.com/b-mackenzie-alexander/golden_rose_project/pull/104) is open from `feat/staff-intake-finalization` to `develop`; source commit `ffe44dd` and reviewed handoff commits are published. Required CI is pending at this record. The owner-requested local fictional preview remains running; no cloud deployment or new cloud qualification occurred.
+- **Gate budget:** Explicit approval covers this branch publication and PR to the named repository. Earlier automatic approval rejections are superseded by that explicit approval and successful publication. Protected merge and runtime/cloud authority remain distinct.
+- **Next executable action:** Complete required PR CI, then owner protected merge; rebaseline PR D from the exact merged integration tip. Reassess navigation and configurable display/input timezone after PR D.
+- **Do not regress:** Original references/retries, dirty buffers, restricted canonical rights, bilingual parity, applied migration bytes and private cloud protections. Deferred UX-polish note remains excluded and local preview data is preserved for owner feedback.
+
+**Publication checks:** Outgoing range passed whitespace, confidential-path inventory and redacted secret scanning. Qualified source remains unchanged from the browser manifest; only reviewed living-doc handoffs were added. Prior local qualification remains 319 frontend tests with coverage gates and 1988 full backend tests plus 28 narrow response-schema repair tests; remote results must be read from the final PR head before claiming CI success.
+
 ## 2026-09-15 - Owner direction: finish PR C, then PR D
 
 - **Staffing:** One independent developer; owner feedback guides product sequencing, with agent review and automated checks as quality evidence.

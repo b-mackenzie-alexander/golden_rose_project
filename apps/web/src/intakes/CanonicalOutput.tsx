@@ -1,4 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { CanonicalCorrectionForm } from './CanonicalCorrectionForm';
+import { CanonicalCurrentReview } from './CanonicalCurrentReview';
+import { correctionPath } from '../api/canonicalCorrectionClient';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { NavigationGuardContext } from '../app/navigationGuardContext';
 import { Link, useParams } from 'react-router';
 import { getCanonicalIntake } from '../api/intakeClient';
 import { getCanonicalOutput, hasAddress, outputReference, restrictedOutput } from '../api/canonicalOutputClient';
@@ -30,7 +34,28 @@ function OutputDetail({ intakeId, output }: { intakeId: string; output: string }
   const [outputs, setOutputs] = useState<FinalizationOutputs | null>(null);
   const [facts, setFacts] = useState<DraftObject | null>(null), [address, setAddress] = useState<DraftObject | null>(null);
   const [busy, setBusy] = useState(true), [failed, setFailed] = useState(false), [addressFailed, setAddressFailed] = useState(false);
+  const [lockedSection, setLockedSection] = useState<string | null>(null);
+  const [dirtySections, setDirtySections] = useState<Record<string, boolean>>({});
+  const hasDirty = Object.values(dirtySections).some(Boolean);
+  const [committedVersion, setCommittedVersion] = useState<number>();
+  const [savedNotice, setSavedNotice] = useState(false);
+  const [reviewLocked, setReviewLocked] = useState(false);
+  const [reviewEpoch, setReviewEpoch] = useState(0);
   const epoch = useRef(0), pending = useRef(false);
+  const setNavigationBlocked = useContext(NavigationGuardContext);
+  useEffect(() => {
+    setNavigationBlocked?.(hasDirty || lockedSection !== null || reviewLocked);
+    return () => { setNavigationBlocked?.(false); };
+  }, [hasDirty, lockedSection, reviewLocked, setNavigationBlocked]);
+  useEffect(() => {
+    if (!hasDirty && !lockedSection && !reviewLocked) return;
+    const navigation = (event: MouseEvent) => {
+      if (event.target instanceof Element && event.target.closest('a[href]')) { event.preventDefault(); event.stopPropagation(); }
+    };
+    const unload = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    document.addEventListener('click', navigation, true); window.addEventListener('beforeunload', unload);
+    return () => { document.removeEventListener('click', navigation, true); window.removeEventListener('beforeunload', unload); };
+  }, [hasDirty, lockedSection, reviewLocked]);
   useEffect(() => {
     const token = ++epoch.current;
     void getCanonicalIntake(intakeId).then(async (result) => {
@@ -64,31 +89,63 @@ function OutputDetail({ intakeId, output }: { intakeId: string; output: string }
     ++epoch.current; pending.current = false; setBusy(false); setAddress(null); setAddressFailed(false);
     if (restrictedOutput(output)) { setFacts(null); setFailed(false); }
   }
+  function deny() {
+    setFacts(null); setAddress(null); setDirtySections({}); setLockedSection(null); setFailed(true);
+  }
+  function correction(values: DraftObject, addressSection = false) {
+    if (!outputs) return null;
+    const path = correctionPath(outputs, output, addressSection), reference = outputReference(outputs, output);
+    if (!path || !reference) return null;
+    const sectionKey = addressSection ? 'address' : 'facts';
+    const keys = outputs.kind === 'worker' ? ({ worker: ['full_name'], contact: ['phone'], residence: ['address'], preferences: ['interests', 'availability'] } as Record<string, string[]>)[output]
+      : addressSection || output === 'business_address' ? ['address'] : output === 'contact_details' ? ['representative_name', 'phone'] : ['role_title', 'duties_summary', 'worker_count', 'schedule', 'offer'];
+    const initial = Object.fromEntries(Object.entries(values).filter(([key]) => keys?.includes(key)));
+    return <CanonicalCorrectionForm path={path} targetId={reference.id} output={output} initial={initial} version={Number(values.version)} committedVersion={committedVersion} blocked={reviewLocked || (lockedSection !== null && lockedSection !== sectionKey)}
+      onDirty={(dirty) => { setDirtySections((sections) => ({ ...sections, [sectionKey]: dirty })); }}
+      onLock={(locked) => { setLockedSection(locked ? sectionKey : null); }}
+      onDenied={deny}
+      onSaved={async (version) => {
+        if (version !== null) setCommittedVersion(version);
+        const token = epoch.current;
+        const fresh = await getCanonicalOutput(outputs, output, addressSection);
+        if (token !== epoch.current) return false;
+        setSavedNotice(!fresh.ok);
+        if (fresh.ok) { if (addressSection) setAddress(fresh.value); else setFacts(fresh.value); }
+        else if (fresh.failure === 'forbidden') deny();
+        setReviewEpoch((value) => value + 1);
+        return fresh.ok;
+      }} />;
+  }
   const ref = outputs ? outputReference(outputs, output) : null;
   return <section>
-    <Link to={`/staff/intakes/${intakeId}`}>{m.back}</Link>
+    <Link onClick={(event) => { if (hasDirty || lockedSection) event.preventDefault(); }} aria-disabled={hasDirty || !!lockedSection} to={`/staff/intakes/${intakeId}`}>{m.back}</Link>
     <h2>{canonicalLabel(output, language)}</h2>
     {ref ? <p>{m.original}: {ref.id} · {cm.version} {ref.version} · {cm[ref.disposition]}</p> : null}
     <p>{m.meaning}</p>
+    {hasDirty || lockedSection || reviewLocked ? <p role="status">{language === 'en' ? 'Save, retry, or cancel pending changes before refreshing or leaving this record.' : 'Guarde, reintente o cancele los cambios pendientes antes de actualizar o salir de este registro.'}</p> : null}
     {outputs ? <nav aria-label={cm.outputs}><ul>{Object.keys(outputs).filter((key) => outputReference(outputs, key)).map((key) =>
-      <li key={key}><Link aria-current={key === output ? 'page' : undefined} to={`/staff/intakes/${intakeId}/outputs/${key}`}>{canonicalLabel(key, language)}</Link></li>)}</ul></nav> : null}
+      <li key={key}><Link onClick={(event) => { if (hasDirty || lockedSection) event.preventDefault(); }} aria-disabled={hasDirty || !!lockedSection} aria-current={key === output ? 'page' : undefined} to={`/staff/intakes/${intakeId}/outputs/${key}`}>{canonicalLabel(key, language)}</Link></li>)}</ul></nav> : null}
     {busy ? <p role="status">{common.loading}</p> : null}
     {failed ? <p role="alert">{m.unavailable}</p> : null}
-    {outputs ? <button type="button" disabled={busy} onClick={() => void read()}>{restrictedOutput(output) ? m.reveal : m.refresh}</button> : null}
+    {outputs ? <button type="button" disabled={busy || lockedSection !== null || hasDirty || reviewLocked} onClick={() => void read()}>{restrictedOutput(output) ? m.reveal : m.refresh}</button> : null}
     {facts ? <section><h3>{m.current}</h3>
       {ref && facts.version !== ref.version ? <p role="status">{m.changed}</p> : null}
       <Snapshot value={facts} />
+      {correction(facts)}
     </section> : null}
     {outputs && hasAddress(output, outputs) && facts ? <>
       {output === 'contact_details' ? <p>{m.addressHint}</p> : null}
-      <button type="button" disabled={busy} onClick={() => void read(true)}>{m.reveal}</button>
+      <button type="button" disabled={busy || lockedSection !== null || hasDirty || reviewLocked} onClick={() => void read(true)}>{m.reveal}</button>
     </> : null}
     {addressFailed ? <p role="alert">{m.unavailable}</p> : null}
     {address ? <section aria-label={m.reveal}>
       {facts && address.version !== facts.version ? <p role="status">{m.separate}</p> : null}
       <Snapshot value={address} />
+      {correction(address, true)}
     </section> : null}
-    {outputs && (restrictedOutput(output) || hasAddress(output, outputs)) ? <button type="button" onClick={hide}>{m.hide}</button> : null}
+    {outputs && (restrictedOutput(output) || hasAddress(output, outputs)) ? <button type="button" disabled={lockedSection !== null || hasDirty || reviewLocked} onClick={hide}>{m.hide}</button> : null}
+    {savedNotice ? <p role="status">{language === 'en' ? 'Correction saved; current detail is unavailable.' : 'Corrección guardada; datos actuales no disponibles.'}</p> : null}
+    {outputs ? <CanonicalCurrentReview key={reviewEpoch} onDenied={deny} onLock={setReviewLocked} intakeId={intakeId} outputs={outputs} blocked={lockedSection !== null || hasDirty} /> : null}
   </section>;
 }
 export function CanonicalOutput() {

@@ -37,7 +37,10 @@ WORKER_FIELDS = {
 EMPLOYER_FIELDS = {
     "employer": (employers, ("employer_type", "display_name")),
     "employer_contact": (employer_contacts, ("full_name",)),
-    "employer_contact_details": (employer_contact_details, ("phone", *ADDRESS_FIELDS)),
+    "employer_contact_details": (
+        employer_contact_details,
+        ("representative_name", "phone", *ADDRESS_FIELDS),
+    ),
     "employer_address": (employer_addresses, ("purpose", *ADDRESS_FIELDS)),
     "worksite": (worksites, ADDRESS_FIELDS),
 }
@@ -112,7 +115,7 @@ def read_linked_snapshot(
     records: dict[str, Any] = {}
     current: dict[str, Any] = {}
     # Parent first, then fixed entity-name order shared with future command locks.
-    for name in (kind, *sorted(names - {kind})):
+    for name in sorted(names):
         table, columns = fields[name]
         statement = select(
             table.c[f"{name}_id"], table.c.version, *(table.c[c] for c in columns)
@@ -125,7 +128,13 @@ def read_linked_snapshot(
             statement = statement.where(
                 table.c.employer_contact_id == expected["employer_contact"].id
             )
-        row = session.execute(statement).mappings().one_or_none()
+        row = (
+            session.execute(
+                statement if name == "employer_contact" else statement.with_for_update()
+            )
+            .mappings()
+            .one_or_none()
+        )
         if row is None:
             raise IntakeError("not_found", 404)
         records[name] = dict(row)
@@ -159,7 +168,7 @@ def read_linked_snapshot(
             }
             if "employer_contact" in records:
                 content.update(
-                    representative_name=records["employer_contact"]["full_name"],
+                    representative_name=records["employer_contact_details"]["representative_name"],
                     phone=records["employer_contact_details"]["phone"],
                 )
                 if parent["employer_type"] == "household":

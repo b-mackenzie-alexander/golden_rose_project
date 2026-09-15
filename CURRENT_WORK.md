@@ -1,5 +1,48 @@
 # Current Work — Golden Rose Operations Platform
 
+## 2026-09-15 — PR D published as PR #105
+
+- **Staffing:** One independent developer; tests and fresh agent repair reviews provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** [PR #105](https://github.com/b-mackenzie-alexander/golden_rose_project/pull/105) is open to `develop` from `feat/staff-intake-corrections`. Source commit `81aed49` passed the recorded automated and bounded production-build browser checks. Required remote CI is pending at this entry; no deployment or shared-target qualification occurred.
+- **Gate budget:** Owner explicitly approved resumed local verification and PR publication after it passed. No cloud/live/production or default permission activation.
+- **Next executable action:** Complete required PR CI and owner protected merge. Keep the complete PR D/A–D delivery items open until merge; preserve deferred human/shared-target acceptance.
+- **Do not regress:** Original finalization/history and retries, independent dirty buffers, restricted permissions, bilingual parity, applied migrations, owner's separate preview and deferred UX note.
+
+Publication used an explicit 65-path inventory. Exact outgoing-range whitespace and redacted secret checks passed; the separate UX note is not committed. The bounded browser observations and additional-review usage-limit limitation are recorded in the [handoff](docs/review-handoffs/2026-09-15-staff-intake-pr-d-handoff.md). Earlier uncommitted/unpublished and browser-blocked entries are historical.
+
+
+## 2026-09-15 — PR D bounded browser verification passed; publication authorized
+
+- **Staffing:** One independent developer; automated checks and fresh agent repair reviews are quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR D production-build local walkthrough passed correction/re-review in English and Spanish, exact unknown retry with later dirty edits, second-browser persistence and revoked-read clearing. Employer contact axe returned zero violations and 390px reflow had no horizontal overflow. No cloud qualification or human/fluent-language acceptance is claimed.
+- **Gate budget:** Owner explicitly approved resumed bounded local verification and publication after it passes. No cloud/live/production or default permission activation.
+- **Next executable action:** Complete publication hygiene and publish PR D to `develop`, then read required CI before owner protected merge.
+- **Do not regress:** Original finalized references/history, exact retry identity, independent buffers, restricted permissions, bilingual parity, applied migration bytes, owner preview and deferred UX note.
+
+Automated baseline remains 2,055 backend tests at 95.22% coverage, 26 subsequent focused tests and 344 frontend tests/full verification. No product code changed during the resumed walkthrough. Earlier fresh reviews/rereviews passed; an additional final agent attempt hit its usage limit and is not claimed as completed. See [PR D handoff](docs/review-handoffs/2026-09-15-staff-intake-pr-d-handoff.md).
+
+
+## 2026-09-15 — PR D implemented candidate; browser/publication pending
+
+- **Staffing:** One independent developer; fresh agent reviews and automated checks supply quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR C is merged at `develop@50f2ac86621329f12680e706bd8d224e76833c22`. PR D source is implemented locally on `feat/staff-intake-corrections`; the production build rendered the local workspace and canonical detail. Interactive correction/review browser qualification remains incomplete. Owner preview is untouched; no cloud availability recheck occurred.
+- **Gate budget:** Owner-authorized PR D source work and disposable fictional testing; no cloud/live/production or default permission activation.
+- **Next executable action:** Resume the bounded browser walkthrough when approval tooling is available, resolve any observed defects, finish integration review and outgoing-range hygiene/secret checks, then publish PR D and complete required CI before owner merge. Automatic approval review rejected the next browser action due to account usage limits; no workaround was attempted.
+- **Do not regress:** Original finalized references/history, exact retry identities, independent dirty buffers, restricted permissions, bilingual parity, applied migration bytes, owner preview and deferred UX note.
+
+**Validated:** 2,055 full backend tests at 95.22% coverage; 26 subsequent focused tests including runtime-role correction routes and populated migration preservation; 344 frontend tests with all coverage thresholds, lock checks, lint, typecheck and production build. Fresh agent rereviews cleared the repaired bounded findings. PR D remains uncommitted/unpublished, and complete-PR-D / complete-A–D checklist items remain open. See [PR D handoff](docs/review-handoffs/2026-09-15-staff-intake-pr-d-handoff.md).
+
+
+## 2026-09-15 - PR C merged; PR D implementation active
+
+- **Staffing:** One independent developer; fresh agent reviews and automated checks supply quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #104 is confirmed merged at `develop@50f2ac86621329f12680e706bd8d224e76833c22`; GitHub reports successful application, branch-policy, hygiene and image-build checks. PR C bounded local browser evidence remains recorded; the owner preview is preserved and its availability was not rechecked. No new cloud qualification occurred.
+- **Gate budget:** Owner authorized rebasing from current `origin/develop` and continuing implementation through PR D. Existing disposable fictional local test approval applies; cloud/live/production authority remains separately scoped.
+- **Next executable action:** Implement contract §9 canonical corrections and current-facts re-review on `feat/staff-intake-corrections` from the exact merged tip, then complete fresh review and qualification before publication.
+- **Do not regress:** Immutable original intake/review/finalization references and command retries, independent dirty buffers, restricted canonical permissions, bilingual parity, applied migration bytes and private runtime boundaries. Preserve the deferred UX note and owner preview data.
+
+**Observed rebaseline:** The pre-rebase PR C branch and merged `origin/develop` had identical trees. Rebase skipped already-squashed commits and completed at `50f2ac8`; the PR D branch starts there. PR D remains incomplete. This entry supersedes older pending-publication/CI/merge statements below.
+
 ## 2026-09-15 - PR C published as PR #104
 
 - **Staffing:** One independent developer; fresh agent reviews and automated/browser checks provide quality evidence, not independent-human authorization.

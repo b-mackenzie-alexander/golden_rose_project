@@ -109,4 +109,7 @@ def test_worker_tables_have_minimal_runtime_grants(connection, table):
             text("SELECT has_table_privilege('golden_rose_runtime',:table,:privilege)"),
             {"table": table, "privilege": privilege},
         )
-        assert permitted == (privilege in {"SELECT", "INSERT"})
+        assert permitted == (
+            privilege in {"SELECT", "INSERT"}
+            or (table == "worker_interest_selections" and privilege == "DELETE")
+        )

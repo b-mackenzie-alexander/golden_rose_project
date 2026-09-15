@@ -939,7 +939,7 @@ worker_contacts = Table(
     metadata,
     Column("worker_contact_id", UUID(as_uuid=True), primary_key=True),
     Column("worker_id", UUID(as_uuid=True), nullable=False),
-    Column("phone", String(32), nullable=False),
+    Column("phone", String(40), nullable=False),
     *_canonical_attribution(),
 )
 worker_residences = Table(
@@ -1089,3 +1089,58 @@ for _kind in (
     intake_finalizations.append_column(Column(f"{_kind}_id", UUID(as_uuid=True)))
     intake_finalizations.append_column(Column(f"{_kind}_version", Integer))
     intake_finalizations.append_column(Column(f"{_kind}_disposition", String(16)))
+
+# PR D protected canonical correction evidence. Exact SQL authority is migration-managed.
+canonical_corrections = Table(
+    "canonical_corrections",
+    metadata,
+    Column("event_id", UUID(as_uuid=True), primary_key=True),
+    Column("command_id", UUID(as_uuid=True), nullable=False),
+    Column("command_type", String(64), nullable=False),
+    Column("entity_type", String(64), nullable=False),
+    Column("entity_id", UUID(as_uuid=True), nullable=False),
+    Column("previous_version", Integer, nullable=False),
+    Column("result_version", Integer, nullable=False),
+    Column("actor_id", UUID(as_uuid=True), nullable=False),
+    Column("occurred_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("corrects_event_id", UUID(as_uuid=True)),
+)
+canonical_correction_payloads = Table(
+    "canonical_correction_payloads",
+    metadata,
+    Column("event_id", UUID(as_uuid=True), primary_key=True),
+    Column("reason_text", String(512), nullable=False),
+    Column("before", JSONB, nullable=False),
+    Column("after", JSONB, nullable=False),
+)
+canonical_review_heads = Table(
+    "canonical_review_heads",
+    metadata,
+    Column("canonical_output_review_id", UUID(as_uuid=True), primary_key=True),
+    Column("intake_id", UUID(as_uuid=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    Column("latest_review_id", UUID(as_uuid=True)),
+    Column("updated_by", UUID(as_uuid=True)),
+    Column("updated_at", TIMESTAMP(timezone=True)),
+)
+canonical_output_reviews = Table(
+    "canonical_output_reviews",
+    metadata,
+    Column("review_id", UUID(as_uuid=True), primary_key=True),
+    Column("intake_id", UUID(as_uuid=True), nullable=False),
+    Column("original_review_id", UUID(as_uuid=True), nullable=False),
+    Column("command_id", UUID(as_uuid=True), nullable=False),
+    Column("event_id", UUID(as_uuid=True), nullable=False),
+    Column("result_version", Integer, nullable=False),
+    Column("actor_id", UUID(as_uuid=True), nullable=False),
+    Column("occurred_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("dependencies", JSONB, nullable=False),
+)
+canonical_output_review_payloads = Table(
+    "canonical_output_review_payloads",
+    metadata,
+    Column("review_id", UUID(as_uuid=True), primary_key=True),
+    Column("reviewed_content", JSONB, nullable=False),
+    Column("note", String(512)),
+)
+entity_authorities.append_column(Column("canonical_output_review_id", UUID(as_uuid=True)))

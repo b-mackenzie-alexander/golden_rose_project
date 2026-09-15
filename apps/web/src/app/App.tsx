@@ -1,4 +1,7 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
+import { useEffect, useState } from 'react';
+import { createBrowserRouter, RouterProvider, Navigate, Route, Routes } from 'react-router';
+import { NavigationGuard } from './NavigationGuard';
+import { routerWindow } from '../browser/routerWindow';
 
 import { WorkInterestCatalog } from '../intakes/WorkInterests';
 import { CanonicalOutput } from '../intakes/CanonicalOutput';
@@ -33,11 +36,18 @@ export function AppRoutes() {
 }
 
 export function App() {
+  const [router] = useState(() => {
+    const instance = createBrowserRouter([{ path: '*', element: <NavigationGuard><AppRoutes /></NavigationGuard> }], { window: routerWindow() });
+    instance.dispose();
+    return instance;
+  });
+  useEffect(() => {
+    router.initialize();
+    return () => { router.dispose(); };
+  }, [router]);
   return (
     <LanguageProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
+      <RouterProvider router={router} />
     </LanguageProvider>
   );
 }

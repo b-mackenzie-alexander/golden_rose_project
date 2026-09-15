@@ -96,7 +96,7 @@ def test_worker_resolves_exact_children_without_values_or_writes():
     command = request()
     assert command.party is not None
     data = [{"worker_id": command.party.id, "version": 1}]
-    for name in ("worker_contact", "worker_residence", "worker_preferences"):
+    for name in ("worker_contact", "worker_preferences", "worker_residence"):
         data.append({f"{name}_id": uuid4(), "version": 1})
     rows(session, data)
     result = resolve_link_dependencies(
@@ -105,7 +105,7 @@ def test_worker_resolves_exact_children_without_values_or_writes():
     assert result == {
         name: {"id": str(row[f"{name}_id"]), "version": 1}
         for name, row in zip(
-            ("worker", "worker_contact", "worker_residence", "worker_preferences"),
+            ("worker", "worker_contact", "worker_preferences", "worker_residence"),
             data,
             strict=True,
         )
@@ -172,10 +172,10 @@ def employer_request() -> LinkIntakeRequest:
 def employer_rows(command) -> list[Any]:
     return [
         {"employer_id": command.party.id, "version": 1, "employer_type": "business"},
+        {"employer_address_id": command.business_address.id, "version": 1},
         {"employer_contact_id": command.contact.id, "version": 1},
         {"employer_contact_details_id": uuid4(), "version": 1},
         {"worksite_id": command.worksite.id, "version": 1},
-        {"employer_address_id": command.business_address.id, "version": 1},
     ]
 
 
@@ -193,14 +193,14 @@ def test_employer_locks_parent_and_resolves_same_parent_children():
         "worksite",
         "employer_address",
     }
-    assert result["employer_contact_details"]["id"] == str(data[2]["employer_contact_details_id"])
+    assert result["employer_contact_details"]["id"] == str(data[3]["employer_contact_details_id"])
     statements = [call.args[0] for call in session.execute.call_args_list]
     assert "FOR UPDATE" in str(statements[0])
     assert command.party is not None and command.contact is not None
-    for statement in statements[1:]:
+    for index, statement in enumerate(statements[1:], start=1):
         assert command.party.id in statement.compile().params.values()
-        assert "FOR UPDATE" not in str(statement)
-    assert command.contact.id in statements[2].compile().params.values()
+        assert ("FOR UPDATE" in str(statement)) == (index != 2)
+    assert command.contact.id in statements[3].compile().params.values()
     session.commit.assert_not_called()
     session.rollback.assert_not_called()
 
@@ -231,7 +231,7 @@ def test_employer_selected_permissions_precede_lookup(permission):
 
 @pytest.mark.parametrize(
     "index,code",
-    [(1, "not_found"), (2, "canonical_incomplete"), (3, "not_found"), (4, "not_found")],
+    [(1, "not_found"), (2, "not_found"), (3, "canonical_incomplete"), (4, "not_found")],
 )
 def test_employer_missing_selected_rows(index, code):
     session, command = Mock(), employer_request()
@@ -245,7 +245,7 @@ def test_employer_missing_selected_rows(index, code):
     assert error.value.code == code
 
 
-@pytest.mark.parametrize("index", [1, 3, 4])
+@pytest.mark.parametrize("index", [1, 2, 4])
 def test_employer_changed_selected_version(index):
     session, command = Mock(), employer_request()
     data = employer_rows(command)

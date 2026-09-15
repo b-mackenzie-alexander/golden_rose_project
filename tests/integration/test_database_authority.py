@@ -666,7 +666,7 @@ def test_managed_bootstrap_can_be_deleted_before_restricted_migration(
             "unique_indexes",
         ),
         ("GRANT UPDATE ON workers TO golden_rose_runtime", "runtime table privileges"),
-        ("GRANT UPDATE(full_name) ON workers TO golden_rose_runtime", "UPDATE columns"),
+        ("GRANT UPDATE(created_by) ON workers TO golden_rose_runtime", "UPDATE columns"),
         ("GRANT SELECT ON worker_residences TO PUBLIC", "PUBLIC table privileges"),
         ("GRANT EXECUTE ON FUNCTION intake_link_refs(uuid) TO PUBLIC", "PUBLIC execution"),
         (

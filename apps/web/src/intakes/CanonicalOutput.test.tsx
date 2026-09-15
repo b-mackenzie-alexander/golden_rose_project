@@ -118,3 +118,19 @@ it('renders Spanish current-fact labels and passes automated accessibility check
   expect(screen.getByText('Nombre completo')).toBeInTheDocument();
   expect(await runAxe(view.container)).toEqual([]);
 });
+
+it('retains dirty canonical edits when router history traverses backward', async () => {
+  const { createMemoryRouter, RouterProvider } = await import('react-router');
+  const { NavigationGuard } = await import('../app/NavigationGuard');
+  const router = createMemoryRouter([{ path: '*', element: <NavigationGuard><AppRoutes /></NavigationGuard> }], { initialEntries: ['/employers', `/staff/intakes/${id}/outputs/worker`], initialIndex: 1 });
+  render(<LanguageProvider><RouterProvider router={router} /></LanguageProvider>);
+  await screen.findByText('Fictional current worker');
+  fireEvent.click(screen.getByRole('button', { name: 'Correct this section' }));
+  fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Fictional unsaved name' } });
+  await act(async () => { await router.navigate(-1); });
+  expect(screen.getByLabelText('Full name')).toHaveValue('Fictional unsaved name');
+  expect(router.state.location.pathname).toBe(`/staff/intakes/${id}/outputs/worker`);
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel correction' }));
+  await act(async () => { await router.navigate(-1); });
+  expect(router.state.location.pathname).toBe('/employers');
+});

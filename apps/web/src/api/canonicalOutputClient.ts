@@ -79,7 +79,7 @@ export async function getCanonicalOutput(outputs: FinalizationOutputs, key: stri
         path = `${prefix}/contacts/${outputs.contact.id}/details${revealAddress ? '/address' : ''}`;
         validate = revealAddress
           ? shape({ ...identity, contact_details_id: oneOf(reference.id), address })
-          : shape({ ...base, contact_details_id: oneOf(reference.id), employer_contact_id: oneOf(outputs.contact.id), phone: text });
+          : shape({ ...base, contact_details_id: oneOf(reference.id), employer_contact_id: oneOf(outputs.contact.id), representative_name: text, phone: text });
         break;
       case 'worksite':
         path = `${prefix}/worksites/${reference.id}${revealAddress ? '/address' : ''}`;

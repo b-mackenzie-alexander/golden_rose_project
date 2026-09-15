@@ -27,7 +27,11 @@ def read_contact_details(
         raise IntakeError("forbidden", 403)
     table = employer_contact_details
     address_names = ("line1", "line2", "locality", "region", "postal_code", "country")
-    names = address_names if address else ("employer_id", "employer_contact_id", "phone")
+    names = (
+        address_names
+        if address
+        else ("employer_id", "employer_contact_id", "representative_name", "phone")
+    )
     statement = (
         select(
             table.c.employer_contact_details_id.label("contact_details_id"),

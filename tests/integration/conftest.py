@@ -53,7 +53,9 @@ def clean_test_tables(connection) -> None:
            'intake_follow_up_events','intake_history_payloads',
            'workers','worker_contacts','worker_residences','worker_preferences',
            'worker_interest_selections','intake_finalizations','employer_contact_details',
-           'employer_addresses','worksites','staffing_requests')
+           'employer_addresses','worksites','staffing_requests',
+           'canonical_corrections','canonical_correction_payloads',
+           'canonical_review_heads','canonical_output_reviews','canonical_output_review_payloads')
     """)
         )
         .scalars()

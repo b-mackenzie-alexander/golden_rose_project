@@ -1,5 +1,13 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-09-16 — Dashboard NYC heatmap, calendar, and queues branch
+
+- **Staffing:** One independent developer; automated tests and local browser inspection provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** Source work is active on `fix/staff-dashboard-nyc-heatmap` from merged `origin/develop@ecfa03c` after PR #107. The dashboard Activity by area map now uses simplified borough outlines derived from the official NYC Department of City Planning Borough Boundaries GeoJSON instead of generic placeholder geometry. The synthetic values remain unconnected to backend data, but all five boroughs render in geographically recognizable positions, including Staten Island, with a softer basemap treatment and dashboard-native count badges. The `/staff/calendar` route now renders a static staff calendar with summary cards, local day selection, timeline entries, and an agenda panel instead of the generic reserved-route placeholder. The `/staff/queues` route now renders a static work queues module with summary metrics, local queue filters, prioritized rows, and links into existing intake/catalog routes.
+- **Gate budget:** This is bounded source/UI implementation using static synthetic dashboard counts. No shared runtime, image publication, cloud mutation, live data, production permissions, or deployment occurred.
+- **Next executable action:** Decide whether to publish this follow-up PR to `develop`; local production-build browser inspection and full web verification passed for the heatmap correction, calendar route, and work queues route.
+- **Do not regress:** PR #107 dashboard shell/artwork, invariant `Nuestro Corazón Dorado` branding, skyline placement, light/dark behavior, local search routing, PR #106 intake repairs, immutable intake history, restricted addresses and permissions, bilingual parity, and no live/cloud data activation.
+
 ## 2026-09-15 — Dashboard design implementation branch
 
 - **Staffing:** One independent developer; automated tests and local browser inspection provide quality evidence, not independent-human authorization.

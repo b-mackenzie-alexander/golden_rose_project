@@ -35,6 +35,9 @@ describe('Dashboard', () => {
     expect(view.container.querySelector('.skyline-artwork')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'La comunidad nos mueve' })).toHaveClass('mission-statement-mark');
     expect(view.container.querySelector('.zone-map-artwork')).toBeInTheDocument();
+    expect(view.container.querySelectorAll('.zone-map-artwork__borough')).toHaveLength(5);
+    expect(view.container.querySelector('.zone-map-artwork')?.textContent).toContain('Staten Island3');
+    expect(view.container.querySelector('.zone-map-artwork')?.textContent).toContain('Manhattan18');
     expect(await runAxe(view.container)).toEqual([]);
   });
 
@@ -79,6 +82,57 @@ describe('Dashboard', () => {
     await user.click(calendarResult);
 
     expect(screen.getByRole('heading', { name: 'Calendar' })).toBeInTheDocument();
-    expect(screen.getByText('This staff workspace route is now reserved in navigation and can be connected to its workflow data in a later implementation pass.')).toBeInTheDocument();
+    expect(screen.getByText('January 27 - February 2, 2025')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: "Today's agenda" })).toBeInTheDocument();
+  });
+
+  it('renders the staff calendar route with selectable static agenda data', async () => {
+    const user = userEvent.setup();
+    const view = render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/staff/calendar']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    expect(screen.getByRole('link', { name: 'Calendar' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('heading', { name: 'Calendar' })).toBeInTheDocument();
+    expect(screen.getAllByText('Team check-in')).toHaveLength(2);
+    expect(screen.getAllByText('Interview with Ana Quispe')).toHaveLength(2);
+
+    const tuesdayButton = screen.getByText('Jan 28').closest('button');
+    if (tuesdayButton === null) {
+      throw new Error('Tuesday calendar button was not rendered.');
+    }
+    await user.click(tuesdayButton);
+
+    expect(screen.getAllByText('Bright Horizons staffing call')).toHaveLength(2);
+    expect(screen.getAllByText('Meet Carlos Mendoza')).toHaveLength(2);
+    expect(await runAxe(view.container)).toEqual([]);
+  });
+
+  it('renders the work queues route with local queue filters', async () => {
+    const user = userEvent.setup();
+    const view = render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/staff/queues']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    expect(screen.getByRole('link', { name: 'Work queues' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('heading', { name: 'Work queues' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Prioritized work' })).toBeInTheDocument();
+    expect(screen.getByText('Urgent intake review')).toBeInTheDocument();
+    expect(screen.getByText('Employer follow-up')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Employer follow-ups' }));
+
+    expect(screen.queryByText('Urgent intake review')).not.toBeInTheDocument();
+    expect(screen.getByText('Employer follow-up')).toBeInTheDocument();
+    expect(screen.getByText('Update interest catalog')).toBeInTheDocument();
+    expect(await runAxe(view.container)).toEqual([]);
   });
 });

@@ -1,5 +1,11 @@
 # Architecture — Golden Rose Operations Platform
 
+## 2026-09-16 — Current private develop architecture status
+
+Protected `develop@dd6697871986fa5677e722b2805a21a8a7776b64` is deployed to the existing private fictional-synthetic Cloud Run/Cloud SQL `develop` service for stakeholder review. The architecture remains one private staff service behind the temporary expiring Basic gate, with private Cloud SQL, one-instance service bounds, immutable image promotion, and fictional/synthetic data controls. The latest rollout changed only image references for the service, migration job and database-authority job; it did not run migrations, execute database verification, alter Terraform topology, change ingress/authentication, rotate credentials, or promote production authority.
+
+The visible dashboard now contains a static NYC map, calendar and work-queue experience. Architecturally, these are review surfaces over static or placeholder data until separately wired to authoritative request, shift, zone/map-area, follow-up and audit records. Dashboard, calendar, queues, search and maps remain disposable derived projections/queries; PostgreSQL domain rows and append-only audit history remain the authoritative current/history boundary.
+
 ## 2026-09-15 — PR D canonical correction source candidate
 
 PR #104 merged PR C at `develop@50f2ac86621329f12680e706bd8d224e76833c22`. PR D proceeds on `feat/staff-intake-corrections` under accepted ADR-0017. The source adds nine explicit section correction commands with current field permissions, expected versions, required reasons, immutable retries, same-target correction references, and protected before/after evidence. Separate current-facts review binds the original output identities/dispositions to current row versions; original intake reviews and finalizations remain immutable.

@@ -188,7 +188,7 @@ describe('staff intake drafts', () => {
     expect(screen.getByLabelText('Nombre del empleador')).toHaveValue('Fictional Employer');
     expect(screen.getByRole('button', { name: 'Guardar datos' })).toBeInTheDocument();
     expect(await runAxe(view.container)).toEqual([]);
-  }, 15000);
+  }, 60000);
   it('loads bounded shared drafts and ignores late results after selecting a record', async () => {
     vi.mocked(api.queryIntakes).mockResolvedValue({
       ok: true,

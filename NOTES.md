@@ -1,5 +1,19 @@
 # Golden Rose Operations Platform — Production Notes
 
+## 2026-09-15 — Dashboard design implementation branch
+
+- **Staffing:** One independent developer; automated tests and local browser inspection provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** Source work is active on `feat/staff-dashboard-ui` from `origin/develop@68b28ba6f7709085a251141b7f9cab43edbb07a7` after PR #106. The staff workspace shell now follows the provided dashboard design artifacts with a left navigation rail, top utility bar, dashboard home, KPI cards, priority queue, schedule, recent intake/activity modules, quick actions, reserved module routes, responsive behavior, a generated transparent NYC skyline hero art layer based on the design mockup, code-native rose/map artwork, custom navigation/KPI icons, local dashboard search routing, and a working light/dark mode toggle. The local production preview is running on `http://127.0.0.1:4180/` for review. No shared runtime, image publication, cloud mutation, live data, production permissions, or deployment occurred.
+- **Gate budget:** This is bounded source/UI implementation using synthetic static dashboard preview data and existing local workflows. Future image publication, shared synthetic rollout, or cloud qualification requires the applicable fresh scoped approval.
+- **Next executable action:** Review the local dashboard against the design packet, then decide whether to continue with real workflow data wiring for work queues/schedule/map/reports or publish this UI shell as its own source PR.
+- **Do not regress:** PR #106 intake repairs, immutable original intake/review/output history, exact retries, independent dirty buffers, restricted addresses and permissions, bilingual parity, applied migrations, owner preview/private access custody, and no live/cloud data activation.
+
+**Validated:** `npm run verify` passed with 350 frontend tests, coverage thresholds, lint, typecheck, lock checks and production build. Chrome production-preview inspection of `http://127.0.0.1:4180/` confirmed the invariant `Nuestro Corazón Dorado` brand lockup, filled bloom logo, transparent NYC skyline art, Spanish handwritten mission mark, map artwork, separate light/dark skyline blend treatment, search result routing to `/staff/calendar`, and visible light/dark theme toggle behavior. `git diff --check` passed.
+
+**Dashboard visual asset record:** The NYC skyline hero art lives at `apps/web/src/assets/dashboard-nyc-skyline.png`; it is a 1600 x 533 transparent RGBA PNG generated with ImageGen from the user-provided GPT dashboard design references and locally post-processed with `ffmpeg` for alpha transparency. The implementation path is documented in `apps/web/src/assets/README.md`; `SkylineArtwork` exposes the span from `apps/web/src/dashboard/artwork.tsx`, `Dashboard.tsx` places it in the hero banner, and `.skyline-artwork` in `apps/web/src/styles.css` controls the Chrome-calibrated position and light/dark blend treatment.
+
+**Dashboard brand art record:** The dashboard brand name is `Nuestro Corazón Dorado` in both English and Spanish shell states. `apps/web/src/app/AppShell.tsx` renders it as a two-line brand lockup with an accessible invariant label. `apps/web/src/dashboard/artwork.tsx` now provides the filled bloom-style `BrandRose` SVG and the Spanish-only handwritten `MissionStatementMark` SVG (`La comunidad nos mueve`) based on the user-provided mock screenshots; these are code-native artwork, not external image assets.
+
 ## 2026-09-15 — PR D merged; next-step investigation
 
 - **Staffing:** One independent developer; agent reviews and automated/browser checks provide quality evidence, not independent-human authorization.

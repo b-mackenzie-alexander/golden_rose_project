@@ -8,18 +8,18 @@ import { CanonicalOutput } from '../intakes/CanonicalOutput';
 import { IntakeWorkspace } from '../intakes/IntakeWorkspace';
 import { AppShell } from './AppShell';
 import { Dashboard } from '../dashboard/Dashboard';
+import { StaffCalendar } from '../calendar/StaffCalendar';
+import { WorkQueues } from '../queues/WorkQueues';
 import { NotFoundPage } from './NotFoundPage';
 import { reloadCanonicalDocument } from '../browser/privacyLifecycle';
 import { EmployerWorkspace } from '../employers/EmployerWorkspace';
 import { LanguageProvider } from '../i18n/LanguageProvider';
 import { useLanguage } from '../i18n/LanguageProvider';
 
-function StaffModulePlaceholder({ module }: { module: 'calendar' | 'map' | 'queues' | 'reports' }) {
+function StaffModulePlaceholder({ module }: { module: 'map' | 'reports' }) {
   const { language } = useLanguage();
   const moduleNames = {
-    calendar: language === 'en' ? 'Calendar' : 'Calendario',
     map: language === 'en' ? 'Map' : 'Mapa',
-    queues: language === 'en' ? 'Work queues' : 'Colas de trabajo',
     reports: language === 'en' ? 'Reports' : 'Informes',
   };
 
@@ -51,8 +51,8 @@ export function AppRoutes() {
           element={<IntakeWorkspace key="employer" kind="employer" />}
         />
         <Route path="staff/work-interests" element={<WorkInterestCatalog />} />
-        <Route path="staff/calendar" element={<StaffModulePlaceholder module="calendar" />} />
-        <Route path="staff/queues" element={<StaffModulePlaceholder module="queues" />} />
+        <Route path="staff/calendar" element={<StaffCalendar />} />
+        <Route path="staff/queues" element={<WorkQueues />} />
         <Route path="staff/map" element={<StaffModulePlaceholder module="map" />} />
         <Route path="staff/reports" element={<StaffModulePlaceholder module="reports" />} />
         <Route path="staff/intakes/:intakeId/outputs/:output" element={<CanonicalOutput />} />

@@ -23,6 +23,7 @@ type DashboardCopy = {
   scheduleRows: Array<{ dot: 'danger' | 'info' | 'success' | 'warning'; meta: string; time: string; title: string }>;
   searchPlaceholder: string;
   subtitle: string;
+  zoneAreas: Array<{ count: number; intensity: 'high' | 'low' | 'medium' | 'mediumHigh'; label: string; name: 'Bronx' | 'Brooklyn' | 'Manhattan' | 'Queens' | 'Staten Island' }>;
   zonesHeading: string;
   zonesMetric: string;
   zonesMeta: string;
@@ -77,6 +78,13 @@ const englishDashboard: DashboardCopy = {
   ],
   searchPlaceholder: 'Search workers, employers, or intake references...',
   subtitle: "Here's the summary of today in Nuestro Corazón Dorado.",
+  zoneAreas: [
+    { count: 18, intensity: 'high', label: 'Manhattan', name: 'Manhattan' },
+    { count: 14, intensity: 'mediumHigh', label: 'Brooklyn', name: 'Brooklyn' },
+    { count: 12, intensity: 'medium', label: 'Bronx', name: 'Bronx' },
+    { count: 9, intensity: 'medium', label: 'Queens', name: 'Queens' },
+    { count: 3, intensity: 'low', label: 'Staten Island', name: 'Staten Island' },
+  ],
   zonesHeading: 'Activity by area',
   zonesMetric: '56',
   zonesMeta: 'People served this week',
@@ -131,6 +139,13 @@ const spanishDashboard: DashboardCopy = {
   ],
   searchPlaceholder: 'Buscar trabajadores, empleadores o referencias...',
   subtitle: 'Aquí está el resumen de hoy en Nuestro Corazón Dorado.',
+  zoneAreas: [
+    { count: 18, intensity: 'high', label: 'Manhattan', name: 'Manhattan' },
+    { count: 14, intensity: 'mediumHigh', label: 'Brooklyn', name: 'Brooklyn' },
+    { count: 12, intensity: 'medium', label: 'Bronx', name: 'Bronx' },
+    { count: 9, intensity: 'medium', label: 'Queens', name: 'Queens' },
+    { count: 3, intensity: 'low', label: 'Staten Island', name: 'Staten Island' },
+  ],
   zonesHeading: 'Actividad por zonas',
   zonesMetric: '56',
   zonesMeta: 'Personas atendidas esta semana',
@@ -284,11 +299,7 @@ export function Dashboard() {
             <p><strong>{copy.zonesMetric}</strong> {copy.zonesMeta}</p>
           </div>
           <div aria-hidden="true" className="dashboard-map">
-            <ZoneMapArtwork />
-            <span style={{ left: '62%', top: '26%' }}>Bronx 12</span>
-            <span style={{ left: '44%', top: '48%' }}>Manhattan 18</span>
-            <span style={{ left: '70%', top: '64%' }}>Queens 9</span>
-            <span style={{ left: '56%', top: '78%' }}>Brooklyn 14</span>
+            <ZoneMapArtwork areas={copy.zoneAreas} />
           </div>
         </section>
 

@@ -1,5 +1,15 @@
 # Current Work — Golden Rose Operations Platform
 
+## 2026-09-16 — PR #108 deployed to private develop for stakeholder review
+
+- **Staffing:** One independent developer; GitHub Actions, Terraform readbacks and read-only HTTP smoke checks provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #108 is merged into protected `develop` at `dd6697871986fa5677e722b2805a21a8a7776b64` and deployed to the existing private fictional-synthetic `develop` stakeholder-review service. The deployed dashboard includes the PR #107 shell/artwork and PR #108 Activity by area NYC map, static calendar module and work queues module. No live/client data, production promotion, credential rotation, database migration execution or new public access model was introduced.
+- **Gate budget:** The owner explicitly authorized deploying the merged package for stakeholder review. The rollout published and verified a signed image for `develop@dd669787`, then applied one service-stage Terraform plan with `0 added, 3 changed, 0 destroyed`: the staff service, migration job and database-authority job image references were updated in place to the new immutable digest. The GitHub `deploy-develop.yml` service stage passed; migration and database-verification executions were skipped as intended for this UI-only service rollout.
+- **Next executable action:** Stakeholders can review the private `develop` service using the existing private access card. Gather feedback on the dashboard experience, especially the still-static modules and backend wiring gaps for map/calendar/queues/search. Treat manual accessibility, fluent-language, screen-reader, stakeholder acceptance and production readiness as still not run.
+- **Do not regress:** Private fictional-synthetic data boundary; expiring Basic gate; one-instance Cloud Run cap; private Cloud SQL; PR #106 intake repairs; PR #107 branding/artwork; PR #108 map/calendar/queues UI; immutable intake history; restricted addresses and permissions; bilingual parity; no live/client-data admission; no production/default permission activation.
+
+**Deployment evidence:** `build-image.yml` workflow run `35139034254` succeeded for `dd669787`; Terraform service-stage apply completed with `0 added, 3 changed, 0 destroyed`; `deploy-develop.yml` service workflow run `35139757477` succeeded. Cloud Run v2 readback confirmed a service URI, matching latest ready/created revision and deployed image digest `sha256:eb6c214b8124d204e2222a90acdc243cf25c52e58739163bcd6d704a71a9e3ec`. Read-only HTTP smoke checks passed for `/health`, `/readiness`, authenticated `/api/staff/v1/environment`, unauthenticated Basic denial and the dashboard HTML shell. The older full qualification script was not run with synthetic writes because that would persist new synthetic employer/contact records and requires a separate explicit write-probe approval.
+
 ## 2026-09-16 — Dashboard NYC heatmap, calendar, and queues branch
 
 - **Staffing:** One independent developer; automated tests and local browser inspection provide quality evidence, not independent-human authorization.

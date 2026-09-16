@@ -1,5 +1,11 @@
 # Technical Requirements — Golden Rose Operations Platform
 
+## 2026-09-16 — Current develop stakeholder-review surface
+
+PR #108 is merged at protected `develop@dd6697871986fa5677e722b2805a21a8a7776b64` and deployed to the existing private fictional-synthetic `develop` service for stakeholder review. The current service includes the PR #107 dashboard shell/artwork plus PR #108's Activity by area NYC map, static calendar module and static work queues module. This updates the human-visible review surface, but it does not complete the authoritative backend contracts for map/calendar/queues/search and does not admit live/client data, production promotion, new access model, credential rotation or default permission activation.
+
+Near-term product feedback should focus on whether the dashboard helps stakeholders reason about staff work despite the static modules. Implementation follow-up still needs governed backend wiring from authoritative records for map areas, calendar coverage, work queues and dashboard search, with the existing authorization, exact-address, location-privacy, audit, and non-automation constraints preserved.
+
 ## 2026-09-15 — PR D canonical correction source candidate
 
 PR #104 merged PR C at `develop@50f2ac86621329f12680e706bd8d224e76833c22`. PR D proceeds on `feat/staff-intake-corrections` under accepted ADR-0017. The source adds nine explicit section correction commands with current field permissions, expected versions, required reasons, immutable retries, same-target correction references, and protected before/after evidence. Separate current-facts review binds the original output identities/dispositions to current row versions; original intake reviews and finalizations remain immutable.

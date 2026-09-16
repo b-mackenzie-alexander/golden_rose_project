@@ -1,5 +1,11 @@
 # Security — Golden Rose Operations Platform
 
+## 2026-09-16 — PR #108 private develop service update
+
+PR #108 is merged at protected `develop@dd6697871986fa5677e722b2805a21a8a7776b64` and the current signed image has been deployed to the existing private fictional-synthetic `develop` stakeholder-review service. The rollout updated the staff service, migration job and database-authority job image references in place with a service-stage Terraform apply showing `0 added, 3 changed, 0 destroyed`; migration and database-verification executions were intentionally skipped for this UI-only service update.
+
+The deployed workspace now includes the PR #107 dashboard shell/artwork and PR #108 Activity by area NYC map, static calendar module and static work queues module. These surfaces remain stakeholder-review UI over fictional/synthetic data and static or derived placeholders until backend wiring is separately planned and implemented. They do not authorize live/client data, production promotion, credential rotation, new public access, map geocoding provider activation, precise-location disclosure, worker-layer mapping, automated matching/ranking, external calendar sync, notifications, exports, or default permission activation. Read-only smoke checks passed for health/readiness, authenticated environment read, unauthenticated Basic denial and dashboard HTML; the older write-based full qualification script was not run because synthetic write probes require separate approval.
+
 ## 2026-09-15 — PR D canonical correction source candidate
 
 PR #104 merged PR C at `develop@50f2ac86621329f12680e706bd8d224e76833c22`. PR D proceeds on `feat/staff-intake-corrections` under accepted ADR-0017. The source adds nine explicit section correction commands with current field permissions, expected versions, required reasons, immutable retries, same-target correction references, and protected before/after evidence. Separate current-facts review binds the original output identities/dispositions to current row versions; original intake reviews and finalizations remain immutable.

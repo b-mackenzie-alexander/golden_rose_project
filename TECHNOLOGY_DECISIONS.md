@@ -1,5 +1,11 @@
 # Technology Decisions — Golden Rose Operations Platform
 
+## 2026-09-16 — PR #108 develop dashboard deployment status
+
+PR #108 is merged at protected `develop@dd6697871986fa5677e722b2805a21a8a7776b64` and deployed to the existing private fictional-synthetic `develop` service. This is a stakeholder-review update to the accepted temporary develop target, not a new technology decision or production promotion. It confirms that the current dashboard shell/map/calendar/queues source can be published through the existing signed-image and service-stage deployment path without database migration execution.
+
+The decision boundary remains unchanged: real workflow data wiring for map/calendar/queues/search, any geocoder/provider activation, live data, production, public access, exports, notifications, worker-layer mapping and identity changes each require their existing separate planning/approval gates.
+
 ## 2026-09-14 — PR B source implementation
 
 PR #102 merged durable intake drafts at `develop@2783415dd19027428bf2036730b6c0d83f23ab3c`. The owner completed the bounded local browser-verification step and authorized PR B on `feat/staff-intake-review`. Review/follow-up, protected history and governed bilingual work interests are now implemented in the source candidate. Fresh specification/quality and final integration reviews approved source publication; local qualification passed 1,253 backend tests (95.64% coverage) and 202 frontend tests. Required CI and protected merge remain; this is not deployed functionality. The browser evidence remains separately preserved in `ee82615` on `test/staff-intake-browser-ux`, and the requested minor-polish note is reserved for the next docs PR.

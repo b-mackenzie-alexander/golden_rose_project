@@ -153,7 +153,7 @@ export type MessageCatalog = {
 export const englishMessages: MessageCatalog = {
   catalogVersion: 'Proposed',
   reviewStatus: 'Proposed',
-  shellHeading: 'Golden Rose Staff Workspace',
+  shellHeading: 'Nuestro Corazón Dorado',
   primaryNavigation: 'Primary',
   employersNav: 'Employers',
   switchLanguage: 'Cambiar a español',
@@ -307,7 +307,7 @@ export type Messages = MessageCatalog;
 export const spanishMessages: MessageCatalog = {
   catalogVersion: 'Proposed',
   reviewStatus: 'Proposed',
-  shellHeading: 'Espacio de trabajo del personal de Golden Rose',
+  shellHeading: 'Nuestro Corazón Dorado',
   primaryNavigation: 'Principal',
   employersNav: 'Empleadores',
   switchLanguage: 'Switch to English',

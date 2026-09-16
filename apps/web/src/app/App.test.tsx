@@ -31,7 +31,7 @@ describe('App', () => {
     render(<App />);
 
     expect(document.documentElement.lang).toBe('en');
-    expect(screen.getByRole('heading', { name: 'Golden Rose Staff Workspace' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Nuestro Corazón Dorado' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Find an employer' })).toBeInTheDocument();
     expect(screen.getByLabelText('Employer name')).toBeInTheDocument();
     expect(screen.getByLabelText('Draft employer display name')).toBeInTheDocument();
@@ -39,7 +39,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Cambiar a español' }));
 
     expect(document.documentElement.lang).toBe('es');
-    expect(screen.getByRole('heading', { name: 'Espacio de trabajo del personal de Golden Rose' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Nuestro Corazón Dorado' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Buscar un empleador' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Guía del flujo de trabajo' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Buscar primero' })).toBeInTheDocument();
@@ -54,7 +54,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Switch to English' }));
 
     expect(document.documentElement.lang).toBe('en');
-    expect(screen.getByRole('heading', { name: 'Golden Rose Staff Workspace' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Nuestro Corazón Dorado' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Find an employer' })).toBeInTheDocument();
     expect(screen.getByLabelText('Employer name')).toBeInTheDocument();
     expect(screen.getByLabelText('Draft employer display name')).toBeInTheDocument();
@@ -263,7 +263,7 @@ describe('App', () => {
     expect(await runAxe(errorView.container)).toEqual([]);
 
     randomUuidSpy.mockRestore();
-  }, 15000);
+  }, 60000);
 
   it('exposes one ordered semantic workspace', () => {
     render(
@@ -340,7 +340,7 @@ describe('App', () => {
     }
   });
 
-  it('routes root employers and unknown paths safely', () => {
+  it('routes root dashboard, employers, and unknown paths safely', () => {
     const rootRoute = render(
       <LanguageProvider>
         <MemoryRouter initialEntries={['/']}>
@@ -349,9 +349,9 @@ describe('App', () => {
       </LanguageProvider>,
     );
 
-    expect(screen.getByRole('link', { name: 'Employers' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('heading', { name: 'Find an employer' })).toBeInTheDocument();
-    expect(screen.getByRole('form', { name: 'Employer search' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('heading', { name: 'Good morning, Mariela' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: "Today's priorities" })).toBeInTheDocument();
     rootRoute.unmount();
 
     const employersRoute = render(

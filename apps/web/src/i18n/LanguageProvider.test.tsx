@@ -19,7 +19,7 @@ describe('LanguageProvider', () => {
     );
 
     expect(document.documentElement.lang).toBe('en');
-    expect(screen.getByRole('heading', { name: 'Golden Rose Staff Workspace' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Nuestro Corazón Dorado' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Primary' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cambiar a español' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Employers' })).toHaveAttribute('aria-current', 'page');
@@ -27,7 +27,7 @@ describe('LanguageProvider', () => {
     await user.click(screen.getByRole('button', { name: 'Cambiar a español' }));
 
     expect(document.documentElement.lang).toBe('es');
-    expect(screen.getByRole('heading', { name: 'Espacio de trabajo del personal de Golden Rose' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Nuestro Corazón Dorado' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Principal' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Switch to English' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Empleadores' })).toHaveAttribute('aria-current', 'page');
@@ -35,7 +35,7 @@ describe('LanguageProvider', () => {
     await user.click(screen.getByRole('button', { name: 'Switch to English' }));
 
     expect(document.documentElement.lang).toBe('en');
-    expect(screen.getByRole('heading', { name: 'Golden Rose Staff Workspace' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Nuestro Corazón Dorado' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Primary' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cambiar a español' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Employers' })).toHaveAttribute('aria-current', 'page');

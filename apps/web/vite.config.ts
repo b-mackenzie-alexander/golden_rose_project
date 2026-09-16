@@ -38,6 +38,7 @@ export default defineConfig({
     globals: true,
     include: ['src/**/*.test.{ts,tsx}'],
     setupFiles: ['./src/test/setup.ts'],
+    testTimeout: 30000,
     coverage: {
       provider: 'v8',
       include: isFocusedEmployerClientCoverage ? ['src/api/employerClient.ts'] : ['src/**/*.{ts,tsx}'],

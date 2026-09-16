@@ -1,11 +1,17 @@
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 
 import { AppShell } from './AppShell';
 import { LanguageProvider } from '../i18n/LanguageProvider';
 
 describe('AppShell', () => {
-  it('renders compact product header navigation and language action', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    document.documentElement.removeAttribute('data-theme');
+  });
+
+  it('renders the dashboard shell navigation and language action', () => {
     render(
       <LanguageProvider>
         <MemoryRouter initialEntries={['/employers']}>
@@ -16,10 +22,10 @@ describe('AppShell', () => {
 
     const banner = screen.getByRole('banner');
     expect(banner).toHaveClass('app-header');
-    expect(within(banner).getByRole('heading', { name: 'Golden Rose Staff Workspace' })).toHaveClass('app-brand');
-    expect(within(banner).getByRole('navigation', { name: 'Primary' })).toHaveClass('primary-navigation');
-    expect(within(banner).getByRole('link', { name: 'Employers' })).toHaveClass('nav-link');
     expect(within(banner).getByRole('button', { name: 'Cambiar a español' })).toHaveClass('language-action');
+    expect(screen.getByRole('heading', { name: 'Nuestro Corazón Dorado' })).toHaveClass('app-brand');
+    expect(screen.getByRole('navigation', { name: 'Primary' })).toHaveClass('primary-navigation');
+    expect(screen.getByRole('link', { name: 'Employers' })).toHaveClass('nav-link');
     expect(screen.getByRole('main')).toHaveClass('app-main');
   });
 
@@ -34,5 +40,27 @@ describe('AppShell', () => {
     expect(screen.getByRole('navigation', { name: 'Primary' })).toBeInTheDocument();
     expect(screen.getByRole('main')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Employers' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('persists light and dark mode from the utility toggle', async () => {
+    const user = userEvent.setup();
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppShell />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Switch to dark mode' }));
+
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(window.localStorage.getItem('golden-rose-theme')).toBe('dark');
+    expect(screen.getByRole('button', { name: 'Switch to light mode' })).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(screen.getByRole('button', { name: 'Switch to light mode' }));
+
+    expect(document.documentElement.dataset.theme).toBe('light');
+    expect(window.localStorage.getItem('golden-rose-theme')).toBe('light');
   });
 });

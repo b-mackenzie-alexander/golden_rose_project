@@ -1,8 +1,14 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 
 import { IconSymbol, MissionStatementMark, SkylineArtwork, ZoneMapArtwork } from './artwork';
 import type { IconName } from './artwork';
+import { queryIntakes } from '../api/intakeClient';
+import type { IntakeKind, IntakeSummary } from '../api/intakeContracts';
 import { useLanguage } from '../i18n/LanguageProvider';
+
+type DashboardStatus = 'complete' | 'draft' | 'in_review' | 'incomplete' | 'pending';
+type DashboardIntakes = { employers: IntakeSummary[]; workers: IntakeSummary[] };
 
 type DashboardCopy = {
   activityHeading: string;
@@ -12,12 +18,12 @@ type DashboardCopy = {
   kpis: Array<{ accent: 'danger' | 'info' | 'success' | 'warning'; href: string; icon: IconName; label: string; meta: string; value: string }>;
   primaryQueueHeading: string;
   primaryQueueLink: string;
-  queueRows: Array<{ days: string; icon: IconName; name: string; next: string; ref: string; status: 'draft' | 'in_review' | 'incomplete' | 'pending'; type: 'employer' | 'worker' }>;
+  queueRows: Array<{ days: string; href: string; icon: IconName; name: string; next: string; ref: string; status: Exclude<DashboardStatus, 'complete'> }>;
   quickActions: Array<{ href: string; label: string }>;
   quickHeading: string;
   recentEmployerHeading: string;
   recentWorkerHeading: string;
-  recentRows: Array<{ href: string; meta: string; name: string; status: 'complete' | 'draft' | 'in_review' | 'incomplete' | 'pending' }>;
+  recentRows: Array<{ href: string; meta: string; name: string; status: DashboardStatus }>;
   scheduleHeading: string;
   scheduleLink: string;
   scheduleRows: Array<{ dot: 'danger' | 'info' | 'success' | 'warning'; meta: string; time: string; title: string }>;
@@ -39,7 +45,7 @@ const englishDashboard: DashboardCopy = {
   ],
   greeting: 'Good morning, Mariela',
   kpis: [
-    { accent: 'danger', href: '/staff/intakes/workers', icon: 'document', label: 'Worker intakes', meta: 'need review', value: '12' },
+    { accent: 'danger', href: '/staff/intakes/workers?queue=review', icon: 'document', label: 'Worker intakes', meta: 'need review', value: '12' },
     { accent: 'success', href: '/employers', icon: 'workers', label: 'Employer follow-ups', meta: 'scheduled today', value: '8' },
     { accent: 'warning', href: '/staff/queues', icon: 'warning', label: 'Urgent requests', meta: 'require response', value: '4' },
     { accent: 'info', href: '/staff/calendar', icon: 'calendar', label: 'Interviews', meta: 'on the calendar', value: '6' },
@@ -47,11 +53,11 @@ const englishDashboard: DashboardCopy = {
   primaryQueueHeading: "Today's priorities",
   primaryQueueLink: 'View all',
   queueRows: [
-    { days: '9:00 a.m.', icon: 'worker', name: 'Urgent intake review', next: 'Missing residential address', ref: 'Fictional Q Person', status: 'incomplete', type: 'worker' },
-    { days: '10:30 a.m.', icon: 'building', name: 'Employer follow-up', next: 'Confirm contact details', ref: 'Restaurante La Esperanza', status: 'pending', type: 'employer' },
-    { days: '11:00 a.m.', icon: 'worker', name: 'Complete pending interview', next: 'Review availability', ref: 'Jason Meme', status: 'pending', type: 'worker' },
-    { days: '1:00 p.m.', icon: 'document', name: 'Review new drafts', next: 'Three records waiting', ref: 'Staff queue', status: 'draft', type: 'worker' },
-    { days: '3:00 p.m.', icon: 'catalog', name: 'Update interest catalog', next: 'Review new skill labels', ref: 'Catalog', status: 'in_review', type: 'employer' },
+    { days: '9:00 a.m.', href: '/staff/intakes/workers?reference=b7dea69e-9b10-43b3-95aa-d1cd01f6c453&open=match', icon: 'worker', name: 'Urgent intake review', next: 'Missing residential address', ref: 'Preview Catalog Worker', status: 'incomplete' },
+    { days: '10:30 a.m.', href: '/staff/intakes/employers?reference=40bd8f48-88c2-42bf-a2bb-bd4ee6e962e2&open=match', icon: 'building', name: 'Employer follow-up', next: 'Confirm worksite details', ref: 'Heather Micca', status: 'pending' },
+    { days: '11:00 a.m.', href: '/staff/intakes/workers?reference=ca0a3935-e72f-4a00-be6d-af081546a73f&open=match', icon: 'worker', name: 'Complete pending interview', next: 'Review availability', ref: 'Jason Meme', status: 'pending' },
+    { days: '1:00 p.m.', href: '/staff/intakes/workers?queue=review', icon: 'document', name: 'Review new drafts', next: 'Three records waiting', ref: 'Staff queue', status: 'draft' },
+    { days: '3:00 p.m.', href: '/staff/work-interests', icon: 'catalog', name: 'Update interest catalog', next: 'Review new skill labels', ref: 'Catalog', status: 'in_review' },
   ],
   quickActions: [
     { href: '/staff/intakes/workers', label: 'New worker intake' },
@@ -63,9 +69,9 @@ const englishDashboard: DashboardCopy = {
   recentEmployerHeading: 'Recent employer intakes',
   recentWorkerHeading: 'Recent worker intakes',
   recentRows: [
-    { href: '/staff/intakes/workers', meta: '2 days ago', name: 'Maria Lopez', status: 'incomplete' },
-    { href: '/staff/intakes/workers', meta: '1 day ago', name: 'Carlos Rojas', status: 'in_review' },
-    { href: '/staff/intakes/workers', meta: '2 days ago', name: 'Lucia Torres', status: 'draft' },
+    { href: '/staff/intakes/workers?reference=499342a9-30ee-41eb-a5fe-22855025d8a9&open=match', meta: '2 days ago', name: 'Darian Micheal Huges', status: 'complete' },
+    { href: '/staff/intakes/workers?reference=849ae3a9-acde-44f8-b49b-acb3e58a1f7d&open=match', meta: 'Today', name: 'Sam W Gamgee', status: 'complete' },
+    { href: '/staff/intakes/workers?reference=b7dea69e-9b10-43b3-95aa-d1cd01f6c453&open=match', meta: '2 days ago', name: 'Preview Catalog Worker', status: 'incomplete' },
   ],
   scheduleHeading: "Today's schedule",
   scheduleLink: 'View calendar',
@@ -100,7 +106,7 @@ const spanishDashboard: DashboardCopy = {
   ],
   greeting: 'Buenos días, Mariela',
   kpis: [
-    { accent: 'danger', href: '/staff/intakes/workers', icon: 'document', label: 'Registros pendientes', meta: 'requieren revision', value: '12' },
+    { accent: 'danger', href: '/staff/intakes/workers?queue=review', icon: 'document', label: 'Registros pendientes', meta: 'requieren revision', value: '12' },
     { accent: 'success', href: '/employers', icon: 'workers', label: 'Seguimientos hoy', meta: 'contactos programados', value: '8' },
     { accent: 'warning', href: '/staff/queues', icon: 'warning', label: 'Solicitudes urgentes', meta: 'requieren respuesta', value: '4' },
     { accent: 'info', href: '/staff/calendar', icon: 'calendar', label: 'Entrevistas programadas', meta: 'hoy en tu calendario', value: '6' },
@@ -108,11 +114,11 @@ const spanishDashboard: DashboardCopy = {
   primaryQueueHeading: 'Prioridades de hoy',
   primaryQueueLink: 'Ver todas',
   queueRows: [
-    { days: '9:00 a. m.', icon: 'worker', name: 'Revisar solicitud urgente', next: 'Falta domicilio residencial', ref: 'Fictional Q Person', status: 'incomplete', type: 'worker' },
-    { days: '10:30 a. m.', icon: 'building', name: 'Hacer seguimiento con empleador', next: 'Confirmar contacto', ref: 'Restaurante La Esperanza', status: 'pending', type: 'employer' },
-    { days: '11:00 a. m.', icon: 'worker', name: 'Completar entrevista pendiente', next: 'Revisar disponibilidad', ref: 'Jason Meme', status: 'pending', type: 'worker' },
-    { days: '1:00 p. m.', icon: 'document', name: 'Revisar nuevos borradores', next: 'Tres registros sin revisar', ref: 'Cola del personal', status: 'draft', type: 'worker' },
-    { days: '3:00 p. m.', icon: 'catalog', name: 'Actualizar catalogo de intereses', next: 'Revisar nuevas habilidades', ref: 'Catalogo', status: 'in_review', type: 'employer' },
+    { days: '9:00 a. m.', href: '/staff/intakes/workers?reference=b7dea69e-9b10-43b3-95aa-d1cd01f6c453&open=match', icon: 'worker', name: 'Revisar solicitud urgente', next: 'Falta domicilio residencial', ref: 'Preview Catalog Worker', status: 'incomplete' },
+    { days: '10:30 a. m.', href: '/staff/intakes/employers?reference=40bd8f48-88c2-42bf-a2bb-bd4ee6e962e2&open=match', icon: 'building', name: 'Hacer seguimiento con empleador', next: 'Confirmar lugar de trabajo', ref: 'Heather Micca', status: 'pending' },
+    { days: '11:00 a. m.', href: '/staff/intakes/workers?reference=ca0a3935-e72f-4a00-be6d-af081546a73f&open=match', icon: 'worker', name: 'Completar entrevista pendiente', next: 'Revisar disponibilidad', ref: 'Jason Meme', status: 'pending' },
+    { days: '1:00 p. m.', href: '/staff/intakes/workers?queue=review', icon: 'document', name: 'Revisar nuevos borradores', next: 'Tres registros sin revisar', ref: 'Cola del personal', status: 'draft' },
+    { days: '3:00 p. m.', href: '/staff/work-interests', icon: 'catalog', name: 'Actualizar catalogo de intereses', next: 'Revisar nuevas habilidades', ref: 'Catalogo', status: 'in_review' },
   ],
   quickActions: [
     { href: '/staff/intakes/workers', label: 'Nuevo registro de trabajador' },
@@ -124,9 +130,9 @@ const spanishDashboard: DashboardCopy = {
   recentEmployerHeading: 'Registros recientes de empleadores',
   recentWorkerHeading: 'Registros recientes de trabajadores',
   recentRows: [
-    { href: '/staff/intakes/workers', meta: 'hace 2 dias', name: 'Maria Lopez', status: 'incomplete' },
-    { href: '/staff/intakes/workers', meta: 'hace 1 dia', name: 'Carlos Rojas', status: 'in_review' },
-    { href: '/staff/intakes/workers', meta: 'hace 2 dias', name: 'Lucia Torres', status: 'draft' },
+    { href: '/staff/intakes/workers?reference=499342a9-30ee-41eb-a5fe-22855025d8a9&open=match', meta: 'hace 2 dias', name: 'Darian Micheal Huges', status: 'complete' },
+    { href: '/staff/intakes/workers?reference=849ae3a9-acde-44f8-b49b-acb3e58a1f7d&open=match', meta: 'hoy', name: 'Sam W Gamgee', status: 'complete' },
+    { href: '/staff/intakes/workers?reference=b7dea69e-9b10-43b3-95aa-d1cd01f6c453&open=match', meta: 'hace 2 dias', name: 'Preview Catalog Worker', status: 'incomplete' },
   ],
   scheduleHeading: 'Agenda de hoy',
   scheduleLink: 'Ver calendario',
@@ -163,6 +169,148 @@ function statusLabel(status: keyof typeof statusLabels, language: 'en' | 'es') {
   return statusLabels[status][language];
 }
 
+function intakeHref(kind: IntakeKind, item: IntakeSummary) {
+  return `/staff/intakes/${kind === 'worker' ? 'workers' : 'employers'}?reference=${item.intake_id}&open=match`;
+}
+
+function displayName(item: IntakeSummary, language: 'en' | 'es') {
+  return item.display_name?.trim() || (language === 'es' ? 'Registro sin nombre' : 'Unnamed intake');
+}
+
+function summaryStatus(item: IntakeSummary): DashboardStatus {
+  if (item.complete === false) return 'incomplete';
+  if (item.follow_up || item.review_status === 'needs_follow_up') return 'pending';
+  if (item.review_status === 'stale') return 'in_review';
+  if (item.review_status === 'current' && item.complete) return 'complete';
+  return item.complete ? 'complete' : 'draft';
+}
+
+function queueStatus(item: IntakeSummary): Exclude<DashboardStatus, 'complete'> {
+  const status = summaryStatus(item);
+  return status === 'complete' ? 'draft' : status;
+}
+
+function missingLabel(field: string, language: 'en' | 'es') {
+  const labels: Record<string, { en: string; es: string }> = {
+    availability: { en: 'availability', es: 'disponibilidad' },
+    duties_summary: { en: 'duties', es: 'responsabilidades' },
+    offer: { en: 'offer', es: 'oferta' },
+    party_address: { en: 'contact address', es: 'direccion de contacto' },
+    phone: { en: 'phone', es: 'telefono' },
+    representative_name: { en: 'representative name', es: 'nombre del representante' },
+    role_title: { en: 'role title', es: 'cargo' },
+    schedule: { en: 'requested schedule', es: 'horario solicitado' },
+    worker_count: { en: 'number of workers', es: 'numero de trabajadores' },
+    worker_residence: { en: 'residential address', es: 'domicilio residencial' },
+    worksite_address: { en: 'worksite address', es: 'direccion del lugar de trabajo' },
+  };
+  return labels[field]?.[language] ?? field.replace(/_/g, ' ');
+}
+
+function nextStep(item: IntakeSummary, language: 'en' | 'es') {
+  const firstMissingField = item.missing_fields[0];
+  if (firstMissingField) {
+    const firstMissing = missingLabel(firstMissingField, language);
+    return language === 'es' ? `Falta ${firstMissing}` : `Missing ${firstMissing}`;
+  }
+  if (item.review_status !== 'current') {
+    return language === 'es' ? 'Revisar borrador' : 'Review draft';
+  }
+  return language === 'es' ? 'Abrir registro' : 'Open intake';
+}
+
+function relativeDate(value: string, language: 'en' | 'es') {
+  const updated = new Date(value);
+  if (Number.isNaN(updated.getTime())) return language === 'es' ? 'Actualizado recientemente' : 'Updated recently';
+  const now = new Date();
+  const elapsedDays = Math.max(0, Math.floor((now.getTime() - updated.getTime()) / 86_400_000));
+  if (elapsedDays === 0) return language === 'es' ? 'hoy' : 'Today';
+  if (elapsedDays === 1) return language === 'es' ? 'hace 1 dia' : '1 day ago';
+  return language === 'es' ? `hace ${String(elapsedDays)} dias` : `${String(elapsedDays)} days ago`;
+}
+
+function recentRows(
+  kind: IntakeKind,
+  items: IntakeSummary[],
+  language: 'en' | 'es',
+  fallback: DashboardCopy['recentRows'],
+): DashboardCopy['recentRows'] {
+  if (items.length === 0) return fallback;
+  return [...items]
+    .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))
+    .slice(0, 3)
+    .map((item) => ({
+      href: intakeHref(kind, item),
+      meta: relativeDate(item.updated_at, language),
+      name: displayName(item, language),
+      status: summaryStatus(item),
+    }));
+}
+
+function dynamicKpis(copy: DashboardCopy, data: DashboardIntakes, language: 'en' | 'es'): DashboardCopy['kpis'] {
+  if (data.workers.length === 0 && data.employers.length === 0) return copy.kpis;
+  const workerReviewCount = data.workers.filter((item) => item.review_status !== 'current').length;
+  const employerReviewCount = data.employers.filter((item) => item.review_status !== 'current').length;
+  const incompleteCount = [...data.workers, ...data.employers].filter((item) => item.complete === false).length;
+  const workerKpi = copy.kpis[0];
+  const urgentKpi = copy.kpis[2];
+  const calendarKpi = copy.kpis[3];
+  if (!workerKpi || !urgentKpi || !calendarKpi) return copy.kpis;
+  return [
+    { ...workerKpi, value: String(workerReviewCount) },
+    {
+      accent: 'success',
+      href: '/staff/intakes/employers?queue=review',
+      icon: 'building',
+      label: language === 'es' ? 'Registros de empleadores' : 'Employer intakes',
+      meta: language === 'es' ? 'requieren revision' : 'need review',
+      value: String(employerReviewCount),
+    },
+    { ...urgentKpi, label: language === 'es' ? 'Registros incompletos' : 'Incomplete intakes', value: String(incompleteCount) },
+    calendarKpi,
+  ];
+}
+
+function rowFromIntake(
+  kind: IntakeKind,
+  item: IntakeSummary,
+  template: DashboardCopy['queueRows'][number],
+  language: 'en' | 'es',
+): DashboardCopy['queueRows'][number] {
+  return {
+    ...template,
+    href: intakeHref(kind, item),
+    next: nextStep(item, language),
+    ref: displayName(item, language),
+    status: queueStatus(item),
+  };
+}
+
+function dynamicQueueRows(copy: DashboardCopy, data: DashboardIntakes, language: 'en' | 'es'): DashboardCopy['queueRows'] {
+  if (data.workers.length === 0 && data.employers.length === 0) return copy.queueRows;
+  const rows = [...copy.queueRows];
+  const workerReviewCount = data.workers.filter((item) => item.review_status !== 'current').length;
+  const primaryWorker = data.workers.find((item) => item.complete === false) ?? data.workers[0];
+  const primaryEmployer = data.employers.find((item) => item.complete === false) ?? data.employers[0];
+  const availabilityWorker = data.workers.find((item) => item.missing_fields.includes('availability')) ?? data.workers[1] ?? data.workers[0];
+
+  const primaryWorkerTemplate = rows[0];
+  const primaryEmployerTemplate = rows[1];
+  const availabilityWorkerTemplate = rows[2];
+  const reviewQueueTemplate = rows[3];
+  if (primaryWorker && primaryWorkerTemplate) rows[0] = rowFromIntake('worker', primaryWorker, primaryWorkerTemplate, language);
+  if (primaryEmployer && primaryEmployerTemplate) rows[1] = rowFromIntake('employer', primaryEmployer, primaryEmployerTemplate, language);
+  if (availabilityWorker && availabilityWorkerTemplate) rows[2] = rowFromIntake('worker', availabilityWorker, availabilityWorkerTemplate, language);
+  if (!reviewQueueTemplate) return rows;
+  rows[3] = {
+    ...reviewQueueTemplate,
+    next: language === 'es'
+      ? `${String(workerReviewCount)} registros sin revisar`
+      : `${String(workerReviewCount)} records waiting`,
+  };
+  return rows;
+}
+
 function IconMark({ name }: { name: IconName }) {
   return (
     <span aria-hidden="true" className="dashboard-icon">
@@ -174,6 +322,45 @@ function IconMark({ name }: { name: IconName }) {
 export function Dashboard() {
   const { language } = useLanguage();
   const copy = language === 'es' ? spanishDashboard : englishDashboard;
+  const [intakes, setIntakes] = useState<DashboardIntakes>({ employers: [], workers: [] });
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([queryIntakes('worker'), queryIntakes('employer')])
+      .then(([workerResult, employerResult]) => {
+        if (cancelled) return;
+        setIntakes({
+          workers: workerResult.ok ? workerResult.value.items : [],
+          employers: employerResult.ok ? employerResult.value.items : [],
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setIntakes({ employers: [], workers: [] });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const kpis = useMemo(() => dynamicKpis(copy, intakes, language), [copy, intakes, language]);
+  const queueRows = useMemo(() => dynamicQueueRows(copy, intakes, language), [copy, intakes, language]);
+  const workerRows = useMemo(
+    () => recentRows('worker', intakes.workers, language, copy.recentRows),
+    [copy.recentRows, intakes.workers, language],
+  );
+  const employerRows = useMemo(
+    () => recentRows(
+      'employer',
+      intakes.employers,
+      language,
+      [
+        { href: '/staff/intakes/employers', meta: language === 'es' ? 'hoy' : 'Today', name: 'Sunshine Home Care', status: 'pending' },
+        { href: '/staff/intakes/employers', meta: language === 'es' ? 'hace 1 dia' : '1 day ago', name: 'Family First LLC', status: 'incomplete' },
+        { href: '/staff/intakes/employers', meta: language === 'es' ? 'hace 2 dias' : '2 days ago', name: 'Caring Hands', status: 'complete' },
+      ],
+    ),
+    [intakes.employers, language],
+  );
 
   return (
     <section aria-labelledby="dashboard-heading" className="dashboard-page">
@@ -196,7 +383,7 @@ export function Dashboard() {
       </label>
 
       <div className="dashboard-kpis" aria-label={language === 'es' ? 'Metricas principales' : 'Summary metrics'}>
-        {copy.kpis.map((kpi) => (
+        {kpis.map((kpi) => (
           <Link className="dashboard-card dashboard-kpi focus-ring" data-accent={kpi.accent} key={kpi.label} to={kpi.href}>
             <IconMark name={kpi.icon} />
             <span className="dashboard-kpi__number">{kpi.value}</span>
@@ -221,8 +408,8 @@ export function Dashboard() {
               <span>{language === 'es' ? 'Siguiente paso' : 'Next step'}</span>
               <span>{language === 'es' ? 'Hora' : 'Time'}</span>
             </div>
-            {copy.queueRows.map((row) => (
-              <Link className="dashboard-queue__row focus-ring" key={`${row.name}-${row.days}`} to={row.type === 'worker' ? '/staff/intakes/workers' : '/staff/intakes/employers'}>
+            {queueRows.map((row) => (
+              <Link className="dashboard-queue__row focus-ring" key={`${row.name}-${row.days}`} to={row.href}>
                 <span><IconMark name={row.icon} /></span>
                 <span>
                   <strong>{row.name}</strong>
@@ -262,7 +449,7 @@ export function Dashboard() {
             <h3 id="recent-workers-heading"><IconMark name="worker" /> {copy.recentWorkerHeading}</h3>
             <Link className="dashboard-text-link focus-ring" to="/staff/intakes/workers">{copy.primaryQueueLink}</Link>
           </div>
-          <RecentRows rows={copy.recentRows} language={language} />
+          <RecentRows rows={workerRows} language={language} />
         </section>
 
         <section className="dashboard-card" aria-labelledby="recent-employers-heading">
@@ -270,14 +457,7 @@ export function Dashboard() {
             <h3 id="recent-employers-heading"><IconMark name="building" /> {copy.recentEmployerHeading}</h3>
             <Link className="dashboard-text-link focus-ring" to="/staff/intakes/employers">{copy.primaryQueueLink}</Link>
           </div>
-          <RecentRows
-            language={language}
-            rows={[
-              { href: '/staff/intakes/employers', meta: language === 'es' ? 'hoy' : 'Today', name: 'Sunshine Home Care', status: 'pending' },
-              { href: '/staff/intakes/employers', meta: language === 'es' ? 'hace 1 dia' : '1 day ago', name: 'Family First LLC', status: 'incomplete' },
-              { href: '/staff/intakes/employers', meta: language === 'es' ? 'hace 2 dias' : '2 days ago', name: 'Caring Hands', status: 'complete' },
-            ]}
-          />
+          <RecentRows language={language} rows={employerRows} />
         </section>
 
         <section className="dashboard-card dashboard-card--actions" aria-labelledby="quick-actions-heading">

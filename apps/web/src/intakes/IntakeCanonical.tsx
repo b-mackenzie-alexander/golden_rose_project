@@ -67,6 +67,7 @@ export function IntakeCanonical({ detail, section, ready, locked, change, save, 
     children.every((x) => Object.hasOwn(value, x === 'contacts' ? 'contact' : x === 'worksites' ? 'worksite' : 'business_address'));
   const canFinalize = ready && detail.summary.complete && detail.summary.review_status === 'current' &&
     !detail.dependency_stale && detail.latest_review?.outcome === 'intake_reviewed';
+  const showFinalization = detail.latest_review !== undefined || detail.summary.review_status === 'current';
   if (section.status === 'unknown') return <fieldset><legend>{m.title}</legend>
     <p role="status">{status.unknown}</p><button type="button" onClick={() => { save(); }}>{status.retry}</button></fieldset>;
   if (section.status === 'unavailable') return <p role="status">{status.unavailable}</p>;
@@ -90,12 +91,16 @@ export function IntakeCanonical({ detail, section, ready, locked, change, save, 
       setParty(null); save({ operation: 'links', party: null });
     }}>{m.unlink}</button> : null}
     {discard && ['unsaved', 'failed'].includes(section.status) ? <button type="button" onClick={() => { setParty(null); setConfirmation(null); discard(); }}>{m.discard}</button> : null}
-    <p>{m.meaning}</p><label><input type="checkbox" checked={confirmation === reviewKey}
-      onChange={(e) => { setConfirmation(e.target.checked ? reviewKey : null); }} />{m.confirm}</label>
-    {!canFinalize ? <p>{m.ready}</p> : null}
-    <button type="button" disabled={!canFinalize || confirmation !== reviewKey || !(section.status === 'saved' || (section.status === 'failed' && value.operation === 'finalizations'))} onClick={() => {
-      setConfirmation(null); save({ operation: 'finalizations', review_id: detail.latest_review?.review_id ?? '' });
-    }}>{m.finalize}</button>
+    {showFinalization ? (
+      <>
+        <p>{m.meaning}</p><label><input type="checkbox" checked={confirmation === reviewKey}
+          onChange={(e) => { setConfirmation(e.target.checked ? reviewKey : null); }} />{m.confirm}</label>
+        {!canFinalize ? <p>{m.ready}</p> : null}
+        <button type="button" disabled={!canFinalize || confirmation !== reviewKey || !(section.status === 'saved' || (section.status === 'failed' && value.operation === 'finalizations'))} onClick={() => {
+          setConfirmation(null); save({ operation: 'finalizations', review_id: detail.latest_review?.review_id ?? '' });
+        }}>{m.finalize}</button>
+      </>
+    ) : null}
     <p role="status">{status[section.status]}</p>
   </fieldset>;
 }

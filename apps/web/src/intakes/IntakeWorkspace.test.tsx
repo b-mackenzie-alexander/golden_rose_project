@@ -169,12 +169,19 @@ describe('staff intake drafts', () => {
       address: { line1: 'Address A', country: 'US' },
     });
   });
-  it('denied restricted sections do not claim an absent or saved address', async () => {
+  it('opens editable worker address entry when a restricted section cannot be loaded', async () => {
     vi.mocked(api.getIntakeAddress).mockResolvedValue({ ok: false, failure: 'forbidden' });
     mount(`/staff/intakes/${id}`);
     await screen.findByText('Section unavailable. Values are not shown.');
     expect(screen.queryByLabelText('Address line 1')).not.toBeInTheDocument();
     expect(screen.queryByText('All changes saved')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Load restricted section' }));
+    await waitFor(() => {
+      expect(screen.getByLabelText('Address line 1')).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByLabelText('Address line 1'), { target: { value: 'Manual residence address' } });
+    expect(screen.getByLabelText('Address line 1')).toHaveValue('Manual residence address');
+    expect(screen.getByRole('button', { name: 'Save address: Residential address' })).toBeEnabled();
   });
   it('renders bilingual accessible employer fields and preserves section-local values on language change', async () => {
     const view = mount('/staff/intakes/employers');
@@ -197,7 +204,52 @@ describe('staff intake drafts', () => {
     mount();
     fireEvent.click(await screen.findByRole('link', { name: `Resume: Fictional Person — ${id}` }));
     await screen.findByDisplayValue('Fictional');
-    expect(api.queryIntakes).toHaveBeenCalledWith('worker');
+    expect(api.queryIntakes).toHaveBeenCalledWith('worker', {});
+  });
+  it('opens the dashboard review queue with draft results already populated', async () => {
+    const reviewed = {
+      ...detail(1, 'Already Reviewed').summary,
+      intake_id: 'c74eaf5d-549f-4fd0-a872-1fb2d3314916',
+      review_status: 'current' as const,
+    };
+    vi.mocked(api.queryIntakes).mockResolvedValue({
+      ok: true,
+      value: { items: [detail().summary, reviewed], next_cursor: null },
+    });
+    mount('/staff/intakes/workers?queue=review');
+    expect(await screen.findByRole('link', { name: `Resume: Fictional Person — ${id}` })).toBeInTheDocument();
+    expect(screen.queryByText('Already Reviewed')).not.toBeInTheDocument();
+    expect(api.queryIntakes).toHaveBeenCalledWith('worker', {});
+  });
+  it('uses a dashboard entry name to search and opens the single matching intake', async () => {
+    const matchId = 'c74eaf5d-549f-4fd0-a872-1fb2d3314916';
+    vi.mocked(api.queryIntakes).mockResolvedValue({
+      ok: true,
+      value: { items: [{ ...detail(1, 'Maria Lopez').summary, intake_id: matchId }], next_cursor: null },
+    });
+    mount('/staff/intakes/workers?q=Maria%20Lopez&open=match');
+    await waitFor(() => {
+      expect(api.queryIntakes).toHaveBeenCalledWith('worker', { name_query: 'Maria Lopez' });
+    });
+    await waitFor(() => {
+      expect(api.getCanonicalIntake).toHaveBeenCalledWith(matchId);
+    });
+    expect(await screen.findByLabelText('First name')).toBeInTheDocument();
+  });
+  it('uses a dashboard entry reference to open the exact matching intake', async () => {
+    const matchId = 'c74eaf5d-549f-4fd0-a872-1fb2d3314916';
+    vi.mocked(api.queryIntakes).mockResolvedValue({
+      ok: true,
+      value: { items: [{ ...detail(1, 'Preview Catalog Worker').summary, intake_id: matchId }], next_cursor: null },
+    });
+    mount(`/staff/intakes/workers?reference=${matchId}&open=match`);
+    await waitFor(() => {
+      expect(api.queryIntakes).toHaveBeenCalledWith('worker', { reference: matchId });
+    });
+    await waitFor(() => {
+      expect(api.getCanonicalIntake).toHaveBeenCalledWith(matchId);
+    });
+    expect(await screen.findByLabelText('First name')).toBeInTheDocument();
   });
   it('shows conflicts and requires reopening before a new save', async () => {
     mount(`/staff/intakes/${id}`);
@@ -230,7 +282,7 @@ describe('staff intake drafts', () => {
         intake_id: id,
         version: 2,
         section: 'worker_residence',
-        candidate: { line1: 'Fictional Street' },
+        candidate: { line1: 'Fictional Street', country: 'US' },
         resolved: null,
       },
     });
@@ -273,7 +325,7 @@ describe('staff intake drafts', () => {
       expect(api.queryIntakes).toHaveBeenLastCalledWith('worker', { reference: id });
     });
   });
-  it('retains edits made during an address save when its current section must be reloaded', async () => {
+  it('retains edits made during an address save when its current section cannot be reread', async () => {
     mount(`/staff/intakes/${id}`);
     await screen.findByLabelText('Address line 1');
     const pending = deferred<Result<IntakeCommandResult>>();
@@ -291,30 +343,71 @@ describe('staff intake drafts', () => {
       });
       await pending.promise;
     });
-    await screen.findByText(
-      'Saved; current section could not be loaded. Reload this section before saving again.',
-    );
-    expect(screen.getByRole('button', { name: 'Save address: Residential address' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Load restricted section' }));
     await waitFor(() => {
       expect(screen.getByLabelText('Address line 1')).toHaveValue('Later address');
     });
-    vi.mocked(api.getIntakeAddress).mockResolvedValue({
-      ok: true,
-      value: {
-        intake_id: id,
-        version: 2,
-        section: 'worker_residence',
-        candidate: { line1: 'Submitted address' },
-        resolved: null,
-      },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Load restricted section' }));
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Save address: Residential address' })).toBeEnabled();
-    });
+    expect(screen.getByRole('button', { name: 'Save address: Residential address' })).toBeEnabled();
     expect(screen.getByLabelText('Address line 1')).toHaveValue('Later address');
     expect(screen.queryByText('All changes saved')).not.toBeInTheDocument();
+    expect(screen.queryByText('Saved; current section could not be loaded. Reload this section before saving again.')).not.toBeInTheDocument();
+  });
+  it('accepts a submitted address save even when restricted reread cannot read it back', async () => {
+    mount(`/staff/intakes/${id}`);
+    await screen.findByLabelText('Address line 1');
+    fireEvent.change(screen.getByLabelText('Address line 1'), {
+      target: { value: 'Submitted address' },
+    });
+    vi.mocked(api.saveIntake).mockResolvedValue({
+      ok: true,
+      value: { command_id: 'key', result_record_version: 2, current: detail(2) },
+    });
+    vi.mocked(api.getIntakeAddress).mockResolvedValue({ ok: false, failure: 'failed' });
+    fireEvent.click(screen.getByRole('button', { name: 'Save address: Residential address' }));
+
+    await screen.findByText('All changes saved');
+    expect(screen.getByLabelText('Address line 1')).toHaveValue('Submitted address');
+    expect(screen.getByRole('button', { name: 'Save address: Residential address' })).toBeDisabled();
+    expect(screen.queryByText('Saved; current section could not be loaded. Reload this section before saving again.')).not.toBeInTheDocument();
+  });
+  it('accepts a submitted address save when the post-save restricted reread is forbidden', async () => {
+    mount(`/staff/intakes/${id}`);
+    await screen.findByLabelText('Address line 1');
+    fireEvent.change(screen.getByLabelText('Address line 1'), {
+      target: { value: 'Forbidden reread address' },
+    });
+    vi.mocked(api.saveIntake).mockResolvedValue({
+      ok: true,
+      value: { command_id: 'key', result_record_version: 2, current: detail(2) },
+    });
+    vi.mocked(api.getIntakeAddress).mockResolvedValue({ ok: false, failure: 'forbidden' });
+    fireEvent.click(screen.getByRole('button', { name: 'Save address: Residential address' }));
+
+    await screen.findByText('All changes saved');
+    expect(screen.getByLabelText('Address line 1')).toHaveValue('Forbidden reread address');
+    expect(screen.getByRole('button', { name: 'Save address: Residential address' })).toBeDisabled();
+    expect(screen.queryByText('Section unavailable. Values are not shown.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Saved; current section could not be loaded. Reload this section before saving again.')).not.toBeInTheDocument();
+  });
+  it('does not claim an address is saved when the backend reread returns empty values', async () => {
+    mount(`/staff/intakes/${id}`);
+    await screen.findByLabelText('Address line 1');
+    fireEvent.change(screen.getByLabelText('Address line 1'), {
+      target: { value: 'Address that must persist' },
+    });
+    vi.mocked(api.saveIntake).mockResolvedValue({
+      ok: true,
+      value: { command_id: 'key', result_record_version: 2, current: detail(2) },
+    });
+    vi.mocked(api.getIntakeAddress).mockResolvedValue({
+      ok: true,
+      value: { intake_id: id, version: 2, section: 'worker_residence', candidate: null, resolved: null },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save address: Residential address' }));
+
+    await screen.findByText('Not saved. Check the entered values and try again.');
+    expect(screen.queryByText('All changes saved')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Address line 1')).toHaveValue('Address that must persist');
+    expect(screen.getByRole('button', { name: 'Save address: Residential address' })).toBeEnabled();
   });
   it('copies an authorized employer address once without synchronizing later edits', async () => {
     const employer = detail();
@@ -339,6 +432,42 @@ describe('staff intake drafts', () => {
       'href',
       '/staff/intakes/employers',
     );
+  });
+  it('opens editable employer address entry when a restricted section cannot be loaded', async () => {
+    const employer = detail();
+    employer.summary.kind = 'employer';
+    employer.candidate = { display_name: 'Fictional Employer' };
+    vi.mocked(api.getCanonicalIntake).mockResolvedValue({ ok: true, value: employer });
+    vi.mocked(api.getIntakeAddress).mockResolvedValue({ ok: false, failure: 'forbidden' });
+    mount(`/staff/intakes/${id}`);
+    const party = within(await screen.findByRole('group', { name: 'Contact / business address' }));
+    const worksite = within(screen.getByRole('group', { name: 'Worksite address' }));
+    await waitFor(() => {
+      expect(party.getByRole('button', { name: 'Load restricted section' })).toBeEnabled();
+      expect(worksite.getByRole('button', { name: 'Load restricted section' })).toBeEnabled();
+    });
+    fireEvent.click(party.getByRole('button', { name: 'Load restricted section' }));
+    await waitFor(() => {
+      expect(party.getByLabelText('Address line 1')).toBeInTheDocument();
+    });
+    fireEvent.change(party.getByLabelText('Address line 1'), { target: { value: 'Manual contact address' } });
+    expect(party.getByLabelText('Address line 1')).toHaveValue('Manual contact address');
+    expect(party.getByRole('button', { name: 'Save address: Contact / business address' })).toBeEnabled();
+    expect(worksite.getByRole('button', { name: 'Load restricted section' })).toBeEnabled();
+  });
+  it('keeps employer worksite restricted recovery available while another section needs retry', async () => {
+    const employer = detail();
+    employer.summary.kind = 'employer';
+    employer.candidate = { display_name: 'Fictional Employer' };
+    vi.mocked(api.getCanonicalIntake).mockResolvedValue({ ok: true, value: employer });
+    vi.mocked(api.getIntakeAddress).mockResolvedValue({ ok: false, failure: 'forbidden' });
+    vi.mocked(api.saveIntake).mockResolvedValue({ ok: false, failure: 'unknown' });
+    mount(`/staff/intakes/${id}`);
+    const worksite = within(await screen.findByRole('group', { name: 'Worksite address' }));
+    fireEvent.change(screen.getByLabelText('Employer name'), { target: { value: 'Changed Employer' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save details' }));
+    await screen.findByRole('button', { name: 'Retry original save' });
+    expect(worksite.getByRole('button', { name: 'Load restricted section' })).toBeEnabled();
   });
   it('admits only one restricted reload and preserves edits made while it is pending', async () => {
     vi.mocked(api.getIntakeAddress).mockResolvedValue({ ok: false, failure: 'forbidden' });
@@ -395,20 +524,17 @@ describe('staff intake drafts', () => {
     expect(screen.queryByLabelText('Address line 1')).not.toBeInTheDocument();
     expect(screen.queryByDisplayValue('Old concealed value')).not.toBeInTheDocument();
   });
-  it('keeps a new edit dirty when the pending restricted refresh succeeds', async () => {
+  it('keeps a new edit dirty when the pending post-save restricted reread succeeds', async () => {
     mount(`/staff/intakes/${id}`);
     await screen.findByLabelText('Address line 1');
     fireEvent.change(screen.getByLabelText('Address line 1'), { target: { value: 'Submitted' } });
+    const pending = deferred<Result<AddressDetail>>();
     vi.mocked(api.saveIntake).mockResolvedValue({
       ok: true,
       value: { command_id: 'key', result_record_version: 2, current: detail(2) },
     });
-    vi.mocked(api.getIntakeAddress).mockResolvedValue({ ok: false, failure: 'failed' });
-    fireEvent.click(screen.getByRole('button', { name: 'Save address: Residential address' }));
-    await screen.findByRole('button', { name: 'Load restricted section' });
-    const pending = deferred<Result<AddressDetail>>();
     vi.mocked(api.getIntakeAddress).mockReturnValue(pending.promise);
-    fireEvent.click(screen.getByRole('button', { name: 'Load restricted section' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save address: Residential address' }));
     fireEvent.change(screen.getByLabelText('Address line 1'), {
       target: { value: 'Edited during refresh' },
     });
@@ -489,7 +615,7 @@ describe('staff intake drafts', () => {
   it('does not refetch or replace address buffers after an advanced-current address receipt', async () => {
     mount(`/staff/intakes/${id}`);
     await screen.findByLabelText('Address line 1');
-    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Unsaved local content' } });
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'UnsavedLocal' } });
     fireEvent.change(screen.getByLabelText('Address line 1'), {
       target: { value: 'Submitted local address' },
     });
@@ -510,7 +636,7 @@ describe('staff intake drafts', () => {
       });
       await pending.promise;
     });
-    expect(screen.getByLabelText('First name')).toHaveValue('Unsaved local content');
+    expect(screen.getByLabelText('First name')).toHaveValue('UnsavedLocal');
     expect(screen.getByLabelText('Address line 1')).toHaveValue('Later local address');
     expect(api.getIntakeAddress).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: 'Save address: Residential address' })).toBeDisabled();
@@ -545,6 +671,49 @@ it('separates saved completeness and review status', async () => {
   await screen.findByLabelText('First name');
   expect(screen.getByRole('group', { name: 'Review and follow-up' })).toBeInTheDocument();
   expect(screen.getByText(/Not reviewed/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Submit for review' })).toBeDisabled();
+  expect(screen.queryByRole('button', { name: 'Finalize intake' })).not.toBeInTheDocument();
+});
+
+it('allows a follow-up review request when restricted intake sections are recovered', async () => {
+  vi.mocked(api.getIntakeAddress).mockResolvedValue({ ok: false, failure: 'forbidden' });
+  vi.mocked(api.queryFollowUpOwners).mockResolvedValue({
+    ok: true,
+    value: { items: [{ staff_id: id, display_name: 'Fictional owner' }], next_cursor: null },
+  });
+  mount(`/staff/intakes/${id}`);
+  await screen.findByText('Section unavailable. Values are not shown.');
+  fireEvent.change(screen.getByLabelText('Review outcome'), { target: { value: 'needs_follow_up' } });
+  fireEvent.change(screen.getByLabelText('Reason category'), {
+    target: { value: 'missing_information' },
+  });
+  fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Fictional review request' } });
+  await screen.findByRole('option', { name: 'Fictional owner' });
+  fireEvent.change(screen.getByLabelText('Follow-up owner'), { target: { value: id } });
+  fireEvent.change(screen.getByLabelText('Due date and time'), {
+    target: { value: '2026-09-18T10:15' },
+  });
+  fireEvent.click(screen.getByLabelText('Confirm this recorded action'));
+  const button = screen.getByRole('button', { name: 'Record review' });
+  expect(button).toBeEnabled();
+  fireEvent.click(button);
+  await waitFor(() => {
+    expect(api.saveIntake).toHaveBeenCalledTimes(1);
+  });
+  expect(vi.mocked(api.saveIntake).mock.calls[0]?.[0]).toEqual(
+    expect.objectContaining({
+      path: `/intakes/${id}/reviews`,
+      body: {
+        expected_version: 1,
+        outcome: 'needs_follow_up',
+        reason_code: 'missing_information',
+        reason_text: 'Fictional review request',
+        owner_staff_id: id,
+        next_follow_up_at: '2026-09-18T10:15:00-04:00',
+        time_zone: 'America/New_York',
+      },
+    }),
+  );
 });
 
 it('records an explicit current-content review without editing facts', async () => {
@@ -575,7 +744,7 @@ it('records an explicit current-content review without editing facts', async () 
     target: { value: 'Fictional review note' },
   });
   fireEvent.click(screen.getByLabelText('Confirm this recorded action'));
-  fireEvent.click(screen.getByRole('button', { name: 'Record review' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Submit for review' }));
   await screen.findByText(/Current review/);
   expect(api.saveIntake).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -594,7 +763,7 @@ it('keeps unknown review identity and later notes while blocking every section s
   await screen.findByLabelText('Address line 1');
   fireEvent.change(screen.getByLabelText('Restricted note'), { target: { value: 'Original note' } });
   fireEvent.click(screen.getByLabelText('Confirm this recorded action'));
-  fireEvent.click(screen.getByRole('button', { name: 'Record review' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Submit for review' }));
   await screen.findByRole('button', { name: 'Retry original save' });
   fireEvent.change(screen.getByLabelText('Restricted note'), { target: { value: 'Later note' } });
   fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Later name' } });
@@ -620,20 +789,24 @@ it('records needs-follow-up with explicit owner and deadline, retaining rejected
     target: { value: 'missing_information' },
   });
   fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Fictional missing phone' } });
+  await screen.findByRole('option', { name: 'Fictional owner' });
   fireEvent.change(screen.getByLabelText('Follow-up owner'), { target: { value: id } });
-  fireEvent.change(screen.getByLabelText('Due instant (include UTC offset)'), {
-    target: { value: 'bad instant' },
+  fireEvent.change(screen.getByLabelText('Due date and time'), {
+    target: { value: '2026-09-13T15:00' },
   });
-  fireEvent.change(screen.getByLabelText('IANA time zone'), { target: { value: 'America/New_York' } });
+  expect(screen.getByRole('combobox', { name: 'Time zone' })).toHaveValue('America/New_York');
   vi.mocked(api.saveIntake).mockResolvedValue({ ok: false, failure: 'failed' });
   fireEvent.click(screen.getByLabelText('Confirm this recorded action'));
   fireEvent.click(screen.getByRole('button', { name: 'Record review' }));
   await waitFor(() => {
     expect(api.saveIntake).toHaveBeenCalledTimes(1);
   });
-  expect(screen.getByLabelText('Due instant (include UTC offset)')).toHaveValue('bad instant');
-  fireEvent.change(screen.getByLabelText('Due instant (include UTC offset)'), {
-    target: { value: '2026-09-13T15:00:00-04:00' },
+  expect(vi.mocked(api.saveIntake).mock.calls[0]?.[0].body.next_follow_up_at).toBe(
+    '2026-09-13T15:00:00-04:00',
+  );
+  expect(screen.getByLabelText('Due date and time')).toHaveValue('2026-09-13T15:00');
+  fireEvent.change(screen.getByLabelText('Due date and time'), {
+    target: { value: '2026-09-13T16:30' },
   });
   fireEvent.click(screen.getByLabelText('Confirm this recorded action'));
   fireEvent.click(screen.getByRole('button', { name: 'Record review' }));
@@ -646,7 +819,7 @@ it('records needs-follow-up with explicit owner and deadline, retaining rejected
     reason_code: 'missing_information',
     reason_text: 'Fictional missing phone',
     owner_staff_id: id,
-    next_follow_up_at: '2026-09-13T15:00:00-04:00',
+    next_follow_up_at: '2026-09-13T16:30:00-04:00',
     time_zone: 'America/New_York',
   });
   fireEvent.click(
@@ -685,10 +858,10 @@ it.each(['reschedule', 'reassign', 'attempt'])(
     fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Fictional bookkeeping' } });
     await screen.findByRole('option', { name: 'Fictional owner' });
     fireEvent.change(screen.getByLabelText('Follow-up owner'), { target: { value: id } });
-    fireEvent.change(screen.getByLabelText('Due instant (include UTC offset)'), {
-      target: { value: '2026-09-14T12:00:00Z' },
+    fireEvent.change(screen.getByLabelText('Due date and time'), {
+      target: { value: '2026-09-14T12:00' },
     });
-    fireEvent.change(screen.getByLabelText('IANA time zone'), { target: { value: 'Etc/UTC' } });
+    fireEvent.change(screen.getByLabelText('Time zone'), { target: { value: 'Etc/UTC' } });
     if (action === 'attempt') {
       fireEvent.change(screen.getByLabelText('Contact method'), { target: { value: 'phone' } });
       fireEvent.change(screen.getByLabelText('Contact outcome'), { target: { value: 'no_answer' } });
@@ -709,6 +882,7 @@ it.each(['reschedule', 'reassign', 'attempt'])(
     });
     expect(vi.mocked(api.saveIntake).mock.calls[0]?.[0].path).toBe(`/intakes/${id}/follow-ups`);
     expect(vi.mocked(api.saveIntake).mock.calls[0]?.[0].body.action).toBe(action);
+    expect(vi.mocked(api.saveIntake).mock.calls[0]?.[0].body.next_follow_up_at).toBe('2026-09-14T12:00:00+00:00');
     expect(screen.getByText(/Current review/)).toBeInTheDocument();
   },
 );
@@ -720,19 +894,19 @@ it('blocks current review while details are dirty and clears denied review notes
   await screen.findByLabelText('Address line 1');
   fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Later' } });
   fireEvent.click(screen.getByLabelText('Confirm this recorded action'));
-  expect(screen.getByRole('button', { name: 'Record review' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Submit for review' })).toBeDisabled();
   vi.mocked(api.saveIntake).mockResolvedValue({
     ok: true,
     value: { command_id: id, result_record_version: 1, current: complete },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Save details' }));
   await waitFor(() => {
-    expect(screen.getByRole('button', { name: 'Record review' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Submit for review' })).toBeEnabled();
   });
   fireEvent.change(screen.getByLabelText('Restricted note'), { target: { value: 'Concealed note' } });
   fireEvent.click(screen.getByLabelText('Confirm this recorded action'));
   vi.mocked(api.saveIntake).mockResolvedValue({ ok: false, failure: 'forbidden' });
-  fireEvent.click(screen.getByRole('button', { name: 'Record review' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Submit for review' }));
   await waitFor(() => {
     expect(screen.queryByLabelText('Restricted note')).not.toBeInTheDocument();
   });
@@ -759,9 +933,9 @@ it('requires fresh review confirmation after a section save advances the display
   fireEvent.click(screen.getByRole('button', { name: 'Save details' }));
   await screen.findByText(/Version 2/);
   expect(screen.getByLabelText('Confirm this recorded action')).not.toBeChecked();
-  expect(screen.getByRole('button', { name: 'Record review' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Submit for review' })).toBeDisabled();
   fireEvent.click(screen.getByLabelText('Confirm this recorded action'));
-  expect(screen.getByRole('button', { name: 'Record review' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Submit for review' })).toBeEnabled();
 });
 it('retains the selected trusted owner across pages and invalidates confirmation on scope denial', async () => {
   vi.mocked(api.queryFollowUpOwners).mockResolvedValue({
@@ -862,6 +1036,15 @@ describe('canonical workspace integration', () => {
     fireEvent.click(screen.getByLabelText(/I confirm/));
     expect(screen.getByRole('button', { name: 'Finalize intake' })).toBeDisabled();
     expect(api.saveCanonicalIntake).not.toHaveBeenCalled();
+  });
+  it('allows finalization when a restricted address section is concealed but the intake is complete and current', async () => {
+    vi.mocked(api.getCanonicalIntake).mockResolvedValue({ ok: true, value: reviewed() });
+    vi.mocked(api.getIntakeAddress).mockResolvedValue({ ok: false, failure: 'forbidden' });
+    mount(`/staff/intakes/${id}`);
+    await screen.findByText('Section unavailable. Values are not shown.');
+    fireEvent.click(screen.getByLabelText(/I confirm/));
+    expect(screen.queryByText('Save all sections and complete a current review before finalizing.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Finalize intake' })).toBeEnabled();
   });
   it('saves explicit unlink using current version then refreshes address projections', async () => {
     const value = detail(), ref = { id: reviewId, version: 1 };
@@ -979,7 +1162,12 @@ it('retains later candidate edits when an original revision retry returns a subs
   fireEvent.change(screen.getByDisplayValue('Fictional'), { target: { value: 'Submitted revision' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save details' }));
   await screen.findByRole('button', { name: /Retry/ });
-  fireEvent.change(screen.getByDisplayValue('Submitted revision'), { target: { value: 'Keep this later edit' } });
+  const firstNameFields = screen.getAllByLabelText('First name');
+  const editableFirstName = firstNameFields.find(
+    (field): field is HTMLInputElement => field instanceof HTMLInputElement && !field.disabled,
+  );
+  if (!editableFirstName) throw new Error('Missing editable first name field');
+  fireEvent.change(editableFirstName, { target: { value: 'Keep this later edit' } });
   fireEvent.click(screen.getByRole('button', { name: /Retry/ }));
   await waitFor(() => { expect(api.saveIntake).toHaveBeenCalledTimes(2); });
   await waitFor(() => { expect(screen.queryByRole('button', { name: /Retry/ })).not.toBeInTheDocument(); });

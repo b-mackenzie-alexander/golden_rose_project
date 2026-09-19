@@ -30,7 +30,7 @@ export function editSection(section: Section, value: DraftObject): Section {
     ...section,
     value,
     generation: section.generation + 1,
-    status: section.command || section.status === 'refresh' ? section.status : 'unsaved',
+    status: section.command ? section.status : 'unsaved',
   };
 }
 export function submitSection(

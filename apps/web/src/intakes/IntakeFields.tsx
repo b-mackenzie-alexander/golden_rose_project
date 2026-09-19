@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { DraftObject, DraftValue, IntakeKind } from '../api/intakeContracts';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { DEFAULT_STAFF_TIME_ZONE, offsetInstantToLocalDateTime, zonedLocalDateTimeToOffsetInstant } from '../time/timeZone';
+import { normalizedTimeZone, timeZoneOptions } from '../time/timeZoneOptions';
 import { currencies } from './catalogs';
 import { intakeMessages } from './messages';
 import { WorkInterestPicker } from './WorkInterests';
@@ -252,7 +254,11 @@ export function IntakeFields({
   const availability = obj(value.availability);
   const schedule = obj(value.schedule);
   const offer = obj(value.offer);
+  const scheduleTimeZone = typeof schedule.time_zone === 'string' ? schedule.time_zone : DEFAULT_STAFF_TIME_ZONE;
+  const scheduleStartLocal = offsetInstantToLocalDateTime(schedule.starts_at);
+  const scheduleEndLocal = offsetInstantToLocalDateTime(schedule.ends_at);
   const ranges = Array.isArray(availability.ranges) ? availability.ranges.map(obj) : [];
+  const availabilityTimeZone = normalizedTimeZone(availability.time_zone);
   const manualInterests = textList(obj(value.interests).other_description);
   const selections = obj(value.interests).selections;
   const hasCatalogInterest = Array.isArray(selections) && selections.length > 0;
@@ -262,7 +268,7 @@ export function IntakeFields({
     interests: !hasCatalogInterest && !manualInterests.length ? m.interestsRequired : undefined,
     availability: typeof availability.mode === 'string' ? undefined : m.availabilityRequired,
     timeZone:
-      availability.mode === 'weekly' && typeof availability.time_zone !== 'string'
+      availability.mode === 'weekly' && !availabilityTimeZone
         ? m.timeZoneRequired
         : undefined,
     ranges: availability.mode === 'weekly' && !ranges.length ? m.rangesRequired : undefined,
@@ -285,7 +291,61 @@ export function IntakeFields({
     ) === index,
   );
   const setRanges = (next: DraftObject[]) => {
-    nested('availability', 'ranges', dedupeRanges(next));
+    const base = {
+      ...availability,
+      ...(availability.mode === 'weekly' ? { time_zone: availabilityTimeZone } : {}),
+    };
+    change({ ...value, availability: withValue(base, 'ranges', dedupeRanges(next)) });
+  };
+  const setAvailabilityField = (key: string, next: DraftValue | undefined) => {
+    const base = {
+      ...availability,
+      ...(availability.mode === 'weekly' ? { time_zone: availabilityTimeZone } : {}),
+    };
+    change({ ...value, availability: withValue(base, key, next) });
+  };
+  const setSchedule = (next: DraftObject | undefined) => {
+    change(withValue(value, 'schedule', next));
+  };
+  const timedSchedule = (updates: DraftObject, remove: ('starts_at' | 'ends_at')[] = []) => {
+    const next: DraftObject = {
+      mode: 'specified',
+      ...(schedule.note ? { note: schedule.note } : {}),
+      time_zone: scheduleTimeZone,
+      ...Object.fromEntries(
+        Object.entries(schedule).filter(([key]) => ['starts_at', 'ends_at'].includes(key)),
+      ),
+      ...updates,
+    };
+    setSchedule(Object.fromEntries(Object.entries(next).filter(([key]) =>
+      !remove.includes(key as 'starts_at' | 'ends_at'),
+    )));
+  };
+  const setTimedLocal = (key: 'starts_at' | 'ends_at', localValue: DraftValue | undefined) => {
+    if (typeof localValue !== 'string') {
+      timedSchedule({}, [key]);
+      return;
+    }
+    const instant = zonedLocalDateTimeToOffsetInstant(localValue, scheduleTimeZone);
+    if (!instant) {
+      timedSchedule({}, [key]);
+      return;
+    }
+    timedSchedule({ [key]: instant });
+  };
+  const setScheduleTimeZone = (zone: DraftValue | undefined) => {
+    const nextZone = typeof zone === 'string' && zone.trim() ? zone.trim() : DEFAULT_STAFF_TIME_ZONE;
+    const next: DraftObject = { ...schedule, mode: 'specified', time_zone: nextZone };
+    if (scheduleStartLocal) {
+      const instant = zonedLocalDateTimeToOffsetInstant(scheduleStartLocal, nextZone);
+      if (instant) next.starts_at = instant;
+    }
+    if (scheduleEndLocal) {
+      const instant = zonedLocalDateTimeToOffsetInstant(scheduleEndLocal, nextZone);
+      if (instant) next.ends_at = instant;
+    }
+    delete next.requested_start_date;
+    setSchedule(next);
   };
   const weekdays = [
     ['1', 'Monday', 'lunes'],
@@ -398,6 +458,7 @@ export function IntakeFields({
                   v
                     ? {
                         mode: v,
+                        ...(v === 'weekly' ? { time_zone: availabilityTimeZone } : {}),
                         ...(availability.exception_note
                           ? { exception_note: availability.exception_note }
                           : {}),
@@ -416,11 +477,12 @@ export function IntakeFields({
             <fieldset>
               <legend>{m.weekly}</legend>
               <Field
-                label={['IANA time zone', 'Zona horaria IANA']}
-                value={availability.time_zone}
+                label={['Time zone', 'Zona horaria']}
+                value={availabilityTimeZone}
                 error={workerIssues.timeZone}
+                options={timeZoneOptions}
                 change={(v) => {
-                  nested('availability', 'time_zone', v);
+                  setAvailabilityField('time_zone', v ?? DEFAULT_STAFF_TIME_ZONE);
                 }}
               />
               {workerIssues.ranges ? (
@@ -438,14 +500,13 @@ export function IntakeFields({
                     value={range.weekday}
                     options={weekdays}
                     change={(v) => {
-                      nested(
-                          'availability',
-                          'ranges',
-                          dedupeRanges(ranges.map((r, i) =>
-                            i === index
-                              ? withValue(r, 'weekday', v === undefined ? undefined : Number(v))
-                              : r,
-                          )),
+                      setAvailabilityField(
+                        'ranges',
+                        dedupeRanges(ranges.map((r, i) =>
+                          i === index
+                            ? withValue(r, 'weekday', v === undefined ? undefined : Number(v))
+                            : r,
+                        )),
                       );
                     }}
                   />
@@ -456,8 +517,7 @@ export function IntakeFields({
                       type="time"
                       value={range[key]}
                       change={(v) => {
-                        nested(
-                          'availability',
+                        setAvailabilityField(
                           'ranges',
                           dedupeRanges(ranges.map((r, j) => (j === index ? withValue(r, key, v) : r))),
                         );
@@ -472,14 +532,13 @@ export function IntakeFields({
                       ['1', 'Next day', 'Día siguiente'],
                     ]}
                     change={(v) => {
-                      nested(
-                          'availability',
-                          'ranges',
-                          dedupeRanges(ranges.map((r, j) =>
-                            j === index
-                              ? withValue(r, 'end_day_offset', v === undefined ? undefined : Number(v))
-                              : r,
-                          )),
+                      setAvailabilityField(
+                        'ranges',
+                        dedupeRanges(ranges.map((r, j) =>
+                          j === index
+                            ? withValue(r, 'end_day_offset', v === undefined ? undefined : Number(v))
+                            : r,
+                        )),
                       );
                     }}
                   />
@@ -522,11 +581,7 @@ export function IntakeFields({
                   <button
                     type="button"
                     onClick={() => {
-                      nested(
-                        'availability',
-                        'ranges',
-                        ranges.filter((_, i) => i !== index),
-                      );
+                      setAvailabilityField('ranges', ranges.filter((_, i) => i !== index));
                     }}
                   >
                     {m.remove}
@@ -553,7 +608,7 @@ export function IntakeFields({
             max={500}
             value={availability.exception_note}
             change={(v) => {
-              nested('availability', 'exception_note', v);
+              setAvailabilityField('exception_note', v);
             }}
           />
         </>
@@ -577,7 +632,13 @@ export function IntakeFields({
                 withValue(
                   value,
                   'schedule',
-                  v ? { mode: v, ...(schedule.note ? { note: schedule.note } : {}) } : undefined,
+                  v
+                    ? {
+                        mode: v,
+                        ...(v === 'specified' ? { time_zone: scheduleTimeZone } : {}),
+                        ...(schedule.note ? { note: schedule.note } : {}),
+                      }
+                    : undefined,
                 ),
               );
             }}
@@ -592,28 +653,38 @@ export function IntakeFields({
                 type="date"
                 value={schedule.requested_start_date}
                 change={(v) => {
-                  nested('schedule', 'requested_start_date', v);
+                  setSchedule(v ? {
+                    mode: 'specified',
+                    requested_start_date: v,
+                    ...(schedule.note ? { note: schedule.note } : {}),
+                  } : {
+                    mode: 'specified',
+                    time_zone: scheduleTimeZone,
+                    ...(schedule.note ? { note: schedule.note } : {}),
+                  });
                 }}
               />
               <Field
-                label={['Start instant with UTC offset', 'Inicio con desplazamiento UTC']}
-                value={schedule.starts_at}
+                label={['Start date and time', 'Fecha y hora de inicio']}
+                type="datetime-local"
+                value={scheduleStartLocal}
                 change={(v) => {
-                  nested('schedule', 'starts_at', v);
+                  setTimedLocal('starts_at', v);
                 }}
               />
               <Field
-                label={['End instant with UTC offset', 'Fin con desplazamiento UTC']}
-                value={schedule.ends_at}
+                label={['End date and time', 'Fecha y hora de fin']}
+                type="datetime-local"
+                value={scheduleEndLocal}
                 change={(v) => {
-                  nested('schedule', 'ends_at', v);
+                  setTimedLocal('ends_at', v);
                 }}
               />
               <Field
-                label={['Schedule IANA time zone', 'Zona horaria IANA del horario']}
-                value={schedule.time_zone}
+                label={['Schedule time zone', 'Zona horaria del horario']}
+                value={scheduleTimeZone}
                 change={(v) => {
-                  nested('schedule', 'time_zone', v);
+                  setScheduleTimeZone(v);
                 }}
               />
             </div>

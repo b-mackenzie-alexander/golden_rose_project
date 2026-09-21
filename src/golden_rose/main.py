@@ -18,6 +18,7 @@ from golden_rose.api.staff.intake_workflows import router as staff_intake_workfl
 from golden_rose.api.staff.intakes import router as staff_intakes_router
 from golden_rose.api.staff.workers import router as staff_workers_router
 from golden_rose.application.intake_errors import IntakeError
+from golden_rose.application.presentation_demo_seed import seed_presentation_demo_data
 from golden_rose.config import Settings
 from golden_rose.database import create_database_engine
 from golden_rose.demo_access import DemoAccessMiddleware
@@ -33,6 +34,7 @@ def create_app(
     async def lifespan(app: FastAPI):
         engine = engine_factory()
         app.state.db_engine = engine
+        seed_presentation_demo_data(engine, settings)
         try:
             yield
         finally:

@@ -66,6 +66,18 @@ describe('intake transport', () => {
     expect((await getIntake(id)).ok).toBe(true);
     expect(await getIntake('not-an-id')).toEqual({ ok: false, failure: 'failed' });
   });
+  it('accepts the requested intake page size up to the API maximum', async () => {
+    response({ items: Array.from({ length: 50 }, () => detail.summary), next_cursor: null });
+    expect((await queryIntakes('worker', { page_size: 50 })).ok).toBe(true);
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/staff/v1/intakes/query',
+      expect.objectContaining({
+        body: JSON.stringify({ kind: 'worker', lifecycle: 'draft', page_size: 50 }),
+      }),
+    );
+    response({ items: Array.from({ length: 26 }, () => detail.summary), next_cursor: null });
+    expect((await queryIntakes('worker')).ok).toBe(false);
+  });
   it('validates restricted address reads', async () => {
     response({
       intake_id: id,

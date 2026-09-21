@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     demo_access_enabled: bool = False
     demo_access_password: SecretStr | None = Field(default=None, repr=False)
     demo_access_expires_at: datetime | None = Field(default=None, repr=False)
+    presentation_demo_seed_enabled: bool = False
 
     @field_validator("demo_access_password", mode="before")
     @classmethod
@@ -80,6 +81,9 @@ class Settings(BaseSettings):
             raise ValueError(msg)
         if self.environment == "production" and self.auth_mode == "synthetic":
             msg = "synthetic auth_mode is not allowed when environment is production"
+            raise ValueError(msg)
+        if self.presentation_demo_seed_enabled and self.environment != "develop":
+            msg = "presentation demo seed is allowed only in develop"
             raise ValueError(msg)
         if self.environment == "develop":
             if self.deployment_target != DEVELOP_DEPLOYMENT_TARGET:

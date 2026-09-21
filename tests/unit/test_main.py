@@ -158,6 +158,48 @@ def test_develop_app_exposes_value_safe_non_production_marker(monkeypatch) -> No
     assert "gcp-develop-private-synthetic" not in serialized_response
 
 
+def test_develop_lifespan_runs_enabled_presentation_seed(monkeypatch) -> None:
+    class FakeEngine:
+        def dispose(self) -> None:
+            pass
+
+    calls: list[object] = []
+
+    def seed(engine, settings) -> None:
+        calls.append(engine)
+        assert settings.presentation_demo_seed_enabled is True
+        assert settings.environment == "develop"
+
+    monkeypatch.setattr("golden_rose.main.seed_presentation_demo_data", seed)
+    monkeypatch.setenv("GOLDEN_ROSE_ENVIRONMENT", "develop")
+    monkeypatch.setenv("GOLDEN_ROSE_AUTH_MODE", "synthetic")
+    monkeypatch.setenv(
+        "GOLDEN_ROSE_DATABASE_URL",
+        "postgresql+psycopg://test:test@127.0.0.1:55432/golden_rose",
+    )
+    monkeypatch.setenv("GOLDEN_ROSE_SYNTHETIC_STAFF_ID", str(uuid4()))
+    monkeypatch.setenv("GOLDEN_ROSE_DEPLOYMENT_TARGET", "gcp-develop-private-synthetic")
+    monkeypatch.setenv("GOLDEN_ROSE_DEPLOYED_IMAGE_DIGEST", "sha256:" + "a" * 64)
+    monkeypatch.setenv(
+        "GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL",
+        "Non-production develop fictional synthetic data only",
+    )
+    demo_password = base64.urlsafe_b64encode(b"m" * 32).decode("ascii").rstrip("=")
+    monkeypatch.setenv("GOLDEN_ROSE_DEMO_ACCESS_ENABLED", "true")
+    monkeypatch.setenv("GOLDEN_ROSE_DEMO_ACCESS_PASSWORD", demo_password)
+    monkeypatch.setenv(
+        "GOLDEN_ROSE_DEMO_ACCESS_EXPIRES_AT",
+        (datetime.now(UTC) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    )
+    monkeypatch.setenv("GOLDEN_ROSE_PRESENTATION_DEMO_SEED_ENABLED", "true")
+
+    fake_engine: Any = FakeEngine()
+    app = create_app(engine_factory=lambda: fake_engine)
+
+    with TestClient(app):
+        assert calls == [fake_engine]
+
+
 @pytest.mark.parametrize("environment", ["local", "test"])
 def test_environment_marker_is_not_registered_outside_develop(
     monkeypatch,

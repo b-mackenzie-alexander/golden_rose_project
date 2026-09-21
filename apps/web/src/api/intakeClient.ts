@@ -237,17 +237,22 @@ async function request<T>(
     return { ok: false, failure: key ? 'unknown' : 'failed' };
   }
 }
-export const queryIntakes = (kind: IntakeKind, filter: DraftObject = {}) =>
-  request(
+export const queryIntakes = (kind: IntakeKind, filter: DraftObject = {}) => {
+  const pageSize =
+    typeof filter.page_size === 'number' && Number.isSafeInteger(filter.page_size)
+      ? Math.min(Math.max(filter.page_size, 1), 50)
+      : 25;
+  return request(
     '/intakes/query',
-    { kind, lifecycle: 'draft', page_size: 25, ...filter },
+    { kind, lifecycle: 'draft', page_size: pageSize, ...filter },
     (v): v is { items: IntakeSummary[]; next_cursor: string | null } =>
       object(v) &&
       Array.isArray(v.items) &&
-      v.items.length <= 25 &&
+      v.items.length <= pageSize &&
       v.items.every((item) => summary(item)) &&
       (v.next_cursor === null || typeof v.next_cursor === 'string'),
   );
+};
 export const getIntake = (id: string) =>
   uuid.test(id)
     ? request(

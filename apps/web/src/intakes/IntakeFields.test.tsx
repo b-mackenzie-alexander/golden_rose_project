@@ -56,7 +56,7 @@ describe('typed partial fields', () => {
     input('Other work interest 1', 'Cooking');
     input('Other work interest 2', 'Lawncare');
     input('Availability', 'weekly');
-    input('IANA time zone', 'America/New_York');
+    expect(screen.getByRole('combobox', { name: 'Time zone' })).toHaveValue('America/New_York');
     fireEvent.click(screen.getByRole('button', { name: 'Add time block' }));
     input('Day', '1');
     input('Start time', '20:00');
@@ -65,6 +65,9 @@ describe('typed partial fields', () => {
     input('Availability exception note', 'Fictional exception');
     expect(captured()).toContain('"end_day_offset":1');
     expect(captured()).toContain('"other_description":"Cooking; Lawncare"');
+    expect(captured()).toContain('"time_zone":"America/New_York"');
+    input('Time zone', 'Etc/UTC');
+    expect(captured()).toContain('"time_zone":"Etc/UTC"');
     fireEvent.click(screen.getByRole('button', { name: 'Remove range' }));
     expect(captured()).toContain('"ranges":[]');
     input('Availability', 'flexible');
@@ -87,9 +90,10 @@ describe('typed partial fields', () => {
     input('Duties', 'Fictional duties');
     input('Requested schedule', 'specified');
     input('Requested start date (or use timed interval)', '2026-10-01');
-    input('Start instant with UTC offset', '2026-10-01T08:00:00-04:00');
-    input('End instant with UTC offset', '2026-10-01T16:00:00-04:00');
-    input('Schedule IANA time zone', 'America/New_York');
+    expect(captured()).toContain('"requested_start_date":"2026-10-01"');
+    input('Start date and time', '2026-10-01T08:00');
+    input('End date and time', '2026-10-01T16:00');
+    input('Schedule time zone', 'America/New_York');
     input('Schedule note', 'Fictional note');
     input('Minimum amount (decimal)', '0');
     expect(screen.getByText('Zero offer: confirm the supplied amount with staff.')).toBeInTheDocument();
@@ -103,6 +107,10 @@ describe('typed partial fields', () => {
     expect(captured()).toContain('"minimum":"12.34"');
     expect(captured()).toContain('"worker_count":2');
     expect(captured()).toContain('"per_worker":true');
+    expect(captured()).toContain('"starts_at":"2026-10-01T08:00:00-04:00"');
+    expect(captured()).toContain('"ends_at":"2026-10-01T16:00:00-04:00"');
+    expect(captured()).toContain('"time_zone":"America/New_York"');
+    expect(captured()).not.toContain('requested_start_date');
     input('Requested schedule', 'to_be_discussed');
     expect(captured()).not.toContain('starts_at');
     fireEvent.click(screen.getByLabelText('Amount is per worker'));

@@ -19,6 +19,7 @@ type QueueItem = {
   nextStep: string;
   owner: string;
   priority: 'high' | 'low' | 'medium';
+  reason: string;
   reference: string;
   status: QueueStatus;
   title: string;
@@ -35,6 +36,7 @@ type WorkQueuesCopy = {
   owner: string;
   priority: string;
   queueHeading: string;
+  reason: string;
   reference: string;
   status: string;
   subtitle: string;
@@ -59,17 +61,18 @@ const englishQueues: WorkQueuesCopy = {
   ],
   heading: 'Work queues',
   items: [
-    { age: 'Due 9:00 AM', assignee: 'Mariela Torres', category: 'urgent', href: '/staff/intakes/workers', icon: 'worker', id: 'WRK-2025-00123', nextStep: 'Add residential address', owner: 'Fictional Q Person', priority: 'high', reference: 'Worker intake', status: 'incomplete', title: 'Urgent intake review' },
-    { age: 'Due 10:30 AM', assignee: 'Carlos Ramirez', category: 'employer', href: '/staff/intakes/employers', icon: 'building', id: 'EMP-2025-00456', nextStep: 'Confirm contact details', owner: 'Restaurante La Esperanza', priority: 'medium', reference: 'Employer follow-up', status: 'pending', title: 'Employer follow-up' },
-    { age: 'Due 11:00 AM', assignee: 'Ana Torres', category: 'worker', href: '/staff/intakes/workers', icon: 'worker', id: 'WRK-2025-00124', nextStep: 'Review availability', owner: 'Jason Meme', priority: 'medium', reference: 'Worker interview', status: 'pending', title: 'Complete pending interview' },
-    { age: 'Due 1:00 PM', assignee: 'Operations', category: 'worker', href: '/staff/intakes/workers', icon: 'document', id: 'WRK-DRAFTS', nextStep: 'Three records waiting', owner: 'Draft queue', priority: 'low', reference: 'Draft review', status: 'draft', title: 'Review new drafts' },
-    { age: 'Due 3:00 PM', assignee: 'Sofia Diaz', category: 'employer', href: '/staff/work-interests', icon: 'catalog', id: 'CAT-2025-00008', nextStep: 'Review new skill labels', owner: 'Catalog', priority: 'low', reference: 'Work-interest catalog', status: 'in_review', title: 'Update interest catalog' },
+    { age: 'Due 9:00 AM', assignee: 'Mariela Torres', category: 'urgent', href: '/staff/intakes/workers?reference=b7dea69e-9b10-43b3-95aa-d1cd01f6c453&open=match', icon: 'worker', id: 'WRK-2025-00123', nextStep: 'Add residential address', owner: 'Preview Catalog Worker', priority: 'high', reason: 'Missing restricted address blocks review', reference: 'Worker intake', status: 'incomplete', title: 'Urgent intake review' },
+    { age: 'Due 10:30 AM', assignee: 'Carlos Ramirez', category: 'employer', href: '/staff/intakes/employers?reference=40bd8f48-88c2-42bf-a2bb-bd4ee6e962e2&open=match', icon: 'building', id: 'EMP-2025-00456', nextStep: 'Confirm worksite details', owner: 'Heather Micca', priority: 'medium', reason: 'Follow-up deadline is next on today\'s agenda', reference: 'Employer follow-up', status: 'pending', title: 'Employer follow-up' },
+    { age: 'Due 11:00 AM', assignee: 'Ana Torres', category: 'worker', href: '/staff/intakes/workers?reference=ca0a3935-e72f-4a00-be6d-af081546a73f&open=match', icon: 'worker', id: 'WRK-2025-00124', nextStep: 'Review availability', owner: 'Jason Meme', priority: 'medium', reason: 'Interview cannot close until availability is reviewed', reference: 'Worker interview', status: 'pending', title: 'Complete pending interview' },
+    { age: 'Due 1:00 PM', assignee: 'Operations', category: 'worker', href: '/staff/intakes/workers?queue=review', icon: 'document', id: 'WRK-DRAFTS', nextStep: 'Three records waiting', owner: 'Draft queue', priority: 'low', reason: 'Dashboard review queue has new worker drafts', reference: 'Draft review', status: 'draft', title: 'Review new drafts' },
+    { age: 'Due 3:00 PM', assignee: 'Sofia Diaz', category: 'employer', href: '/staff/work-interests', icon: 'catalog', id: 'CAT-2025-00008', nextStep: 'Review new skill labels', owner: 'Catalog', priority: 'low', reason: 'New intake text introduced uncataloged work interests', reference: 'Work-interest catalog', status: 'in_review', title: 'Update interest catalog' },
   ],
   nextStep: 'Next step',
   open: 'Open',
   owner: 'Person / item',
   priority: 'Priority',
   queueHeading: 'Prioritized work',
+  reason: 'Why it is here',
   reference: 'Reference',
   status: 'Status',
   subtitle: 'Prioritized work that needs review, follow-up, or a clear next action.',
@@ -92,17 +95,18 @@ const spanishQueues: WorkQueuesCopy = {
   ],
   heading: 'Colas de trabajo',
   items: [
-    { age: 'Vence 9:00 a. m.', assignee: 'Mariela Torres', category: 'urgent', href: '/staff/intakes/workers', icon: 'worker', id: 'WRK-2025-00123', nextStep: 'Agregar domicilio residencial', owner: 'Fictional Q Person', priority: 'high', reference: 'Registro de trabajador', status: 'incomplete', title: 'Revisar solicitud urgente' },
-    { age: 'Vence 10:30 a. m.', assignee: 'Carlos Ramirez', category: 'employer', href: '/staff/intakes/employers', icon: 'building', id: 'EMP-2025-00456', nextStep: 'Confirmar contacto', owner: 'Restaurante La Esperanza', priority: 'medium', reference: 'Seguimiento de empleador', status: 'pending', title: 'Hacer seguimiento con empleador' },
-    { age: 'Vence 11:00 a. m.', assignee: 'Ana Torres', category: 'worker', href: '/staff/intakes/workers', icon: 'worker', id: 'WRK-2025-00124', nextStep: 'Revisar disponibilidad', owner: 'Jason Meme', priority: 'medium', reference: 'Entrevista de trabajador', status: 'pending', title: 'Completar entrevista pendiente' },
-    { age: 'Vence 1:00 p. m.', assignee: 'Operaciones', category: 'worker', href: '/staff/intakes/workers', icon: 'document', id: 'WRK-DRAFTS', nextStep: 'Tres registros sin revisar', owner: 'Cola de borradores', priority: 'low', reference: 'Revision de borradores', status: 'draft', title: 'Revisar nuevos borradores' },
-    { age: 'Vence 3:00 p. m.', assignee: 'Sofia Diaz', category: 'employer', href: '/staff/work-interests', icon: 'catalog', id: 'CAT-2025-00008', nextStep: 'Revisar nuevas habilidades', owner: 'Catalogo', priority: 'low', reference: 'Catalogo de intereses', status: 'in_review', title: 'Actualizar catalogo de intereses' },
+    { age: 'Vence 9:00 a. m.', assignee: 'Mariela Torres', category: 'urgent', href: '/staff/intakes/workers?reference=b7dea69e-9b10-43b3-95aa-d1cd01f6c453&open=match', icon: 'worker', id: 'WRK-2025-00123', nextStep: 'Agregar domicilio residencial', owner: 'Preview Catalog Worker', priority: 'high', reason: 'Falta domicilio restringido para completar la revision', reference: 'Registro de trabajador', status: 'incomplete', title: 'Revisar solicitud urgente' },
+    { age: 'Vence 10:30 a. m.', assignee: 'Carlos Ramirez', category: 'employer', href: '/staff/intakes/employers?reference=40bd8f48-88c2-42bf-a2bb-bd4ee6e962e2&open=match', icon: 'building', id: 'EMP-2025-00456', nextStep: 'Confirmar lugar de trabajo', owner: 'Heather Micca', priority: 'medium', reason: 'El seguimiento vence en la agenda de hoy', reference: 'Seguimiento de empleador', status: 'pending', title: 'Hacer seguimiento con empleador' },
+    { age: 'Vence 11:00 a. m.', assignee: 'Ana Torres', category: 'worker', href: '/staff/intakes/workers?reference=ca0a3935-e72f-4a00-be6d-af081546a73f&open=match', icon: 'worker', id: 'WRK-2025-00124', nextStep: 'Revisar disponibilidad', owner: 'Jason Meme', priority: 'medium', reason: 'La entrevista necesita disponibilidad revisada', reference: 'Entrevista de trabajador', status: 'pending', title: 'Completar entrevista pendiente' },
+    { age: 'Vence 1:00 p. m.', assignee: 'Operaciones', category: 'worker', href: '/staff/intakes/workers?queue=review', icon: 'document', id: 'WRK-DRAFTS', nextStep: 'Tres registros sin revisar', owner: 'Cola de borradores', priority: 'low', reason: 'La cola del panel tiene nuevos borradores de trabajador', reference: 'Revision de borradores', status: 'draft', title: 'Revisar nuevos borradores' },
+    { age: 'Vence 3:00 p. m.', assignee: 'Sofia Diaz', category: 'employer', href: '/staff/work-interests', icon: 'catalog', id: 'CAT-2025-00008', nextStep: 'Revisar nuevas habilidades', owner: 'Catalogo', priority: 'low', reason: 'Un registro agrego intereses laborales sin catalogar', reference: 'Catalogo de intereses', status: 'in_review', title: 'Actualizar catalogo de intereses' },
   ],
   nextStep: 'Siguiente paso',
   open: 'Abrir',
   owner: 'Persona / elemento',
   priority: 'Prioridad',
   queueHeading: 'Trabajo priorizado',
+  reason: 'Por que aparece',
   reference: 'Referencia',
   status: 'Estado',
   subtitle: 'Trabajo priorizado que necesita revision, seguimiento o un siguiente paso claro.',
@@ -174,6 +178,7 @@ export function WorkQueues() {
             <span>{copy.owner}</span>
             <span>{copy.status}</span>
             <span>{copy.nextStep}</span>
+            <span>{copy.reason}</span>
             <span>{copy.assignee}</span>
             <span>{copy.priority}</span>
             <span>{copy.open}</span>
@@ -192,6 +197,7 @@ export function WorkQueues() {
                 </div>
                 <span className="status-chip" data-status={item.status}>{statusLabel(item.status, language)}</span>
                 <span>{item.nextStep}</span>
+                <span>{item.reason}</span>
                 <span>{item.assignee}</span>
                 <span><span className="queue-priority">{item.age}</span></span>
                 <Link className="dashboard-text-link focus-ring" to={item.href}>{copy.open}</Link>

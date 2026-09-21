@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { queryFollowUpOwners } from '../api/intakeClient';
 import type { DraftObject, IntakeDetail, StaffChoice } from '../api/intakeContracts';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { offsetInstantToLocalDateTime, zonedLocalDateTimeToOffsetInstant } from '../time/timeZone';
+import { normalizedTimeZone, timeZoneOptions } from '../time/timeZoneOptions';
 import { Field } from './IntakeFields';
 import { intakeMessages } from './messages';
 import type { Section } from './saveState';
@@ -74,6 +76,11 @@ export function IntakeWorkflow({
     operation = value.operation === 'follow-ups' ? 'follow-ups' : 'reviews';
   const outcome = typeof value.outcome === 'string' ? value.outcome : 'intake_reviewed';
   const follow = operation === 'follow-ups' || outcome === 'needs_follow_up';
+  const reviewSubmission = operation === 'reviews' && outcome === 'intake_reviewed';
+  const workflowTimeZone = normalizedTimeZone(value.time_zone);
+  const followUpLocalDue =
+    offsetInstantToLocalDateTime(value.next_follow_up_at) ??
+    (typeof value.next_follow_up_at === 'string' ? value.next_follow_up_at : undefined);
   const label = (key: string) => [workflowLabel(key, 'en'), workflowLabel(key, 'es')] as const;
   function edit(key: string, v: unknown) {
     setConfirmedVersion(null);
@@ -130,7 +137,7 @@ export function IntakeWorkflow({
                   operation: e.target.value,
                   ...(e.target.value === 'reviews'
                     ? { outcome: 'intake_reviewed' }
-                    : { action: 'reschedule' }),
+                    : { action: 'reschedule', time_zone: workflowTimeZone }),
                 });
               }}
             >
@@ -149,7 +156,12 @@ export function IntakeWorkflow({
               options={options(['intake_reviewed', 'needs_follow_up'])}
               change={(v) => {
                 setConfirmedVersion(null);
-                change({ operation, outcome: v ?? 'intake_reviewed' });
+                const nextOutcome = v ?? 'intake_reviewed';
+                change({
+                  operation,
+                  outcome: nextOutcome,
+                  ...(nextOutcome === 'needs_follow_up' ? { time_zone: workflowTimeZone } : {}),
+                });
               }}
             />
           ) : (
@@ -193,13 +205,43 @@ export function IntakeWorkflow({
                   {t('more')}
                 </button>
               ) : null}
-              {field('next_follow_up_at', 'due', 100)}
+              <Field
+                label={label('due')}
+                value={followUpLocalDue}
+                type="datetime-local"
+                max={100}
+                change={(v) => {
+                  const instant =
+                    typeof v === 'string' ? zonedLocalDateTimeToOffsetInstant(v, workflowTimeZone) : null;
+                  edit('next_follow_up_at', instant ?? v);
+                }}
+              />
               <p>
                 {language === 'en'
-                  ? 'Enter a date and time with an explicit offset, for example 2026-09-14T15:00:00-04:00, and its matching IANA time zone. Past deadlines are allowed.'
-                  : 'Ingrese fecha y hora con desplazamiento explícito, por ejemplo 2026-09-14T15:00:00-04:00, y su zona horaria IANA correspondiente. Se permiten fechas vencidas.'}
+                  ? 'Choose the local due date and time, then choose the matching time zone. Past deadlines are allowed.'
+                  : 'Elija la fecha y hora límite local y luego la zona horaria correspondiente. Se permiten fechas vencidas.'}
               </p>
-              {field('time_zone', 'zone', 100)}
+              <Field
+                label={label('zone')}
+                value={workflowTimeZone}
+                options={timeZoneOptions}
+                change={(v) => {
+                  const nextTimeZone = normalizedTimeZone(v);
+                  const nextDue =
+                    typeof followUpLocalDue === 'string'
+                      ? zonedLocalDateTimeToOffsetInstant(followUpLocalDue, nextTimeZone) ?? value.next_follow_up_at
+                      : value.next_follow_up_at;
+                  setConfirmedVersion(null);
+                  const next: DraftObject = {
+                    ...value,
+                    operation,
+                    time_zone: nextTimeZone,
+                  };
+                  if (nextDue === undefined) delete next.next_follow_up_at;
+                  else next.next_follow_up_at = nextDue;
+                  change(next);
+                }}
+              />
               {operation === 'follow-ups' && value.action === 'attempt' ? (
                 <>
                   <Field
@@ -261,7 +303,9 @@ export function IntakeWorkflow({
           >
             {section.status === 'unknown'
               ? m.retry
-              : operation === 'reviews'
+              : reviewSubmission
+                ? t('submitReview')
+                : operation === 'reviews'
                 ? t('review')
                 : t(typeof value.action === 'string' ? value.action : 'reschedule')}
           </button>

@@ -13,6 +13,8 @@ export const intakeMessages = {
     zeroOffer: 'Zero offer: confirm the supplied amount with staff.',
     worker: 'Worker intakes',
     employer: 'Employer intakes',
+    workerDesk: 'Worker intake desk',
+    employerDesk: 'Employer intake desk',
     intro:
       'Save what you know now. Any authorized staff member can resume a shared draft. Saving does not review or finalize intake.',
     create: 'New intake',
@@ -76,7 +78,7 @@ export const intakeMessages = {
     phoneRequired: 'Enter a phone number with 7 to 15 digits. Formatting such as dashes or parentheses is OK.',
     interestsRequired: 'Choose at least one common agency position or enter another work interest.',
     availabilityRequired: 'Choose Unknown, Flexible, or Specific days.',
-    timeZoneRequired: 'Enter the time zone for specific-day availability.',
+    timeZoneRequired: 'Choose the time zone for specific-day availability.',
     rangesRequired: 'Add at least one day/time block, or choose Unknown or Flexible.',
     anyTime: 'Anytime',
     copyWeekdays: 'Copy to weekdays',
@@ -102,6 +104,8 @@ export const intakeMessages = {
     zeroOffer: 'Oferta de cero: confirme el importe indicado con el personal.',
     worker: 'Registros de trabajadores',
     employer: 'Registros de empleadores',
+    workerDesk: 'Mesa de registros de trabajadores',
+    employerDesk: 'Mesa de registros de empleadores',
     intro:
       'Guarde lo que conoce ahora. Cualquier miembro autorizado del personal puede continuar un borrador compartido. Guardar no revisa ni finaliza el registro.',
     create: 'Nuevo registro',
@@ -168,7 +172,7 @@ export const intakeMessages = {
     interestsRequired:
       'Elija al menos un puesto común de la agencia o ingrese otro interés laboral.',
     availabilityRequired: 'Elija Desconocida, Flexible o Días específicos.',
-    timeZoneRequired: 'Ingrese la zona horaria para la disponibilidad por días específicos.',
+    timeZoneRequired: 'Elija la zona horaria para la disponibilidad por días específicos.',
     rangesRequired: 'Añada al menos un bloque de día/hora, o elija Desconocida o Flexible.',
     anyTime: 'Cualquier hora',
     copyWeekdays: 'Copiar a días laborales',

@@ -24,6 +24,12 @@ describe('section-local saves', () => {
     expect(later.command?.body).toEqual({ expected_version: 3, content: { full_name: 'First' } });
     expect(later.status).toBe('unknown');
   });
+  it('turns recovery-state edits back into saveable unsaved changes', () => {
+    const refresh = { ...initialSection({ line1: 'Submitted address' }), status: 'refresh' as const };
+    const later = editSection(refresh, { line1: 'Corrected address' });
+    expect(later.value).toEqual({ line1: 'Corrected address' });
+    expect(later.status).toBe('unsaved');
+  });
   it('keeps aggregate unsaved after one section succeeds and next unknown with later edits', () => {
     const saved = finishSection(
       submitSection(

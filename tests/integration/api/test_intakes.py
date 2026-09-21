@@ -111,6 +111,40 @@ def test_create_resume_retry_stale_and_address_minimization(client):
     assert access.json()["candidate"] == {"line1": "23 Fictional Lane"}
 
 
+def test_worker_residential_address_revision_persists_for_fresh_read(client):
+    created = create(client, content={"full_name": "Fictional Worker", "phone": "+12025550123"})
+    safe(created, 201)
+    target = created.json()["current"]["summary"]["intake_id"]
+    response = client.post(
+        f"{ROOT}/{target}/addresses/worker_residence/revisions",
+        headers={"Idempotency-Key": str(uuid4())},
+        json={
+            "expected_version": 1,
+            "address": {
+                "line1": "2020 East Dr",
+                "locality": "Brooklyn",
+                "region": "New York",
+                "postal_code": "11202",
+                "country": "US",
+            },
+        },
+    )
+    safe(response, 200)
+    assert "2020 East Dr" not in response.text
+    first_read = client.get(f"{ROOT}/{target}/addresses/worker_residence")
+    safe(first_read, 200)
+    assert first_read.json()["candidate"] == {
+        "line1": "2020 East Dr",
+        "locality": "Brooklyn",
+        "region": "New York",
+        "postal_code": "11202",
+        "country": "US",
+    }
+    second_read = client.get(f"{ROOT}/{target}/addresses/worker_residence")
+    safe(second_read, 200)
+    assert second_read.json() == first_read.json()
+
+
 @pytest.mark.parametrize(
     "method,path,body,status",
     [

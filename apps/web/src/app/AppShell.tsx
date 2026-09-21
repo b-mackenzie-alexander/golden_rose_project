@@ -49,6 +49,41 @@ export function AppShell() {
   ] satisfies Array<{ icon: IconName; label: string; to: string }>;
   const searchItems = useMemo<Array<SearchItem>>(() => [
     {
+      href: '/staff/intakes/workers?queue=review',
+      icon: 'document',
+      keywords: 'review workers worker review queue pending worker drafts review new drafts revisar trabajadores pendientes',
+      label: language === 'en' ? 'Review worker drafts' : 'Revisar borradores de trabajadores',
+      meta: language === 'en' ? 'Open the worker review queue' : 'Abrir la cola de revision',
+    },
+    {
+      href: '/staff/queues',
+      icon: 'warning',
+      keywords: 'urgent requests urgent queue priority due today solicitudes urgentes prioridad vence hoy',
+      label: language === 'en' ? 'Urgent requests' : 'Solicitudes urgentes',
+      meta: language === 'en' ? 'Prioritized work queue' : 'Cola de trabajo priorizado',
+    },
+    {
+      href: '/staff/calendar',
+      icon: 'calendar',
+      keywords: 'add calendar event day planner personal company schedule agregar evento calendario agenda',
+      label: language === 'en' ? 'Add calendar event' : 'Agregar evento al calendario',
+      meta: language === 'en' ? 'Open the staff day planner' : 'Abrir el planificador del personal',
+    },
+    {
+      href: '/staff/intakes/employers',
+      icon: 'employerIntake',
+      keywords: 'new employer intake employer onboarding demand request nuevo empleador registro demanda',
+      label: language === 'en' ? 'New employer intake' : 'Nuevo registro de empleador',
+      meta: language === 'en' ? 'Start employer onboarding' : 'Iniciar registro de empleador',
+    },
+    {
+      href: '/staff/intakes/workers',
+      icon: 'worker',
+      keywords: 'new worker intake worker onboarding registration nuevo trabajador registro',
+      label: language === 'en' ? 'New worker intake' : 'Nuevo registro de trabajador',
+      meta: language === 'en' ? 'Start worker onboarding' : 'Iniciar registro de trabajador',
+    },
+    {
       href: '/',
       icon: 'home',
       keywords: 'home dashboard summary kpi today priorities inicio panel resumen metricas',

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { getCanonicalIntake, getIntakeAddress, queryIntakes, saveIntake, saveCanonicalIntake } from '../api/intakeClient';
 import type {
   AddressSection,
@@ -9,6 +9,8 @@ import type {
   IntakeSummary,
 } from '../api/intakeContracts';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { zonedLocalDateTimeToOffsetInstant } from '../time/timeZone';
+import { normalizedTimeZone } from '../time/timeZoneOptions';
 import { AddressFields, Field, IntakeFields } from './IntakeFields';
 import { intakeMessages } from './messages';
 import { IntakeCanonical } from './IntakeCanonical';
@@ -34,8 +36,49 @@ type EditorState = {
   canonicalEpoch?: number;
   resolvedAddresses?: Record<string, DraftObject | null>;
 };
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const addressSections = (kind: IntakeKind): AddressSection[] =>
   kind === 'worker' ? ['worker_residence'] : ['party_address', 'worksite_address'];
+
+const canRecoverEmptyAddress = (kind: IntakeKind, section: AddressSection) =>
+  addressSections(kind).includes(section);
+
+const reviewQueueItems = (items: IntakeSummary[]) =>
+  items.filter((item) => item.review_status !== 'current');
+
+const readyForCanonicalAction = (section: Section) =>
+  ['saved', 'unavailable'].includes(section.status) && !section.readPending;
+
+function sameAddress(left: DraftObject | null | undefined, right: DraftObject | null | undefined) {
+  const fields = ['line1', 'line2', 'locality', 'region', 'postal_code', 'country'];
+  const normalized = (value: DraftObject | null | undefined) => {
+    const result: Record<string, string> = {};
+    for (const field of fields) {
+      const item = value?.[field];
+      if (typeof item === 'string' && item.trim()) result[field] = item;
+    }
+    return result;
+  };
+  return JSON.stringify(normalized(left)) === JSON.stringify(normalized(right));
+}
+
+function draftObject(value: unknown): DraftObject | null {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as DraftObject)
+    : null;
+}
+
+function normalizeWorkflowValue(value: DraftObject) {
+  const needsFollowUpTimeZone = value.operation === 'follow-ups' || value.outcome === 'needs_follow_up';
+  if (!needsFollowUpTimeZone) return value;
+  const timeZone = normalizedTimeZone(value.time_zone);
+  const nextFollowUpAt =
+    typeof value.next_follow_up_at === 'string'
+      ? zonedLocalDateTimeToOffsetInstant(value.next_follow_up_at, timeZone) ?? value.next_follow_up_at
+      : value.next_follow_up_at;
+  return { ...value, time_zone: timeZone, next_follow_up_at: nextFollowUpAt };
+}
 
 function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind }) {
   const { language } = useLanguage();
@@ -190,10 +233,13 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
     update((s) => {
       const own = s.sections[section] ?? initialSection({});
       const hasEdits = own.generation !== generation || own.generation > own.confirmedGeneration;
+      const hasVisibleDraft = Object.keys(own.value).length > 0 || own.status === 'refresh';
       const next: Section = result.ok
         ? hasEdits
           ? { ...own, readPending: false, status: 'unsaved' }
           : initialSection(result.value.candidate ?? {})
+        : canRecoverEmptyAddress(selected.summary.kind, section)
+          ? { ...(hasEdits || hasVisibleDraft ? own : initialSection({})), readPending: false, status: 'unsaved' }
         : result.failure !== 'forbidden' && (own.status === 'refresh' || hasEdits)
           ? { ...own, readPending: false, status: 'refresh' }
           : { ...initialSection({}), status: 'unavailable' };
@@ -223,11 +269,12 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
     const workflow = name === 'workflow' || canonical;
     if (
       workflow &&
+      !canonical &&
       !section.command &&
       section.value.operation !== 'follow-ups' &&
       !Object.entries(s.sections)
-        .filter(([key]) => key !== name)
-        .every(([, value]) => value.status === 'saved' && !value.readPending)
+        .filter(([key]) => key !== 'workflow' && key !== 'canonical')
+        .every(([, value]) => readyForCanonicalAction(value))
     )
       return;
     if (canonical && !section.command && section.value.operation === 'finalizations' &&
@@ -255,7 +302,7 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
               body: structuredClone({
                 expected_version: s.detail?.summary.version ?? 0,
                 ...Object.fromEntries(
-                  Object.entries(section.value).filter(([key]) => key !== 'operation'),
+                  Object.entries(normalizeWorkflowValue(section.value)).filter(([key]) => key !== 'operation'),
                 ),
                 ...(!canonical && section.value.operation !== 'follow-ups' && !section.value.outcome
                   ? { outcome: 'intake_reviewed' }
@@ -377,16 +424,27 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
       const address = await getIntakeAddress(intakeId, name as AddressSection);
       update((previous) => {
         const own = finishSection(previous.sections[name] ?? section, 'saved');
+        const submitted =
+          pending.command && 'address' in pending.command.body ? draftObject(pending.command.body.address) : null;
         if (!address.ok)
           return {
             ...previous,
             resolvedAddresses: { ...previous.resolvedAddresses, [name]: null },
             sections: {
               ...previous.sections,
-              [name]:
-                address.failure === 'forbidden'
-                  ? { ...initialSection({}), status: 'unavailable' }
-                  : { ...own, status: 'refresh' },
+              [name]: own,
+            },
+          };
+        if (
+          own.status === 'saved' &&
+          !sameAddress(submitted, address.value.candidate ?? null)
+        )
+          return {
+            ...previous,
+            resolvedAddresses: { ...previous.resolvedAddresses, [name]: address.value.resolved },
+            sections: {
+              ...previous.sections,
+              [name]: { ...own, value: previous.sections[name]?.value ?? section.value, status: 'failed' },
             },
           };
         return {
@@ -519,7 +577,7 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
                   {section?.status === 'unavailable' ? (
                     <button
                       type="button"
-                      disabled={locked || section.readPending}
+                      disabled={state.error === 'conflict' || section.readPending}
                       onClick={() => void loadAddress(name)}
                     >
                       {m.reveal}
@@ -553,7 +611,7 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
                   {section.status === 'refresh' ? (
                     <button
                       type="button"
-                      disabled={locked || section.readPending}
+                      disabled={state.error === 'conflict' || section.readPending}
                       onClick={() => void loadAddress(name)}
                     >
                       {m.reveal}
@@ -579,30 +637,30 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
       )}
       {state.detail ? (
         <>
-          <IntakeCanonical
-            key={`${state.detail.summary.intake_id}:${String(state.canonicalEpoch ?? 0)}`}
-            detail={state.detail} section={state.sections.canonical ?? initialSection({})}
-            ready={!state.error && Object.entries(state.sections).filter(([key]) => key !== 'canonical')
-              .every(([, section]) => section.status === 'saved' && !section.readPending)}
-            locked={locked}
-            discard={() => { update((previous) => ({ ...previous, canonicalEpoch: (previous.canonicalEpoch ?? 0) + 1, sections: { ...previous.sections, canonical: initialSection({}) } })); }}
-            change={(value) => { change('canonical', value); }}
-            save={(value) => { if (value) change('canonical', value); void save('canonical'); }}
-          />
           <IntakeWorkflow
             detail={state.detail}
             section={state.sections.workflow ?? initialSection({})}
             ready={
               !state.error &&
               Object.entries(state.sections)
-                .filter(([key]) => key !== 'workflow')
-                .every(([, section]) => section.status === 'saved' && !section.readPending)
+                .filter(([key]) => key !== 'workflow' && key !== 'canonical')
+                .every(([, section]) => readyForCanonicalAction(section))
             }
             locked={locked}
             change={(value) => {
               change('workflow', value);
             }}
             save={() => void save('workflow')}
+          />
+          <IntakeCanonical
+            key={`${state.detail.summary.intake_id}:${String(state.canonicalEpoch ?? 0)}`}
+            detail={state.detail} section={state.sections.canonical ?? initialSection({})}
+            ready={!state.error && Object.entries(state.sections).filter(([key]) => key !== 'canonical')
+              .every(([, section]) => readyForCanonicalAction(section))}
+            locked={locked}
+            discard={() => { update((previous) => ({ ...previous, canonicalEpoch: (previous.canonicalEpoch ?? 0) + 1, sections: { ...previous.sections, canonical: initialSection({}) } })); }}
+            change={(value) => { change('canonical', value); }}
+            save={(value) => { if (value) change('canonical', value); void save('canonical'); }}
           />
           <IntakeHistory
             key={`${state.detail.summary.intake_id}:${String(state.detail.summary.version)}`}
@@ -618,6 +676,9 @@ function IntakeEditor({ id, kind: initialKind }: { id?: string; kind: IntakeKind
 
 export function IntakeWorkspace({ kind = 'worker' }: { kind?: IntakeKind }) {
   const { intakeId } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [, setSearchParams] = useSearchParams();
   const { language } = useLanguage();
   const m = intakeMessages[language];
   const t = (key: string) => workflowLabel(key, language);
@@ -629,12 +690,18 @@ export function IntakeWorkspace({ kind = 'worker' }: { kind?: IntakeKind }) {
   const appliedFilter = useRef<DraftObject>({});
   const [newDraft, setNewDraft] = useState(false);
   const requestNumber = useRef(0);
+  const queueMode = new URLSearchParams(location.search).get('queue') === 'review' ? 'review' : null;
+  const visibleItems = items && queueMode === 'review' ? reviewQueueItems(items) : items;
   async function query(next?: string) {
     const request = ++requestNumber.current;
-    if (!next)
+    if (!next) {
       appliedFilter.current = filter.trim()
         ? { [byReference ? 'reference' : 'name_query']: filter.trim() }
         : {};
+      const nextParams = new URLSearchParams();
+      if (filter.trim()) nextParams.set(byReference ? 'reference' : 'q', filter.trim());
+      setSearchParams(nextParams, { replace: true });
+    }
     const result = await queryIntakes(kind, {
       ...appliedFilter.current,
       ...(next ? { cursor: next } : {}),
@@ -652,10 +719,36 @@ export function IntakeWorkspace({ kind = 'worker' }: { kind?: IntakeKind }) {
   }
   useEffect(() => {
     const request = ++requestNumber.current;
-    if (!intakeId)
-      void queryIntakes(kind).then((result) => {
+    if (!intakeId) {
+      const routeParams = new URLSearchParams(location.search);
+      const nameQuery = routeParams.get('q')?.trim() ?? '';
+      const reference = routeParams.get('reference')?.trim().toLowerCase() ?? '';
+      const routeFilter: DraftObject = reference && UUID_PATTERN.test(reference)
+        ? { reference }
+        : nameQuery
+          ? { name_query: nameQuery }
+          : {};
+      const autoOpen = routeParams.get('open') === 'match';
+      const shouldFilterReview = routeParams.get('queue') === 'review';
+      appliedFilter.current = routeFilter;
+      void Promise.resolve().then(() => {
+        if (request !== requestNumber.current) return;
+        setByReference('reference' in routeFilter);
+        setFilter(typeof routeFilter.reference === 'string' ? routeFilter.reference : typeof routeFilter.name_query === 'string' ? routeFilter.name_query : '');
+        setFailed(false);
+        setItems(null);
+        setCursor(null);
+      });
+      void queryIntakes(kind, routeFilter).then((result) => {
         if (request !== requestNumber.current) return;
         if (result.ok) {
+          const matchedItems = shouldFilterReview ? reviewQueueItems(result.value.items) : result.value.items;
+          if (autoOpen && matchedItems.length === 1) {
+            const [matchedItem] = matchedItems;
+            if (!matchedItem) return;
+            void navigate(`/staff/intakes/${matchedItem.intake_id}`, { replace: true });
+            return;
+          }
           setItems(result.value.items);
           setCursor(result.value.next_cursor);
         } else {
@@ -664,6 +757,7 @@ export function IntakeWorkspace({ kind = 'worker' }: { kind?: IntakeKind }) {
           setFailed(true);
         }
       });
+    }
     const clear = () => {
       ++requestNumber.current;
       appliedFilter.current = {};
@@ -676,11 +770,32 @@ export function IntakeWorkspace({ kind = 'worker' }: { kind?: IntakeKind }) {
       requestNumber.current = request + 1000000;
       window.removeEventListener('pagehide', clear);
     };
-  }, [kind, intakeId]);
+  }, [kind, intakeId, location.search, navigate]);
   return (
-    <div className="intake-workspace">
-      <h2>{intakeId ? m.content : m[kind]}</h2>
-      <p>{m.intro}</p>
+    <div className={`intake-workspace${intakeId ? '' : ' intake-index'}`}>
+      {intakeId ? (
+        <>
+          <h2>{m.content}</h2>
+          <p>{m.intro}</p>
+        </>
+      ) : (
+        <header className="intake-index-hero">
+          <div>
+            <p className="intake-index-kicker">{kind === 'worker' ? m.workerDesk : m.employerDesk}</p>
+            <h2>{m[kind]}</h2>
+            <p>{m.intro}</p>
+          </div>
+          <button
+            type="button"
+            className="intake-index-new"
+            onClick={() => {
+              setNewDraft(true);
+            }}
+          >
+            {m.create}
+          </button>
+        </header>
+      )}
       {intakeId ? (
         <>
           <IntakeEditor key={intakeId} id={intakeId} kind={kind} />
@@ -694,7 +809,7 @@ export function IntakeWorkspace({ kind = 'worker' }: { kind?: IntakeKind }) {
             }}
             className="intake-search"
           >
-            <label>
+            <label className="intake-search-reference">
               <input
                 type="checkbox"
                 checked={byReference}
@@ -705,48 +820,67 @@ export function IntakeWorkspace({ kind = 'worker' }: { kind?: IntakeKind }) {
               />
               {m.reference}
             </label>
-            <label htmlFor="intake-name-query">{byReference ? m.reference : m.query}</label>
-            <input
-              id="intake-name-query"
-              value={filter}
-              minLength={byReference ? 36 : 2}
-              maxLength={100}
-              onChange={(e) => {
-                setFilter(e.target.value);
-              }}
-            />
+            <div className="intake-search-field">
+              <label htmlFor="intake-name-query">{byReference ? m.reference : m.query}</label>
+              <input
+                id="intake-name-query"
+                value={filter}
+                minLength={byReference ? 36 : 2}
+                maxLength={100}
+                onChange={(e) => {
+                  setFilter(e.target.value);
+                }}
+              />
+            </div>
             <button type="submit">{m.search}</button>
           </form>
           {failed ? (
             <p role="alert">{m.unavailableDraft}</p>
-          ) : items === null ? (
+          ) : visibleItems === null ? (
             <p role="status">{m.loading}</p>
-          ) : !items.length ? (
+          ) : !visibleItems.length ? (
             <p>{m.empty}</p>
           ) : (
             <ul className="intake-list">
-              {items.map((item) => (
-                <li key={item.intake_id}>
-                  <Link to={`/staff/intakes/${item.intake_id}`}>
-                    {m.open}: {item.display_name || m.unnamed} — {item.intake_id}
-                  </Link>
-                  <span>
-                    {item.complete === null ? m.completenessUnavailable : item.complete ? m.complete : m.incomplete} · {m.saved} · {t(item.review_status)} ·{' '}
-                    {m.version} {item.version}
+              {visibleItems.map((item) => (
+                <li key={item.intake_id} className="intake-card">
+                  <div className="intake-card-header">
+                    <div className="intake-card-marker" aria-hidden="true">
+                      {kind === 'worker' ? 'W' : 'E'}
+                    </div>
+                    <div className="intake-card-title">
+                      <strong>{item.display_name || m.unnamed}</strong>
+                      <span className="intake-card-reference">{item.intake_id}</span>
+                    </div>
+                    <Link
+                      className="intake-card-action"
+                      to={`/staff/intakes/${item.intake_id}`}
+                      aria-label={`${m.open}: ${item.display_name || m.unnamed} — ${item.intake_id}`}
+                    >
+                      {m.open}
+                    </Link>
+                  </div>
+                  <span className="intake-card-status">
+                    <span>{item.complete === null ? m.completenessUnavailable : item.complete ? m.complete : m.incomplete}</span>
+                    <span>{m.saved}</span>
+                    <span>{t(item.review_status)}</span>
+                    <span>
+                      {m.version} {item.version}
+                    </span>
                   </span>
                   {item.complete === false ? (
-                    <span>
+                    <span className="intake-card-missing">
                       {t('missing')}: {item.missing_fields.map((field) => t(field)).join(', ')}
                     </span>
                   ) : null}
                   {item.follow_up ? (
-                    <span>
+                    <span className="intake-card-note">
                       {t('retained')}: {item.follow_up.next_follow_up_at}
                       {item.follow_up.overdue ? ` · ${t('overdue')}` : ''}
                     </span>
                   ) : null}
                   {item.offer ? (
-                    <span>
+                    <span className="intake-card-note">
                       {typeof item.offer.minimum === 'string' ? item.offer.minimum : ''}
                       {item.offer.maximum
                         ? `–${typeof item.offer.maximum === 'string' ? item.offer.maximum : ''}`
@@ -772,14 +906,6 @@ export function IntakeWorkspace({ kind = 'worker' }: { kind?: IntakeKind }) {
               {m.more}
             </button>
           ) : null}
-          <button
-            type="button"
-            onClick={() => {
-              setNewDraft(true);
-            }}
-          >
-            {m.create}
-          </button>
           {newDraft ? <IntakeEditor key={kind} kind={kind} /> : null}
         </>
       )}

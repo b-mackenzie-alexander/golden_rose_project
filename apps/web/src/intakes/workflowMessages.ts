@@ -1,6 +1,7 @@
 export const workflowText = {
   workflow: ['Review and follow-up', 'Revisión y seguimiento'],
   review: ['Record review', 'Registrar revisión'],
+  submitReview: ['Submit for review', 'Enviar para revisión'],
   history: ['Intake history', 'Historial del registro'],
   current: ['Current review', 'Revisión vigente'],
   stale: ['Review is stale', 'Revisión desactualizada'],
@@ -18,8 +19,8 @@ export const workflowText = {
   clarification: ['Clarification', 'Aclaración'],
   other: ['Other', 'Otro'],
   owner: ['Follow-up owner', 'Responsable del seguimiento'],
-  due: ['Due instant (include UTC offset)', 'Fecha y hora límite (incluya desplazamiento UTC)'],
-  zone: ['IANA time zone', 'Zona horaria IANA'],
+  due: ['Due date and time', 'Fecha y hora límite'],
+  zone: ['Time zone', 'Zona horaria'],
   note: ['Restricted note', 'Nota restringida'],
   confirm: ['Confirm this recorded action', 'Confirmar esta acción registrada'],
   meaning: [

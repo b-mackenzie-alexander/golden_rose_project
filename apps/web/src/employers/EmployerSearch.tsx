@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type SyntheticEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { Link } from 'react-router';
 
 import { getEmployer, searchEmployers } from '../api/employerClient';
+import { queryIntakes } from '../api/intakeClient';
 import type {
   ApiFailureKind,
   EmployerSummary,
@@ -9,6 +11,7 @@ import type {
   RevisionEmployerDetail,
   SearchEmployersInput,
 } from '../api/employerContracts';
+import type { IntakeSummary } from '../api/intakeContracts';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { EmployerDetail } from './EmployerDetail';
 
@@ -85,6 +88,7 @@ export function EmployerSearch({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [searchState, setSearchState] = useState<SearchUiState>('idle');
   const [results, setResults] = useState<EmployerSummary[]>([]);
+  const [intakeResults, setIntakeResults] = useState<IntakeSummary[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [failureState, setFailureState] = useState<SearchFailureState | null>(null);
   const [paginationFailureState, setPaginationFailureState] = useState<PaginationFailureState | null>(null);
@@ -273,6 +277,7 @@ export function EmployerSearch({
     setIsLoadingMore(false);
     setSearchState('idle');
     setResults([]);
+    setIntakeResults([]);
     setNextCursor(null);
     setFailureState(null);
     setPaginationFailureState(null);
@@ -446,6 +451,16 @@ export function EmployerSearch({
       }
 
       if (result.ok) {
+        const matchingIntakes = isPaginationRequest
+          ? null
+          : await queryIntakes('employer', {
+              name_query: nextSubmittedSearch.displayNameQuery,
+              page_size: 5,
+            });
+        if (activeSearchControllerRef.current !== controller) {
+          return;
+        }
+        const intakeItems = matchingIntakes?.ok ? matchingIntakes.value.items : [];
         setNextCursor(result.value.nextCursor);
         if (isPaginationRequest) {
           setResults((currentResults) => {
@@ -466,9 +481,10 @@ export function EmployerSearch({
           setSearchState('results');
         } else {
           setResults(result.value.items);
+          setIntakeResults(intakeItems);
           pendingResultsFocusIdRef.current = null;
-          setSearchState(result.value.items.length === 0 ? 'empty' : 'results');
-          onSearchCheckpointChange?.(result.value.items.length === 0 ? 'empty' : 'results');
+          setSearchState(result.value.items.length === 0 && intakeItems.length === 0 ? 'empty' : 'results');
+          onSearchCheckpointChange?.(result.value.items.length === 0 && intakeItems.length === 0 ? 'empty' : 'results');
         }
         return;
       }
@@ -486,6 +502,7 @@ export function EmployerSearch({
         }
 
         setResults([]);
+        setIntakeResults([]);
         setFailureState({ kind: result.failure.kind });
         setSearchState('failure');
         onSearchCheckpointChange?.('none');
@@ -570,6 +587,39 @@ export function EmployerSearch({
   const shouldRenderStandaloneDetail = searchState !== 'results' && (detail !== null || detailFailureState !== null || refreshFailure || isDetailLoading);
   const shouldRenderDetailPresentation = searchState === 'results' || shouldRenderStandaloneDetail;
   const detailAutoFocus = !showRevisionSuccess;
+  const intakeResultPresentation = intakeResults.length === 0 ? null : (
+    <section aria-labelledby="employer-intake-results-heading" className="employer-intake-results">
+      <h3 id="employer-intake-results-heading">{messages.employerSearchIntakeResultsHeading}</h3>
+      <p>{messages.employerSearchIntakeResultsBody}</p>
+      <ul className="intake-list">
+        {intakeResults.map((item) => {
+          const displayName = item.display_name?.trim() || messages.employerSearchIntakeUnnamed;
+          return (
+            <li className="intake-card" key={item.intake_id}>
+              <div className="intake-card-header">
+                <div className="intake-card-marker" aria-hidden="true">E</div>
+                <div className="intake-card-title">
+                  <strong>{displayName}</strong>
+                  <span className="intake-card-reference">{item.intake_id}</span>
+                </div>
+                <Link
+                  className="intake-card-action"
+                  to={`/staff/intakes/employers?reference=${item.intake_id}&open=match`}
+                  aria-label={`${messages.employerSearchIntakeOpen}: ${displayName} - ${item.intake_id}`}
+                >
+                  {messages.employerSearchIntakeOpen}
+                </Link>
+              </div>
+              <span className="intake-card-status">
+                <span>{messages.employerLifecycleDraft}</span>
+                <span>{item.complete ? messages.employerSearchIntakeComplete : messages.employerSearchIntakeIncomplete}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
   const detailPresentation = !shouldRenderDetailPresentation ? null : (
     refreshFailure ? (
       <section aria-live="assertive">
@@ -594,6 +644,7 @@ export function EmployerSearch({
           failureKind={detailFailureState?.kind ?? null}
           isLoading={isDetailLoading}
         />
+        {intakeResultPresentation}
       </>
     )
   );

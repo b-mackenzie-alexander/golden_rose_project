@@ -52,6 +52,12 @@ export type MessageCatalog = {
   employerSearchEmptyHeading: string;
   employerSearchEmptyBody: string;
   employerSearchResultsHeading: string;
+  employerSearchIntakeResultsHeading: string;
+  employerSearchIntakeResultsBody: string;
+  employerSearchIntakeOpen: string;
+  employerSearchIntakeUnnamed: string;
+  employerSearchIntakeComplete: string;
+  employerSearchIntakeIncomplete: string;
   employerLifecycleDraft: string;
   employerSearchValidationFailureHeading: string;
   employerSearchValidationFailureBody: string;
@@ -204,6 +210,12 @@ export const englishMessages: MessageCatalog = {
   employerSearchEmptyHeading: 'No matching employers',
   employerSearchEmptyBody: 'Try a different employer name fragment or clear the employer type filter.',
   employerSearchResultsHeading: 'Search results',
+  employerSearchIntakeResultsHeading: 'Matching employer intakes',
+  employerSearchIntakeResultsBody: 'These draft employer intakes match the same search and can be opened for review.',
+  employerSearchIntakeOpen: 'Open intake',
+  employerSearchIntakeUnnamed: 'Unnamed employer intake',
+  employerSearchIntakeComplete: 'Complete',
+  employerSearchIntakeIncomplete: 'Incomplete',
   employerLifecycleDraft: 'Draft',
   employerSearchValidationFailureHeading: 'Search could not run',
   employerSearchValidationFailureBody: 'Review the employer name fragment or employer type and try again.',
@@ -358,6 +370,12 @@ export const spanishMessages: MessageCatalog = {
   employerSearchEmptyHeading: 'No hay empleadores coincidentes',
   employerSearchEmptyBody: 'Pruebe un fragmento diferente del nombre del empleador o quite el filtro de tipo de empleador.',
   employerSearchResultsHeading: 'Resultados de la búsqueda',
+  employerSearchIntakeResultsHeading: 'Registros de empleador coincidentes',
+  employerSearchIntakeResultsBody: 'Estos borradores de empleador coinciden con la misma busqueda y pueden abrirse para revision.',
+  employerSearchIntakeOpen: 'Abrir registro',
+  employerSearchIntakeUnnamed: 'Registro de empleador sin nombre',
+  employerSearchIntakeComplete: 'Completo',
+  employerSearchIntakeIncomplete: 'Incompleto',
   employerLifecycleDraft: 'Borrador',
   employerSearchValidationFailureHeading: 'La búsqueda no pudo ejecutarse',
   employerSearchValidationFailureBody: 'Revise el fragmento del nombre del empleador o el tipo de empleador e inténtelo de nuevo.',

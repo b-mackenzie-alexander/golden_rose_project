@@ -1,6 +1,8 @@
 import { Link } from 'react-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
+import { queryIntakes } from '../api/intakeClient';
+import type { IntakeKind, IntakeSummary } from '../api/intakeContracts';
 import { IconSymbol } from '../dashboard/artwork';
 import type { IconName } from '../dashboard/artwork';
 import { useLanguage } from '../i18n/LanguageProvider';
@@ -61,9 +63,9 @@ const englishQueues: WorkQueuesCopy = {
   ],
   heading: 'Work queues',
   items: [
-    { age: 'Due 9:00 AM', assignee: 'Mariela Torres', category: 'urgent', href: '/staff/intakes/workers?reference=b7dea69e-9b10-43b3-95aa-d1cd01f6c453&open=match', icon: 'worker', id: 'WRK-2025-00123', nextStep: 'Add residential address', owner: 'Ana Quispe', priority: 'high', reason: 'Missing restricted address blocks review', reference: 'Worker intake', status: 'incomplete', title: 'Urgent intake review' },
-    { age: 'Due 10:30 AM', assignee: 'Carlos Ramirez', category: 'employer', href: '/staff/intakes/employers?reference=40bd8f48-88c2-42bf-a2bb-bd4ee6e962e2&open=match', icon: 'building', id: 'EMP-2025-00456', nextStep: 'Confirm worksite details', owner: 'Restaurante La Esperanza', priority: 'medium', reason: 'Follow-up deadline is next on today\'s agenda', reference: 'Employer follow-up', status: 'pending', title: 'Employer follow-up' },
-    { age: 'Due 11:00 AM', assignee: 'Ana Torres', category: 'worker', href: '/staff/intakes/workers?reference=ca0a3935-e72f-4a00-be6d-af081546a73f&open=match', icon: 'worker', id: 'WRK-2025-00124', nextStep: 'Review availability', owner: 'Carlos Mendoza', priority: 'medium', reason: 'Interview cannot close until availability is reviewed', reference: 'Worker interview', status: 'pending', title: 'Complete pending interview' },
+    { age: 'Due 9:00 AM', assignee: 'Mariela Torres', category: 'worker', href: '/staff/intakes/workers?q=Ana%20Quispe&open=match', icon: 'worker', id: 'WRK-2025-00123', nextStep: 'Add residential address', owner: 'Ana Quispe', priority: 'high', reason: 'Missing restricted address blocks review', reference: 'Worker intake', status: 'incomplete', title: 'Urgent intake review' },
+    { age: 'Due 10:30 AM', assignee: 'Carlos Ramirez', category: 'employer', href: '/staff/intakes/employers?q=Restaurante%20La%20Esperanza&open=match', icon: 'building', id: 'EMP-2025-00456', nextStep: 'Confirm worksite details', owner: 'Restaurante La Esperanza', priority: 'medium', reason: 'Follow-up deadline is next on today\'s agenda', reference: 'Employer follow-up', status: 'pending', title: 'Employer follow-up' },
+    { age: 'Due 11:00 AM', assignee: 'Ana Torres', category: 'worker', href: '/staff/intakes/workers?q=Carlos%20Mendoza&open=match', icon: 'worker', id: 'WRK-2025-00124', nextStep: 'Review availability', owner: 'Carlos Mendoza', priority: 'medium', reason: 'Interview cannot close until availability is reviewed', reference: 'Worker interview', status: 'pending', title: 'Complete pending interview' },
     { age: 'Due 1:00 PM', assignee: 'Operations', category: 'worker', href: '/staff/intakes/workers?queue=review', icon: 'document', id: 'WRK-DRAFTS', nextStep: 'Three records waiting', owner: 'Draft queue', priority: 'low', reason: 'Dashboard review queue has new worker drafts', reference: 'Draft review', status: 'draft', title: 'Review new drafts' },
     { age: 'Due 3:00 PM', assignee: 'Sofia Diaz', category: 'employer', href: '/staff/work-interests', icon: 'catalog', id: 'CAT-2025-00008', nextStep: 'Review new skill labels', owner: 'Catalog', priority: 'low', reason: 'New intake text introduced uncataloged work interests', reference: 'Work-interest catalog', status: 'in_review', title: 'Update interest catalog' },
   ],
@@ -95,9 +97,9 @@ const spanishQueues: WorkQueuesCopy = {
   ],
   heading: 'Colas de trabajo',
   items: [
-    { age: 'Vence 9:00 a. m.', assignee: 'Mariela Torres', category: 'urgent', href: '/staff/intakes/workers?reference=b7dea69e-9b10-43b3-95aa-d1cd01f6c453&open=match', icon: 'worker', id: 'WRK-2025-00123', nextStep: 'Agregar domicilio residencial', owner: 'Ana Quispe', priority: 'high', reason: 'Falta domicilio restringido para completar la revision', reference: 'Registro de trabajador', status: 'incomplete', title: 'Revisar solicitud urgente' },
-    { age: 'Vence 10:30 a. m.', assignee: 'Carlos Ramirez', category: 'employer', href: '/staff/intakes/employers?reference=40bd8f48-88c2-42bf-a2bb-bd4ee6e962e2&open=match', icon: 'building', id: 'EMP-2025-00456', nextStep: 'Confirmar lugar de trabajo', owner: 'Restaurante La Esperanza', priority: 'medium', reason: 'El seguimiento vence en la agenda de hoy', reference: 'Seguimiento de empleador', status: 'pending', title: 'Hacer seguimiento con empleador' },
-    { age: 'Vence 11:00 a. m.', assignee: 'Ana Torres', category: 'worker', href: '/staff/intakes/workers?reference=ca0a3935-e72f-4a00-be6d-af081546a73f&open=match', icon: 'worker', id: 'WRK-2025-00124', nextStep: 'Revisar disponibilidad', owner: 'Carlos Mendoza', priority: 'medium', reason: 'La entrevista necesita disponibilidad revisada', reference: 'Entrevista de trabajador', status: 'pending', title: 'Completar entrevista pendiente' },
+    { age: 'Vence 9:00 a. m.', assignee: 'Mariela Torres', category: 'worker', href: '/staff/intakes/workers?q=Ana%20Quispe&open=match', icon: 'worker', id: 'WRK-2025-00123', nextStep: 'Agregar domicilio residencial', owner: 'Ana Quispe', priority: 'high', reason: 'Falta domicilio restringido para completar la revision', reference: 'Registro de trabajador', status: 'incomplete', title: 'Revisar solicitud urgente' },
+    { age: 'Vence 10:30 a. m.', assignee: 'Carlos Ramirez', category: 'employer', href: '/staff/intakes/employers?q=Restaurante%20La%20Esperanza&open=match', icon: 'building', id: 'EMP-2025-00456', nextStep: 'Confirmar lugar de trabajo', owner: 'Restaurante La Esperanza', priority: 'medium', reason: 'El seguimiento vence en la agenda de hoy', reference: 'Seguimiento de empleador', status: 'pending', title: 'Hacer seguimiento con empleador' },
+    { age: 'Vence 11:00 a. m.', assignee: 'Ana Torres', category: 'worker', href: '/staff/intakes/workers?q=Carlos%20Mendoza&open=match', icon: 'worker', id: 'WRK-2025-00124', nextStep: 'Revisar disponibilidad', owner: 'Carlos Mendoza', priority: 'medium', reason: 'La entrevista necesita disponibilidad revisada', reference: 'Entrevista de trabajador', status: 'pending', title: 'Completar entrevista pendiente' },
     { age: 'Vence 1:00 p. m.', assignee: 'Operaciones', category: 'worker', href: '/staff/intakes/workers?queue=review', icon: 'document', id: 'WRK-DRAFTS', nextStep: 'Tres registros sin revisar', owner: 'Cola de borradores', priority: 'low', reason: 'La cola del panel tiene nuevos borradores de trabajador', reference: 'Revision de borradores', status: 'draft', title: 'Revisar nuevos borradores' },
     { age: 'Vence 3:00 p. m.', assignee: 'Sofia Diaz', category: 'employer', href: '/staff/work-interests', icon: 'catalog', id: 'CAT-2025-00008', nextStep: 'Revisar nuevas habilidades', owner: 'Catalogo', priority: 'low', reason: 'Un registro agrego intereses laborales sin catalogar', reference: 'Catalogo de intereses', status: 'in_review', title: 'Actualizar catalogo de intereses' },
   ],
@@ -122,14 +124,179 @@ function statusLabel(status: QueueStatus, language: 'en' | 'es') {
   return statusLabels[status][language];
 }
 
+type QueueData = {
+  employers: IntakeSummary[];
+  workers: IntakeSummary[];
+};
+
+function intakeHref(kind: IntakeKind, item: IntakeSummary) {
+  return `/staff/intakes/${kind === 'worker' ? 'workers' : 'employers'}?reference=${item.intake_id}&open=match`;
+}
+
+function displayName(item: IntakeSummary, language: 'en' | 'es') {
+  return item.display_name?.trim() || (language === 'es' ? 'Registro sin nombre' : 'Unnamed intake');
+}
+
+function missingLabel(field: string, language: 'en' | 'es') {
+  const labels: Record<string, { en: string; es: string }> = {
+    availability: { en: 'availability', es: 'disponibilidad' },
+    duties_summary: { en: 'duties', es: 'responsabilidades' },
+    offer: { en: 'offer', es: 'oferta' },
+    party_address: { en: 'contact address', es: 'direccion de contacto' },
+    phone: { en: 'phone', es: 'telefono' },
+    representative_name: { en: 'representative name', es: 'nombre del representante' },
+    role_title: { en: 'role title', es: 'cargo' },
+    schedule: { en: 'requested schedule', es: 'horario solicitado' },
+    worker_count: { en: 'number of workers', es: 'numero de trabajadores' },
+    worker_residence: { en: 'residential address', es: 'domicilio residencial' },
+    worksite_address: { en: 'worksite address', es: 'direccion del lugar de trabajo' },
+  };
+  return labels[field]?.[language] ?? field.replace(/_/g, ' ');
+}
+
+function itemStatus(item: IntakeSummary): QueueStatus {
+  if (item.complete === false) return 'incomplete';
+  if (item.follow_up || item.review_status === 'needs_follow_up') return 'pending';
+  if (item.review_status === 'stale') return 'in_review';
+  return 'draft';
+}
+
+function itemPriority(item: IntakeSummary): QueueItem['priority'] {
+  if (item.follow_up?.overdue || item.complete === false) return 'high';
+  if (item.follow_up || item.review_status === 'needs_follow_up' || item.review_status === 'stale') return 'medium';
+  return 'low';
+}
+
+function itemNextStep(item: IntakeSummary, language: 'en' | 'es') {
+  const firstMissing = item.missing_fields[0];
+  if (firstMissing) {
+    return language === 'es'
+      ? `Completar ${missingLabel(firstMissing, language)}`
+      : `Complete ${missingLabel(firstMissing, language)}`;
+  }
+  if (item.follow_up || item.review_status === 'needs_follow_up') {
+    return language === 'es' ? 'Completar seguimiento' : 'Complete follow-up';
+  }
+  if (item.review_status !== 'current') {
+    return language === 'es' ? 'Revisar borrador' : 'Review draft';
+  }
+  return language === 'es' ? 'Abrir registro' : 'Open intake';
+}
+
+function itemReason(kind: IntakeKind, item: IntakeSummary, language: 'en' | 'es') {
+  if (item.follow_up?.overdue) {
+    return language === 'es' ? 'El seguimiento esta vencido' : 'Follow-up is overdue';
+  }
+  if (item.follow_up) {
+    return language === 'es' ? 'El seguimiento es el siguiente paso registrado' : 'Follow-up is the recorded next step';
+  }
+  if (item.complete === false) {
+    return language === 'es' ? 'El registro necesita campos obligatorios' : 'Required intake fields are still missing';
+  }
+  return kind === 'employer'
+    ? language === 'es' ? 'Borrador de empleador pendiente de revision' : 'Employer draft is waiting for review'
+    : language === 'es' ? 'Borrador de trabajador pendiente de revision' : 'Worker draft is waiting for review';
+}
+
+function itemAge(item: IntakeSummary, language: 'en' | 'es') {
+  if (item.follow_up) {
+    const due = new Date(item.follow_up.next_follow_up_at);
+    if (!Number.isNaN(due.getTime())) {
+      return due.toLocaleString(language === 'es' ? 'es-US' : 'en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        month: 'short',
+        day: 'numeric',
+      });
+    }
+  }
+  return language === 'es' ? 'Borrador' : 'Draft';
+}
+
+function itemFromIntake(kind: IntakeKind, item: IntakeSummary, language: 'en' | 'es'): QueueItem {
+  const owner = displayName(item, language);
+  const priority = itemPriority(item);
+  return {
+    age: itemAge(item, language),
+    assignee: language === 'es' ? 'Operaciones' : 'Operations',
+    category: kind === 'employer' ? 'employer' : 'worker',
+    href: intakeHref(kind, item),
+    icon: kind === 'employer' ? 'building' : 'worker',
+    id: item.intake_id,
+    nextStep: itemNextStep(item, language),
+    owner,
+    priority,
+    reason: itemReason(kind, item, language),
+    reference: kind === 'employer'
+      ? language === 'es' ? 'Registro de empleador' : 'Employer intake'
+      : language === 'es' ? 'Registro de trabajador' : 'Worker intake',
+    status: itemStatus(item),
+    title: kind === 'employer'
+      ? language === 'es' ? 'Seguimiento de empleador' : 'Employer follow-up'
+      : priority === 'high'
+        ? language === 'es' ? 'Revisar solicitud urgente' : 'Urgent intake review'
+        : language === 'es' ? 'Revision de trabajador' : 'Worker intake review',
+  };
+}
+
+function dynamicItems(copy: WorkQueuesCopy, data: QueueData | null, language: 'en' | 'es') {
+  if (data === null || (data.workers.length === 0 && data.employers.length === 0)) {
+    return copy.items;
+  }
+  return [
+    ...data.workers.map((item) => itemFromIntake('worker', item, language)),
+    ...data.employers.map((item) => itemFromIntake('employer', item, language)),
+  ]
+    .sort((left, right) => {
+      const priorityOrder = { high: 0, medium: 1, low: 2 } as const;
+      return priorityOrder[left.priority] - priorityOrder[right.priority];
+    })
+    .slice(0, 8);
+}
+
+function dynamicSummary(copy: WorkQueuesCopy, items: QueueItem[]) {
+  if (items === copy.items) return copy.summaryItems;
+  const urgent = items.filter((item) => item.priority === 'high').length;
+  const workers = items.filter((item) => item.category === 'worker').length;
+  const employers = items.filter((item) => item.category === 'employer').length;
+  return copy.summaryItems.map((item) => {
+    if (item.icon === 'warning') return { ...item, value: String(urgent) };
+    if (item.icon === 'worker') return { ...item, value: String(workers) };
+    if (item.icon === 'building') return { ...item, value: String(employers) };
+    if (item.icon === 'queue') return { ...item, value: String(items.length) };
+    return item;
+  });
+}
+
 export function WorkQueues() {
   const { language } = useLanguage();
   const copy = language === 'es' ? spanishQueues : englishQueues;
   const [filter, setFilter] = useState<QueueFilter>('all');
+  const [queueData, setQueueData] = useState<QueueData | null>(null);
+  const items = useMemo(() => dynamicItems(copy, queueData, language), [copy, language, queueData]);
+  const summaryItems = useMemo(() => dynamicSummary(copy, items), [copy, items]);
   const visibleItems = useMemo(
-    () => copy.items.filter((item) => filter === 'all' || item.category === filter),
-    [copy.items, filter],
+    () => items.filter((item) => filter === 'all' || (filter === 'urgent' ? item.priority === 'high' : item.category === filter)),
+    [filter, items],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([queryIntakes('worker', { page_size: 50 }), queryIntakes('employer', { page_size: 50 })])
+      .then(([workerResult, employerResult]) => {
+        if (cancelled) return;
+        setQueueData({
+          workers: workerResult.ok ? workerResult.value.items : [],
+          employers: employerResult.ok ? employerResult.value.items : [],
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setQueueData(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <section aria-labelledby="work-queues-heading" className="work-queues-page">
@@ -142,7 +309,7 @@ export function WorkQueues() {
       </div>
 
       <div className="queue-summary-grid" aria-label={language === 'es' ? 'Resumen de colas' : 'Queue summary'}>
-        {copy.summaryItems.map((item) => (
+        {summaryItems.map((item) => (
           <div className="queue-summary-card" key={item.label}>
             <span aria-hidden="true" className="dashboard-icon">
               <IconSymbol name={item.icon} />

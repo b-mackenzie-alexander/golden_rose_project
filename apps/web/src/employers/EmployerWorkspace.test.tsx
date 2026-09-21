@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router';
 import { vi } from 'vitest';
 
 import { createEmployer, getEmployer, reviseEmployer, searchEmployers } from '../api/employerClient';
+import * as intakeApi from '../api/intakeClient';
 import { App, AppRoutes } from '../app/App';
 import { EmployerCreateForm } from './EmployerCreateForm';
 import { EmployerWorkspace } from './EmployerWorkspace';
@@ -16,6 +17,7 @@ vi.mock('../api/employerClient', () => ({
   reviseEmployer: vi.fn(),
   searchEmployers: vi.fn(),
 }));
+vi.mock('../api/intakeClient');
 
 function createDeferredPromise<T>() {
   let resolve!: (value: T) => void;
@@ -30,6 +32,14 @@ function createDeferredPromise<T>() {
 }
 
 describe('EmployerWorkspace', () => {
+  beforeEach(() => {
+    vi.mocked(intakeApi.queryIntakes).mockReset();
+    vi.mocked(intakeApi.queryIntakes).mockResolvedValue({
+      ok: true,
+      value: { items: [], next_cursor: null },
+    });
+  });
+
   it('resets state on page hide without requiring a persisted-restore callback', () => {
     render(
       <LanguageProvider>
@@ -631,6 +641,57 @@ describe('EmployerWorkspace', () => {
     expect(screen.getByText('Try a different employer name fragment or clear the employer type filter.')).toBeInTheDocument();
     expect(screen.queryByText('Ghost Rose')).not.toBeInTheDocument();
     expect(screen.queryByRole('status', { name: /searching employers/i })).not.toBeInTheDocument();
+  });
+
+  it('surfaces matching employer intake drafts when employer records are empty', async () => {
+    const user = userEvent.setup();
+    vi.mocked(searchEmployers).mockReset();
+    vi.mocked(searchEmployers).mockResolvedValue({
+      ok: true,
+      value: { items: [], nextCursor: null },
+    });
+    vi.mocked(intakeApi.queryIntakes).mockResolvedValue({
+      ok: true,
+      value: {
+        items: [
+          {
+            intake_id: '77777777-7777-4777-8777-777777777777',
+            kind: 'employer',
+            version: 2,
+            lifecycle: 'draft',
+            display_name: 'Restaurante La Esperanza',
+            complete: false,
+            missing_fields: ['worksite_address'],
+            review_status: 'needs_follow_up',
+            updated_at: '2026-09-21T14:00:00Z',
+          },
+        ],
+        next_cursor: null,
+      },
+    });
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(screen.getByLabelText('Employer name'), 'Esperanza');
+    await user.click(screen.getByRole('button', { name: 'Search employers' }));
+
+    expect(await screen.findByRole('heading', { name: 'Search results' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Matching employer intakes' })).toBeInTheDocument();
+    expect(screen.getByText('Restaurante La Esperanza')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Open intake: Restaurante La Esperanza/ })).toHaveAttribute(
+      'href',
+      '/staff/intakes/employers?reference=77777777-7777-4777-8777-777777777777&open=match',
+    );
+    expect(intakeApi.queryIntakes).toHaveBeenCalledWith('employer', {
+      name_query: 'Esperanza',
+      page_size: 5,
+    });
   });
 
   it('renders minimized accepted results', async () => {

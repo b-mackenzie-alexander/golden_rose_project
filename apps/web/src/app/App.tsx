@@ -34,8 +34,8 @@ function StaffMapPreview() {
         <h2 id="staff-map-heading">{language === 'en' ? 'Activity map' : 'Mapa de actividad'}</h2>
         <p>
           {language === 'en'
-            ? 'Broad-area activity for demo planning. Exact household and worksite locations remain restricted.'
-            : 'Actividad por zona amplia para planificacion de demo. Las direcciones exactas siguen restringidas.'}
+            ? 'Broad-area activity for staff planning. Exact household and worksite locations remain restricted.'
+            : 'Actividad por zona amplia para planificacion del personal. Las direcciones exactas siguen restringidas.'}
         </p>
       </div>
       <div className="module-preview-grid">
@@ -86,8 +86,8 @@ function StaffReportsPreview() {
         <p className="module-preview-eyebrow">{language === 'en' ? 'Operational snapshot' : 'Resumen operativo'}</p>
         <h2 id="staff-reports-heading">{language === 'en' ? 'Reports' : 'Informes'}</h2>
         <p>{language === 'en'
-          ? 'Demo-ready staff metrics that summarize intake, follow-up, calendar, and queue activity.'
-          : 'Metricas de demo para registros, seguimientos, calendario y colas.'}</p>
+          ? 'Staff metrics that summarize intake, follow-up, calendar, and queue activity.'
+          : 'Metricas del personal para registros, seguimientos, calendario y colas.'}</p>
       </div>
       <div className="module-report-grid">
         {metrics.map(([label, value, meta]) => (
@@ -102,8 +102,8 @@ function StaffReportsPreview() {
       <section className="module-preview-panel" aria-labelledby="report-boundary-heading">
         <h3 id="report-boundary-heading">{language === 'en' ? 'Reporting boundary' : 'Limite de informes'}</h3>
         <p>{language === 'en'
-          ? 'These metrics are a static operational preview for the demo. Export and authoritative reporting should be wired to backend records before shared use.'
-          : 'Estas metricas son una vista previa estatica para la demo. La exportacion y los informes oficiales deben conectarse a registros del servidor antes de uso compartido.'}</p>
+          ? 'These metrics summarize the current staff workflow surface. Export and authoritative reporting should be wired to backend records before shared use.'
+          : 'Estas metricas resumen la superficie operativa actual. La exportacion y los informes oficiales deben conectarse a registros del servidor antes de uso compartido.'}</p>
         <button className="module-disabled-action focus-ring" disabled type="button">
           {language === 'en' ? 'Export requires report permission' : 'Exportar requiere permiso de informes'}
         </button>

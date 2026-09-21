@@ -682,9 +682,10 @@ describe('EmployerWorkspace', () => {
     await user.click(screen.getByRole('button', { name: 'Search employers' }));
 
     expect(await screen.findByRole('heading', { name: 'Search results' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Matching employer intakes' })).toBeInTheDocument();
-    expect(screen.getByText('Restaurante La Esperanza')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Open intake: Restaurante La Esperanza/ })).toHaveAttribute(
+    const searchForm = screen.getByRole('form', { name: 'Employer search' });
+    expect(within(searchForm).getByRole('heading', { name: 'Matching employer intakes' })).toBeInTheDocument();
+    expect(within(searchForm).getByText('Restaurante La Esperanza')).toBeInTheDocument();
+    expect(within(searchForm).getByRole('link', { name: /Open intake: Restaurante La Esperanza/ })).toHaveAttribute(
       'href',
       '/staff/intakes/employers?reference=77777777-7777-4777-8777-777777777777&open=match',
     );

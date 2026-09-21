@@ -644,7 +644,6 @@ export function EmployerSearch({
           failureKind={detailFailureState?.kind ?? null}
           isLoading={isDetailLoading}
         />
-        {intakeResultPresentation}
       </>
     )
   );
@@ -768,6 +767,7 @@ export function EmployerSearch({
               {messages.employerSearchLoadMore}
             </button>
           )}
+          {intakeResultPresentation}
         </section>
       )}
 

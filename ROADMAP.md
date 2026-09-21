@@ -1,5 +1,15 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-09-21 — Employer intake search result visibility active
+
+- **Staffing:** One independent developer; focused frontend regression tests provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** Source work is active on `fix/employer-intake-search-results` from protected `develop` after the PR #113 dashboard-search rollout. Owner screenshot evidence showed the Employer-intake search panel could submit `Bright` while `Bright Horizons Staffing` was visible in the Employer intakes list but not rendered in the search results area. This follow-up moves matching employer-intake draft cards into the submitted search results block so staff see the match immediately and can use the direct `Open intake` link.
+- **Gate budget:** Source/frontend repair only. No backend contract change, cloud inspection or mutation, image publication, deployment, live/client data, production authority, database rerun, persistent synthetic write qualification, or default permission activation occurred.
+- **Next executable action:** Complete focused and standard frontend validation, then package the fix for PR to `develop`; refresh of the private presentation environment remains a separate bounded rollout after merge.
+- **Do not regress:** PR #113 global search, work-queue routing and no-demo-copy behavior; PR #112 readiness/current-schema behavior; PR #111 presentation seed; PR #110 dashboard/intake direct-open behavior; immutable intake history; restricted addresses and permissions; bilingual parity; private fictional-synthetic data boundary; no live/client-data admission; no production/default permission activation.
+
+**Validation:** `npm --prefix apps/web test -- EmployerWorkspace.test.tsx` passed 71 tests. `npm --prefix apps/web test -- Dashboard.test.tsx EmployerWorkspace.test.tsx` passed 79 tests with existing jsdom canvas notices. `npm --prefix apps/web run typecheck`, `npm --prefix apps/web run lint`, `npm --prefix apps/web run build`, and `git diff --check` passed. The production build retains the existing Vite large-dashboard-chunk warning.
+
 ## 2026-09-21 — PR #113 dashboard search and queue hardening deployed
 
 - **Staffing:** One independent developer; focused frontend tests, lint, typecheck, build, hygiene checks, GitHub Actions and read-only service smoke checks provide quality evidence, not independent-human authorization.

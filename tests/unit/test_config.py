@@ -140,7 +140,9 @@ def test_production_forbids_demo_access_configuration() -> None:
 
 
 @pytest.mark.parametrize("environment", ["local", "test"])
-def test_presentation_demo_seed_is_develop_only(environment: str) -> None:
+def test_presentation_demo_seed_is_develop_only(
+    environment: Literal["local", "test"],
+) -> None:
     with pytest.raises(ValidationError, match="presentation demo seed"):
         Settings(
             environment=environment,

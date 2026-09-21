@@ -1,5 +1,9 @@
 from datetime import UTC, datetime, timedelta
+from typing import Any, cast
 from uuid import uuid4
+
+from pydantic import SecretStr
+from sqlalchemy.engine import Engine
 
 from golden_rose.application import presentation_demo_seed
 from golden_rose.application.presentation_demo_seed import (
@@ -8,6 +12,10 @@ from golden_rose.application.presentation_demo_seed import (
     seed_presentation_demo_data,
 )
 from golden_rose.config import Settings
+
+
+def _model_input(value: object) -> Any:
+    return value
 
 
 class FakeSession:
@@ -34,9 +42,9 @@ def _develop_settings(*, enabled: bool) -> Settings:
         public_environment_label="Non-production develop fictional synthetic data only",
         deployed_image_digest="sha256:" + "a" * 64,
         demo_access_enabled=True,
-        demo_access_password="ZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmY",
-        demo_access_expires_at=(datetime.now(UTC) + timedelta(days=1)).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
+        demo_access_password=SecretStr("ZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmY"),
+        demo_access_expires_at=_model_input(
+            (datetime.now(UTC) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
         ),
         presentation_demo_seed_enabled=enabled,
     )
@@ -62,7 +70,7 @@ def test_disabled_presentation_seed_does_not_open_session(monkeypatch) -> None:
     FakeSession.instances.clear()
     monkeypatch.setattr(presentation_demo_seed, "Session", FakeSession)
 
-    seed_presentation_demo_data(object(), _develop_settings(enabled=False))
+    seed_presentation_demo_data(cast(Engine, object()), _develop_settings(enabled=False))
 
     assert FakeSession.instances == []
 
@@ -78,7 +86,7 @@ def test_enabled_presentation_seed_replays_all_records_with_demo_permissions(mon
     monkeypatch.setattr(presentation_demo_seed, "Session", FakeSession)
     monkeypatch.setattr(presentation_demo_seed, "execute_intake", execute_intake)
 
-    engine = object()
+    engine = cast(Engine, object())
     seed_presentation_demo_data(engine, _develop_settings(enabled=True))
 
     assert len(FakeSession.instances) == 1

@@ -1,5 +1,15 @@
 # Current Work — Golden Rose Operations Platform
 
+## 2026-09-21 — Employer intake search result visibility active
+
+- **Staffing:** One independent developer; focused frontend regression tests provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** Source work is active on `fix/employer-intake-search-results` from protected `develop` after the PR #113 dashboard-search rollout. Owner screenshot evidence showed the Employer-intake search panel could submit `Bright` while `Bright Horizons Staffing` was visible in the Employer intakes list but not rendered in the search results area. The defect was caused by matching employer-intake draft cards being rendered in the lower work-area/detail presentation instead of inside the submitted search results block. The search panel now renders matching employer-intake drafts directly under `Search results`, preserving the `Open intake` direct link to the matching draft reference.
+- **Gate budget:** This is a bounded frontend/source UX repair for the private fictional-synthetic staff presentation surface. It does not change backend contracts, run migrations, inspect or mutate cloud resources, admit live/client data, activate production/default permissions, or run persistent synthetic write qualification.
+- **Next executable action:** Complete focused and standard frontend validation, then package the fix for PR to `develop`. Any cloud image publication or service refresh remains a separate explicitly authorized private synthetic rollout after merge.
+- **Do not regress:** PR #113 global search, work-queue routing and no-demo-copy behavior; PR #112 readiness/current-schema behavior; PR #111 presentation seed; PR #110 dashboard/intake direct-open behavior; immutable intake history; restricted addresses and permissions; bilingual parity; private fictional-synthetic data boundary; no live/client-data admission; no production/default permission activation.
+
+**Validation:** `npm --prefix apps/web test -- EmployerWorkspace.test.tsx` passed 71 tests. `npm --prefix apps/web test -- Dashboard.test.tsx EmployerWorkspace.test.tsx` passed 79 tests with existing jsdom canvas notices. `npm --prefix apps/web run typecheck`, `npm --prefix apps/web run lint`, `npm --prefix apps/web run build`, and `git diff --check` passed. The production build retains the existing Vite large-dashboard-chunk warning.
+
 ## 2026-09-21 — PR #113 dashboard search and queue hardening deployed
 
 - **Staffing:** One independent developer; focused frontend tests, lint, typecheck, build, hygiene checks, GitHub Actions and read-only service smoke checks provide quality evidence, not independent-human authorization.

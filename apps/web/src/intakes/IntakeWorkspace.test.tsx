@@ -96,6 +96,33 @@ describe('staff intake drafts', () => {
     await screen.findByDisplayValue('Authoritative');
     expect(screen.getByText(/Version 4/)).toBeInTheDocument();
   });
+  it('opens a new worker draft above existing draft results', async () => {
+    vi.mocked(api.queryIntakes).mockResolvedValue({
+      ok: true,
+      value: { items: [detail().summary], next_cursor: null },
+    });
+    mount();
+    await screen.findByRole('link', { name: `Resume: Fictional Person — ${id}` });
+    fireEvent.click(screen.getByRole('button', { name: 'New intake' }));
+    const newDraftRegion = screen.getByRole('region', { name: 'New intake: Worker intakes' });
+    const searchButton = screen.getByRole('button', { name: 'Search drafts' });
+    expect(newDraftRegion.compareDocumentPosition(searchButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(newDraftRegion).getByLabelText('First name')).toHaveValue('');
+  });
+  it.each([
+    ['/staff/intakes/workers', 'New intake: Worker intakes', 'First name'],
+    ['/staff/intakes/employers', 'New intake: Employer intakes', 'Employer name'],
+  ])('reopens a blank template when New intake is clicked again on %s', (path, regionName, fieldLabel) => {
+    mount(path);
+    fireEvent.click(screen.getByRole('button', { name: 'New intake' }));
+    const firstDraft = screen.getByRole('region', { name: regionName });
+    fireEvent.change(within(firstDraft).getByLabelText(fieldLabel), {
+      target: { value: 'Draft value' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'New intake' }));
+    const secondDraft = screen.getByRole('region', { name: regionName });
+    expect(within(secondDraft).getByLabelText(fieldLabel)).toHaveValue('');
+  });
   it('keeps later edits unsaved after pending save', async () => {
     const pending = deferred<Result<IntakeCommandResult>>();
     vi.mocked(api.saveIntake).mockReturnValue(pending.promise);

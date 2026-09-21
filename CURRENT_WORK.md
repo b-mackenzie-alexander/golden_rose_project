@@ -1,5 +1,15 @@
 # Current Work — Golden Rose Operations Platform
 
+## 2026-09-21 — Worker and employer New intake buttons active
+
+- **Staffing:** One independent developer; focused frontend regression tests, lint, typecheck and production build provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** Source work is active on `fix/new-intake-buttons` from protected `develop`. Owner feedback showed the `New intake` button on Worker intakes and Employer intakes did not visibly provide a fresh blank template for adding people/employers into the dashboard. The intake index now renders the blank draft editor immediately below the page header, before search and existing results, so the action has an obvious visible result. Each `New intake` click also creates a new keyed editor instance, so staff can intentionally reopen a blank worker or employer template instead of being left in a stale existing in-memory draft.
+- **Gate budget:** This is a bounded frontend/source UX repair for the private fictional-synthetic staff presentation surface. It does not change backend contracts, run migrations, inspect or mutate cloud resources, admit live/client data, activate production/default permissions, or run persistent synthetic write qualification.
+- **Next executable action:** Publish this focused source repair as a PR to `develop`, then decide whether to refresh the private develop service after merge under explicit rollout authorization.
+- **Do not regress:** PR #115 employer-intake search result visibility; PR #113 global search, work-queue routing and no-demo-copy behavior; PR #112 readiness/current-schema behavior; PR #111 presentation seed; PR #110 dashboard/intake direct-open behavior; immutable intake history; restricted addresses and permissions; bilingual parity; private fictional-synthetic data boundary; no live/client-data admission; no production/default permission activation.
+
+**Validation:** `npm --prefix apps/web test -- IntakeWorkspace.test.tsx` passed 56 tests with existing jsdom canvas notices. `npm --prefix apps/web run typecheck`, `npm --prefix apps/web run lint`, and `npm --prefix apps/web run build` passed. The production build retains the existing Vite large-dashboard-chunk warning.
+
 ## 2026-09-21 — PR #115 employer intake search visibility deployed
 
 - **Staffing:** One independent developer; focused frontend regression tests, GitHub Actions, image signing/verification, Cloud Run readback and read-only service smoke checks provide quality evidence, not independent-human authorization.

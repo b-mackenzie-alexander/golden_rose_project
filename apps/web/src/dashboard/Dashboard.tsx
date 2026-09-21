@@ -53,9 +53,9 @@ const englishDashboard: DashboardCopy = {
   primaryQueueHeading: "Today's priorities",
   primaryQueueLink: 'View all',
   queueRows: [
-    { days: '9:00 a.m.', href: '/staff/intakes/workers?reference=b7dea69e-9b10-43b3-95aa-d1cd01f6c453&open=match', icon: 'worker', name: 'Urgent intake review', next: 'Missing residential address', ref: 'Preview Catalog Worker', status: 'incomplete' },
-    { days: '10:30 a.m.', href: '/staff/intakes/employers?reference=40bd8f48-88c2-42bf-a2bb-bd4ee6e962e2&open=match', icon: 'building', name: 'Employer follow-up', next: 'Confirm worksite details', ref: 'Heather Micca', status: 'pending' },
-    { days: '11:00 a.m.', href: '/staff/intakes/workers?reference=ca0a3935-e72f-4a00-be6d-af081546a73f&open=match', icon: 'worker', name: 'Complete pending interview', next: 'Review availability', ref: 'Jason Meme', status: 'pending' },
+    { days: '9:00 a.m.', href: '/staff/intakes/workers?reference=b7dea69e-9b10-43b3-95aa-d1cd01f6c453&open=match', icon: 'worker', name: 'Urgent intake review', next: 'Missing residential address', ref: 'Ana Quispe', status: 'incomplete' },
+    { days: '10:30 a.m.', href: '/staff/intakes/employers?reference=40bd8f48-88c2-42bf-a2bb-bd4ee6e962e2&open=match', icon: 'building', name: 'Employer follow-up', next: 'Confirm worksite details', ref: 'Restaurante La Esperanza', status: 'pending' },
+    { days: '11:00 a.m.', href: '/staff/intakes/workers?reference=ca0a3935-e72f-4a00-be6d-af081546a73f&open=match', icon: 'worker', name: 'Complete pending interview', next: 'Review availability', ref: 'Carlos Mendoza', status: 'pending' },
     { days: '1:00 p.m.', href: '/staff/intakes/workers?queue=review', icon: 'document', name: 'Review new drafts', next: 'Three records waiting', ref: 'Staff queue', status: 'draft' },
     { days: '3:00 p.m.', href: '/staff/work-interests', icon: 'catalog', name: 'Update interest catalog', next: 'Review new skill labels', ref: 'Catalog', status: 'in_review' },
   ],
@@ -69,9 +69,9 @@ const englishDashboard: DashboardCopy = {
   recentEmployerHeading: 'Recent employer intakes',
   recentWorkerHeading: 'Recent worker intakes',
   recentRows: [
-    { href: '/staff/intakes/workers?reference=499342a9-30ee-41eb-a5fe-22855025d8a9&open=match', meta: '2 days ago', name: 'Darian Micheal Huges', status: 'complete' },
-    { href: '/staff/intakes/workers?reference=849ae3a9-acde-44f8-b49b-acb3e58a1f7d&open=match', meta: 'Today', name: 'Sam W Gamgee', status: 'complete' },
-    { href: '/staff/intakes/workers?reference=b7dea69e-9b10-43b3-95aa-d1cd01f6c453&open=match', meta: '2 days ago', name: 'Preview Catalog Worker', status: 'incomplete' },
+    { href: '/staff/intakes/workers?reference=499342a9-30ee-41eb-a5fe-22855025d8a9&open=match', meta: '2 days ago', name: 'Maria Lopez', status: 'complete' },
+    { href: '/staff/intakes/workers?reference=849ae3a9-acde-44f8-b49b-acb3e58a1f7d&open=match', meta: 'Today', name: 'Sofia Diaz', status: 'complete' },
+    { href: '/staff/intakes/workers?reference=b7dea69e-9b10-43b3-95aa-d1cd01f6c453&open=match', meta: '2 days ago', name: 'Ana Quispe', status: 'incomplete' },
   ],
   scheduleHeading: "Today's schedule",
   scheduleLink: 'View calendar',
@@ -114,9 +114,9 @@ const spanishDashboard: DashboardCopy = {
   primaryQueueHeading: 'Prioridades de hoy',
   primaryQueueLink: 'Ver todas',
   queueRows: [
-    { days: '9:00 a. m.', href: '/staff/intakes/workers?reference=b7dea69e-9b10-43b3-95aa-d1cd01f6c453&open=match', icon: 'worker', name: 'Revisar solicitud urgente', next: 'Falta domicilio residencial', ref: 'Preview Catalog Worker', status: 'incomplete' },
-    { days: '10:30 a. m.', href: '/staff/intakes/employers?reference=40bd8f48-88c2-42bf-a2bb-bd4ee6e962e2&open=match', icon: 'building', name: 'Hacer seguimiento con empleador', next: 'Confirmar lugar de trabajo', ref: 'Heather Micca', status: 'pending' },
-    { days: '11:00 a. m.', href: '/staff/intakes/workers?reference=ca0a3935-e72f-4a00-be6d-af081546a73f&open=match', icon: 'worker', name: 'Completar entrevista pendiente', next: 'Revisar disponibilidad', ref: 'Jason Meme', status: 'pending' },
+    { days: '9:00 a. m.', href: '/staff/intakes/workers?reference=b7dea69e-9b10-43b3-95aa-d1cd01f6c453&open=match', icon: 'worker', name: 'Revisar solicitud urgente', next: 'Falta domicilio residencial', ref: 'Ana Quispe', status: 'incomplete' },
+    { days: '10:30 a. m.', href: '/staff/intakes/employers?reference=40bd8f48-88c2-42bf-a2bb-bd4ee6e962e2&open=match', icon: 'building', name: 'Hacer seguimiento con empleador', next: 'Confirmar lugar de trabajo', ref: 'Restaurante La Esperanza', status: 'pending' },
+    { days: '11:00 a. m.', href: '/staff/intakes/workers?reference=ca0a3935-e72f-4a00-be6d-af081546a73f&open=match', icon: 'worker', name: 'Completar entrevista pendiente', next: 'Revisar disponibilidad', ref: 'Carlos Mendoza', status: 'pending' },
     { days: '1:00 p. m.', href: '/staff/intakes/workers?queue=review', icon: 'document', name: 'Revisar nuevos borradores', next: 'Tres registros sin revisar', ref: 'Cola del personal', status: 'draft' },
     { days: '3:00 p. m.', href: '/staff/work-interests', icon: 'catalog', name: 'Actualizar catalogo de intereses', next: 'Revisar nuevas habilidades', ref: 'Catalogo', status: 'in_review' },
   ],
@@ -130,9 +130,9 @@ const spanishDashboard: DashboardCopy = {
   recentEmployerHeading: 'Registros recientes de empleadores',
   recentWorkerHeading: 'Registros recientes de trabajadores',
   recentRows: [
-    { href: '/staff/intakes/workers?reference=499342a9-30ee-41eb-a5fe-22855025d8a9&open=match', meta: 'hace 2 dias', name: 'Darian Micheal Huges', status: 'complete' },
-    { href: '/staff/intakes/workers?reference=849ae3a9-acde-44f8-b49b-acb3e58a1f7d&open=match', meta: 'hoy', name: 'Sam W Gamgee', status: 'complete' },
-    { href: '/staff/intakes/workers?reference=b7dea69e-9b10-43b3-95aa-d1cd01f6c453&open=match', meta: 'hace 2 dias', name: 'Preview Catalog Worker', status: 'incomplete' },
+    { href: '/staff/intakes/workers?reference=499342a9-30ee-41eb-a5fe-22855025d8a9&open=match', meta: 'hace 2 dias', name: 'Maria Lopez', status: 'complete' },
+    { href: '/staff/intakes/workers?reference=849ae3a9-acde-44f8-b49b-acb3e58a1f7d&open=match', meta: 'hoy', name: 'Sofia Diaz', status: 'complete' },
+    { href: '/staff/intakes/workers?reference=b7dea69e-9b10-43b3-95aa-d1cd01f6c453&open=match', meta: 'hace 2 dias', name: 'Ana Quispe', status: 'incomplete' },
   ],
   scheduleHeading: 'Agenda de hoy',
   scheduleLink: 'Ver calendario',
@@ -326,7 +326,7 @@ export function Dashboard() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([queryIntakes('worker'), queryIntakes('employer')])
+    Promise.all([queryIntakes('worker', { page_size: 50 }), queryIntakes('employer', { page_size: 50 })])
       .then(([workerResult, employerResult]) => {
         if (cancelled) return;
         setIntakes({

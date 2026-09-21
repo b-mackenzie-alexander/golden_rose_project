@@ -7,6 +7,7 @@ from fastapi import Depends, Header, Request
 from sqlalchemy.orm import Session
 
 from golden_rose.api.errors import InvalidIdempotencyKeyError
+from golden_rose.application.presentation_demo_seed import DEMO_INTAKE_PERMISSIONS
 from golden_rose.auth.permissions import (
     CREATE_DRAFT_EMPLOYER_PERMISSION,
     EMPLOYER_CONTACT_DRAFT_CREATE_PERMISSION,
@@ -43,24 +44,7 @@ def get_db_session(request: Request) -> Iterator[Session]:
 
 def get_staff_principal(settings: Annotated[Settings, Depends(get_settings)]) -> StaffPrincipal:
     intake_permissions = (
-        {
-            "intake:read",
-            "intake:draft:create",
-            "intake:draft:revise",
-            "intake:review",
-            "intake:follow_up",
-            "intake:restricted_history:read",
-            "work_interest:read",
-            "work_interest:manage",
-            "worker_residence:read",
-            "worker_residence:write",
-            "party_address:read",
-            "party_address:write",
-            "worksite_address:read",
-            "worksite_address:write",
-        }
-        if settings.environment in {"local", "test"}
-        else set()
+        DEMO_INTAKE_PERMISSIONS if settings.environment in {"local", "test", "develop"} else set()
     )
     return StaffPrincipal(
         actor_id=settings.synthetic_staff_id,
@@ -107,9 +91,5 @@ def get_staff_directory(settings: Annotated[Settings, Depends(get_settings)]):
         return StaffDirectory()
     principal = get_staff_principal(settings)
     return StaffDirectory(
-        (
-            StaffDirectoryEntry(
-                principal.actor_id, "Fictional staff reviewer", True, principal.permissions
-            ),
-        )
+        (StaffDirectoryEntry(principal.actor_id, "Mariela Torres", True, principal.permissions),)
     )

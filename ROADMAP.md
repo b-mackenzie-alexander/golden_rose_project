@@ -1,5 +1,15 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-09-21 — Presentation demo data patch active
+
+- **Staffing:** One independent developer; focused unit tests, full web verification, lint/typecheck/build and secret scanning provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** Source work is active on `fix/presentation-demo-data` from protected `origin/develop@58e9cfa` after PR #110 reached `develop`. Remaining effort before the five-to-eight-minute Google demo is presentation hardening only: critical fixes and UI/UX gap sealing. The current patch makes the dashboard and intake lists feel populated with backend-backed fictional-synthetic records instead of obvious placeholder labels. It seeds 50 worker draft intakes and 30 employer draft intakes through the existing intake command/audit/receipt path, gives the private synthetic develop staff principal the bounded intake permissions needed to read them, lets the dashboard request the max 50-item intake page, and removes old preview/person-fixture names from visible dashboard/calendar/queue fallback copy.
+- **Gate budget:** This is a source/UI-copy/Terraform-env-flag patch only. No cloud inspection or mutation, image publication, deployment, live/client data, production authority, database rerun, or default permission activation occurred in this source task. The cloud presentation refresh remains a separate bounded private synthetic rollout after the source patch reaches `develop`.
+- **Next executable action:** Publish this patch for review/merge to `develop`, then refresh the private develop image/service under an explicit rollout packet so the demo environment starts with the presentation seed enabled.
+- **Do not regress:** PR #110 dashboard/intake direct-open behavior; PR #106 intake entry repairs; PR #107 dashboard shell/artwork; PR #108 map/calendar/queues modules; PR #109 deployment documents; immutable intake history; restricted addresses and permissions; bilingual parity; private fictional-synthetic data boundary; no live/client-data admission; no production/default permission activation.
+
+**Validation:** Focused backend unit tests passed 38 tests; focused UI tests passed 28 tests; full `npm run verify` passed 370 frontend tests with coverage gates, lint, typecheck, lock checks and production build; focused Ruff/mypy passed; `git diff --check` passed; `gitleaks dir --no-banner --redact .` found no leaks. Existing jsdom canvas notices and Vite large-dashboard-chunk warning remain nonblocking.
+
 ## 2026-09-17 — Demo UX repairs active
 
 - **Staffing:** One independent developer; focused automated frontend tests, lint/typecheck and production build provide quality evidence, not independent-human authorization.

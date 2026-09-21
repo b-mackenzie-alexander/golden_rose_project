@@ -73,6 +73,11 @@ resource "google_cloud_run_v2_service" "staff_tracer" {
       }
 
       env {
+        name  = "GOLDEN_ROSE_PRESENTATION_DEMO_SEED_ENABLED"
+        value = "true"
+      }
+
+      env {
         name = "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD"
         value_source {
           secret_key_ref {

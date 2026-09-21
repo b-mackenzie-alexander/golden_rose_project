@@ -294,7 +294,7 @@ def test_request_headers_cannot_grant_employer_contact_permissions() -> None:
     assert not hasattr(principal, "request_headers")
 
 
-def test_intake_permissions_are_not_activated_in_develop():
+def test_intake_permissions_are_available_in_private_synthetic_develop():
     settings = Settings(
         environment="local",
         auth_mode="synthetic",
@@ -302,7 +302,10 @@ def test_intake_permissions_are_not_activated_in_develop():
         synthetic_staff_id=uuid4(),
     ).model_copy(update={"environment": "develop"})
     principal = get_staff_principal(settings)
-    assert principal.permissions == frozenset(
+    assert "intake:read" in principal.permissions
+    assert "intake:draft:create" in principal.permissions
+    assert "worker_residence:read" in principal.permissions
+    assert principal.permissions > frozenset(
         {
             CREATE_DRAFT_EMPLOYER_PERMISSION,
             EMPLOYER_READ_PERMISSION,

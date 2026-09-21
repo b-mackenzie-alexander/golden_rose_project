@@ -1,5 +1,15 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-09-21 — Dashboard search and queue hardening active
+
+- **Staffing:** One independent developer; focused frontend tests, lint, typecheck, build and diff hygiene provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** Source work is active on `fix/dashboard-search-queues` from protected `origin/develop@86eec4d` after PR #112. This tranche addresses presentation-blocking UX gaps without changing backend contracts: visible Reports/Map copy no longer repeatedly labels the staff surface as a demo; global staff search queries worker and employer draft-intake records by name fragment or exact intake reference before dashboard shortcuts; Work Queues derives rows/counts/direct `Open` links from current draft-intake summaries; and the Employers workspace supplements canonical employer-record search with matching employer-intake draft cards that open the intake directly.
+- **Gate budget:** Source/frontend patch only. No cloud inspection or mutation, image publication, deployment, live/client data, production authority, database rerun, or default permission activation occurred.
+- **Next executable action:** Complete final source review and, with explicit owner approval, package a PR to `develop`; refresh of the private presentation environment remains a separate bounded rollout after merge.
+- **Do not regress:** PR #112 readiness/current-schema behavior; PR #111 presentation seed; PR #110 dashboard/intake direct-open behavior; PR #106 intake entry repairs; PR #107 dashboard shell/artwork; PR #108 map/calendar/queues modules; immutable intake history; restricted addresses and permissions; bilingual parity; private fictional-synthetic data boundary; no live/client-data admission; no production/default permission activation.
+
+**Validation:** `npm --prefix apps/web run typecheck`, `npm --prefix apps/web test -- Dashboard.test.tsx EmployerWorkspace.test.tsx` (79 tests), `npm --prefix apps/web run lint`, `npm --prefix apps/web run build`, and `git diff --check` passed. The existing Vite large-dashboard-chunk warning remains nonblocking.
+
 ## 2026-09-21 — Presentation demo data patch active
 
 - **Staffing:** One independent developer; focused unit tests, full web verification, lint/typecheck/build and secret scanning provide quality evidence, not independent-human authorization.

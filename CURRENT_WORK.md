@@ -1,5 +1,15 @@
 # Current Work — Golden Rose Operations Platform
 
+## 2026-09-21 — Dashboard search and queue hardening active
+
+- **Staffing:** One independent developer; focused frontend tests, lint, typecheck, build and diff hygiene provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** Source work is active on `fix/dashboard-search-queues` from protected `origin/develop@86eec4d` after PR #112. The running private `develop` image is reported by the owner as current for PR #112; this source patch has not been published or deployed. Visible Reports and Map copy no longer repeatedly labels the staff surface as a demo. Global staff search now queries current worker and employer draft-intake records by name fragment or exact intake reference before falling back to dashboard shortcuts. Work Queues now derives rows, counts and `Open` links from current draft-intake summaries, so employer follow-up rows point to existing employer-intake references instead of stale hardcoded IDs. The Employers workspace keeps the canonical employer-record search and now also surfaces matching employer-intake drafts with direct `Open intake` links when staff are searching by employer name.
+- **Gate budget:** This is a bounded frontend/source hardening patch for the private fictional-synthetic staff presentation surface. It does not inspect or mutate cloud resources, publish an image, run a deployment, admit live/client data, activate production/default permissions, or change backend contracts.
+- **Next executable action:** Complete final review and, if approved, package this source patch for PR to `develop`; any cloud image publication or service refresh remains a separate explicitly authorized private synthetic rollout.
+- **Do not regress:** PR #112 readiness/current-schema behavior; PR #111 presentation seed; PR #110 dashboard/intake direct-open behavior; PR #106 intake entry repairs; PR #107 dashboard shell/artwork; PR #108 map/calendar/queues modules; immutable intake history; restricted addresses and permissions; bilingual parity; private fictional-synthetic data boundary; no live/client-data admission; no production/default permission activation.
+
+**Validation:** `npm --prefix apps/web run typecheck`, `npm --prefix apps/web test -- Dashboard.test.tsx EmployerWorkspace.test.tsx` (79 tests), `npm --prefix apps/web run lint`, `npm --prefix apps/web run build`, and `git diff --check` passed. The production build retains the existing Vite large-dashboard-chunk warning. A grep for `demo`/`Demo` under `apps/web/src` now finds only calendar test event names, not visible app source copy.
+
 ## 2026-09-21 — Presentation demo data patch active
 
 - **Staffing:** One independent developer; focused unit tests, full web verification, lint/typecheck/build and secret scanning provide quality evidence, not independent-human authorization.

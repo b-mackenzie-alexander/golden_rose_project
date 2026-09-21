@@ -4,6 +4,8 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 
 import { BrandRose, IconSymbol } from '../dashboard/artwork';
 import type { IconName } from '../dashboard/artwork';
+import { queryIntakes } from '../api/intakeClient';
+import type { DraftObject, IntakeKind, IntakeSummary } from '../api/intakeContracts';
 import { useLanguage } from '../i18n/LanguageProvider';
 
 type ThemeMode = 'dark' | 'light';
@@ -16,6 +18,32 @@ type SearchItem = {
   meta: string;
 };
 
+type DataSearchItem = SearchItem & {
+  id: string;
+};
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function intakeSearchHref(kind: IntakeKind, item: IntakeSummary) {
+  return `/staff/intakes/${kind === 'worker' ? 'workers' : 'employers'}?reference=${item.intake_id}&open=match`;
+}
+
+function dataSearchItem(kind: IntakeKind, item: IntakeSummary, language: 'en' | 'es'): DataSearchItem {
+  const displayName = item.display_name?.trim() || (language === 'en' ? 'Unnamed intake' : 'Registro sin nombre');
+  const kindLabel = kind === 'worker'
+    ? language === 'en' ? 'Worker intake' : 'Registro de trabajador'
+    : language === 'en' ? 'Employer intake' : 'Registro de empleador';
+  const reviewLabel = language === 'en' ? 'Draft intake record' : 'Borrador de registro';
+  return {
+    href: intakeSearchHref(kind, item),
+    icon: kind === 'worker' ? 'worker' : 'employerIntake',
+    id: `${kind}:${item.intake_id}`,
+    keywords: `${displayName} ${item.intake_id} ${kindLabel}`,
+    label: displayName,
+    meta: `${kindLabel} - ${reviewLabel}`,
+  };
+}
+
 export function AppShell() {
   const { messages, toggleLanguage, language } = useLanguage();
   const location = useLocation();
@@ -23,6 +51,7 @@ export function AppShell() {
   const [theme, setTheme] = useState<ThemeMode>('light');
   const [searchValue, setSearchValue] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [dataSearchItems, setDataSearchItems] = useState<DataSearchItem[]>([]);
   const isDark = theme === 'dark';
   const navItems = [
     { icon: 'home', label: language === 'en' ? 'Home' : 'Inicio', to: '/' },
@@ -148,10 +177,43 @@ export function AppShell() {
     },
   ], [language]);
   const normalizedSearch = searchValue.trim().toLocaleLowerCase();
-  const searchResults = normalizedSearch === ''
+  const shortcutResults = normalizedSearch === ''
     ? []
     : searchItems.filter((item) => `${item.label} ${item.meta} ${item.keywords}`.toLocaleLowerCase().includes(normalizedSearch)).slice(0, 5);
+  const searchResults = [...dataSearchItems, ...shortcutResults].slice(0, 7);
   const showSearchPanel = isSearchFocused && searchValue.trim().length > 0;
+
+  useEffect(() => {
+    const rawQuery = searchValue.trim();
+    const isReference = UUID_PATTERN.test(rawQuery);
+    if (rawQuery.length < 2 && !isReference) {
+      const timeoutId = window.setTimeout(() => {
+        setDataSearchItems([]);
+      }, 0);
+      return () => {
+        window.clearTimeout(timeoutId);
+      };
+    }
+
+    let cancelled = false;
+    const filter: DraftObject = isReference ? { reference: rawQuery.toLowerCase() } : { name_query: rawQuery };
+    Promise.all([queryIntakes('worker', filter), queryIntakes('employer', filter)])
+      .then(([workerResult, employerResult]) => {
+        if (cancelled) return;
+        const nextItems = [
+          ...(workerResult.ok ? workerResult.value.items.map((item) => dataSearchItem('worker', item, language)) : []),
+          ...(employerResult.ok ? employerResult.value.items.map((item) => dataSearchItem('employer', item, language)) : []),
+        ];
+        setDataSearchItems(nextItems.slice(0, 5));
+      })
+      .catch(() => {
+        if (!cancelled) setDataSearchItems([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [language, searchValue]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -238,11 +300,15 @@ export function AppShell() {
             {showSearchPanel ? (
               <div className="global-search-results" id="global-search-results">
                 {searchResults.length === 0 ? (
-                  <p>{language === 'en' ? 'No matching dashboard areas found.' : 'No se encontraron areas coincidentes.'}</p>
+                  <p>
+                    {language === 'en' ? 'No matching staff records or dashboard areas found.' : 'No se encontraron registros ni areas coincidentes.'}
+                  </p>
                 ) : (
                   <ol>
-                    {searchResults.map((item) => (
-                      <li key={item.href}>
+                    {searchResults.map((item) => {
+                      const itemKey = 'id' in item && typeof item.id === 'string' ? item.id : `${item.href}:${item.label}`;
+                      return (
+                      <li key={itemKey}>
                         <button
                           className="focus-ring"
                           type="button"
@@ -257,7 +323,8 @@ export function AppShell() {
                           </span>
                         </button>
                       </li>
-                    ))}
+                      );
+                    })}
                   </ol>
                 )}
               </div>

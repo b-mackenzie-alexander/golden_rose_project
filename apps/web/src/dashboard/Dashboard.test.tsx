@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -147,6 +147,26 @@ describe('Dashboard', () => {
     expect(screen.getByRole('heading', { name: "Today's agenda" })).toBeInTheDocument();
   });
 
+  it('routes from global search directly to matching employer intake data', async () => {
+    const user = userEvent.setup();
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.type(within(screen.getByRole('banner')).getByRole('searchbox', { name: 'Global search' }), 'Dynamic Employer');
+    await user.click(await screen.findByRole('button', { name: /Dynamic Employer One/ }));
+
+    await waitFor(() => {
+      expect(intakeApi.queryIntakes).toHaveBeenCalledWith('employer', { name_query: 'Dynamic Employer' });
+    });
+    expect(screen.getByRole('heading', { name: 'Employer intakes' })).toBeInTheDocument();
+    expect(screen.getByDisplayValue('44444444-4444-4444-8444-444444444444')).toBeInTheDocument();
+  });
+
   it('routes from global search directly to an urgent work intent', async () => {
     const user = userEvent.setup();
     render(
@@ -158,10 +178,20 @@ describe('Dashboard', () => {
     );
 
     await user.type(within(screen.getByRole('banner')).getByRole('searchbox', { name: 'Global search' }), 'urgent requests');
-    await user.click(screen.getByRole('button', { name: /Urgent requests/ }));
+    const urgentShortcut = screen.getAllByRole('button', { name: /Urgent requests/ }).find((button) => (
+      button.textContent.includes('Prioritized work queue')
+    ));
+    if (urgentShortcut === undefined) {
+      throw new Error('Urgent requests shortcut was not rendered.');
+    }
+    await user.click(urgentShortcut);
 
     expect(screen.getByRole('heading', { name: 'Work queues' })).toBeInTheDocument();
-    expect(screen.getByText('Urgent intake review')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getAllByRole('link', { name: 'Open' }).some((link) => (
+        link.getAttribute('href') === '/staff/intakes/workers?reference=11111111-1111-4111-8111-111111111111&open=match'
+      ))).toBe(true);
+    });
   });
 
   it('renders the staff calendar route with selectable static agenda data', async () => {
@@ -203,21 +233,24 @@ describe('Dashboard', () => {
     expect(screen.getByRole('link', { name: 'Work queues' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('heading', { name: 'Work queues' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Prioritized work' })).toBeInTheDocument();
-    expect(screen.getByText('Urgent intake review')).toBeInTheDocument();
-    expect(screen.getByText('Employer follow-up')).toBeInTheDocument();
-    expect(screen.getByText('Missing restricted address blocks review')).toBeInTheDocument();
-    const urgentRow = screen.getByText('Urgent intake review').closest('article');
-    if (!urgentRow) throw new Error('Urgent queue row was not rendered.');
-    expect(within(urgentRow).getByRole('link', { name: 'Open' })).toHaveAttribute(
-      'href',
-      '/staff/intakes/workers?reference=b7dea69e-9b10-43b3-95aa-d1cd01f6c453&open=match',
-    );
+    await waitFor(() => {
+      expect(screen.getAllByRole('link', { name: 'Open' }).some((link) => (
+        link.getAttribute('href') === '/staff/intakes/workers?reference=11111111-1111-4111-8111-111111111111&open=match'
+      ))).toBe(true);
+    });
+    expect(screen.getAllByText('Employer follow-up').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Required intake fields are still missing').length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole('button', { name: 'Employer follow-ups' }));
 
     expect(screen.queryByText('Urgent intake review')).not.toBeInTheDocument();
-    expect(screen.getByText('Employer follow-up')).toBeInTheDocument();
-    expect(screen.getByText('Update interest catalog')).toBeInTheDocument();
+    expect(screen.getAllByText('Employer follow-up').length).toBeGreaterThan(0);
+    const employerRow = screen.getAllByText('Employer follow-up')[0]?.closest('article');
+    if (!employerRow) throw new Error('Employer queue row was not rendered.');
+    expect(within(employerRow).getByRole('link', { name: 'Open' })).toHaveAttribute(
+      'href',
+      '/staff/intakes/employers?reference=44444444-4444-4444-8444-444444444444&open=match',
+    );
     expect(await runAxe(view.container)).toEqual([]);
   });
 

@@ -292,6 +292,9 @@ def presentation_seed_records() -> list[SeedRecord]:
 
 
 def _command_id(settings: Settings, record: SeedRecord) -> UUID:
+    if settings.synthetic_staff_id is None:
+        msg = "presentation demo seed requires a synthetic staff actor"
+        raise RuntimeError(msg)
     return uuid5(
         NAMESPACE_URL,
         f"golden-rose:presentation-demo:{settings.synthetic_staff_id}:{record.key}",
@@ -303,6 +306,9 @@ def seed_presentation_demo_data(engine: Engine, settings: Settings) -> None:
         return
     if settings.environment != "develop" or settings.auth_mode != "synthetic":
         msg = "presentation demo seed is restricted to private synthetic develop"
+        raise RuntimeError(msg)
+    if settings.synthetic_staff_id is None:
+        msg = "presentation demo seed requires a synthetic staff actor"
         raise RuntimeError(msg)
     principal = StaffPrincipal(
         actor_id=settings.synthetic_staff_id,

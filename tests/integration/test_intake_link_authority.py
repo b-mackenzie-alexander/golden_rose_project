@@ -722,9 +722,7 @@ def test_successor_downgrade_refuses_link_history_before_ddl(client, migration_d
     }
     with pytest.raises(RuntimeError, match="before DDL"):
         migrate(migration_database, PREDECESSOR, downgrade=True)
-    assert (
-        rows(migration_database, "alembic_version")[0]["version_num"] == "0009a_canonical_reviews"
-    )
+    assert rows(migration_database, "alembic_version")[0]["version_num"] == "0010_staff_accounts"
     assert {table: rows(migration_database, table) for table in before} == before
     with migration_database.connect() as connection:
         assert connection.scalar(

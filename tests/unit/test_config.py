@@ -165,6 +165,77 @@ def test_production_rejects_synthetic_auth() -> None:
     assert "synthetic" in str(exc_info.value)
 
 
+def test_synthetic_auth_requires_synthetic_staff_id() -> None:
+    with pytest.raises(ValidationError, match="synthetic_staff_id"):
+        Settings(
+            environment="local",
+            auth_mode="synthetic",
+            database_url="postgresql+psycopg://test:test@127.0.0.1:55432/golden_rose",
+            synthetic_staff_id=None,
+        )
+
+
+def test_production_accepts_configured_staff_oidc_auth() -> None:
+    settings = Settings(
+        environment="production",
+        auth_mode="staff_oidc",
+        database_url="postgresql+psycopg://test:test@127.0.0.1:55432/golden_rose",
+        synthetic_staff_id=None,
+        staff_oidc_issuer="https://accounts.example.test",
+        staff_oidc_audience="golden-rose-staff",
+        staff_oidc_jwks_url="https://accounts.example.test/.well-known/jwks.json",
+    )
+
+    assert settings.auth_mode == "staff_oidc"
+    assert settings.synthetic_staff_id is None
+
+
+def test_staff_oidc_requires_complete_external_provider_configuration() -> None:
+    with pytest.raises(ValidationError, match="staff_oidc auth requires"):
+        Settings(
+            environment="production",
+            auth_mode="staff_oidc",
+            database_url="postgresql+psycopg://test:test@127.0.0.1:55432/golden_rose",
+            synthetic_staff_id=None,
+            staff_oidc_issuer="https://accounts.example.test",
+        )
+
+    with pytest.raises(ValidationError, match="https URL"):
+        Settings(
+            environment="production",
+            auth_mode="staff_oidc",
+            database_url="postgresql+psycopg://test:test@127.0.0.1:55432/golden_rose",
+            synthetic_staff_id=None,
+            staff_oidc_issuer="http://accounts.example.test",
+            staff_oidc_audience="golden-rose-staff",
+            staff_oidc_jwks_url="https://accounts.example.test/.well-known/jwks.json",
+        )
+
+    with pytest.raises(ValidationError, match="synthetic_staff_id"):
+        Settings(
+            environment="production",
+            auth_mode="staff_oidc",
+            database_url="postgresql+psycopg://test:test@127.0.0.1:55432/golden_rose",
+            synthetic_staff_id=uuid4(),
+            staff_oidc_issuer="https://accounts.example.test",
+            staff_oidc_audience="golden-rose-staff",
+            staff_oidc_jwks_url="https://accounts.example.test/.well-known/jwks.json",
+        )
+
+
+def test_staff_oidc_is_not_a_develop_demo_auth_mode() -> None:
+    with pytest.raises(ValidationError, match="staff_oidc auth_mode"):
+        Settings(
+            environment="develop",
+            auth_mode="staff_oidc",
+            database_url="postgresql+psycopg://test:test@127.0.0.1:55432/golden_rose",
+            synthetic_staff_id=None,
+            staff_oidc_issuer="https://accounts.example.test",
+            staff_oidc_audience="golden-rose-staff",
+            staff_oidc_jwks_url="https://accounts.example.test/.well-known/jwks.json",
+        )
+
+
 @pytest.mark.parametrize("environment", ["local", "test"])
 def test_local_and_test_allow_synthetic_auth(
     environment: Literal["local", "test"],

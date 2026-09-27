@@ -43,6 +43,9 @@ def get_db_session(request: Request) -> Iterator[Session]:
 
 
 def get_staff_principal(settings: Annotated[Settings, Depends(get_settings)]) -> StaffPrincipal:
+    if settings.auth_mode != "synthetic" or settings.synthetic_staff_id is None:
+        msg = "staff principal resolution requires a configured staff identity provider"
+        raise RuntimeError(msg)
     intake_permissions = (
         DEMO_INTAKE_PERMISSIONS if settings.environment in {"local", "test", "develop"} else set()
     )

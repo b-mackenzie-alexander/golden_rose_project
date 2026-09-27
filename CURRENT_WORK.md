@@ -1,12 +1,14 @@
 # Current Work — Golden Rose Operations Platform
 
-## 2026-09-27 — Production-readiness planning active
+## 2026-09-27 — Staff identity and accounts source slice active
 
-- **Staffing:** One independent developer; docs review, GitHub PR gates and later implementation checks provide quality evidence, not independent-human authorization.
-- **Human-visible outcome:** Demo day is complete. PR #116 and PR #117 are merged into protected `develop`; `origin/develop` is now `9c9a09d2c5ffb9128a28195a333f7f208d98bca6`. The active work is a docs-only production-readiness plan that makes staff identity, personal accounts, MFA/recovery and account lifecycle the first implementation tranche, followed by deployable GCP package hardening and authoritative dashboard operations.
-- **Gate budget:** Documentation/planning only. No source implementation, cloud inspection or mutation, production deployment, live/client data, new identity provider activation, credential rotation, persistent synthetic writes or default permission activation occurs in this branch.
-- **Next executable action:** Publish this docs-only plan as a PR to `develop`. After it merges, fetch the protected tip and create a fresh implementation branch from `origin/develop` for the staff identity/account lifecycle tranche.
+- **Staffing:** One independent developer; automated tests, source review and later PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** Demo day is complete. PR #116, PR #117 and the production-readiness docs PR #118 are merged into protected `develop`; `origin/develop` was rebased to `37043cdfef1b4a556c9567d58f14e617651f26fb` before source work began. The active branch is `feat/staff-identity-accounts`. The first source slice adds production-capable staff OIDC configuration vocabulary, fails closed so OIDC mode cannot fall back to the synthetic demo principal, and introduces durable staff account, permission grant and delegation schema foundations. No user-facing login flow or provider integration is live yet.
+- **Gate budget:** Source/backend foundation only. No cloud inspection or mutation, production deployment, live/client data, new identity provider activation, credential rotation, persistent synthetic writes, default permission activation or shared-runtime rollout occurs in this branch.
+- **Next executable action:** Finish publication hygiene for the staff identity/account foundation PR, then publish to `develop` for required CI. A later tranche must wire provider token validation, account administration UI/API, recovery workflows and deployable-package operator guidance before this is production-ready.
 - **Do not regress:** Human staff decision boundaries; no automated matching/ranking/eligibility/referral/placement; private fictional-synthetic boundaries until live-data gates open; immutable intake history and exact retries; restricted-field permissions; bilingual/accessibility parity; separate public/staff identity planes; deployable package portability for the client's later GCP environment.
+
+**Validation so far:** `UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run ruff check src tests/unit/test_config.py tests/unit/auth/test_staff_accounts.py tests/unit/test_staff_account_migration.py`, `UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run mypy src tests/unit/test_config.py tests/unit/auth/test_staff_accounts.py tests/unit/test_staff_account_migration.py`, focused backend unit tests and the full `tests/unit` suite passed. Alembic offline inspection reports single head `0010_staff_accounts`. PostgreSQL-backed integration migration tests were attempted but blocked by local database unavailability at `127.0.0.1:55432`, so live migration execution is not yet qualified in this branch.
 
 **Planning artifact:** [Production-readiness and staff identity plan](docs/planning/2026-09-27-production-readiness-plan.md).
 

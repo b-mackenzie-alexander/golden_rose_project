@@ -21,7 +21,7 @@ class FakeEngine:
 
 class FakeScalarResult:
     def scalar_one(self) -> str:
-        return "0009a_canonical_reviews"
+        return "0010_staff_accounts"
 
 
 class FakeConnection:

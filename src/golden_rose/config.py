@@ -11,7 +11,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from golden_rose.database import validate_database_role_identifier
 
 Environment = Literal["local", "test", "develop", "production"]
-AuthMode = Literal["synthetic"]
+AuthMode = Literal["synthetic", "staff_oidc"]
 DEVELOP_DEPLOYMENT_TARGET = "gcp-develop-private-synthetic"
 
 
@@ -25,7 +25,10 @@ class Settings(BaseSettings):
     environment: Environment
     auth_mode: AuthMode
     database_url: str = Field(repr=False)
-    synthetic_staff_id: UUID
+    synthetic_staff_id: UUID | None = None
+    staff_oidc_issuer: str | None = None
+    staff_oidc_audience: str | None = None
+    staff_oidc_jwks_url: str | None = None
     deployment_target: str | None = None
     public_environment_label: str | None = None
     deployed_image_digest: str | None = None
@@ -72,6 +75,11 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_auth_mode(self) -> "Settings":
+        if self.auth_mode == "synthetic" and self.synthetic_staff_id is None:
+            msg = "synthetic_staff_id is required when auth_mode is synthetic"
+            raise ValueError(msg)
+        if self.auth_mode == "staff_oidc":
+            self._validate_staff_oidc_configuration()
         if self.environment == "production" and (
             self.demo_access_enabled
             or self.demo_access_password is not None
@@ -125,3 +133,29 @@ class Settings(BaseSettings):
                 msg = "deployed_image_digest must be an immutable sha256 digest"
                 raise ValueError(msg)
         return self
+
+    def _validate_staff_oidc_configuration(self) -> None:
+        if self.environment not in ("test", "production"):
+            msg = "staff_oidc auth_mode is allowed only for test or production"
+            raise ValueError(msg)
+        if self.synthetic_staff_id is not None:
+            msg = "synthetic_staff_id must not be configured when auth_mode is staff_oidc"
+            raise ValueError(msg)
+        values = {
+            "staff_oidc_issuer": self.staff_oidc_issuer,
+            "staff_oidc_audience": self.staff_oidc_audience,
+            "staff_oidc_jwks_url": self.staff_oidc_jwks_url,
+        }
+        missing = [name for name, value in values.items() if value is None or value.strip() == ""]
+        if missing:
+            msg = "staff_oidc auth requires " + ", ".join(missing)
+            raise ValueError(msg)
+        for name in ("staff_oidc_issuer", "staff_oidc_jwks_url"):
+            value = values[name]
+            if (
+                value is None
+                or not value.startswith("https://")
+                or any(ch.isspace() for ch in value)
+            ):
+                msg = f"{name} must be an https URL"
+                raise ValueError(msg)

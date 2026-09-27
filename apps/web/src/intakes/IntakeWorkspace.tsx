@@ -689,9 +689,15 @@ export function IntakeWorkspace({ kind = 'worker' }: { kind?: IntakeKind }) {
   const [byReference, setByReference] = useState(false);
   const appliedFilter = useRef<DraftObject>({});
   const [newDraft, setNewDraft] = useState(false);
+  const [newDraftToken, setNewDraftToken] = useState(0);
   const requestNumber = useRef(0);
   const queueMode = new URLSearchParams(location.search).get('queue') === 'review' ? 'review' : null;
   const visibleItems = items && queueMode === 'review' ? reviewQueueItems(items) : items;
+  function openNewDraft() {
+    if (newDraft && !window.confirm(m.leave)) return;
+    setNewDraft(true);
+    setNewDraftToken((current) => current + 1);
+  }
   async function query(next?: string) {
     const request = ++requestNumber.current;
     if (!next) {
@@ -788,9 +794,9 @@ export function IntakeWorkspace({ kind = 'worker' }: { kind?: IntakeKind }) {
           <button
             type="button"
             className="intake-index-new"
-            onClick={() => {
-              setNewDraft(true);
-            }}
+            aria-controls="intake-new-draft"
+            aria-expanded={newDraft}
+            onClick={openNewDraft}
           >
             {m.create}
           </button>
@@ -802,6 +808,15 @@ export function IntakeWorkspace({ kind = 'worker' }: { kind?: IntakeKind }) {
         </>
       ) : (
         <>
+          {newDraft ? (
+            <section
+              aria-label={`${m.create}: ${m[kind]}`}
+              className="intake-new-draft"
+              id="intake-new-draft"
+            >
+              <IntakeEditor key={`${kind}:${String(newDraftToken)}`} kind={kind} />
+            </section>
+          ) : null}
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -906,7 +921,6 @@ export function IntakeWorkspace({ kind = 'worker' }: { kind?: IntakeKind }) {
               {m.more}
             </button>
           ) : null}
-          {newDraft ? <IntakeEditor key={kind} kind={kind} /> : null}
         </>
       )}
     </div>

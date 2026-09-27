@@ -1,5 +1,15 @@
 # Current Work — Golden Rose Operations Platform
 
+## 2026-09-27 — Production-readiness planning active
+
+- **Staffing:** One independent developer; docs review, GitHub PR gates and later implementation checks provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** Demo day is complete. PR #116 and PR #117 are merged into protected `develop`; `origin/develop` is now `9c9a09d2c5ffb9128a28195a333f7f208d98bca6`. The active work is a docs-only production-readiness plan that makes staff identity, personal accounts, MFA/recovery and account lifecycle the first implementation tranche, followed by deployable GCP package hardening and authoritative dashboard operations.
+- **Gate budget:** Documentation/planning only. No source implementation, cloud inspection or mutation, production deployment, live/client data, new identity provider activation, credential rotation, persistent synthetic writes or default permission activation occurs in this branch.
+- **Next executable action:** Publish this docs-only plan as a PR to `develop`. After it merges, fetch the protected tip and create a fresh implementation branch from `origin/develop` for the staff identity/account lifecycle tranche.
+- **Do not regress:** Human staff decision boundaries; no automated matching/ranking/eligibility/referral/placement; private fictional-synthetic boundaries until live-data gates open; immutable intake history and exact retries; restricted-field permissions; bilingual/accessibility parity; separate public/staff identity planes; deployable package portability for the client's later GCP environment.
+
+**Planning artifact:** [Production-readiness and staff identity plan](docs/planning/2026-09-27-production-readiness-plan.md).
+
 ## 2026-09-21 — Worker and employer New intake buttons active
 
 - **Staffing:** One independent developer; focused frontend regression tests, lint, typecheck and production build provide quality evidence, not independent-human authorization.

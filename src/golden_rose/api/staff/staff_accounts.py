@@ -28,6 +28,8 @@ from golden_rose.application.staff_account_lifecycle import (
     activate_staff_account,
     create_staff_account,
     deprovision_staff_account,
+    record_staff_account_recovery_evidence,
+    record_staff_account_session_revocation_evidence,
     suspend_staff_account,
 )
 from golden_rose.auth.principal import StaffPrincipal
@@ -211,6 +213,80 @@ def post_staff_account_deprovisioning(
 ) -> StaffAccountLifecycleResponse | Response:
     try:
         result = deprovision_staff_account(
+            session=session,
+            principal=principal,
+            command_id=idempotency_key,
+            staff_id=staff_id,
+            expected_version=request.expected_version,
+            clock=clock,
+            identifiers=identifiers,
+            reason_text=request.reason_text,
+        )
+    except (
+        StaffAccountLifecycleError,
+        StaffAccountNotFoundError,
+        StaffAccountVersionConflictError,
+        SafePersistenceError,
+    ) as exc:
+        return _problem_for_lifecycle_error(exc)
+    _lifecycle_response(result, response)
+    return _lifecycle_body(result)
+
+
+@router.post(
+    "/{staff_id}/recovery-evidence",
+    response_model=StaffAccountLifecycleResponse,
+    status_code=status.HTTP_200_OK,
+)
+def post_staff_account_recovery_evidence(
+    staff_id: UUID,
+    request: StaffAccountTransitionRequest,
+    response: Response,
+    idempotency_key: Annotated[UUID, Depends(get_idempotency_key)],
+    session: Annotated[Session, Depends(get_db_session)],
+    principal: Annotated[StaffPrincipal, Depends(get_staff_principal)],
+    clock: Annotated[Clock, Depends(get_clock)],
+    identifiers: Annotated[IdentifierFactory, Depends(get_identifier_factory)],
+) -> StaffAccountLifecycleResponse | Response:
+    try:
+        result = record_staff_account_recovery_evidence(
+            session=session,
+            principal=principal,
+            command_id=idempotency_key,
+            staff_id=staff_id,
+            expected_version=request.expected_version,
+            clock=clock,
+            identifiers=identifiers,
+            reason_text=request.reason_text,
+        )
+    except (
+        StaffAccountLifecycleError,
+        StaffAccountNotFoundError,
+        StaffAccountVersionConflictError,
+        SafePersistenceError,
+    ) as exc:
+        return _problem_for_lifecycle_error(exc)
+    _lifecycle_response(result, response)
+    return _lifecycle_body(result)
+
+
+@router.post(
+    "/{staff_id}/session-revocations",
+    response_model=StaffAccountLifecycleResponse,
+    status_code=status.HTTP_200_OK,
+)
+def post_staff_account_session_revocation(
+    staff_id: UUID,
+    request: StaffAccountTransitionRequest,
+    response: Response,
+    idempotency_key: Annotated[UUID, Depends(get_idempotency_key)],
+    session: Annotated[Session, Depends(get_db_session)],
+    principal: Annotated[StaffPrincipal, Depends(get_staff_principal)],
+    clock: Annotated[Clock, Depends(get_clock)],
+    identifiers: Annotated[IdentifierFactory, Depends(get_identifier_factory)],
+) -> StaffAccountLifecycleResponse | Response:
+    try:
+        result = record_staff_account_session_revocation_evidence(
             session=session,
             principal=principal,
             command_id=idempotency_key,

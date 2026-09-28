@@ -596,7 +596,8 @@ staff_account_lifecycle_events = Table(
     CheckConstraint(
         "event_type IN ("
         "'staff_account.created','staff_account.activated',"
-        "'staff_account.suspended','staff_account.deprovisioned')",
+        "'staff_account.suspended','staff_account.deprovisioned',"
+        "'staff_account.recovery_recorded','staff_account.sessions_revoked')",
         name="ck_staff_account_lifecycle_events_event_type",
     ),
     CheckConstraint(
@@ -620,10 +621,19 @@ staff_account_lifecycle_events = Table(
         "AND previous_version IS NULL "
         "AND new_version=1"
         ") OR ("
-        "event_type<>'staff_account.created' "
+        "event_type IN ("
+        "'staff_account.activated','staff_account.suspended',"
+        "'staff_account.deprovisioned') "
         "AND previous_status IS NOT NULL "
         "AND previous_version IS NOT NULL "
         "AND new_version=previous_version+1"
+        ") OR ("
+        "event_type IN ("
+        "'staff_account.recovery_recorded','staff_account.sessions_revoked') "
+        "AND previous_status IS NOT NULL "
+        "AND previous_status=new_status "
+        "AND previous_version IS NOT NULL "
+        "AND new_version=previous_version"
         ")",
         name="ck_staff_account_lifecycle_events_version_shape",
     ),

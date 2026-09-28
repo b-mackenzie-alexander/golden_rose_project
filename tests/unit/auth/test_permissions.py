@@ -9,6 +9,8 @@ from golden_rose.auth.permissions import (
     STAFF_ACCOUNT_CREATE_PERMISSION,
     STAFF_ACCOUNT_DEPROVISION_PERMISSION,
     STAFF_ACCOUNT_READ_PERMISSION,
+    STAFF_ACCOUNT_RECOVERY_RECORD_PERMISSION,
+    STAFF_ACCOUNT_SESSION_REVOKE_PERMISSION,
     STAFF_ACCOUNT_SUSPEND_PERMISSION,
     can_activate_staff_account,
     can_create_draft_employer,
@@ -18,7 +20,9 @@ from golden_rose.auth.permissions import (
     can_read_employer,
     can_read_employer_contact,
     can_read_staff_account,
+    can_record_staff_account_recovery,
     can_revise_draft_employer,
+    can_revoke_staff_account_sessions,
     can_suspend_staff_account,
 )
 from golden_rose.auth.principal import StaffPrincipal
@@ -191,6 +195,8 @@ def test_staff_account_permission_constants_have_exact_values_and_require_named_
                 STAFF_ACCOUNT_SUSPEND_PERMISSION,
                 STAFF_ACCOUNT_DEPROVISION_PERMISSION,
                 STAFF_ACCOUNT_READ_PERMISSION,
+                STAFF_ACCOUNT_RECOVERY_RECORD_PERMISSION,
+                STAFF_ACCOUNT_SESSION_REVOKE_PERMISSION,
             }
         ),
     )
@@ -200,13 +206,19 @@ def test_staff_account_permission_constants_have_exact_values_and_require_named_
     assert STAFF_ACCOUNT_SUSPEND_PERMISSION == "staff_account:suspend"
     assert STAFF_ACCOUNT_DEPROVISION_PERMISSION == "staff_account:deprovision"
     assert STAFF_ACCOUNT_READ_PERMISSION == "staff_account:read"
+    assert STAFF_ACCOUNT_RECOVERY_RECORD_PERMISSION == "staff_account:recovery:record"
+    assert STAFF_ACCOUNT_SESSION_REVOKE_PERMISSION == "staff_account:session:revoke"
     assert can_create_staff_account(owner_with_labels_only) is False
     assert can_activate_staff_account(owner_with_labels_only) is False
     assert can_suspend_staff_account(owner_with_labels_only) is False
     assert can_deprovision_staff_account(owner_with_labels_only) is False
     assert can_read_staff_account(owner_with_labels_only) is False
+    assert can_record_staff_account_recovery(owner_with_labels_only) is False
+    assert can_revoke_staff_account_sessions(owner_with_labels_only) is False
     assert can_create_staff_account(account_admin) is True
     assert can_activate_staff_account(account_admin) is True
     assert can_suspend_staff_account(account_admin) is True
     assert can_deprovision_staff_account(account_admin) is True
     assert can_read_staff_account(account_admin) is True
+    assert can_record_staff_account_recovery(account_admin) is True
+    assert can_revoke_staff_account_sessions(account_admin) is True

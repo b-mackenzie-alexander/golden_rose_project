@@ -12,6 +12,8 @@ from golden_rose.application.staff_account_lifecycle import (
     activate_staff_account,
     create_staff_account,
     deprovision_staff_account,
+    record_staff_account_recovery_evidence,
+    record_staff_account_session_revocation_evidence,
     resolve_staff_principal_from_claims,
     suspend_staff_account,
 )
@@ -442,6 +444,133 @@ def test_deprovision_staff_account_transitions_and_records_evidence(
     assert result.event_type == "staff_account.deprovisioned"
     assert result.account.lifecycle_status == "deprovisioned"
     assert session.commits == 1
+
+
+def test_record_staff_account_recovery_evidence_records_current_version(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+    observed: dict[str, Any] = {}
+
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_id_for_update",
+        lambda **_kwargs: _record(status="active", version=4, mfa_enrolled=True),
+    )
+    monkeypatch.setattr(
+        lifecycle_module,
+        "insert_lifecycle_event",
+        lambda **kwargs: observed.setdefault("event", kwargs),
+    )
+
+    result = record_staff_account_recovery_evidence(
+        session=session,  # type: ignore[arg-type]
+        principal=_principal("staff_account:recovery:record"),
+        command_id=COMMAND_ID,
+        staff_id=STAFF_ID,
+        expected_version=4,
+        clock=FixedClock(),
+        identifiers=FixedIdentifiers(),
+        reason_text="Assisted MFA recovery completed",
+    )
+
+    assert result.event_type == "staff_account.recovery_recorded"
+    assert result.result_version == 4
+    assert observed["event"]["event_type"] == "staff_account.recovery_recorded"
+    assert observed["event"]["previous_status"] == "active"
+    assert observed["event"]["new_status"] == "active"
+    assert observed["event"]["previous_version"] == 4
+    assert observed["event"]["new_version"] == 4
+    assert observed["event"]["reason_text"] == "Assisted MFA recovery completed"
+    assert session.commits == 1
+
+
+def test_record_staff_account_session_revocation_evidence_allows_deprovisioned_account(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+    observed: dict[str, Any] = {}
+
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_id_for_update",
+        lambda **_kwargs: _record(status="deprovisioned", version=5, mfa_enrolled=False),
+    )
+    monkeypatch.setattr(
+        lifecycle_module,
+        "insert_lifecycle_event",
+        lambda **kwargs: observed.setdefault("event", kwargs),
+    )
+
+    result = record_staff_account_session_revocation_evidence(
+        session=session,  # type: ignore[arg-type]
+        principal=_principal("staff_account:session:revoke"),
+        command_id=COMMAND_ID,
+        staff_id=STAFF_ID,
+        expected_version=5,
+        clock=FixedClock(),
+        identifiers=FixedIdentifiers(),
+        reason_text="Provider sessions revoked",
+    )
+
+    assert result.event_type == "staff_account.sessions_revoked"
+    assert result.result_version == 5
+    assert observed["event"]["event_type"] == "staff_account.sessions_revoked"
+    assert observed["event"]["previous_status"] == "deprovisioned"
+    assert observed["event"]["new_status"] == "deprovisioned"
+    assert observed["event"]["previous_version"] == 5
+    assert observed["event"]["new_version"] == 5
+    assert session.commits == 1
+
+
+def test_staff_account_recovery_evidence_requires_permission() -> None:
+    with pytest.raises(PermissionError, match="staff_account:recovery:record"):
+        record_staff_account_recovery_evidence(
+            session=FakeSession(),  # type: ignore[arg-type]
+            principal=_principal(),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            expected_version=1,
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="Recovery",
+        )
+
+
+def test_staff_account_session_revocation_evidence_requires_permission() -> None:
+    with pytest.raises(PermissionError, match="staff_account:session:revoke"):
+        record_staff_account_session_revocation_evidence(
+            session=FakeSession(),  # type: ignore[arg-type]
+            principal=_principal(),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            expected_version=1,
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="Session revoke",
+        )
+
+
+def test_staff_account_recovery_evidence_rejects_deprovisioned_account(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_id_for_update",
+        lambda **_kwargs: _record(status="deprovisioned", version=5, mfa_enrolled=False),
+    )
+
+    with pytest.raises(StaffAccountLifecycleError, match="cannot be recovered"):
+        record_staff_account_recovery_evidence(
+            session=FakeSession(),  # type: ignore[arg-type]
+            principal=_principal("staff_account:recovery:record"),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            expected_version=5,
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="Recovery",
+        )
 
 
 def test_transition_staff_account_reports_missing_account(monkeypatch: pytest.MonkeyPatch) -> None:

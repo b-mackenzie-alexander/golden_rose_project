@@ -10,6 +10,8 @@ from golden_rose.auth.permissions import (
     can_activate_staff_account,
     can_create_staff_account,
     can_deprovision_staff_account,
+    can_record_staff_account_recovery,
+    can_revoke_staff_account_sessions,
     can_suspend_staff_account,
 )
 from golden_rose.auth.principal import StaffPrincipal
@@ -225,6 +227,62 @@ def deprovision_staff_account(
     )
 
 
+def record_staff_account_recovery_evidence(
+    *,
+    session: Session,
+    principal: StaffPrincipal,
+    command_id: UUID,
+    staff_id: UUID,
+    expected_version: int,
+    clock: Clock,
+    identifiers: IdentifierFactory,
+    reason_text: str,
+) -> StaffAccountLifecycleResult:
+    if not can_record_staff_account_recovery(principal):
+        msg = "principal lacks staff_account:recovery:record"
+        raise PermissionError(msg)
+    return _record_staff_account_evidence(
+        session=session,
+        principal=principal,
+        command_id=command_id,
+        staff_id=staff_id,
+        expected_version=expected_version,
+        clock=clock,
+        identifiers=identifiers,
+        reason_text=reason_text,
+        event_type="staff_account.recovery_recorded",
+        allow_deprovisioned=False,
+    )
+
+
+def record_staff_account_session_revocation_evidence(
+    *,
+    session: Session,
+    principal: StaffPrincipal,
+    command_id: UUID,
+    staff_id: UUID,
+    expected_version: int,
+    clock: Clock,
+    identifiers: IdentifierFactory,
+    reason_text: str,
+) -> StaffAccountLifecycleResult:
+    if not can_revoke_staff_account_sessions(principal):
+        msg = "principal lacks staff_account:session:revoke"
+        raise PermissionError(msg)
+    return _record_staff_account_evidence(
+        session=session,
+        principal=principal,
+        command_id=command_id,
+        staff_id=staff_id,
+        expected_version=expected_version,
+        clock=clock,
+        identifiers=identifiers,
+        reason_text=reason_text,
+        event_type="staff_account.sessions_revoked",
+        allow_deprovisioned=True,
+    )
+
+
 def resolve_staff_principal_from_claims(
     *,
     session: Session,
@@ -249,6 +307,58 @@ def resolve_staff_principal_from_claims(
         permissions=permissions,
         mfa_enrolled=account.mfa_enrolled,
     ).to_principal()
+
+
+def _record_staff_account_evidence(
+    *,
+    session: Session,
+    principal: StaffPrincipal,
+    command_id: UUID,
+    staff_id: UUID,
+    expected_version: int,
+    clock: Clock,
+    identifiers: IdentifierFactory,
+    reason_text: str,
+    event_type: str,
+    allow_deprovisioned: bool,
+) -> StaffAccountLifecycleResult:
+    reason_text = _require_text("reason_text", reason_text, 512)
+    now = clock.now()
+    try:
+        try:
+            current = get_staff_account_by_id_for_update(session=session, staff_id=staff_id)
+        except NoResultFound as exc:
+            raise StaffAccountNotFoundError("staff account not found") from exc
+        if current.version != expected_version:
+            raise StaffAccountVersionConflictError("staff account version conflict")
+        if current.lifecycle_status == "deprovisioned" and not allow_deprovisioned:
+            raise StaffAccountLifecycleError("deprovisioned staff account cannot be recovered")
+        insert_lifecycle_event(
+            session=session,
+            event_id=identifiers.new_uuid4(),
+            command_id=command_id,
+            staff_id=staff_id,
+            actor_id=principal.actor_id,
+            event_type=event_type,
+            previous_status=current.lifecycle_status,
+            new_status=current.lifecycle_status,
+            previous_version=current.version,
+            new_version=current.version,
+            occurred_at=now,
+            reason_text=reason_text,
+        )
+        session.commit()
+    except SQLAlchemyError as exc:
+        session.rollback()
+        raise SafePersistenceError("persistence operation failed") from exc
+    except Exception:
+        session.rollback()
+        raise
+    return StaffAccountLifecycleResult(
+        account=current,
+        event_type=event_type,
+        result_version=current.version,
+    )
 
 
 def _transition_staff_account(

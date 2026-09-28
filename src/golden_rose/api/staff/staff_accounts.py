@@ -1,0 +1,231 @@
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Response, status
+from sqlalchemy.orm import Session
+
+from golden_rose.api.dependencies import (
+    get_clock,
+    get_db_session,
+    get_idempotency_key,
+    get_identifier_factory,
+    get_staff_principal,
+)
+from golden_rose.api.errors import no_store_problem_response
+from golden_rose.api.staff.schemas import (
+    ActivateStaffAccountRequest,
+    CreateStaffAccountRequest,
+    StaffAccountLifecycleResponse,
+    StaffAccountResponse,
+    StaffAccountTransitionRequest,
+)
+from golden_rose.application.errors import SafePersistenceError
+from golden_rose.application.staff_account_lifecycle import (
+    StaffAccountLifecycleError,
+    StaffAccountLifecycleResult,
+    StaffAccountNotFoundError,
+    StaffAccountVersionConflictError,
+    activate_staff_account,
+    create_staff_account,
+    deprovision_staff_account,
+    suspend_staff_account,
+)
+from golden_rose.auth.principal import StaffPrincipal
+from golden_rose.clock import Clock
+from golden_rose.identifiers import IdentifierFactory
+
+router = APIRouter(prefix="/api/staff/v1/staff-accounts", tags=["staff-accounts"])
+
+
+def _lifecycle_response(result: StaffAccountLifecycleResult, response: Response) -> Response:
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Vary"] = "Authorization"
+    response.headers["Idempotency-Result-Version"] = str(result.result_version)
+    return response
+
+
+def _lifecycle_body(result: StaffAccountLifecycleResult) -> StaffAccountLifecycleResponse:
+    return StaffAccountLifecycleResponse(
+        account=StaffAccountResponse.model_validate(result.account),
+        event_type=result.event_type,  # type: ignore[arg-type]
+        result_version=result.result_version,
+    )
+
+
+def _problem_for_lifecycle_error(exc: Exception) -> Response:
+    if isinstance(exc, StaffAccountNotFoundError):
+        return no_store_problem_response(
+            status_code=404,
+            title="Not Found",
+            detail="staff account not found",
+            type_="https://golden-rose.local/problems/staff-account-not-found",
+        )
+    if isinstance(exc, StaffAccountVersionConflictError):
+        return no_store_problem_response(
+            status_code=412,
+            title="Precondition Failed",
+            detail="staff account version conflict",
+            type_="https://golden-rose.local/problems/staff-account-version-conflict",
+        )
+    if isinstance(exc, StaffAccountLifecycleError):
+        return no_store_problem_response(
+            status_code=422,
+            title="Unprocessable Entity",
+            detail="staff account lifecycle request is invalid",
+            type_="https://golden-rose.local/problems/staff-account-lifecycle-invalid",
+        )
+    if isinstance(exc, SafePersistenceError):
+        return no_store_problem_response(
+            status_code=503,
+            title="Service Unavailable",
+            detail="service unavailable",
+            type_="https://golden-rose.local/problems/service-unavailable",
+        )
+    raise exc
+
+
+@router.post(
+    "",
+    response_model=StaffAccountLifecycleResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def post_staff_account(
+    request: CreateStaffAccountRequest,
+    response: Response,
+    idempotency_key: Annotated[UUID, Depends(get_idempotency_key)],
+    session: Annotated[Session, Depends(get_db_session)],
+    principal: Annotated[StaffPrincipal, Depends(get_staff_principal)],
+    clock: Annotated[Clock, Depends(get_clock)],
+    identifiers: Annotated[IdentifierFactory, Depends(get_identifier_factory)],
+) -> StaffAccountLifecycleResponse | Response:
+    try:
+        result = create_staff_account(
+            session=session,
+            principal=principal,
+            command_id=idempotency_key,
+            staff_id=identifiers.new_uuid4(),
+            provider_subject=request.provider_subject,
+            display_name=request.display_name,
+            role_name=request.role_name,
+            permission_names=frozenset(request.permission_names),
+            mfa_enrolled=request.mfa_enrolled,
+            clock=clock,
+            identifiers=identifiers,
+            reason_text=request.reason_text,
+        )
+    except (StaffAccountLifecycleError, SafePersistenceError) as exc:
+        return _problem_for_lifecycle_error(exc)
+    _lifecycle_response(result, response)
+    return _lifecycle_body(result)
+
+
+@router.post(
+    "/{staff_id}/activate",
+    response_model=StaffAccountLifecycleResponse,
+    status_code=status.HTTP_200_OK,
+)
+def post_staff_account_activation(
+    staff_id: UUID,
+    request: ActivateStaffAccountRequest,
+    response: Response,
+    idempotency_key: Annotated[UUID, Depends(get_idempotency_key)],
+    session: Annotated[Session, Depends(get_db_session)],
+    principal: Annotated[StaffPrincipal, Depends(get_staff_principal)],
+    clock: Annotated[Clock, Depends(get_clock)],
+    identifiers: Annotated[IdentifierFactory, Depends(get_identifier_factory)],
+) -> StaffAccountLifecycleResponse | Response:
+    try:
+        result = activate_staff_account(
+            session=session,
+            principal=principal,
+            command_id=idempotency_key,
+            staff_id=staff_id,
+            expected_version=request.expected_version,
+            mfa_enrolled=request.mfa_enrolled,
+            clock=clock,
+            identifiers=identifiers,
+            reason_text=request.reason_text,
+        )
+    except (
+        StaffAccountLifecycleError,
+        StaffAccountNotFoundError,
+        StaffAccountVersionConflictError,
+        SafePersistenceError,
+    ) as exc:
+        return _problem_for_lifecycle_error(exc)
+    _lifecycle_response(result, response)
+    return _lifecycle_body(result)
+
+
+@router.post(
+    "/{staff_id}/suspend",
+    response_model=StaffAccountLifecycleResponse,
+    status_code=status.HTTP_200_OK,
+)
+def post_staff_account_suspension(
+    staff_id: UUID,
+    request: StaffAccountTransitionRequest,
+    response: Response,
+    idempotency_key: Annotated[UUID, Depends(get_idempotency_key)],
+    session: Annotated[Session, Depends(get_db_session)],
+    principal: Annotated[StaffPrincipal, Depends(get_staff_principal)],
+    clock: Annotated[Clock, Depends(get_clock)],
+    identifiers: Annotated[IdentifierFactory, Depends(get_identifier_factory)],
+) -> StaffAccountLifecycleResponse | Response:
+    try:
+        result = suspend_staff_account(
+            session=session,
+            principal=principal,
+            command_id=idempotency_key,
+            staff_id=staff_id,
+            expected_version=request.expected_version,
+            clock=clock,
+            identifiers=identifiers,
+            reason_text=request.reason_text,
+        )
+    except (
+        StaffAccountLifecycleError,
+        StaffAccountNotFoundError,
+        StaffAccountVersionConflictError,
+        SafePersistenceError,
+    ) as exc:
+        return _problem_for_lifecycle_error(exc)
+    _lifecycle_response(result, response)
+    return _lifecycle_body(result)
+
+
+@router.post(
+    "/{staff_id}/deprovision",
+    response_model=StaffAccountLifecycleResponse,
+    status_code=status.HTTP_200_OK,
+)
+def post_staff_account_deprovisioning(
+    staff_id: UUID,
+    request: StaffAccountTransitionRequest,
+    response: Response,
+    idempotency_key: Annotated[UUID, Depends(get_idempotency_key)],
+    session: Annotated[Session, Depends(get_db_session)],
+    principal: Annotated[StaffPrincipal, Depends(get_staff_principal)],
+    clock: Annotated[Clock, Depends(get_clock)],
+    identifiers: Annotated[IdentifierFactory, Depends(get_identifier_factory)],
+) -> StaffAccountLifecycleResponse | Response:
+    try:
+        result = deprovision_staff_account(
+            session=session,
+            principal=principal,
+            command_id=idempotency_key,
+            staff_id=staff_id,
+            expected_version=request.expected_version,
+            clock=clock,
+            identifiers=identifiers,
+            reason_text=request.reason_text,
+        )
+    except (
+        StaffAccountLifecycleError,
+        StaffAccountNotFoundError,
+        StaffAccountVersionConflictError,
+        SafePersistenceError,
+    ) as exc:
+        return _problem_for_lifecycle_error(exc)
+    _lifecycle_response(result, response)
+    return _lifecycle_body(result)

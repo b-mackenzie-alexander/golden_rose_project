@@ -43,6 +43,18 @@ def session(engine: Engine):
 def clean_test_tables(connection) -> None:
     # These statement guards intentionally reject TRUNCATE, including CASCADE.
     # Only the disposable test database owner disables its exact cleanup guards.
+    staff_account_tables = tuple(
+        connection.execute(
+            text("""
+        SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname='public' AND c.relname IN
+          ('staff_account_lifecycle_events','staff_permission_grants',
+           'staff_delegations','staff_accounts')
+    """)
+        )
+        .scalars()
+        .all()
+    )
     guarded_tables = (
         connection.execute(
             text("""
@@ -63,7 +75,15 @@ def clean_test_tables(connection) -> None:
     )
     for table in guarded_tables:
         connection.execute(text(f"ALTER TABLE {table} DISABLE TRIGGER deny_mutation_{table}"))
-    targets = ", ".join(["audit_events", "command_receipts", "employers", *guarded_tables])
+    targets = ", ".join(
+        [
+            "audit_events",
+            "command_receipts",
+            "employers",
+            *staff_account_tables,
+            *guarded_tables,
+        ]
+    )
     connection.execute(text(f"TRUNCATE TABLE {targets} CASCADE"))
     for table in guarded_tables:
         connection.execute(text(f"ALTER TABLE {table} ENABLE TRIGGER deny_mutation_{table}"))

@@ -5,11 +5,21 @@ from golden_rose.auth.permissions import (
     EMPLOYER_CONTACT_READ_PERMISSION,
     EMPLOYER_DRAFT_REVISE_PERMISSION,
     EMPLOYER_READ_PERMISSION,
+    STAFF_ACCOUNT_ACTIVATE_PERMISSION,
+    STAFF_ACCOUNT_CREATE_PERMISSION,
+    STAFF_ACCOUNT_DEPROVISION_PERMISSION,
+    STAFF_ACCOUNT_READ_PERMISSION,
+    STAFF_ACCOUNT_SUSPEND_PERMISSION,
+    can_activate_staff_account,
     can_create_draft_employer,
     can_create_draft_employer_contact,
+    can_create_staff_account,
+    can_deprovision_staff_account,
     can_read_employer,
     can_read_employer_contact,
+    can_read_staff_account,
     can_revise_draft_employer,
+    can_suspend_staff_account,
 )
 from golden_rose.auth.principal import StaffPrincipal
 
@@ -163,3 +173,40 @@ def test_employer_contact_permission_constants_have_exact_values_and_do_not_foll
     assert can_read_employer_contact(owner_principal) is False
     assert can_create_draft_employer_contact(platform_principal) is False
     assert can_read_employer_contact(platform_principal) is False
+
+
+def test_staff_account_permission_constants_have_exact_values_and_require_named_grants() -> None:
+    owner_with_labels_only = StaffPrincipal(
+        actor_id=uuid4(),
+        role_name="owner",
+        permissions=frozenset({"system:health:read"}),
+    )
+    account_admin = StaffPrincipal(
+        actor_id=uuid4(),
+        role_name="owner",
+        permissions=frozenset(
+            {
+                STAFF_ACCOUNT_CREATE_PERMISSION,
+                STAFF_ACCOUNT_ACTIVATE_PERMISSION,
+                STAFF_ACCOUNT_SUSPEND_PERMISSION,
+                STAFF_ACCOUNT_DEPROVISION_PERMISSION,
+                STAFF_ACCOUNT_READ_PERMISSION,
+            }
+        ),
+    )
+
+    assert STAFF_ACCOUNT_CREATE_PERMISSION == "staff_account:create"
+    assert STAFF_ACCOUNT_ACTIVATE_PERMISSION == "staff_account:activate"
+    assert STAFF_ACCOUNT_SUSPEND_PERMISSION == "staff_account:suspend"
+    assert STAFF_ACCOUNT_DEPROVISION_PERMISSION == "staff_account:deprovision"
+    assert STAFF_ACCOUNT_READ_PERMISSION == "staff_account:read"
+    assert can_create_staff_account(owner_with_labels_only) is False
+    assert can_activate_staff_account(owner_with_labels_only) is False
+    assert can_suspend_staff_account(owner_with_labels_only) is False
+    assert can_deprovision_staff_account(owner_with_labels_only) is False
+    assert can_read_staff_account(owner_with_labels_only) is False
+    assert can_create_staff_account(account_admin) is True
+    assert can_activate_staff_account(account_admin) is True
+    assert can_suspend_staff_account(account_admin) is True
+    assert can_deprovision_staff_account(account_admin) is True
+    assert can_read_staff_account(account_admin) is True

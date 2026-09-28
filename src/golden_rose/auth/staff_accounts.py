@@ -57,6 +57,13 @@ class StaffAccount:
 
 
 @dataclass(frozen=True, slots=True)
+class StaffIdentityClaims:
+    provider_subject: str
+    mfa_verified: bool
+    session_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class StaffDelegation:
     delegation_id: UUID
     grantor_staff_id: UUID

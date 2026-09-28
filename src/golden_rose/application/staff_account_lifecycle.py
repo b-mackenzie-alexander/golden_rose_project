@@ -1,0 +1,364 @@
+from dataclasses import dataclass
+from typing import cast
+from uuid import UUID
+
+from sqlalchemy.exc import NoResultFound, SQLAlchemyError
+from sqlalchemy.orm import Session
+
+from golden_rose.application.errors import SafePersistenceError
+from golden_rose.auth.permissions import (
+    can_activate_staff_account,
+    can_create_staff_account,
+    can_deprovision_staff_account,
+    can_suspend_staff_account,
+)
+from golden_rose.auth.principal import StaffPrincipal
+from golden_rose.auth.staff_accounts import STAFF_ACCOUNT_ROLES, StaffAccount, StaffIdentityClaims
+from golden_rose.auth.staff_accounts import StaffAccountRole as AuthStaffAccountRole
+from golden_rose.clock import Clock
+from golden_rose.identifiers import IdentifierFactory
+from golden_rose.persistence.staff_accounts import (
+    StaffAccountRecord,
+    StaffAccountStatus,
+    get_staff_account_by_id_for_update,
+    get_staff_account_by_provider_subject,
+    insert_lifecycle_event,
+    insert_staff_account,
+    insert_staff_permission_grants,
+    list_active_staff_permissions,
+    update_staff_account_lifecycle,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class StaffAccountLifecycleResult:
+    account: StaffAccountRecord
+    event_type: str
+    result_version: int
+
+
+class StaffAccountLifecycleError(RuntimeError):
+    pass
+
+
+class StaffAccountNotFoundError(StaffAccountLifecycleError):
+    pass
+
+
+class StaffAccountVersionConflictError(StaffAccountLifecycleError):
+    pass
+
+
+def create_staff_account(
+    *,
+    session: Session,
+    principal: StaffPrincipal,
+    command_id: UUID,
+    staff_id: UUID,
+    provider_subject: str,
+    display_name: str,
+    role_name: str,
+    permission_names: frozenset[str],
+    mfa_enrolled: bool,
+    clock: Clock,
+    identifiers: IdentifierFactory,
+    reason_text: str,
+) -> StaffAccountLifecycleResult:
+    if not can_create_staff_account(principal):
+        msg = "principal lacks staff_account:create"
+        raise PermissionError(msg)
+
+    provider_subject = _require_text("provider_subject", provider_subject, 256)
+    display_name = _require_text("display_name", display_name, 160)
+    reason_text = _require_text("reason_text", reason_text, 512)
+    permissions = _validate_permission_names(permission_names)
+    _validate_role_permissions(role_name=role_name, permissions=permissions)
+    _deny_self_escalation(
+        principal=principal,
+        target_staff_id=staff_id,
+        requested_permissions=permissions,
+    )
+    if role_name not in STAFF_ACCOUNT_ROLES:
+        raise StaffAccountLifecycleError("invalid staff role")
+
+    now = clock.now()
+    try:
+        account = insert_staff_account(
+            session=session,
+            staff_id=staff_id,
+            provider_subject=provider_subject,
+            display_name=display_name,
+            role_name=role_name,
+            lifecycle_status="suspended",
+            mfa_enrolled=mfa_enrolled,
+            created_at=now,
+            actor_id=principal.actor_id,
+        )
+        grants = tuple((identifiers.new_uuid4(), item) for item in sorted(permissions))
+        insert_staff_permission_grants(
+            session=session,
+            grants=grants,
+            staff_id=staff_id,
+            granted_at=now,
+            actor_id=principal.actor_id,
+        )
+        insert_lifecycle_event(
+            session=session,
+            event_id=identifiers.new_uuid4(),
+            command_id=command_id,
+            staff_id=staff_id,
+            actor_id=principal.actor_id,
+            event_type="staff_account.created",
+            previous_status=None,
+            new_status=account.lifecycle_status,
+            previous_version=None,
+            new_version=account.version,
+            occurred_at=now,
+            reason_text=reason_text,
+        )
+        session.commit()
+    except SQLAlchemyError as exc:
+        session.rollback()
+        raise SafePersistenceError("persistence operation failed") from exc
+    except Exception:
+        session.rollback()
+        raise
+
+    return StaffAccountLifecycleResult(
+        account=account,
+        event_type="staff_account.created",
+        result_version=account.version,
+    )
+
+
+def activate_staff_account(
+    *,
+    session: Session,
+    principal: StaffPrincipal,
+    command_id: UUID,
+    staff_id: UUID,
+    expected_version: int,
+    mfa_enrolled: bool,
+    clock: Clock,
+    identifiers: IdentifierFactory,
+    reason_text: str,
+) -> StaffAccountLifecycleResult:
+    if not can_activate_staff_account(principal):
+        msg = "principal lacks staff_account:activate"
+        raise PermissionError(msg)
+    if not mfa_enrolled:
+        raise StaffAccountLifecycleError("active staff account requires mfa enrollment")
+    return _transition_staff_account(
+        session=session,
+        principal=principal,
+        command_id=command_id,
+        staff_id=staff_id,
+        expected_version=expected_version,
+        new_status="active",
+        mfa_enrolled=True,
+        clock=clock,
+        identifiers=identifiers,
+        reason_text=reason_text,
+        event_type="staff_account.activated",
+    )
+
+
+def suspend_staff_account(
+    *,
+    session: Session,
+    principal: StaffPrincipal,
+    command_id: UUID,
+    staff_id: UUID,
+    expected_version: int,
+    clock: Clock,
+    identifiers: IdentifierFactory,
+    reason_text: str,
+) -> StaffAccountLifecycleResult:
+    if not can_suspend_staff_account(principal):
+        msg = "principal lacks staff_account:suspend"
+        raise PermissionError(msg)
+    if staff_id == principal.actor_id:
+        raise StaffAccountLifecycleError("staff account cannot suspend itself")
+    return _transition_staff_account(
+        session=session,
+        principal=principal,
+        command_id=command_id,
+        staff_id=staff_id,
+        expected_version=expected_version,
+        new_status="suspended",
+        mfa_enrolled=False,
+        clock=clock,
+        identifiers=identifiers,
+        reason_text=reason_text,
+        event_type="staff_account.suspended",
+    )
+
+
+def deprovision_staff_account(
+    *,
+    session: Session,
+    principal: StaffPrincipal,
+    command_id: UUID,
+    staff_id: UUID,
+    expected_version: int,
+    clock: Clock,
+    identifiers: IdentifierFactory,
+    reason_text: str,
+) -> StaffAccountLifecycleResult:
+    if not can_deprovision_staff_account(principal):
+        msg = "principal lacks staff_account:deprovision"
+        raise PermissionError(msg)
+    if staff_id == principal.actor_id:
+        raise StaffAccountLifecycleError("staff account cannot deprovision itself")
+    return _transition_staff_account(
+        session=session,
+        principal=principal,
+        command_id=command_id,
+        staff_id=staff_id,
+        expected_version=expected_version,
+        new_status="deprovisioned",
+        mfa_enrolled=False,
+        clock=clock,
+        identifiers=identifiers,
+        reason_text=reason_text,
+        event_type="staff_account.deprovisioned",
+    )
+
+
+def resolve_staff_principal_from_claims(
+    *,
+    session: Session,
+    claims: StaffIdentityClaims,
+) -> StaffPrincipal:
+    if not claims.mfa_verified:
+        raise PermissionError("staff session requires mfa")
+    try:
+        account = get_staff_account_by_provider_subject(
+            session=session,
+            provider_subject=_require_text("provider_subject", claims.provider_subject, 256),
+        )
+    except NoResultFound as exc:
+        raise StaffAccountNotFoundError("staff account not found") from exc
+    permissions = list_active_staff_permissions(session=session, staff_id=account.staff_id)
+    return StaffAccount(
+        staff_id=account.staff_id,
+        provider_subject=account.provider_subject,
+        display_name=account.display_name,
+        role_name=cast(AuthStaffAccountRole, account.role_name),
+        status=account.lifecycle_status,
+        permissions=permissions,
+        mfa_enrolled=account.mfa_enrolled,
+    ).to_principal()
+
+
+def _transition_staff_account(
+    *,
+    session: Session,
+    principal: StaffPrincipal,
+    command_id: UUID,
+    staff_id: UUID,
+    expected_version: int,
+    new_status: str,
+    mfa_enrolled: bool,
+    clock: Clock,
+    identifiers: IdentifierFactory,
+    reason_text: str,
+    event_type: str,
+) -> StaffAccountLifecycleResult:
+    reason_text = _require_text("reason_text", reason_text, 512)
+    now = clock.now()
+    try:
+        try:
+            current = get_staff_account_by_id_for_update(session=session, staff_id=staff_id)
+        except NoResultFound as exc:
+            raise StaffAccountNotFoundError("staff account not found") from exc
+        if current.version != expected_version:
+            raise StaffAccountVersionConflictError("staff account version conflict")
+        if current.lifecycle_status == "deprovisioned" and new_status != "deprovisioned":
+            raise StaffAccountLifecycleError("deprovisioned staff account cannot be reactivated")
+        if current.lifecycle_status == new_status and current.mfa_enrolled == mfa_enrolled:
+            raise StaffAccountLifecycleError("staff account transition requires a change")
+        updated = update_staff_account_lifecycle(
+            session=session,
+            staff_id=staff_id,
+            expected_version=expected_version,
+            lifecycle_status=cast(StaffAccountStatus, new_status),
+            mfa_enrolled=mfa_enrolled,
+            updated_at=now,
+            actor_id=principal.actor_id,
+        )
+        insert_lifecycle_event(
+            session=session,
+            event_id=identifiers.new_uuid4(),
+            command_id=command_id,
+            staff_id=staff_id,
+            actor_id=principal.actor_id,
+            event_type=event_type,
+            previous_status=current.lifecycle_status,
+            new_status=updated.lifecycle_status,
+            previous_version=current.version,
+            new_version=updated.version,
+            occurred_at=now,
+            reason_text=reason_text,
+        )
+        session.commit()
+    except SQLAlchemyError as exc:
+        session.rollback()
+        raise SafePersistenceError("persistence operation failed") from exc
+    except Exception:
+        session.rollback()
+        raise
+    return StaffAccountLifecycleResult(
+        account=updated,
+        event_type=event_type,
+        result_version=updated.version,
+    )
+
+
+def _require_text(field: str, value: str, max_length: int) -> str:
+    normalized = " ".join(value.split())
+    if not normalized or len(normalized) > max_length:
+        raise StaffAccountLifecycleError(f"invalid {field}")
+    return normalized
+
+
+def _validate_permission_names(permission_names: frozenset[str]) -> frozenset[str]:
+    if not permission_names:
+        raise StaffAccountLifecycleError("staff account requires named permissions")
+    normalized = frozenset(_require_text("permission_name", item, 120) for item in permission_names)
+    if len(normalized) != len(permission_names):
+        raise StaffAccountLifecycleError("duplicate staff account permission")
+    return normalized
+
+
+def _validate_role_permissions(*, role_name: str, permissions: frozenset[str]) -> None:
+    if role_name == "platform_administrator" and any(
+        _is_operational_data_permission(permission) for permission in permissions
+    ):
+        raise StaffAccountLifecycleError("platform administrator cannot receive operational data")
+
+
+def _deny_self_escalation(
+    *,
+    principal: StaffPrincipal,
+    target_staff_id: UUID,
+    requested_permissions: frozenset[str],
+) -> None:
+    if target_staff_id == principal.actor_id and not requested_permissions <= principal.permissions:
+        raise StaffAccountLifecycleError("staff account cannot grant itself new permissions")
+
+
+def _is_operational_data_permission(permission: str) -> bool:
+    return permission.startswith(
+        (
+            "employer",
+            "employer_contact",
+            "intake",
+            "worker",
+            "worker_residence",
+            "party_address",
+            "worksite_address",
+            "work_interest",
+            "canonical",
+        )
+    )

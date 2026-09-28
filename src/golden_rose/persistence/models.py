@@ -483,6 +483,152 @@ command_results.append_constraint(
     )
 )
 
+staff_accounts = Table(
+    "staff_accounts",
+    metadata,
+    Column("staff_id", UUID(as_uuid=True), primary_key=True),
+    Column("provider_subject", String(256), nullable=False),
+    Column("display_name", String(160), nullable=False),
+    Column("role_name", String(80), nullable=False),
+    Column("lifecycle_status", String(32), nullable=False),
+    Column("mfa_enrolled", Boolean, nullable=False),
+    Column("created_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("created_by", UUID(as_uuid=True), nullable=False),
+    Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("updated_by", UUID(as_uuid=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint("provider_subject", name="uq_staff_accounts_provider_subject"),
+    CheckConstraint("btrim(provider_subject)<>''", name="ck_staff_accounts_subject_nonblank"),
+    CheckConstraint("btrim(display_name)<>''", name="ck_staff_accounts_display_name_nonblank"),
+    CheckConstraint(
+        "role_name IN ('owner','delegated_manager','operations_staff','platform_administrator')",
+        name="ck_staff_accounts_role_name",
+    ),
+    CheckConstraint(
+        "lifecycle_status IN ('active','suspended','deprovisioned')",
+        name="ck_staff_accounts_lifecycle_status",
+    ),
+    CheckConstraint("version>=1", name="ck_staff_accounts_version_positive"),
+    CheckConstraint(
+        "(lifecycle_status='active' AND mfa_enrolled) OR lifecycle_status<>'active'",
+        name="ck_staff_accounts_active_requires_mfa",
+    ),
+)
+
+staff_permission_grants = Table(
+    "staff_permission_grants",
+    metadata,
+    Column("grant_id", UUID(as_uuid=True), primary_key=True),
+    Column("staff_id", UUID(as_uuid=True), nullable=False),
+    Column("permission_name", String(120), nullable=False),
+    Column("scope_kind", String(40), nullable=False),
+    Column("scope_id", UUID(as_uuid=True)),
+    Column("granted_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("granted_by", UUID(as_uuid=True), nullable=False),
+    Column("revoked_at", TIMESTAMP(timezone=True)),
+    Column("revoked_by", UUID(as_uuid=True)),
+    Column("revocation_reason", String(512)),
+    ForeignKeyConstraint(
+        ["staff_id"], ["staff_accounts.staff_id"], name="fk_staff_permission_grants_staff"
+    ),
+    ForeignKeyConstraint(
+        ["granted_by"],
+        ["staff_accounts.staff_id"],
+        name="fk_staff_permission_grants_granted_by",
+    ),
+    ForeignKeyConstraint(
+        ["revoked_by"],
+        ["staff_accounts.staff_id"],
+        name="fk_staff_permission_grants_revoked_by",
+    ),
+)
+
+staff_delegations = Table(
+    "staff_delegations",
+    metadata,
+    Column("delegation_id", UUID(as_uuid=True), primary_key=True),
+    Column("grantor_staff_id", UUID(as_uuid=True), nullable=False),
+    Column("grantee_staff_id", UUID(as_uuid=True), nullable=False),
+    Column("permission_name", String(120), nullable=False),
+    Column("scope_kind", String(40), nullable=False),
+    Column("scope_id", UUID(as_uuid=True)),
+    Column("reason_text", String(512), nullable=False),
+    Column("starts_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("expires_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("revoked_at", TIMESTAMP(timezone=True)),
+    Column("revoked_by", UUID(as_uuid=True)),
+    Column("revocation_reason", String(512)),
+    ForeignKeyConstraint(
+        ["grantor_staff_id"],
+        ["staff_accounts.staff_id"],
+        name="fk_staff_delegations_grantor",
+    ),
+    ForeignKeyConstraint(
+        ["grantee_staff_id"],
+        ["staff_accounts.staff_id"],
+        name="fk_staff_delegations_grantee",
+    ),
+    ForeignKeyConstraint(
+        ["revoked_by"], ["staff_accounts.staff_id"], name="fk_staff_delegations_revoked_by"
+    ),
+)
+
+staff_account_lifecycle_events = Table(
+    "staff_account_lifecycle_events",
+    metadata,
+    Column("event_id", UUID(as_uuid=True), primary_key=True),
+    Column("command_id", UUID(as_uuid=True), nullable=False),
+    Column("staff_id", UUID(as_uuid=True), nullable=False),
+    Column("actor_id", UUID(as_uuid=True), nullable=False),
+    Column("event_type", String(64), nullable=False),
+    Column("previous_status", String(32)),
+    Column("new_status", String(32), nullable=False),
+    Column("previous_version", Integer),
+    Column("new_version", Integer, nullable=False),
+    Column("occurred_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("reason_text", String(512), nullable=False),
+    UniqueConstraint("command_id", name="uq_staff_account_lifecycle_events_command"),
+    ForeignKeyConstraint(
+        ["staff_id"],
+        ["staff_accounts.staff_id"],
+        name="fk_staff_account_lifecycle_events_staff",
+    ),
+    CheckConstraint(
+        "event_type IN ("
+        "'staff_account.created','staff_account.activated',"
+        "'staff_account.suspended','staff_account.deprovisioned')",
+        name="ck_staff_account_lifecycle_events_event_type",
+    ),
+    CheckConstraint(
+        "previous_status IS NULL OR previous_status IN ('active','suspended','deprovisioned')",
+        name="ck_staff_account_lifecycle_events_previous_status",
+    ),
+    CheckConstraint(
+        "new_status IN ('active','suspended','deprovisioned')",
+        name="ck_staff_account_lifecycle_events_new_status",
+    ),
+    CheckConstraint(
+        "previous_version IS NULL OR previous_version>=1",
+        name="ck_staff_account_lifecycle_events_previous_version",
+    ),
+    CheckConstraint("new_version>=1", name="ck_staff_account_lifecycle_events_new_version"),
+    CheckConstraint("btrim(reason_text)<>''", name="ck_staff_account_lifecycle_events_reason"),
+    CheckConstraint(
+        "("
+        "event_type='staff_account.created' "
+        "AND previous_status IS NULL "
+        "AND previous_version IS NULL "
+        "AND new_version=1"
+        ") OR ("
+        "event_type<>'staff_account.created' "
+        "AND previous_status IS NOT NULL "
+        "AND previous_version IS NOT NULL "
+        "AND new_version=previous_version+1"
+        ")",
+        name="ck_staff_account_lifecycle_events_version_shape",
+    ),
+)
+
 
 # PR B workflow history is append-only; sensitive values have separate tables.
 intake_reviews = Table(

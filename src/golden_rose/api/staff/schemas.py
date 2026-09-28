@@ -241,5 +241,7 @@ class StaffAccountLifecycleResponse(BaseModel):
         "staff_account.activated",
         "staff_account.suspended",
         "staff_account.deprovisioned",
+        "staff_account.recovery_recorded",
+        "staff_account.sessions_revoked",
     ]
     result_version: int

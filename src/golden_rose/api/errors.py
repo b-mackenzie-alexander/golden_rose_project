@@ -6,6 +6,12 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from golden_rose.application.create_draft_employer import IdempotencyConflictError
 from golden_rose.application.errors import SafePersistenceError
 from golden_rose.application.synthetic_data import SyntheticDataAdmissionError
+from golden_rose.auth.staff_oidc import (
+    StaffAccountUnavailableError,
+    StaffAuthenticationFailedError,
+    StaffAuthenticationRequiredError,
+    StaffIdentityProviderUnavailableError,
+)
 
 
 class InvalidIdempotencyKeyError(ValueError):
@@ -79,6 +85,54 @@ def install_exception_handlers(app: FastAPI) -> None:
             title="Forbidden",
             detail="forbidden",
             type_="https://golden-rose.local/problems/forbidden",
+        )
+
+    @app.exception_handler(StaffAuthenticationRequiredError)
+    async def handle_staff_authentication_required(
+        request: Request, exc: StaffAuthenticationRequiredError
+    ) -> JSONResponse:
+        response = no_store_problem_response(
+            status_code=401,
+            title="Unauthorized",
+            detail="staff authentication required",
+            type_="https://golden-rose.local/problems/staff-authentication-required",
+        )
+        response.headers["WWW-Authenticate"] = "Bearer"
+        return response
+
+    @app.exception_handler(StaffAuthenticationFailedError)
+    async def handle_staff_authentication_failed(
+        request: Request, exc: StaffAuthenticationFailedError
+    ) -> JSONResponse:
+        response = no_store_problem_response(
+            status_code=401,
+            title="Unauthorized",
+            detail="staff authentication failed",
+            type_="https://golden-rose.local/problems/staff-authentication-failed",
+        )
+        response.headers["WWW-Authenticate"] = "Bearer"
+        return response
+
+    @app.exception_handler(StaffAccountUnavailableError)
+    async def handle_staff_account_unavailable(
+        request: Request, exc: StaffAccountUnavailableError
+    ) -> JSONResponse:
+        return no_store_problem_response(
+            status_code=403,
+            title="Forbidden",
+            detail="staff account is unavailable",
+            type_="https://golden-rose.local/problems/staff-account-unavailable",
+        )
+
+    @app.exception_handler(StaffIdentityProviderUnavailableError)
+    async def handle_staff_identity_provider_unavailable(
+        request: Request, exc: StaffIdentityProviderUnavailableError
+    ) -> JSONResponse:
+        return no_store_problem_response(
+            status_code=503,
+            title="Service Unavailable",
+            detail="staff identity provider unavailable",
+            type_="https://golden-rose.local/problems/staff-identity-provider-unavailable",
         )
 
     @app.exception_handler(SyntheticDataAdmissionError)

@@ -9,6 +9,12 @@ LIFECYCLE_MIGRATION = (
     / "versions"
     / "0011_staff_account_lifecycle.py"
 )
+EVIDENCE_HOOK_MIGRATION = (
+    Path(__file__).resolve().parents[2]
+    / "migrations"
+    / "versions"
+    / "0012_staff_account_evidence_hooks.py"
+)
 
 
 def test_staff_account_migration_records_account_grants_and_delegations() -> None:
@@ -47,5 +53,22 @@ def test_staff_account_lifecycle_migration_adds_evidence_and_narrow_write_grants
         "staff_account.deprovisioned",
         "GRANT UPDATE(lifecycle_status,mfa_enrolled,updated_at,updated_by,version)",
         "staff account lifecycle data blocks downgrade before DDL",
+    ):
+        assert fragment in source
+
+
+def test_staff_account_evidence_hook_migration_extends_lifecycle_events() -> None:
+    source = EVIDENCE_HOOK_MIGRATION.read_text(encoding="utf-8")
+
+    for fragment in (
+        'revision = "0012_staff_account_evidence"',
+        'down_revision = "0011_staff_account_lifecycle"',
+        "DROP CONSTRAINT IF EXISTS staff_account_lifecycle_events_event_type_check",
+        "DROP CONSTRAINT IF EXISTS staff_account_lifecycle_events_check",
+        "staff_account.recovery_recorded",
+        "staff_account.sessions_revoked",
+        "AND previous_status=new_status",
+        "AND new_version=previous_version",
+        "staff account evidence hook data blocks downgrade before DDL",
     ):
         assert fragment in source

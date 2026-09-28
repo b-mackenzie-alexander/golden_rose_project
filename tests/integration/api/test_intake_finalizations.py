@@ -7,7 +7,12 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from golden_rose.api.dependencies import get_settings, get_staff_directory, get_staff_principal
+from golden_rose.api.dependencies import (
+    get_settings,
+    get_staff_directory,
+    get_staff_principal,
+    resolve_staff_principal_for_settings,
+)
 from golden_rose.auth.staff_directory import StaffDirectory, StaffDirectoryEntry
 from golden_rose.main import create_app
 from tests.integration.api.test_intake_review_workflows import ROOT, command, worker
@@ -16,7 +21,7 @@ from tests.integration.api.test_intake_review_workflows import ROOT, command, wo
 @pytest.fixture
 def client(clean_tables):
     app = create_app()
-    principal = get_staff_principal(get_settings())
+    principal = resolve_staff_principal_for_settings(get_settings())
     finalizer = replace(principal, permissions=principal.permissions | {"intake:finalize"})
     directory = StaffDirectory(
         (

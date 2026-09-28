@@ -2050,6 +2050,8 @@ def test_openapi_exposes_only_intended_staff_route() -> None:
             "/api/staff/v1/staff-accounts/{staff_id}/activate",
             "/api/staff/v1/staff-accounts/{staff_id}/suspend",
             "/api/staff/v1/staff-accounts/{staff_id}/deprovision",
+            "/api/staff/v1/staff-accounts/{staff_id}/recovery-evidence",
+            "/api/staff/v1/staff-accounts/{staff_id}/session-revocations",
             "/health",
             "/readiness",
             "/api/staff/v1/employers",
@@ -2066,6 +2068,8 @@ def test_openapi_exposes_only_intended_staff_route() -> None:
         assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/activate"]) == {"post"}
         assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/suspend"]) == {"post"}
         assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/deprovision"]) == {"post"}
+        assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/recovery-evidence"]) == {"post"}
+        assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/session-revocations"]) == {"post"}
         assert set(paths["/api/staff/v1/employers"]) == {"post"}
         assert set(paths["/api/staff/v1/employers/search"]) == {"post"}
         assert set(paths["/api/staff/v1/employers/{employer_id}/revisions"]) == {"post"}
@@ -2131,6 +2135,8 @@ def test_openapi_exposes_only_create_search_detail_and_revision_routes() -> None
             "/api/staff/v1/staff-accounts/{staff_id}/activate",
             "/api/staff/v1/staff-accounts/{staff_id}/suspend",
             "/api/staff/v1/staff-accounts/{staff_id}/deprovision",
+            "/api/staff/v1/staff-accounts/{staff_id}/recovery-evidence",
+            "/api/staff/v1/staff-accounts/{staff_id}/session-revocations",
             "/health",
             "/readiness",
             "/api/staff/v1/employers",
@@ -2147,6 +2153,8 @@ def test_openapi_exposes_only_create_search_detail_and_revision_routes() -> None
         assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/activate"]) == {"post"}
         assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/suspend"]) == {"post"}
         assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/deprovision"]) == {"post"}
+        assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/recovery-evidence"]) == {"post"}
+        assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/session-revocations"]) == {"post"}
         assert set(paths["/api/staff/v1/employers"]) == {"post"}
         assert set(paths["/api/staff/v1/employers/search"]) == {"post"}
         assert set(paths["/api/staff/v1/employers/{employer_id}"]) == {"get"}
@@ -2215,6 +2223,8 @@ def test_staff_employer_revision_openapi_exposes_only_approved_contract() -> Non
             "/api/staff/v1/staff-accounts/{staff_id}/activate",
             "/api/staff/v1/staff-accounts/{staff_id}/suspend",
             "/api/staff/v1/staff-accounts/{staff_id}/deprovision",
+            "/api/staff/v1/staff-accounts/{staff_id}/recovery-evidence",
+            "/api/staff/v1/staff-accounts/{staff_id}/session-revocations",
             "/health",
             "/readiness",
             "/api/staff/v1/employers",
@@ -2231,6 +2241,8 @@ def test_staff_employer_revision_openapi_exposes_only_approved_contract() -> Non
         assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/activate"]) == {"post"}
         assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/suspend"]) == {"post"}
         assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/deprovision"]) == {"post"}
+        assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/recovery-evidence"]) == {"post"}
+        assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/session-revocations"]) == {"post"}
         revision_path = paths["/api/staff/v1/employers/{employer_id}/revisions"]
         assert set(revision_path) == {"post"}
         revision_operation = revision_path["post"]

@@ -9,7 +9,12 @@ from fastapi.testclient import TestClient
 from httpx import Response
 from sqlalchemy import func, select
 
-from golden_rose.api.dependencies import get_settings, get_staff_directory, get_staff_principal
+from golden_rose.api.dependencies import (
+    get_settings,
+    get_staff_directory,
+    get_staff_principal,
+    resolve_staff_principal_for_settings,
+)
 from golden_rose.auth.staff_directory import StaffDirectory, StaffDirectoryEntry
 from golden_rose.main import create_app
 from golden_rose.persistence.models import audit_events
@@ -22,7 +27,7 @@ SECOND = UUID("33333333-3333-4333-8333-333333333333")
 @pytest.fixture
 def client(clean_tables):
     app = create_app()
-    principal = get_staff_principal(get_settings())
+    principal = resolve_staff_principal_for_settings(get_settings())
     directory = StaffDirectory(
         (
             StaffDirectoryEntry(
@@ -224,7 +229,7 @@ def test_reassignment_preserves_prior_owner_and_deadline(client):
 @pytest.mark.parametrize("missing", ["intake:review", "worker_residence:read"])
 def test_ordinary_staff_cannot_review_without_delegation(client, missing):
     target = worker(client)["summary"]["intake_id"]
-    principal = get_staff_principal(get_settings())
+    principal = resolve_staff_principal_for_settings(get_settings())
     client.app.dependency_overrides[get_staff_principal] = lambda: replace(
         principal, permissions=principal.permissions - {missing}
     )
@@ -238,7 +243,7 @@ def test_ordinary_staff_cannot_review_without_delegation(client, missing):
 
 def test_review_requires_read_not_write_and_revoked_retry_fails(client):
     target = worker(client)["summary"]["intake_id"]
-    principal = get_staff_principal(get_settings())
+    principal = resolve_staff_principal_for_settings(get_settings())
     client.app.dependency_overrides[get_staff_principal] = lambda: replace(
         principal, permissions=principal.permissions - {"worker_residence:write"}
     )
@@ -324,7 +329,7 @@ def test_history_keyset_scope_and_protected_access(client):
     assert third["next_cursor"] is None
     for body in [{"page_size": 2, "cursor": first["next_cursor"]}, {"cursor": "tampered"}]:
         assert client.post(query, json=body).status_code == 422
-    principal = get_staff_principal(get_settings())
+    principal = resolve_staff_principal_for_settings(get_settings())
     client.app.dependency_overrides[get_staff_principal] = lambda: replace(
         principal, actor_id=SECOND
     )
@@ -359,7 +364,7 @@ def test_owner_options_bind_directory_and_reject_ineligible_assignment(client):
         {"staff_id": str(SECOND), "display_name": "Fictional Follow-up Staff"}
     ]
     assert second["next_cursor"] is None
-    principal = get_staff_principal(get_settings())
+    principal = resolve_staff_principal_for_settings(get_settings())
     for entry in [
         StaffDirectoryEntry(SECOND, "Inactive Fictional", False, principal.permissions),
         StaffDirectoryEntry(
@@ -440,7 +445,7 @@ def test_catalog_paging_replay_history_and_reselection(client, session):
     assert (
         session.execute(select(func.count()).select_from(work_interest_versions)).scalar_one() == 3
     )
-    principal = get_staff_principal(get_settings())
+    principal = resolve_staff_principal_for_settings(get_settings())
     client.app.dependency_overrides[get_staff_principal] = lambda: replace(
         principal, permissions=principal.permissions - {"work_interest:manage"}
     )
@@ -463,7 +468,7 @@ def test_catalog_selection_validation_and_read_permissions(client):
         client, f"{ROOT}/{target}/reviews", {"expected_version": 1, "outcome": "intake_reviewed"}
     )
     event = client.post(f"{ROOT}/{target}/history/query", json={}).json()["items"][0]["event_id"]
-    principal = get_staff_principal(get_settings())
+    principal = resolve_staff_principal_for_settings(get_settings())
     client.app.dependency_overrides[get_staff_principal] = lambda: replace(
         principal, permissions=principal.permissions - {"work_interest:read"}
     )
@@ -596,7 +601,7 @@ def test_review_rechecks_catalog_rights_after_initial_snapshot(client, monkeypat
     body = {"expected_version": 1, "outcome": "intake_reviewed"}
     if replay:
         command(client, f"{ROOT}/{target}/reviews", body, key=key)
-    principal = get_staff_principal(get_settings())
+    principal = resolve_staff_principal_for_settings(get_settings())
     client.app.dependency_overrides[get_staff_principal] = lambda: replace(
         principal, permissions=principal.permissions - {"work_interest:read"}
     )
@@ -646,7 +651,7 @@ def test_employer_review_protects_both_address_sections(client, kind):
     target = current["summary"]["intake_id"]
     assert current["summary"]["complete"] is True
     body = {"expected_version": 1, "outcome": "intake_reviewed"}
-    principal = get_staff_principal(get_settings())
+    principal = resolve_staff_principal_for_settings(get_settings())
     for permission in ["party_address:read", "worksite_address:read"]:
         client.app.dependency_overrides[get_staff_principal] = lambda permission=permission: (
             replace(principal, permissions=principal.permissions - {permission})
@@ -719,7 +724,7 @@ def test_cleared_address_can_be_reviewed_as_needing_followup(client):
 
 @pytest.mark.parametrize("surface", ["history", "follow-up-owners"])
 def test_long_valid_staff_display_names_survive_history_and_owner_queries(client, surface):
-    principal = get_staff_principal(get_settings())
+    principal = resolve_staff_principal_for_settings(get_settings())
     name = "Fictional " + "Reviewer" * 20
     assert 100 < len(name) <= 200
     client.app.dependency_overrides[get_staff_directory] = lambda: StaffDirectory(

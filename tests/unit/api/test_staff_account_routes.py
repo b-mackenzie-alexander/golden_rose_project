@@ -49,6 +49,8 @@ def http(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClient, FixedIde
                 "staff_account:activate",
                 "staff_account:suspend",
                 "staff_account:deprovision",
+                "staff_account:recovery:record",
+                "staff_account:session:revoke",
             }
         ),
     )
@@ -203,6 +205,58 @@ def test_terminal_staff_account_lifecycle_routes(
     assert response.json()["event_type"] == event_type
     assert response.json()["account"]["lifecycle_status"] == status
     assert command.call_args.kwargs["expected_version"] == 2
+
+
+@pytest.mark.parametrize(
+    ("path_suffix", "patch_name", "event_type", "reason_text"),
+    [
+        (
+            "recovery-evidence",
+            "record_staff_account_recovery_evidence",
+            "staff_account.recovery_recorded",
+            "Assisted MFA recovery completed",
+        ),
+        (
+            "session-revocations",
+            "record_staff_account_session_revocation_evidence",
+            "staff_account.sessions_revoked",
+            "Provider sessions revoked",
+        ),
+    ],
+)
+def test_staff_account_evidence_routes_record_current_version_without_status_change(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+    path_suffix: str,
+    patch_name: str,
+    event_type: str,
+    reason_text: str,
+) -> None:
+    client, _ = http
+    command = Mock(
+        return_value=lifecycle_result(
+            event_type=event_type,
+            record=account_record(status="active", version=4, mfa_enrolled=True),
+        )
+    )
+    monkeypatch.setattr(staff_accounts, patch_name, command)
+
+    response = client.post(
+        f"/api/staff/v1/staff-accounts/{STAFF_ID}/{path_suffix}",
+        headers=command_headers(),
+        json={"expected_version": 4, "reason_text": reason_text},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["vary"] == "Authorization"
+    assert response.headers["idempotency-result-version"] == "4"
+    assert response.json()["event_type"] == event_type
+    assert response.json()["account"]["lifecycle_status"] == "active"
+    assert response.json()["result_version"] == 4
+    assert command.call_args.kwargs["staff_id"] == STAFF_ID
+    assert command.call_args.kwargs["expected_version"] == 4
+    assert command.call_args.kwargs["reason_text"] == reason_text
 
 
 @pytest.mark.parametrize(

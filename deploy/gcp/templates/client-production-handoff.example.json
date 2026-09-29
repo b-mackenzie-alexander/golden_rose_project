@@ -1,0 +1,46 @@
+{
+  "purpose": "Placeholder-only production handoff evidence template. Do not commit real values.",
+  "authority_boundary": {
+    "production_deployment": "separate-approval-required",
+    "live_data_admission": "separate-approval-required",
+    "cloud_execution": "separate-approval-required"
+  },
+  "source": {
+    "source_commit": "<git-commit-sha>",
+    "migration_revision": "<alembic-revision>"
+  },
+  "artifact_admission": {
+    "image_digest": "sha256:<64-hex-digest>",
+    "signature_evidence": "<value-safe-cosign-admission-record>",
+    "sbom_evidence": "<value-safe-sbom-validation-record>",
+    "provenance_evidence": "<value-safe-slsa-provenance-record>",
+    "repository_subject_restriction": "<approved-repository-subject>"
+  },
+  "plan_review": {
+    "validator_command": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_production_plan.py <operator-held-plan.json>",
+    "status": "<passed-or-not-run>"
+  },
+  "database_authority": {
+    "receipt": "<value-safe-database-authority-record>",
+    "status": "<passed-or-not-run>"
+  },
+  "smoke": {
+    "health": "<passed-or-not-run>",
+    "readiness": "<passed-or-not-run>",
+    "staff_entry_boundary": "<passed-or-not-run>"
+  },
+  "recovery": {
+    "rollback_or_forward_recovery_note": "<value-safe-recovery-record>",
+    "status": "<recorded-or-not-run>"
+  },
+  "operations": {
+    "backup_restore_owner": "<private-owner-record>",
+    "monitoring_owner": "<private-owner-record>",
+    "incident_owner": "<private-owner-record>",
+    "support_owner": "<private-owner-record>"
+  },
+  "owner_acceptance": {
+    "acceptance_checklist": "<private-acceptance-record>",
+    "status": "<accepted-or-not-run>"
+  }
+}

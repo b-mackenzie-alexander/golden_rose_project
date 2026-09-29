@@ -18,6 +18,11 @@ activate provider-side staff identity, or create shared runtime access.
 - `deploy/gcp/templates/client-production-policy.example.json` is a source
   review manifest for later package checks. It is not a Terraform plan and does
   not authorize cloud execution.
+- `deploy/gcp/templates/client-production-handoff.example.json` is a
+  placeholder-only template for later value-safe handoff evidence. It is not a
+  production evidence record and must not be filled with private URLs, staff
+  identities, secret payloads, state details or command transcripts in source
+  control.
 - Real project IDs, billing IDs, principals, service URLs, database URLs,
   identity-provider URLs, JWKS URLs, secret names, passwords, tokens, state
   buckets, support contacts, and owner emails must remain in approved private
@@ -61,6 +66,22 @@ instead of synthetic/demo settings, and that the runbook keeps private
 develop/demo values out of the client-owned package materials. It does not
 authenticate to GCP, read Terraform state, inspect Cloud Run, create secrets,
 or verify provider-side identity.
+
+The package validator also requires the placeholder handoff evidence template.
+When a later approved production packet has value-safe handoff evidence, keep
+the filled JSON outside source control and validate it locally:
+
+```bash
+UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_handoff_evidence.py <operator-held-handoff.json>
+```
+
+The handoff evidence validator checks that source commit, migration revision,
+immutable image digest, signed image/SBOM/provenance evidence, plan review,
+database-authority receipt, smoke/readiness results, rollback or
+forward-recovery note, operational owners and owner acceptance are present in a
+value-safe shape. It does not authenticate to GCP, inspect cloud resources,
+activate identity, run smoke probes, perform backup/restore, execute provider
+recovery or revocation, deploy production, or admit live/client data.
 
 ## Later Plan Review Policy
 
@@ -113,6 +134,8 @@ these are true:
 
 A later approved production packet should produce value-safe handoff evidence:
 
+- placeholder structure from
+  `deploy/gcp/templates/client-production-handoff.example.json`,
 - source commit and immutable image digest,
 - migration revision,
 - state backend lineage identifier,

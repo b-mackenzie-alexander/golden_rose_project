@@ -4,6 +4,7 @@ import pytest
 
 from scripts.validate_deployable_package import (
     ENV_TEMPLATE_PATH,
+    HANDOFF_TEMPLATE_PATH,
     INPUTS_TEMPLATE_PATH,
     POLICY_TEMPLATE_PATH,
     RUNBOOK_PATH,
@@ -20,6 +21,7 @@ def _copy_package(tmp_path: Path) -> Path:
         ENV_TEMPLATE_PATH,
         INPUTS_TEMPLATE_PATH,
         POLICY_TEMPLATE_PATH,
+        HANDOFF_TEMPLATE_PATH,
     ):
         source = ROOT / relative_path
         destination = tmp_path / relative_path
@@ -36,6 +38,7 @@ def test_deployable_package_artifacts_are_placeholder_only_and_complete() -> Non
         str(ENV_TEMPLATE_PATH),
         str(INPUTS_TEMPLATE_PATH),
         str(POLICY_TEMPLATE_PATH),
+        str(HANDOFF_TEMPLATE_PATH),
     ]
 
 
@@ -162,4 +165,21 @@ def test_deployable_package_rejects_policy_concrete_artifact_evidence(
     )
 
     with pytest.raises(PackageValidationError, match="signature_evidence"):
+        validate(root)
+
+
+def test_deployable_package_rejects_handoff_template_concrete_acceptance(
+    tmp_path: Path,
+) -> None:
+    root = _copy_package(tmp_path)
+    handoff_path = root / HANDOFF_TEMPLATE_PATH
+    handoff_path.write_text(
+        handoff_path.read_text(encoding="utf-8").replace(
+            "<private-acceptance-record>",
+            "owner accepted production handoff",
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PackageValidationError, match="acceptance_checklist"):
         validate(root)

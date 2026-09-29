@@ -28,6 +28,7 @@ REQUIRED_RUNBOOK_PHRASES = (
     "provider-side factor reset",
     "state backend lineage identifier",
     "client-production-policy.example.json",
+    "scripts/validate_client_production_plan.py",
     "delete/replace actions",
     "public SQL exposure",
     "broad IAM",
@@ -81,6 +82,10 @@ REQUIRED_POLICY_STRING_VALUES = {
     ("authority_boundary", "production_deployment"): "separate-approval-required",
     ("authority_boundary", "live_data_admission"): "separate-approval-required",
     ("authority_boundary", "provider_side_identity_activation"): "separate-approval-required",
+    ("plan_review", "validator_command"): (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_client_production_plan.py <operator-held-plan.json>"
+    ),
     ("production_environment", "environment"): "production",
     ("production_environment", "auth_mode"): "staff_oidc",
     ("production_environment", "synthetic_staff_id"): "<unset>",

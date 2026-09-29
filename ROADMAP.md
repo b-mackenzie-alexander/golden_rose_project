@@ -1,5 +1,17 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-09-29 — Client production plan review validator active
+
+- **Staffing:** One independent developer; focused package/plan-validator tests, static checks, secret scans and later PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #129, `feat: add client package policy manifest`, merged into protected `develop` at `dab1f8cdbcd5b0b36ba25104c2a477c52af05ffa`. Local `develop` was fetched/pruned and fast-forwarded to that exact `origin/develop` tip. The stale local `feat/client-package-policy-manifest` branch was deleted after GitHub merge confirmation, empty diff comparison and no-extra-worktree verification. Fresh work is active on `feat/client-plan-review-validator`. This slice continues Tranche 2 by adding an offline Terraform JSON plan validator for later client-owned production packet review. The guard checks delete/replacement actions, unsupported managed-resource actions, public Cloud SQL posture, broad IAM members/roles, mutable Cloud Run images, missing staff OIDC runtime configuration, production demo/synthetic drift and Secret Manager payload resources.
+- **Gate budget:** Source/documentation/local-static-validation work only. No cloud inspection or mutation, Terraform plan/apply, production deployment, live/client data, live identity-provider activation, provider-side reset/revocation mechanics, credential rotation, default permission activation, persistent synthetic write qualification, cloud migration or shared-runtime rollout occurs in this branch.
+- **Next executable action:** Finish validating and publishing this plan-review-validator slice, then continue any remaining deployable-package hardening before the next cloud migration or shared-runtime rollout.
+- **Do not regress:** Human staff decision boundaries; no automated matching/ranking/eligibility/referral/placement; private fictional-synthetic boundaries until live-data gates open; immutable intake history and exact retries; restricted-field permissions; bilingual/accessibility parity; separate public/staff identity planes; auth-sensitive no-store handling; evidence-only recovery/session-revocation wording; placeholder-only package materials for the client's later GCP environment.
+
+**Validation to date:** Focused package and client production plan validator tests passed with 19 tests; the deployable package validator passed; focused Ruff check and mypy with explicit package bases passed for the touched validators/tests.
+
+**Planning artifact:** [Production-readiness and staff identity plan](docs/planning/2026-09-27-production-readiness-plan.md).
+
 ## 2026-09-29 — Client package policy manifest active
 
 - **Staffing:** One independent developer; focused package-validator tests, static checks, secret scans and later PR gates provide quality evidence, not independent-human authorization.

@@ -1,5 +1,11 @@
 # Security — Golden Rose Operations Platform
 
+## 2026-09-29 — Client production plan review source guard
+
+The active `feat/client-plan-review-validator` source slice extends Tranche 2 portability with `scripts/validate_client_production_plan.py`, an offline validator for an operator-held Terraform JSON plan created only inside a later separately approved production packet. It fails closed on delete/replacement actions, unsupported managed-resource actions, public Cloud SQL IPv4 or authorized networks, broad IAM members/roles, mutable Cloud Run images, missing staff OIDC runtime configuration, synthetic/demo production drift and Secret Manager payload resources.
+
+The validator is a local source guard only. It reads a JSON file supplied by an operator, reports value-safe resource addresses and stop reasons, and authenticates to no cloud system. It does not generate a Terraform plan, inspect Terraform state, apply infrastructure, create secrets, activate a staff identity provider, execute provider-side recovery or session revocation, deploy production, admit live/client data or authorize shared-runtime rollout. Plan files, plan JSON, private variables, state files and command transcripts remain outside tracked source.
+
 ## 2026-09-29 — Client package policy manifest source guard
 
 The active `feat/client-package-policy-manifest` source slice extends Tranche 2 portability with a placeholder-only production package policy manifest and stricter local static validation. The policy manifest records later review requirements for delete/replace plan actions, public SQL exposure, broad IAM, immutable image digest admission, staff OIDC configuration, production demo-access and presentation-seed exclusion, secret-payload exclusion, database-authority evidence, backup/restore ownership and monitoring/incident/support owners. It contains no real project IDs, provider URLs, service URLs, principals, emails, credentials, state paths, secret payloads or production values.

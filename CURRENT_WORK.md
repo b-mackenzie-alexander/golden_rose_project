@@ -1,5 +1,17 @@
 # Current Work — Golden Rose Operations Platform
 
+## 2026-09-29 — Client production plan review validator active
+
+- **Staffing:** One independent developer; focused package/plan-validator tests, static checks, secret scans and later PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #129, `feat: add client package policy manifest`, merged into protected `develop` at `dab1f8cdbcd5b0b36ba25104c2a477c52af05ffa`. Local `develop` was fetched/pruned and fast-forwarded to that exact `origin/develop` tip. The stale local `feat/client-package-policy-manifest` branch was deleted after GitHub merge confirmation, an empty diff against `origin/develop` and a no-extra-worktree check. Fresh source work is active on `feat/client-plan-review-validator`. This slice continues Tranche 2 by adding an offline, value-safe Terraform JSON plan validator for later client-owned production packet review and wiring the command into the placeholder package policy/runbook.
+- **Gate budget:** Source/documentation/local-static-validation work only. No cloud inspection or mutation, Terraform plan/apply, production deployment, live/client data, live identity-provider activation, provider-side reset/revocation mechanics, credential rotation, default permission activation, persistent synthetic write qualification, cloud migration or shared-runtime rollout occurs in this branch.
+- **Next executable action:** Complete validation and publication hygiene for this plan-review-validator slice, including focused package/plan tests, Ruff/mypy where touched, `git diff --check`, redacted secret scans and outgoing-range checks before PR publication. Keep production packet execution, real Terraform plan generation, cloud migration and shared-runtime rollout separately gated.
+- **Do not regress:** Human staff decision boundaries; no automated matching/ranking/eligibility/referral/placement; private fictional-synthetic boundaries until live-data gates open; immutable intake history and exact retries; restricted-field permissions; bilingual/accessibility parity; separate public/staff identity planes; auth-sensitive no-store handling; evidence-only recovery/session-revocation wording; placeholder-only package materials for the client's later GCP environment.
+
+**Validation to date:** `UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run pytest tests/unit/test_deployable_package.py tests/unit/test_client_production_plan_validator.py -q` passed 19 tests. `UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_deployable_package.py` passed. Focused Ruff check and mypy with explicit package bases passed for the touched validators/tests.
+
+**Planning artifact:** [Production-readiness and staff identity plan](docs/planning/2026-09-27-production-readiness-plan.md).
+
 ## 2026-09-29 — Client package policy manifest active
 
 - **Staffing:** One independent developer; focused package-validator tests, static checks, secret scans and later PR gates provide quality evidence, not independent-human authorization.

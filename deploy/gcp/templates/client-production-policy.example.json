@@ -17,6 +17,7 @@
     "mfa_claim_mapping_required": true
   },
   "plan_review": {
+    "validator_command": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_production_plan.py <operator-held-plan.json>",
     "allowed_actions": [
       "no-op",
       "create",

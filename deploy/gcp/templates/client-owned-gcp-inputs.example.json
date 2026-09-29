@@ -1,0 +1,42 @@
+{
+  "purpose": "Placeholder-only client-owned GCP package input inventory. Do not commit real values.",
+  "client_gcp": {
+    "project_id": "<client-gcp-project-id>",
+    "region": "<approved-gcp-region>",
+    "billing_account_id": "<client-billing-account-id>",
+    "budget_owner": "<private-owner-record>"
+  },
+  "state_backend": {
+    "bucket": "<client-terraform-state-bucket>",
+    "prefix": "<client-terraform-state-prefix>",
+    "lineage_record": "<private-state-lineage-record>"
+  },
+  "artifact": {
+    "repository": "<client-artifact-registry-repository>",
+    "image_digest": "sha256:<64-hex-digest>",
+    "admission_evidence": "<value-safe-image-admission-record>"
+  },
+  "identity": {
+    "workload_identity_provider": "<client-workload-identity-provider>",
+    "repository_subject_restriction": "<approved-repository-subject>",
+    "staff_oidc_issuer": "<https-staff-oidc-issuer-url>",
+    "staff_oidc_audience": "<staff-api-audience>",
+    "staff_oidc_jwks_url": "<https-staff-oidc-jwks-url>",
+    "mfa_claim_mapping": "<private-mfa-claim-record>",
+    "recovery_and_session_revocation_runbook": "<private-provider-runbook-record>"
+  },
+  "secrets": {
+    "runtime_database_url": "<secret-manager-runtime-database-url>",
+    "migration_database_url": "<secret-manager-migration-database-url>",
+    "staff_oidc_issuer": "<secret-manager-staff-oidc-issuer>",
+    "staff_oidc_audience": "<secret-manager-staff-oidc-audience>",
+    "staff_oidc_jwks_url": "<secret-manager-staff-oidc-jwks-url>"
+  },
+  "operations": {
+    "backup_restore_owner": "<private-owner-record>",
+    "monitoring_owner": "<private-owner-record>",
+    "incident_owner": "<private-owner-record>",
+    "support_owner": "<private-owner-record>",
+    "acceptance_owner": "<private-owner-record>"
+  }
+}

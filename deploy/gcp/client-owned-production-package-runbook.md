@@ -1,0 +1,95 @@
+# Client-Owned GCP Package Runbook
+
+This runbook describes the value-safe source package inputs needed before a
+later client-owned Golden Rose deployment. This is not an approval to inspect or
+mutate cloud resources, deploy production, admit live data, rotate credentials,
+activate provider-side staff identity, or create shared runtime access.
+
+## Boundary
+
+- This repository currently contains the historical private synthetic develop
+  infrastructure contract and production-shaped application code.
+- A client-owned deployment requires a separate explicit approval packet,
+  environment-specific variables, provider-side staff identity setup, and
+  live-data gates.
+- The example files under `deploy/gcp/templates/` are placeholders only. They
+  are not secrets, not Terraform plans, not production values, and not complete
+  authority to deploy.
+- Real project IDs, billing IDs, principals, service URLs, database URLs,
+  identity-provider URLs, JWKS URLs, secret names, passwords, tokens, state
+  buckets, support contacts, and owner emails must remain in approved private
+  operator custody until a scoped production packet exists.
+
+## Required Inputs
+
+An operator must identify these inputs outside source control before any later
+client-owned deployment packet can be considered:
+
+- Client GCP project ID and region.
+- Billing account and budget owner.
+- Terraform state backend bucket or approved state lineage.
+- Artifact Registry repository and immutable admitted image digest.
+- Workload Identity Federation provider and repository subject restrictions.
+- Runtime, migration, deployer, verifier, and artifact-reader service accounts.
+- Cloud SQL instance posture, backup window, PITR choice, and restore owner.
+- Secret Manager secret names for runtime database URL, migration database URL,
+  staff OIDC issuer, audience, JWKS URL, and any future provider adapter
+  material.
+- Staff identity provider issuer, audience, JWKS URL, MFA claim semantics, and
+  recovery/session-revocation provider runbook owner.
+- Initial staff account list and authorized human who verifies provider
+  subjects before activation.
+- Monitoring, alerting, log-retention, incident, rollback, support, and
+  acceptance owners.
+
+## Source Package Checks
+
+Before a production packet is drafted, run the local package validator:
+
+```bash
+UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_deployable_package.py
+```
+
+The validator is intentionally static. It checks that placeholder-only package
+templates remain present, that production app configuration uses staff OIDC
+instead of synthetic/demo settings, and that the runbook keeps private
+develop/demo values out of the client-owned package materials. It does not
+authenticate to GCP, read Terraform state, inspect Cloud Run, create secrets,
+or verify provider-side identity.
+
+## Stop Conditions
+
+Stop before drafting or executing any production deployment packet if any of
+these are true:
+
+- A template contains a concrete project ID, billing ID, service URL, email,
+  private principal, credential, token, database URL, identity-provider URL, or
+  JWKS URL.
+- A production app template enables synthetic auth, demo access, presentation
+  seed data, or an embedded staff actor.
+- A runbook asks an operator to apply Terraform, create Secret Manager payloads,
+  deploy Cloud Run, rotate credentials, activate live staff identity, or admit
+  live/client data without a separate approval packet.
+- Staff recovery or session-revocation wording implies Golden Rose performs
+  provider-side factor reset, provider-side session revocation, token
+  revocation, or forced logout.
+- Required human operators and client-owned support contacts have not been
+  named outside source control.
+
+## Later Packet Evidence
+
+A later approved production packet should produce value-safe handoff evidence:
+
+- source commit and immutable image digest,
+- migration revision,
+- state backend lineage identifier,
+- database-authority receipt,
+- staff identity readiness result,
+- smoke/readiness results,
+- rollback or forward-recovery note,
+- owner acceptance checklist,
+- support and incident-routing owner confirmation.
+
+Do not place raw private URLs, secret payloads, staff emails, staff provider
+subjects, client data, access tokens, plan files, state files, or command
+transcripts in tracked source.

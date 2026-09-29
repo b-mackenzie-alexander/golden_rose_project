@@ -1,5 +1,17 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-09-29 — Deployable package portability active
+
+- **Staffing:** One independent developer; focused package-validator tests, static checks, secret scans and later PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #127, `feat: add staff identity readiness surface`, merged into protected `develop` at `75f460e8d2397e20c3b2cc3ec189caa151c5c4f8`. Local `develop` was fetched/pruned and fast-forwarded to that exact `origin/develop` tip. The stale local `feat/staff-account-operator-readiness` branch was deleted after merge confirmation and empty diff comparison; fresh work is active on `feat/staff-deployable-package-readiness`. This tranche begins Tranche 2 by adding placeholder-only client-owned GCP package runbook/templates plus a static package validator for production app posture, placeholder-only identity/GCP inputs and required handoff owners.
+- **Gate budget:** Source/documentation/local-static-validation work only. No cloud inspection or mutation, Terraform plan/apply, production deployment, live/client data, live identity-provider activation, provider-side reset/revocation mechanics, credential rotation, default permission activation, persistent synthetic write qualification, cloud migration or shared-runtime rollout occurs in this branch.
+- **Next executable action:** Finish validating and publishing this package-portability slice, then continue the remaining deployable-package hardening before the next cloud migration or shared-runtime rollout.
+- **Do not regress:** Human staff decision boundaries; no automated matching/ranking/eligibility/referral/placement; private fictional-synthetic boundaries until live-data gates open; immutable intake history and exact retries; restricted-field permissions; bilingual/accessibility parity; separate public/staff identity planes; auth-sensitive no-store handling; evidence-only recovery/session-revocation wording; placeholder-only package materials for the client's later GCP environment.
+
+**Validation:** The deployable package validator passed, focused package tests passed with 5 tests, focused Ruff format/check and mypy passed for the new validator/test files, and whitespace/secret hygiene passed.
+
+**Planning artifact:** [Production-readiness and staff identity plan](docs/planning/2026-09-27-production-readiness-plan.md).
+
 ## 2026-09-29 — Staff account operator readiness active
 
 - **Staffing:** One independent developer; focused backend/frontend tests, lint/typecheck/build and later PR gates provide quality evidence, not independent-human authorization.

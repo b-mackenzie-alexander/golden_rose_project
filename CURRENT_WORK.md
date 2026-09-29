@@ -1,5 +1,17 @@
 # Current Work — Golden Rose Operations Platform
 
+## 2026-09-29 — Deployable package portability active
+
+- **Staffing:** One independent developer; focused package-validator tests, static checks, secret scans and later PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #127, `feat: add staff identity readiness surface`, merged into protected `develop` at `75f460e8d2397e20c3b2cc3ec189caa151c5c4f8`. Local `develop` was fetched/pruned and fast-forwarded to that exact `origin/develop` tip. The stale local `feat/staff-account-operator-readiness` branch was deleted after GitHub merge confirmation and an empty diff against `origin/develop`; no extra linked worktree remained. Fresh source work is active on `feat/staff-deployable-package-readiness`. This slice begins Tranche 2 by adding placeholder-only client-owned GCP package artifacts and a static validator that fails closed when production app templates drift into synthetic/demo auth, concrete private URLs, or missing handoff owners.
+- **Gate budget:** Source/documentation/local-static-validation work only. No cloud inspection or mutation, Terraform plan/apply, production deployment, live/client data, live identity-provider activation, provider-side reset/revocation mechanics, credential rotation, default permission activation, persistent synthetic write qualification, cloud migration or shared-runtime rollout occurs in this branch.
+- **Next executable action:** Complete validation and publication hygiene for this package-portability slice, including the deployable-package validator, focused package tests, Ruff/mypy where touched, `git diff --check`, redacted secret scans and outgoing-range checks before PR publication. Continue deployable package portability before any next cloud migration or shared-runtime rollout.
+- **Do not regress:** Human staff decision boundaries; no automated matching/ranking/eligibility/referral/placement; private fictional-synthetic boundaries until live-data gates open; immutable intake history and exact retries; restricted-field permissions; bilingual/accessibility parity; separate public/staff identity planes; auth-sensitive no-store handling; evidence-only recovery/session-revocation wording; placeholder-only package materials for the client's later GCP environment.
+
+**Validation:** `UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_deployable_package.py` passed. Focused package tests passed: `UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run pytest tests/unit/test_deployable_package.py -q` reported 5 passed. Focused Ruff format/check and mypy passed for the new validator/test files. `git diff --check` and `gitleaks dir --no-banner --redact .` passed.
+
+**Planning artifact:** [Production-readiness and staff identity plan](docs/planning/2026-09-27-production-readiness-plan.md).
+
 ## 2026-09-29 — Staff account operator readiness active
 
 - **Staffing:** One independent developer; focused backend/frontend tests, lint/typecheck/build and later PR gates provide quality evidence, not independent-human authorization.

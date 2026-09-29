@@ -6,6 +6,7 @@ import {
   deprovisionStaffAccount,
   getStaffSession,
   grantStaffDelegation,
+  listStaffAccountEvents,
   listStaffAccounts,
   listStaffDelegations,
   recordRecoveryEvidence,
@@ -41,6 +42,20 @@ const delegation = {
   revoked_at: null,
   revoked_by: null,
   revocation_reason: null,
+};
+
+const lifecycleEvent = {
+  event_id: '55555555-5555-4555-8555-555555555555',
+  command_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  staff_id: account.staff_id,
+  actor_id: '11111111-1111-4111-8111-111111111111',
+  event_type: 'staff_account.recovery_recorded',
+  previous_status: 'active',
+  new_status: 'active',
+  previous_version: 2,
+  new_version: 2,
+  occurred_at: '2026-09-28T12:30:00Z',
+  reason_text: 'Recovery evidence recorded in provider ticket',
 };
 
 afterEach(() => {
@@ -149,6 +164,52 @@ it('reads the current staff session with account and delegation context', async 
       }],
     },
   });
+});
+
+it('lists staff account lifecycle events with no-store options and strict parsing', async () => {
+  const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+    new Response(JSON.stringify({ items: [lifecycleEvent] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+
+  const result = await listStaffAccountEvents(account.staff_id);
+
+  expect(fetchMock).toHaveBeenCalledWith(`/api/staff/v1/staff-accounts/${account.staff_id}/events`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+    credentials: 'same-origin',
+    mode: 'same-origin',
+    redirect: 'error',
+    referrerPolicy: 'no-referrer',
+  });
+  expect(result).toEqual({
+    ok: true,
+    value: [{
+      eventId: lifecycleEvent.event_id,
+      commandId: lifecycleEvent.command_id,
+      staffId: lifecycleEvent.staff_id,
+      actorId: lifecycleEvent.actor_id,
+      eventType: lifecycleEvent.event_type,
+      previousStatus: lifecycleEvent.previous_status,
+      newStatus: lifecycleEvent.new_status,
+      previousVersion: lifecycleEvent.previous_version,
+      newVersion: lifecycleEvent.new_version,
+      occurredAt: lifecycleEvent.occurred_at,
+      reasonText: lifecycleEvent.reason_text,
+    }],
+  });
+});
+
+it('rejects non-json lifecycle event responses as unusable reads', async () => {
+  vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(
+    new Response('not json', { status: 200, headers: { 'Content-Type': 'text/plain' } }),
+  ));
+
+  expect(await listStaffAccountEvents(account.staff_id)).toEqual({ ok: false, failure: { kind: 'unexpected' } });
 });
 
 it('maps staff authentication and account-state problem responses', async () => {
@@ -314,6 +375,34 @@ it('rejects malformed delegation payloads and mismatched delegation command vers
     reasonText: 'Temporary coverage',
     commandId: delegation.delegation_id,
   })).toEqual({ ok: false, failure: { kind: 'unknown_outcome' } });
+});
+
+it('rejects malformed lifecycle event payloads', async () => {
+  const invalidEvents = [
+    { ...lifecycleEvent, extra_field: 'private' },
+    { ...lifecycleEvent, event_id: 'not-a-uuid' },
+    { ...lifecycleEvent, command_id: 'not-a-uuid' },
+    { ...lifecycleEvent, staff_id: 'not-a-uuid' },
+    { ...lifecycleEvent, actor_id: 'not-a-uuid' },
+    { ...lifecycleEvent, event_type: 'staff_account.provider_reset' },
+    { ...lifecycleEvent, previous_status: 'pending' },
+    { ...lifecycleEvent, new_status: 'pending' },
+    { ...lifecycleEvent, previous_version: 0 },
+    { ...lifecycleEvent, new_version: 0 },
+    { ...lifecycleEvent, occurred_at: 'not-a-date' },
+    { ...lifecycleEvent, reason_text: '' },
+  ];
+
+  for (const invalidEvent of invalidEvents) {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ items: [invalidEvent] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    ));
+
+    expect(await listStaffAccountEvents(account.staff_id)).toEqual({ ok: false, failure: { kind: 'unexpected' } });
+  }
 });
 
 it('maps version conflicts and unknown command outcomes to recoverable failures', async () => {

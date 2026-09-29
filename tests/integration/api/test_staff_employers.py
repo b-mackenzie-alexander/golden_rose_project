@@ -2049,6 +2049,7 @@ def test_openapi_exposes_only_intended_staff_route() -> None:
             "/api/staff/v1/session",
             "/api/staff/v1/staff-accounts",
             "/api/staff/v1/staff-accounts/{staff_id}",
+            "/api/staff/v1/staff-accounts/{staff_id}/events",
             "/api/staff/v1/staff-accounts/{staff_id}/delegations",
             "/api/staff/v1/staff-accounts/{staff_id}/delegations/{delegation_id}/revoke",
             "/api/staff/v1/staff-accounts/{staff_id}/activate",
@@ -2071,6 +2072,7 @@ def test_openapi_exposes_only_intended_staff_route() -> None:
         assert set(paths["/api/staff/v1/session"]) == {"get"}
         assert set(paths["/api/staff/v1/staff-accounts"]) == {"get", "post"}
         assert set(paths["/api/staff/v1/staff-accounts/{staff_id}"]) == {"get"}
+        assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/events"]) == {"get"}
         assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/delegations"]) == {"get", "post"}
         assert set(
             paths["/api/staff/v1/staff-accounts/{staff_id}/delegations/{delegation_id}/revoke"]
@@ -2144,6 +2146,7 @@ def test_openapi_exposes_only_create_search_detail_and_revision_routes() -> None
             "/api/staff/v1/session",
             "/api/staff/v1/staff-accounts",
             "/api/staff/v1/staff-accounts/{staff_id}",
+            "/api/staff/v1/staff-accounts/{staff_id}/events",
             "/api/staff/v1/staff-accounts/{staff_id}/delegations",
             "/api/staff/v1/staff-accounts/{staff_id}/delegations/{delegation_id}/revoke",
             "/api/staff/v1/staff-accounts/{staff_id}/activate",
@@ -2166,6 +2169,7 @@ def test_openapi_exposes_only_create_search_detail_and_revision_routes() -> None
         assert set(paths["/api/staff/v1/session"]) == {"get"}
         assert set(paths["/api/staff/v1/staff-accounts"]) == {"get", "post"}
         assert set(paths["/api/staff/v1/staff-accounts/{staff_id}"]) == {"get"}
+        assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/events"]) == {"get"}
         assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/delegations"]) == {"get", "post"}
         assert set(
             paths["/api/staff/v1/staff-accounts/{staff_id}/delegations/{delegation_id}/revoke"]
@@ -2242,6 +2246,7 @@ def test_staff_employer_revision_openapi_exposes_only_approved_contract() -> Non
             "/api/staff/v1/session",
             "/api/staff/v1/staff-accounts",
             "/api/staff/v1/staff-accounts/{staff_id}",
+            "/api/staff/v1/staff-accounts/{staff_id}/events",
             "/api/staff/v1/staff-accounts/{staff_id}/delegations",
             "/api/staff/v1/staff-accounts/{staff_id}/delegations/{delegation_id}/revoke",
             "/api/staff/v1/staff-accounts/{staff_id}/activate",
@@ -2264,6 +2269,7 @@ def test_staff_employer_revision_openapi_exposes_only_approved_contract() -> Non
         assert set(paths["/api/staff/v1/session"]) == {"get"}
         assert set(paths["/api/staff/v1/staff-accounts"]) == {"get", "post"}
         assert set(paths["/api/staff/v1/staff-accounts/{staff_id}"]) == {"get"}
+        assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/events"]) == {"get"}
         assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/delegations"]) == {"get", "post"}
         assert set(
             paths["/api/staff/v1/staff-accounts/{staff_id}/delegations/{delegation_id}/revoke"]

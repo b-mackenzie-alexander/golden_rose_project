@@ -1,5 +1,17 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-09-29 — Staff account onboarding history active
+
+- **Staffing:** One independent developer; focused backend/frontend tests, lint/typecheck/build and later PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #125, `feat: add staff account session UX`, merged into protected `develop` at `8491768fc37a6cca01b070f5e318720a880186fe`. Local `develop` was fetched/pruned and fast-forwarded to that exact `origin/develop` tip. The stale local `feat/staff-account-session-ux` branch was deleted after merge confirmation and empty diff comparison; fresh work is active on `feat/staff-account-onboarding-history`. This tranche continues Tranche 1 by making account administration more operationally accountable: no-store lifecycle evidence history, strict frontend history parsing, account filters/search/readiness cues, per-account evidence timelines and delegation-expiration validation.
+- **Gate budget:** Source/frontend/backend-client work only. No cloud inspection or mutation, production deployment, live/client data, live identity-provider activation, provider-side reset/revocation mechanics, credential rotation, default permission activation, persistent synthetic write qualification or shared-runtime rollout occurs in this branch.
+- **Next executable action:** Complete full source validation and publication hygiene for this onboarding-history slice, then continue provider/operator runbooks and deployable-package portability before the next cloud migration or shared-runtime rollout.
+- **Do not regress:** Human staff decision boundaries; no automated matching/ranking/eligibility/referral/placement; private fictional-synthetic boundaries until live-data gates open; immutable intake history and exact retries; restricted-field permissions; bilingual/accessibility parity; separate public/staff identity planes; auth-sensitive no-store handling; evidence-only recovery/session-revocation wording; deployable package portability for the client's later GCP environment.
+
+**Validation to date:** Focused frontend account client/admin tests passed with 23 tests and existing jsdom canvas notices. Focused backend route, persistence and OpenAPI checks passed with 37 tests and the existing Starlette/httpx warning. Full frontend verification passed lock validation, lint, typecheck, 401 frontend tests with coverage gates, and production build; the build retains the existing large-chunk warning. Focused backend Ruff format/check passed for touched files, full mypy passed across 234 source files, and full-tree whitespace/secret hygiene passed.
+
+**Planning artifact:** [Production-readiness and staff identity plan](docs/planning/2026-09-27-production-readiness-plan.md).
+
 ## 2026-09-29 — Staff account session UX active
 
 - **Staffing:** One independent developer; focused backend/frontend tests, lint/typecheck/build and later PR gates provide quality evidence, not independent-human authorization.

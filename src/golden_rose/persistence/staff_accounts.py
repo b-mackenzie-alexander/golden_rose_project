@@ -47,6 +47,21 @@ class StaffDelegationRecord:
     revocation_reason: str | None
 
 
+@dataclass(frozen=True, slots=True)
+class StaffAccountLifecycleEventRecord:
+    event_id: UUID
+    command_id: UUID
+    staff_id: UUID
+    actor_id: UUID
+    event_type: str
+    previous_status: str | None
+    new_status: StaffAccountStatus
+    previous_version: int | None
+    new_version: int
+    occurred_at: datetime
+    reason_text: str
+
+
 def insert_staff_account(
     *,
     session: Session,
@@ -360,6 +375,36 @@ def list_staff_delegations(
         .limit(limit)
     )
     return tuple(StaffDelegationRecord(*row) for row in rows)
+
+
+def list_staff_account_lifecycle_events(
+    *,
+    session: Session,
+    staff_id: UUID,
+    limit: int = 50,
+) -> tuple[StaffAccountLifecycleEventRecord, ...]:
+    rows = session.execute(
+        select(
+            staff_account_lifecycle_events.c.event_id,
+            staff_account_lifecycle_events.c.command_id,
+            staff_account_lifecycle_events.c.staff_id,
+            staff_account_lifecycle_events.c.actor_id,
+            staff_account_lifecycle_events.c.event_type,
+            staff_account_lifecycle_events.c.previous_status,
+            staff_account_lifecycle_events.c.new_status,
+            staff_account_lifecycle_events.c.previous_version,
+            staff_account_lifecycle_events.c.new_version,
+            staff_account_lifecycle_events.c.occurred_at,
+            staff_account_lifecycle_events.c.reason_text,
+        )
+        .where(staff_account_lifecycle_events.c.staff_id == staff_id)
+        .order_by(
+            staff_account_lifecycle_events.c.occurred_at.desc(),
+            staff_account_lifecycle_events.c.event_id.asc(),
+        )
+        .limit(limit)
+    )
+    return tuple(StaffAccountLifecycleEventRecord(*row) for row in rows)
 
 
 def revoke_staff_delegation(

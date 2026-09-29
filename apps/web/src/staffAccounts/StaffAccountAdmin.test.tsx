@@ -8,13 +8,14 @@ import {
   createStaffAccount,
   grantStaffDelegation,
   listStaffAccounts,
+  listStaffAccountEvents,
   listStaffDelegations,
   recordRecoveryEvidence,
   recordSessionRevocationEvidence,
   revokeStaffDelegation,
   suspendStaffAccount,
 } from '../api/staffAccountClient';
-import type { StaffAccount, StaffDelegation } from '../api/staffAccountClient';
+import type { StaffAccount, StaffAccountLifecycleEvent, StaffDelegation } from '../api/staffAccountClient';
 import { LanguageProvider } from '../i18n/LanguageProvider';
 import { runAxe } from '../test/axe';
 import { AppRoutes } from '../app/App';
@@ -29,6 +30,7 @@ vi.mock('../api/staffAccountClient', () => ({
   createStaffAccount: vi.fn(),
   deprovisionStaffAccount: vi.fn(),
   grantStaffDelegation: vi.fn(),
+  listStaffAccountEvents: vi.fn(),
   listStaffAccounts: vi.fn(),
   listStaffDelegations: vi.fn(),
   recordRecoveryEvidence: vi.fn(),
@@ -74,12 +76,27 @@ const delegation: StaffDelegation = {
   revocationReason: null,
 };
 
+const lifecycleEvent: StaffAccountLifecycleEvent = {
+  eventId: '55555555-5555-4555-8555-555555555555',
+  commandId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  staffId: suspended.staffId,
+  actorId: '11111111-1111-4111-8111-111111111111',
+  eventType: 'staff_account.recovery_recorded',
+  previousStatus: 'active',
+  newStatus: 'active',
+  previousVersion: 2,
+  newVersion: 2,
+  occurredAt: '2026-09-28T12:30:00Z',
+  reasonText: 'Provider ticket reviewed; evidence recorded only',
+};
+
 beforeEach(() => {
   vi.mocked(listStaffAccounts).mockResolvedValue({ ok: true, value: [suspended] });
   vi.mocked(createStaffAccount).mockReset();
   vi.mocked(activateStaffAccount).mockReset();
   vi.mocked(recordRecoveryEvidence).mockReset();
   vi.mocked(recordSessionRevocationEvidence).mockReset();
+  vi.mocked(listStaffAccountEvents).mockResolvedValue({ ok: true, value: [lifecycleEvent] });
   vi.mocked(listStaffDelegations).mockResolvedValue({ ok: true, value: [delegation] });
   vi.mocked(grantStaffDelegation).mockReset();
   vi.mocked(revokeStaffDelegation).mockReset();
@@ -124,6 +141,74 @@ it('creates a suspended onboarding account and shows field-local validation', as
   expect(createCall?.reasonText).toBe('Initial onboarding approved');
   expect(await screen.findByText('Staff account created in suspended onboarding state.')).toBeInTheDocument();
   expect(screen.getByText('Sofia Diaz')).toBeInTheDocument();
+});
+
+it('filters staff accounts by lifecycle, MFA readiness, and search text', async () => {
+  const user = userEvent.setup();
+  const activeStaff: StaffAccount = {
+    ...active,
+    staffId: '33333333-3333-4333-8333-333333333333',
+    displayName: 'Sofia Diaz',
+    providerSubject: 'oidc:staff:456',
+  };
+  const deprovisioned: StaffAccount = {
+    ...suspended,
+    staffId: '55555555-5555-4555-8555-555555555555',
+    displayName: 'Elena Ruiz',
+    providerSubject: 'oidc:staff:789',
+    lifecycleStatus: 'deprovisioned',
+    version: 3,
+  };
+  vi.mocked(listStaffAccounts).mockResolvedValue({ ok: true, value: [suspended, activeStaff, deprovisioned] });
+
+  render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
+  await screen.findByText('Mariela Torres');
+  expect(screen.getByText('Sofia Diaz')).toBeInTheDocument();
+  expect(screen.getByText('Elena Ruiz')).toBeInTheDocument();
+
+  await user.selectOptions(screen.getByLabelText('Lifecycle filter'), 'active');
+  expect(screen.queryByText('Mariela Torres')).not.toBeInTheDocument();
+  expect(screen.getByText('Sofia Diaz')).toBeInTheDocument();
+
+  await user.selectOptions(screen.getByLabelText('Lifecycle filter'), 'mfa_pending');
+  expect(screen.getByText('Mariela Torres')).toBeInTheDocument();
+  expect(screen.queryByText('Sofia Diaz')).not.toBeInTheDocument();
+  expect(screen.queryByText('Elena Ruiz')).not.toBeInTheDocument();
+
+  await user.type(screen.getByRole('textbox', { name: 'Find account' }), 'missing');
+  expect(screen.getByText('No accounts match this filter.')).toBeInTheDocument();
+});
+
+it('opens lifecycle evidence history without claiming provider-side execution', async () => {
+  const user = userEvent.setup();
+
+  render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
+  await screen.findByText('Mariela Torres');
+
+  await user.click(screen.getByRole('button', { name: 'History' }));
+
+  expect(await screen.findByRole('heading', { name: 'Account history: Mariela Torres' })).toBeInTheDocument();
+  expect(listStaffAccountEvents).toHaveBeenCalledWith(suspended.staffId);
+  expect(screen.getByText('Recovery evidence recorded')).toBeInTheDocument();
+  expect(screen.getByText('Provider ticket reviewed; evidence recorded only')).toBeInTheDocument();
+  expect(screen.getByText(/Recovery and session entries do not confirm provider-side reset or revocation/)).toBeInTheDocument();
+});
+
+it('shows recoverable history errors and empty lifecycle evidence', async () => {
+  const user = userEvent.setup();
+  vi.mocked(listStaffAccountEvents)
+    .mockResolvedValueOnce({ ok: false, failure: { kind: 'not_found' } })
+    .mockResolvedValueOnce({ ok: true, value: [] });
+
+  render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
+  await screen.findByText('Mariela Torres');
+
+  await user.click(screen.getByRole('button', { name: 'History' }));
+  expect(await screen.findByText('The account is no longer available. Reload the list.')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Close' }));
+  await user.click(screen.getByRole('button', { name: 'History' }));
+
+  expect(await screen.findByText('No lifecycle evidence has been recorded for this account.')).toBeInTheDocument();
 });
 
 it('activates with MFA evidence and records recovery evidence without provider-side claims', async () => {
@@ -265,6 +350,23 @@ it('shows recoverable delegation list and form errors', async () => {
   await user.type(lastElement(screen.getAllByLabelText('Reason')), 'Temporary coverage');
   await user.click(screen.getByRole('button', { name: 'Grant delegation' }));
   expect(await screen.findByText('Check the highlighted account fields and try again.')).toBeInTheDocument();
+});
+
+it('blocks expired delegation grants before submitting to the API', async () => {
+  const user = userEvent.setup();
+
+  render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
+  await screen.findByText('Mariela Torres');
+
+  await user.click(screen.getByRole('button', { name: 'Delegations' }));
+  await screen.findByRole('heading', { name: 'Delegations: Mariela Torres' });
+  await user.clear(screen.getByLabelText('Expires'));
+  await user.type(screen.getByLabelText('Expires'), '2000-01-01T00:00');
+  await user.type(lastElement(screen.getAllByLabelText('Reason')), 'Temporary coverage');
+  await user.click(screen.getByRole('button', { name: 'Grant delegation' }));
+
+  expect(screen.getByText('Expiration must be a future date and time.')).toBeInTheDocument();
+  expect(grantStaffDelegation).not.toHaveBeenCalled();
 });
 
 it('renders Spanish account administration and has no automated axe violations', async () => {

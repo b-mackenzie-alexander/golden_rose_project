@@ -1,0 +1,96 @@
+{
+  "purpose": "Placeholder-only deployable package index. Do not commit real values.",
+  "index_type": "client-owned-deployable-package-index-not-production-activation",
+  "validator_command": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_package_index.py <operator-held-package-index.json>",
+  "authority_boundary": {
+    "cloud_execution": "separate-approval-required",
+    "terraform_plan": "separate-approval-required",
+    "production_deployment": "separate-approval-required",
+    "live_data_admission": "separate-approval-required",
+    "provider_side_identity_activation": "separate-approval-required"
+  },
+  "source_artifacts": [
+    {
+      "path": "deploy/gcp/client-owned-production-package-runbook.md",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-runbook-review-record>"
+    },
+    {
+      "path": "deploy/gcp/staff-identity-production-runbook.md",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-staff-identity-runbook-record>"
+    },
+    {
+      "path": "deploy/gcp/templates/client-production.env.example",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-env-template-record>"
+    },
+    {
+      "path": "deploy/gcp/templates/client-owned-gcp-inputs.example.json",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-gcp-inputs-template-record>"
+    },
+    {
+      "path": "deploy/gcp/templates/client-production-policy.example.json",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-policy-template-record>"
+    },
+    {
+      "path": "deploy/gcp/templates/client-production-handoff.example.json",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-handoff-template-record>"
+    },
+    {
+      "path": "deploy/gcp/templates/client-production-readiness-checklist.example.json",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-readiness-template-record>"
+    },
+    {
+      "path": "deploy/gcp/templates/client-production-package-index.example.json",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-package-index-template-record>"
+    },
+    {
+      "path": "scripts/validate_deployable_package.py",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-package-validator-record>"
+    },
+    {
+      "path": "scripts/validate_client_production_plan.py",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-plan-validator-record>"
+    },
+    {
+      "path": "scripts/validate_client_handoff_evidence.py",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-handoff-validator-record>"
+    },
+    {
+      "path": "scripts/validate_client_readiness_checklist.py",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-readiness-validator-record>"
+    },
+    {
+      "path": "scripts/validate_client_package_index.py",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-package-index-validator-record>"
+    }
+  ],
+  "validator_commands": {
+    "deployable_package": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_deployable_package.py",
+    "terraform_plan": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_production_plan.py <operator-held-plan.json>",
+    "handoff_evidence": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_handoff_evidence.py <operator-held-handoff.json>",
+    "readiness_checklist": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_readiness_checklist.py <operator-held-readiness.json>",
+    "package_index": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_package_index.py <operator-held-package-index.json>"
+  },
+  "manual_acceptance_boundary": {
+    "accessibility_review": "<not-run-or-separate-record>",
+    "fluent_spanish_review": "<not-run-or-separate-record>",
+    "staff_workflow_acceptance": "<not-run-or-separate-record>"
+  },
+  "activation_boundary": {
+    "production_deployment": "not-executed-without-separate-approval",
+    "live_data_admission": "not-admitted-without-separate-approval",
+    "shared_runtime_rollout": "not-executed-without-separate-approval"
+  }
+}

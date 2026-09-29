@@ -1,5 +1,11 @@
 # Technical Requirements — Golden Rose Operations Platform
 
+## 2026-09-29 — Client package index validator
+
+The active Tranche 2 portability slice adds `deploy/gcp/templates/client-production-package-index.example.json` and `scripts/validate_client_package_index.py`. A later approved operator can keep a filled package index outside source control and validate that the package runbooks, placeholder templates and offline validator scripts were reviewed with value-safe evidence.
+
+This validator is not a cloud command and does not replace future production packet approval, manual accessibility review, fluent Spanish review, staff workflow acceptance, Terraform execution, backup/restore rehearsal, production deployment or live-data approval. It preserves `separate-review-required` for manual acceptance and requires production deployment, live-data admission and shared-runtime rollout to remain not executed without separate approval.
+
 ## 2026-09-29 — Client readiness checklist validator
 
 The active Tranche 2 portability slice adds `deploy/gcp/templates/client-production-readiness-checklist.example.json` and `scripts/validate_client_readiness_checklist.py`. A later approved operator can keep a filled readiness checklist outside source control and validate that package artifacts, staff identity, Terraform plan review, artifact admission, handoff evidence and operations-owner readiness are all marked ready with value-safe evidence.

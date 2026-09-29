@@ -1,5 +1,11 @@
 # Security — Golden Rose Operations Platform
 
+## 2026-09-29 — Client package index source guard
+
+The active `feat/client-package-index-validator` source slice extends Tranche 2 portability with `deploy/gcp/templates/client-production-package-index.example.json` and `scripts/validate_client_package_index.py`. The template is placeholder-only and indexes the package runbooks, production placeholder templates and offline validator scripts that a later operator must review outside source control with value-safe evidence.
+
+The package index validator is local static validation only. It does not authenticate to cloud systems, inspect state, run probes, create plans, apply infrastructure, create secrets, activate identity, perform acceptance testing, deploy production, admit live/client data or authorize shared-runtime rollout. It rejects concrete URLs, email-like values, obvious credential/secret/payload terms, live-data/deployment overclaims and provider-side reset/revocation completion claims; manual accessibility, fluent Spanish and staff workflow acceptance remain separate-review-required.
+
 ## 2026-09-29 — Client readiness checklist source guard
 
 The active `feat/client-readiness-checklist-validator` source slice extends Tranche 2 portability with `deploy/gcp/templates/client-production-readiness-checklist.example.json` and `scripts/validate_client_readiness_checklist.py`. The template is placeholder-only and explicitly distinguishes deployable-package review from production activation. The validator is for later operator-held, value-safe readiness JSON and requires package artifacts, staff identity, Terraform plan review, artifact admission, handoff evidence and operations-owner sections to be ready with value-safe evidence.

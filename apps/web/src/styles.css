@@ -1906,6 +1906,10 @@ select {
   font-weight: 800;
 }
 
+.staff-profile-list--compact {
+  margin-top: var(--space-4);
+}
+
 @media (max-width: 920px) {
   .staff-profile-summary {
     grid-template-columns: 1fr;

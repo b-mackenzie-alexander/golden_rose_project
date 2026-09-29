@@ -1,5 +1,17 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-09-29 — Staff account operator readiness active
+
+- **Staffing:** One independent developer; focused backend/frontend tests, lint/typecheck/build and later PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #126, `feat: add staff account lifecycle history`, merged into protected `develop` at `bb3e12bfa81092e043e7ad78edfebada8cdf3082`. Local `develop` was fetched/pruned and fast-forwarded to that exact `origin/develop` tip. The stale local `feat/staff-account-onboarding-history` branch was deleted after merge confirmation and empty diff comparison; fresh work is active on `feat/staff-account-operator-readiness`. This tranche continues Tranche 1 by making the staff personal-account surface show deploy/readiness posture: a no-store staff identity readiness endpoint, strict frontend readiness parsing, an operator-readiness panel on `/staff/account`, and production staff identity runbook guidance for OIDC/MFA/account/evidence boundaries before the next cloud migration.
+- **Gate budget:** Source/frontend/backend-client/documentation work only. No cloud inspection or mutation, production deployment, live/client data, live identity-provider activation, provider-side reset/revocation mechanics, credential rotation, default permission activation, persistent synthetic write qualification, cloud migration or shared-runtime rollout occurs in this branch.
+- **Next executable action:** Complete full source validation and publication hygiene for this operator-readiness slice, then continue deployable package portability and final operator handoff work before the next cloud migration or shared-runtime rollout.
+- **Do not regress:** Human staff decision boundaries; no automated matching/ranking/eligibility/referral/placement; private fictional-synthetic boundaries until live-data gates open; immutable intake history and exact retries; restricted-field permissions; bilingual/accessibility parity; separate public/staff identity planes; auth-sensitive no-store handling; evidence-only recovery/session-revocation wording; deployable package portability for the client's later GCP environment.
+
+**Validation to date:** Focused frontend account client/profile tests passed with 18 tests and existing jsdom canvas notices. Focused backend operator-readiness route tests passed 3 tests, and focused OpenAPI allowlist checks passed 3 tests with the existing Starlette/httpx warning. Focused backend Ruff format/check passed for touched Python files, full mypy passed across 236 source files, and full frontend verification passed lock validation, lint, typecheck, 404 frontend tests with coverage gates, and production build. `git diff --check` and full-tree redacted secret scanning passed. The frontend build retains the existing large-chunk warning.
+
+**Planning artifact:** [Production-readiness and staff identity plan](docs/planning/2026-09-27-production-readiness-plan.md).
+
 ## 2026-09-29 — Staff account onboarding history active
 
 - **Staffing:** One independent developer; focused backend/frontend tests, lint/typecheck/build and later PR gates provide quality evidence, not independent-human authorization.

@@ -1,0 +1,55 @@
+{
+  "purpose": "Placeholder-only deployable package readiness checklist. Do not commit real values.",
+  "checklist_type": "deployable-package-review-not-production-activation",
+  "validator_command": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_readiness_checklist.py <operator-held-readiness.json>",
+  "authority_boundary": {
+    "cloud_execution": "separate-approval-required",
+    "terraform_plan": "separate-approval-required",
+    "production_deployment": "separate-approval-required",
+    "live_data_admission": "separate-approval-required",
+    "provider_side_identity_activation": "separate-approval-required"
+  },
+  "required_sections": [
+    "package_artifacts",
+    "staff_identity",
+    "terraform_plan_review",
+    "artifact_admission",
+    "handoff_evidence",
+    "operations_owners",
+    "manual_acceptance_boundary"
+  ],
+  "package_artifacts": {
+    "status": "<ready-or-blocked>",
+    "evidence": "<value-safe-package-validation-record>"
+  },
+  "staff_identity": {
+    "status": "<ready-or-blocked>",
+    "evidence": "<value-safe-staff-identity-readiness-record>"
+  },
+  "terraform_plan_review": {
+    "status": "<ready-or-blocked>",
+    "evidence": "<value-safe-plan-validator-record>"
+  },
+  "artifact_admission": {
+    "status": "<ready-or-blocked>",
+    "evidence": "<value-safe-artifact-admission-record>"
+  },
+  "handoff_evidence": {
+    "status": "<ready-or-blocked>",
+    "evidence": "<value-safe-handoff-validator-record>"
+  },
+  "operations_owners": {
+    "status": "<ready-or-blocked>",
+    "evidence": "<value-safe-owner-readiness-record>"
+  },
+  "manual_acceptance_boundary": {
+    "accessibility_review": "<not-run-or-separate-record>",
+    "fluent_spanish_review": "<not-run-or-separate-record>",
+    "staff_workflow_acceptance": "<not-run-or-separate-record>"
+  },
+  "activation_boundary": {
+    "production_deployment": "not-executed-without-separate-approval",
+    "live_data_admission": "not-admitted-without-separate-approval",
+    "shared_runtime_rollout": "not-executed-without-separate-approval"
+  }
+}

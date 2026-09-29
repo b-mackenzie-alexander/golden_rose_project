@@ -23,6 +23,10 @@ activate provider-side staff identity, or create shared runtime access.
   production evidence record and must not be filled with private URLs, staff
   identities, secret payloads, state details or command transcripts in source
   control.
+- `deploy/gcp/templates/client-production-readiness-checklist.example.json` is a
+  placeholder-only checklist for deciding whether the deployable package is
+  reviewable. It is not a production activation checklist and must preserve the
+  separate-approval boundary for deployment, live data and shared runtime.
 - Real project IDs, billing IDs, principals, service URLs, database URLs,
   identity-provider URLs, JWKS URLs, secret names, passwords, tokens, state
   buckets, support contacts, and owner emails must remain in approved private
@@ -83,6 +87,21 @@ value-safe shape. It does not authenticate to GCP, inspect cloud resources,
 activate identity, run smoke probes, perform backup/restore, execute provider
 recovery or revocation, deploy production, or admit live/client data.
 
+When a later operator wants a single value-safe package readiness summary, keep
+the filled checklist outside source control and validate it locally:
+
+```bash
+UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_readiness_checklist.py <operator-held-readiness.json>
+```
+
+The readiness checklist validator requires the package artifacts, staff
+identity, Terraform plan review, artifact admission, handoff evidence and
+operations-owner sections to be marked ready with value-safe evidence. It also
+requires manual accessibility, fluent Spanish and staff workflow acceptance to
+remain `separate-review-required`, and requires production deployment, live-data
+admission and shared-runtime rollout to remain not executed without separate
+approval.
+
 ## Later Plan Review Policy
 
 A later approved production packet must review Terraform plan output against the
@@ -136,6 +155,8 @@ A later approved production packet should produce value-safe handoff evidence:
 
 - placeholder structure from
   `deploy/gcp/templates/client-production-handoff.example.json`,
+- optional package-readiness summary structure from
+  `deploy/gcp/templates/client-production-readiness-checklist.example.json`,
 - source commit and immutable image digest,
 - migration revision,
 - state backend lineage identifier,

@@ -1,5 +1,11 @@
 # Technical Requirements — Golden Rose Operations Platform
 
+## 2026-09-29 — Client readiness checklist validator
+
+The active Tranche 2 portability slice adds `deploy/gcp/templates/client-production-readiness-checklist.example.json` and `scripts/validate_client_readiness_checklist.py`. A later approved operator can keep a filled readiness checklist outside source control and validate that package artifacts, staff identity, Terraform plan review, artifact admission, handoff evidence and operations-owner readiness are all marked ready with value-safe evidence.
+
+This validator is not a cloud command and does not replace future production packet approval, manual accessibility review, fluent Spanish review, staff workflow acceptance, Terraform execution, backup/restore rehearsal, production deployment or live-data approval. It preserves `separate-review-required` for manual acceptance and requires production deployment, live-data admission and shared-runtime rollout to remain not executed without separate approval.
+
 ## 2026-09-29 — Client handoff evidence validator
 
 The active Tranche 2 portability slice adds `deploy/gcp/templates/client-production-handoff.example.json` and `scripts/validate_client_handoff_evidence.py`. A later approved production packet can use the template outside source control to produce value-safe handoff evidence, then validate the filled JSON locally. The validator requires source commit and migration revision, immutable image digest, signed image/SBOM/provenance evidence, plan-review result, database-authority receipt, smoke/readiness results, rollback or forward-recovery note, named operational owners and owner acceptance.

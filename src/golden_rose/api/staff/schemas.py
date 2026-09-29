@@ -238,6 +238,67 @@ class StaffAccountListResponse(BaseModel):
     items: tuple[StaffAccountResponse, ...]
 
 
+class StaffDelegationGrantRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    permission_name: str
+    scope_kind: Literal["global"] = "global"
+    expires_at: datetime
+    reason_text: str
+
+    @field_validator("permission_name")
+    @classmethod
+    def validate_staff_permission_name(cls, value: str) -> str:
+        return _normalize_staff_text("permission_name", value, 120)
+
+    @field_validator("reason_text")
+    @classmethod
+    def validate_staff_delegation_reason_text(cls, value: str) -> str:
+        return _normalize_staff_text("reason_text", value, 512)
+
+
+class StaffDelegationRevokeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason_text: str
+
+    @field_validator("reason_text")
+    @classmethod
+    def validate_staff_delegation_revocation_reason_text(cls, value: str) -> str:
+        return _normalize_staff_text("reason_text", value, 512)
+
+
+class StaffDelegationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+    delegation_id: UUID
+    grantor_staff_id: UUID
+    grantee_staff_id: UUID
+    permission_name: str
+    scope_kind: Literal["global"]
+    scope_id: UUID | None
+    reason_text: str
+    starts_at: datetime
+    expires_at: datetime
+    revoked_at: datetime | None
+    revoked_by: UUID | None
+    revocation_reason: str | None
+
+
+class StaffDelegationListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: tuple[StaffDelegationResponse, ...]
+
+
+class StaffDelegationCommandResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    delegation: StaffDelegationResponse
+    event_type: Literal["staff_delegation.granted", "staff_delegation.revoked"]
+    result_version: int
+
+
 class StaffAccountLifecycleResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

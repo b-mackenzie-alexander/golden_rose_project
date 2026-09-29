@@ -5,12 +5,15 @@ import {
   activateStaffAccount,
   createStaffAccount,
   deprovisionStaffAccount,
+  grantStaffDelegation,
   listStaffAccounts,
+  listStaffDelegations,
   recordRecoveryEvidence,
   recordSessionRevocationEvidence,
+  revokeStaffDelegation,
   suspendStaffAccount,
 } from '../api/staffAccountClient';
-import type { StaffAccount, StaffAccountFailureKind, StaffAccountRole } from '../api/staffAccountClient';
+import type { StaffAccount, StaffAccountFailureKind, StaffAccountRole, StaffDelegation } from '../api/staffAccountClient';
 import { IconSymbol } from '../dashboard/artwork';
 import { useLanguage } from '../i18n/LanguageProvider';
 
@@ -29,6 +32,16 @@ type ActionForm = {
   reasonText: string;
   mfaEnrolled: boolean;
 };
+type DelegationPanel = {
+  account: StaffAccount;
+  items: StaffDelegation[];
+  loading: boolean;
+  permissionName: string;
+  expiresAt: string;
+  reasonText: string;
+  revokeReasonText: string;
+  error: string;
+};
 
 const permissions = [
   'staff_account:read',
@@ -38,6 +51,8 @@ const permissions = [
   'staff_account:deprovision',
   'staff_account:recovery:record',
   'staff_account:session:revoke',
+  'staff_account:delegation:grant',
+  'staff_account:delegation:revoke',
   'intake:read',
   'worker:read',
   'employer:read',
@@ -98,6 +113,12 @@ function formatDate(value: string) {
   return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+function tomorrowLocalValue() {
+  const value = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  value.setSeconds(0, 0);
+  return value.toISOString().slice(0, 16);
+}
+
 function failureText(kind: StaffAccountFailureKind, language: 'en' | 'es') {
   return failureLabels[kind][language];
 }
@@ -133,6 +154,7 @@ export function StaffAccountAdmin() {
   const [createErrors, setCreateErrors] = useState<Partial<Record<keyof CreateForm, string>>>({});
   const [actionForm, setActionForm] = useState<ActionForm | null>(null);
   const [actionError, setActionError] = useState('');
+  const [delegationPanel, setDelegationPanel] = useState<DelegationPanel | null>(null);
   const activeCount = useMemo(() => accounts.filter((account) => account.lifecycleStatus === 'active').length, [accounts]);
   const suspendedCount = useMemo(() => accounts.filter((account) => account.lifecycleStatus === 'suspended').length, [accounts]);
 
@@ -233,6 +255,78 @@ export function StaffAccountAdmin() {
     }));
   }
 
+  async function openDelegations(account: StaffAccount) {
+    const panel: DelegationPanel = {
+      account,
+      items: [],
+      loading: true,
+      permissionName: 'intake:read',
+      expiresAt: tomorrowLocalValue(),
+      reasonText: '',
+      revokeReasonText: '',
+      error: '',
+    };
+    setDelegationPanel(panel);
+    const result = await listStaffDelegations(account.staffId);
+    if (!result.ok) {
+      setDelegationPanel({ ...panel, loading: false, error: failureText(result.failure.kind, language) });
+      return;
+    }
+    setDelegationPanel({ ...panel, loading: false, items: result.value });
+  }
+
+  async function submitDelegation(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (delegationPanel === null) return;
+    if (delegationPanel.reasonText.trim().length === 0 || delegationPanel.expiresAt.trim().length === 0) {
+      setDelegationPanel({ ...delegationPanel, error: language === 'en' ? 'Permission, expiration and reason are required.' : 'Permiso, vencimiento y motivo requeridos.' });
+      return;
+    }
+    const result = await grantStaffDelegation({
+      staffId: delegationPanel.account.staffId,
+      permissionName: delegationPanel.permissionName,
+      expiresAt: new Date(delegationPanel.expiresAt).toISOString(),
+      reasonText: delegationPanel.reasonText,
+      commandId: createCommandId(),
+    });
+    if (!result.ok) {
+      setDelegationPanel({ ...delegationPanel, error: failureText(result.failure.kind, language) });
+      return;
+    }
+    setDelegationPanel({
+      ...delegationPanel,
+      items: [result.value.delegation, ...delegationPanel.items.filter((item) => item.delegationId !== result.value.delegation.delegationId)],
+      reasonText: '',
+      error: '',
+    });
+    setNotice(language === 'en' ? 'Delegation recorded.' : 'Delegacion registrada.');
+  }
+
+  async function submitDelegationRevocation(delegation: StaffDelegation) {
+    if (delegationPanel === null) return;
+    if (delegationPanel.revokeReasonText.trim().length === 0) {
+      setDelegationPanel({ ...delegationPanel, error: language === 'en' ? 'Revocation reason is required.' : 'Motivo de revocacion requerido.' });
+      return;
+    }
+    const result = await revokeStaffDelegation({
+      staffId: delegationPanel.account.staffId,
+      delegationId: delegation.delegationId,
+      reasonText: delegationPanel.revokeReasonText,
+      commandId: createCommandId(),
+    });
+    if (!result.ok) {
+      setDelegationPanel({ ...delegationPanel, error: failureText(result.failure.kind, language) });
+      return;
+    }
+    setDelegationPanel({
+      ...delegationPanel,
+      items: delegationPanel.items.map((item) => item.delegationId === result.value.delegation.delegationId ? result.value.delegation : item),
+      revokeReasonText: '',
+      error: '',
+    });
+    setNotice(language === 'en' ? 'Delegation revoked.' : 'Delegacion revocada.');
+  }
+
   return (
     <section aria-labelledby="staff-account-heading" className="staff-account-page">
       <div className="staff-account-header">
@@ -297,6 +391,7 @@ export function StaffAccountAdmin() {
                     <button className="focus-ring" type="button" onClick={() => { setActionForm({ account, action: 'recovery', reasonText: '', mfaEnrolled: account.mfaEnrolled }); }}>{language === 'en' ? 'Recovery evidence' : 'Evidencia recuperacion'}</button>
                   ) : null}
                   <button className="focus-ring" type="button" onClick={() => { setActionForm({ account, action: 'session', reasonText: '', mfaEnrolled: account.mfaEnrolled }); }}>{language === 'en' ? 'Session evidence' : 'Evidencia sesion'}</button>
+                  <button className="focus-ring" type="button" onClick={() => { void openDelegations(account); }}>{language === 'en' ? 'Delegations' : 'Delegaciones'}</button>
                 </span>
               </div>
             ))}
@@ -373,6 +468,64 @@ export function StaffAccountAdmin() {
               <textarea className="focus-ring" value={actionForm.reasonText} onChange={(event) => { setActionForm({ ...actionForm, reasonText: event.target.value }); }} />
             </label>
             <button className="staff-primary-button focus-ring" type="submit">{actionLabels[actionForm.action][language]}</button>
+          </form>
+        </section>
+      ) : null}
+
+      {delegationPanel ? (
+        <section className="staff-account-panel staff-action-panel" aria-labelledby="delegation-heading">
+          <div className="staff-account-panel-header">
+            <h3 id="delegation-heading">{language === 'en' ? 'Delegations' : 'Delegaciones'}: {delegationPanel.account.displayName}</h3>
+            <button className="staff-secondary-button focus-ring" type="button" onClick={() => { setDelegationPanel(null); }}>{language === 'en' ? 'Close' : 'Cerrar'}</button>
+          </div>
+          {delegationPanel.loading ? <p>{language === 'en' ? 'Loading' : 'Cargando'}</p> : null}
+          {delegationPanel.error ? <p className="staff-account-error" role="alert">{delegationPanel.error}</p> : null}
+          <div className="staff-delegation-list" aria-label={language === 'en' ? 'Staff delegations' : 'Delegaciones del personal'}>
+            {delegationPanel.items.map((delegation) => (
+              <div className="staff-delegation-row" key={delegation.delegationId}>
+                <span>
+                  <strong>{delegation.permissionName}</strong>
+                  <small>{language === 'en' ? 'Global scope' : 'Alcance global'}</small>
+                </span>
+                <span>
+                  <time dateTime={delegation.expiresAt}>{formatDate(delegation.expiresAt)}</time>
+                  <small>{delegation.revokedAt ? (language === 'en' ? 'Revoked' : 'Revocada') : (language === 'en' ? 'Active until' : 'Activa hasta')}</small>
+                </span>
+                <span>
+                  {delegation.revokedAt ? (
+                    <small>{delegation.revocationReason}</small>
+                  ) : (
+                    <button className="focus-ring" type="button" onClick={() => { void submitDelegationRevocation(delegation); }}>{language === 'en' ? 'Revoke' : 'Revocar'}</button>
+                  )}
+                </span>
+              </div>
+            ))}
+            {!delegationPanel.loading && delegationPanel.items.length === 0 ? (
+              <p className="staff-account-empty">{language === 'en' ? 'No delegations recorded for this account.' : 'No hay delegaciones registradas para esta cuenta.'}</p>
+            ) : null}
+          </div>
+          <form className="staff-account-form" onSubmit={(event) => { void submitDelegation(event); }}>
+            <div className="calendar-form-row">
+              <label>
+                <span>{language === 'en' ? 'Permission' : 'Permiso'}</span>
+                <select className="focus-ring" value={delegationPanel.permissionName} onChange={(event) => { setDelegationPanel({ ...delegationPanel, permissionName: event.target.value }); }}>
+                  {permissions.map((permission) => <option key={permission} value={permission}>{permission}</option>)}
+                </select>
+              </label>
+              <label>
+                <span>{language === 'en' ? 'Expires' : 'Vence'}</span>
+                <input className="focus-ring" type="datetime-local" value={delegationPanel.expiresAt} onChange={(event) => { setDelegationPanel({ ...delegationPanel, expiresAt: event.target.value }); }} />
+              </label>
+            </div>
+            <label>
+              <span>{language === 'en' ? 'Reason' : 'Motivo'}</span>
+              <textarea className="focus-ring" value={delegationPanel.reasonText} onChange={(event) => { setDelegationPanel({ ...delegationPanel, reasonText: event.target.value }); }} />
+            </label>
+            <label>
+              <span>{language === 'en' ? 'Revocation reason' : 'Motivo de revocacion'}</span>
+              <textarea className="focus-ring" value={delegationPanel.revokeReasonText} onChange={(event) => { setDelegationPanel({ ...delegationPanel, revokeReasonText: event.target.value }); }} />
+            </label>
+            <button className="staff-primary-button focus-ring" type="submit">{language === 'en' ? 'Grant delegation' : 'Conceder delegacion'}</button>
           </form>
         </section>
       ) : null}

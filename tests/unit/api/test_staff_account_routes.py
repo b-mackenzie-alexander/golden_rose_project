@@ -7,11 +7,17 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy.exc import NoResultFound
+from sqlalchemy.exc import NoResultFound, SQLAlchemyError
 
 from golden_rose.api.dependencies import get_db_session, get_identifier_factory, get_staff_principal
 from golden_rose.api.staff import staff_accounts
 from golden_rose.application.errors import SafePersistenceError
+from golden_rose.application.staff_account_delegations import (
+    StaffDelegationConflictError,
+    StaffDelegationError,
+    StaffDelegationNotFoundError,
+    StaffDelegationResult,
+)
 from golden_rose.application.staff_account_lifecycle import (
     StaffAccountLifecycleError,
     StaffAccountLifecycleResult,
@@ -20,12 +26,13 @@ from golden_rose.application.staff_account_lifecycle import (
 )
 from golden_rose.auth.principal import StaffPrincipal
 from golden_rose.main import create_app
-from golden_rose.persistence.staff_accounts import StaffAccountRecord
+from golden_rose.persistence.staff_accounts import StaffAccountRecord, StaffDelegationRecord
 
 NOW = datetime(2026, 9, 28, 12, 0, tzinfo=UTC)
 ACTOR_ID = UUID("11111111-1111-4111-8111-111111111111")
 STAFF_ID = UUID("22222222-2222-4222-8222-222222222222")
 GENERATED_STAFF_ID = UUID("33333333-3333-4333-8333-333333333333")
+DELEGATION_ID = UUID("44444444-4444-4444-8444-444444444444")
 
 
 class FixedIdentifiers:
@@ -53,6 +60,8 @@ def http(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClient, FixedIde
                 "staff_account:read",
                 "staff_account:recovery:record",
                 "staff_account:session:revoke",
+                "staff_account:delegation:grant",
+                "staff_account:delegation:revoke",
             }
         ),
     )
@@ -93,6 +102,31 @@ def lifecycle_result(
         account=record,
         event_type=event_type,
         result_version=record.version,
+    )
+
+
+def delegation_record(*, revoked: bool = False) -> StaffDelegationRecord:
+    return StaffDelegationRecord(
+        delegation_id=DELEGATION_ID,
+        grantor_staff_id=ACTOR_ID,
+        grantee_staff_id=STAFF_ID,
+        permission_name="intake:read",
+        scope_kind="global",
+        scope_id=None,
+        reason_text="Temporary coverage",
+        starts_at=NOW,
+        expires_at=datetime(2026, 9, 29, 12, 0, tzinfo=UTC),
+        revoked_at=NOW if revoked else None,
+        revoked_by=ACTOR_ID if revoked else None,
+        revocation_reason="Coverage ended" if revoked else None,
+    )
+
+
+def delegation_result(*, event_type: str, revoked: bool = False) -> StaffDelegationResult:
+    return StaffDelegationResult(
+        delegation=delegation_record(revoked=revoked),
+        event_type=event_type,
+        result_version=1,
     )
 
 
@@ -165,12 +199,20 @@ def test_staff_account_read_routes_preserve_forbidden_and_missing_boundaries(
     missing = Mock(side_effect=NoResultFound())
     monkeypatch.setattr(staff_accounts, "get_staff_account_by_id", missing)
     not_found = client.get(f"/api/staff/v1/staff-accounts/{STAFF_ID}")
+    unavailable = Mock(side_effect=SQLAlchemyError("private database details"))
+    monkeypatch.setattr(staff_accounts, "list_staff_accounts", unavailable)
+    service_unavailable = client.get("/api/staff/v1/staff-accounts")
 
     assert forbidden.status_code == 403
     assert forbidden.headers["cache-control"] == "no-store"
     listed.assert_not_called()
     assert not_found.status_code == 404
     assert not_found.json()["type"] == "https://golden-rose.local/problems/staff-account-not-found"
+    assert service_unavailable.status_code == 503
+    assert service_unavailable.json()["type"] == (
+        "https://golden-rose.local/problems/service-unavailable"
+    )
+    assert "private" not in service_unavailable.text
 
 
 def test_create_staff_account_routes_normalized_admin_request(
@@ -332,6 +374,146 @@ def test_staff_account_evidence_routes_record_current_version_without_status_cha
     assert command.call_args.kwargs["staff_id"] == STAFF_ID
     assert command.call_args.kwargs["expected_version"] == 4
     assert command.call_args.kwargs["reason_text"] == reason_text
+
+
+def test_staff_account_delegation_routes_list_and_grant_no_store(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = http
+    listed = Mock(return_value=(delegation_record(),))
+    grant = Mock(return_value=delegation_result(event_type="staff_delegation.granted"))
+    monkeypatch.setattr(staff_accounts, "list_delegations_for_staff", listed)
+    monkeypatch.setattr(staff_accounts, "grant_staff_delegation", grant)
+
+    list_response = client.get(f"/api/staff/v1/staff-accounts/{STAFF_ID}/delegations")
+    grant_response = client.post(
+        f"/api/staff/v1/staff-accounts/{STAFF_ID}/delegations",
+        headers={"Idempotency-Key": str(DELEGATION_ID)},
+        json={
+            "permission_name": " intake:read ",
+            "scope_kind": "global",
+            "expires_at": "2026-09-29T12:00:00Z",
+            "reason_text": " Temporary coverage ",
+        },
+    )
+
+    assert list_response.status_code == 200, list_response.text
+    assert list_response.headers["cache-control"] == "no-store"
+    assert list_response.headers["vary"] == "Authorization"
+    assert list_response.json()["items"][0]["delegation_id"] == str(DELEGATION_ID)
+    assert grant_response.status_code == 201, grant_response.text
+    assert grant_response.headers["idempotency-result-version"] == "1"
+    assert grant_response.json()["event_type"] == "staff_delegation.granted"
+    assert grant.call_args.kwargs["delegation_id"] == DELEGATION_ID
+    assert grant.call_args.kwargs["grantee_staff_id"] == STAFF_ID
+    assert grant.call_args.kwargs["permission_name"] == "intake:read"
+    assert grant.call_args.kwargs["scope_kind"] == "global"
+    assert grant.call_args.kwargs["reason_text"] == "Temporary coverage"
+
+
+def test_staff_account_delegation_revocation_route(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = http
+    revoke = Mock(
+        return_value=delegation_result(event_type="staff_delegation.revoked", revoked=True)
+    )
+    monkeypatch.setattr(staff_accounts, "revoke_staff_account_delegation", revoke)
+
+    response = client.post(
+        f"/api/staff/v1/staff-accounts/{STAFF_ID}/delegations/{DELEGATION_ID}/revoke",
+        headers=command_headers(),
+        json={"reason_text": " Coverage ended "},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["idempotency-result-version"] == "1"
+    assert response.json()["delegation"]["revoked_at"] == NOW.isoformat().replace("+00:00", "Z")
+    assert response.json()["event_type"] == "staff_delegation.revoked"
+    assert revoke.call_args.kwargs["delegation_id"] == DELEGATION_ID
+    assert revoke.call_args.kwargs["grantee_staff_id"] == STAFF_ID
+    assert revoke.call_args.kwargs["reason_text"] == "Coverage ended"
+
+
+def test_staff_account_delegation_errors_are_value_safe(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = http
+    missing = Mock(side_effect=StaffDelegationNotFoundError("private delegation"))
+    invalid = Mock(side_effect=StaffDelegationError("private invalid delegation"))
+    monkeypatch.setattr(staff_accounts, "list_delegations_for_staff", missing)
+    monkeypatch.setattr(staff_accounts, "grant_staff_delegation", invalid)
+
+    not_found = client.get(f"/api/staff/v1/staff-accounts/{STAFF_ID}/delegations")
+    bad_request = client.post(
+        f"/api/staff/v1/staff-accounts/{STAFF_ID}/delegations",
+        headers=command_headers(),
+        json={
+            "permission_name": "intake:read",
+            "scope_kind": "global",
+            "expires_at": "2026-09-29T12:00:00Z",
+            "reason_text": "Temporary coverage",
+        },
+    )
+
+    assert not_found.status_code == 404
+    assert (
+        not_found.json()["type"] == "https://golden-rose.local/problems/staff-delegation-not-found"
+    )
+    assert "private" not in not_found.text
+    assert bad_request.status_code == 422
+    assert bad_request.json()["type"] == (
+        "https://golden-rose.local/problems/staff-delegation-invalid"
+    )
+    assert "private" not in bad_request.text
+
+
+def test_staff_account_delegation_routes_preserve_forbidden_and_service_boundaries(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = http
+    forbidden_list = Mock(side_effect=PermissionError("private delegation permission"))
+    conflict_grant = Mock(side_effect=StaffDelegationConflictError("private delegation conflict"))
+    unavailable_revoke = Mock(side_effect=SafePersistenceError("private database value"))
+    monkeypatch.setattr(staff_accounts, "list_delegations_for_staff", forbidden_list)
+    monkeypatch.setattr(staff_accounts, "grant_staff_delegation", conflict_grant)
+    monkeypatch.setattr(staff_accounts, "revoke_staff_account_delegation", unavailable_revoke)
+
+    forbidden = client.get(f"/api/staff/v1/staff-accounts/{STAFF_ID}/delegations")
+    conflict = client.post(
+        f"/api/staff/v1/staff-accounts/{STAFF_ID}/delegations",
+        headers=command_headers(),
+        json={
+            "permission_name": "intake:read",
+            "scope_kind": "global",
+            "expires_at": "2026-09-29T12:00:00Z",
+            "reason_text": "Temporary coverage",
+        },
+    )
+    service_unavailable = client.post(
+        f"/api/staff/v1/staff-accounts/{STAFF_ID}/delegations/{DELEGATION_ID}/revoke",
+        headers=command_headers(),
+        json={"reason_text": "Coverage ended"},
+    )
+
+    assert forbidden.status_code == 403
+    assert forbidden.headers["cache-control"] == "no-store"
+    assert "private" not in forbidden.text
+    assert conflict.status_code == 412
+    assert conflict.json()["type"] == (
+        "https://golden-rose.local/problems/staff-delegation-conflict"
+    )
+    assert "private" not in conflict.text
+    assert service_unavailable.status_code == 503
+    assert service_unavailable.json()["type"] == (
+        "https://golden-rose.local/problems/service-unavailable"
+    )
+    assert "private" not in service_unavailable.text
 
 
 @pytest.mark.parametrize(

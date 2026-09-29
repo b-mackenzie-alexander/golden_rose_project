@@ -9,6 +9,28 @@ export type StaffAccountEvent =
   | 'staff_account.sessions_revoked';
 export type StaffDelegationEvent = 'staff_delegation.granted' | 'staff_delegation.revoked';
 export type StaffAuthContext = 'synthetic' | 'staff_oidc';
+export type StaffIdentityBoundary =
+  | 'synthetic_local_or_test'
+  | 'synthetic_private_develop'
+  | 'production_oidc_configured';
+export type StaffIdentityReadinessAction =
+  | 'use_only_for_local_or_test'
+  | 'configure_staff_oidc_for_production'
+  | 'replace_synthetic_staff_auth_before_production'
+  | 'configure_staff_oidc_issuer_audience_and_jwks'
+  | 'create_staff_accounts_before_live_use'
+  | 'confirm_mfa_claim_mapping'
+  | 'record_recovery_and_session_revocation_provider_runbook';
+
+export type StaffIdentityReadiness = {
+  environment: 'local' | 'test' | 'develop' | 'production';
+  authMode: StaffAuthContext;
+  staffIdentityBoundary: StaffIdentityBoundary;
+  productionStaffAuthReady: boolean;
+  syntheticStaffRuntimeAllowed: boolean;
+  recoveryAndSessionRevocationEvidenceOnly: boolean;
+  requiredOperatorActions: StaffIdentityReadinessAction[];
+};
 
 export type StaffAccount = {
   staffId: string;
@@ -129,6 +151,21 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const roles = new Set<StaffAccountRole>(['owner', 'delegated_manager', 'operations_staff', 'platform_administrator']);
 const statuses = new Set<StaffAccountStatus>(['active', 'suspended', 'deprovisioned']);
 const authContexts = new Set<StaffAuthContext>(['synthetic', 'staff_oidc']);
+const environments = new Set<StaffIdentityReadiness['environment']>(['local', 'test', 'develop', 'production']);
+const identityBoundaries = new Set<StaffIdentityBoundary>([
+  'synthetic_local_or_test',
+  'synthetic_private_develop',
+  'production_oidc_configured',
+]);
+const readinessActions = new Set<StaffIdentityReadinessAction>([
+  'use_only_for_local_or_test',
+  'configure_staff_oidc_for_production',
+  'replace_synthetic_staff_auth_before_production',
+  'configure_staff_oidc_issuer_audience_and_jwks',
+  'create_staff_accounts_before_live_use',
+  'confirm_mfa_claim_mapping',
+  'record_recovery_and_session_revocation_provider_runbook',
+]);
 const events = new Set<StaffAccountEvent>([
   'staff_account.created',
   'staff_account.activated',
@@ -379,6 +416,39 @@ function parseSession(value: unknown): StaffSession | null {
   };
 }
 
+function parseIdentityReadiness(value: unknown): StaffIdentityReadiness | null {
+  if (!object(value)) return null;
+  const keys = new Set([
+    'environment',
+    'auth_mode',
+    'staff_identity_boundary',
+    'production_staff_auth_ready',
+    'synthetic_staff_runtime_allowed',
+    'recovery_and_session_revocation_evidence_only',
+    'required_operator_actions',
+  ]);
+  if (Object.keys(value).some((key) => !keys.has(key))) return null;
+  if (typeof value.environment !== 'string' || !environments.has(value.environment as StaffIdentityReadiness['environment'])) return null;
+  if (typeof value.auth_mode !== 'string' || !authContexts.has(value.auth_mode as StaffAuthContext)) return null;
+  if (typeof value.staff_identity_boundary !== 'string' || !identityBoundaries.has(value.staff_identity_boundary as StaffIdentityBoundary)) return null;
+  if (typeof value.production_staff_auth_ready !== 'boolean') return null;
+  if (typeof value.synthetic_staff_runtime_allowed !== 'boolean') return null;
+  if (typeof value.recovery_and_session_revocation_evidence_only !== 'boolean') return null;
+  if (!Array.isArray(value.required_operator_actions) || value.required_operator_actions.length > 20) return null;
+  if (value.required_operator_actions.some((action) => typeof action !== 'string' || !readinessActions.has(action as StaffIdentityReadinessAction))) {
+    return null;
+  }
+  return {
+    environment: value.environment as StaffIdentityReadiness['environment'],
+    authMode: value.auth_mode as StaffAuthContext,
+    staffIdentityBoundary: value.staff_identity_boundary as StaffIdentityBoundary,
+    productionStaffAuthReady: value.production_staff_auth_ready,
+    syntheticStaffRuntimeAllowed: value.synthetic_staff_runtime_allowed,
+    recoveryAndSessionRevocationEvidenceOnly: value.recovery_and_session_revocation_evidence_only,
+    requiredOperatorActions: value.required_operator_actions as StaffIdentityReadinessAction[],
+  };
+}
+
 async function request<T>(
   path: string,
   init: RequestInit,
@@ -423,6 +493,10 @@ async function request<T>(
 
 export async function getStaffSession(): Promise<StaffAccountResult<StaffSession>> {
   return request('/session', { method: 'GET', headers: { Accept: 'application/json' } }, parseSession);
+}
+
+export async function getStaffIdentityReadiness(): Promise<StaffAccountResult<StaffIdentityReadiness>> {
+  return request('/staff-identity-readiness', { method: 'GET', headers: { Accept: 'application/json' } }, parseIdentityReadiness);
 }
 
 export async function listStaffAccounts(): Promise<StaffAccountResult<StaffAccount[]>> {

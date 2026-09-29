@@ -4,6 +4,7 @@ import {
   activateStaffAccount,
   createStaffAccount,
   deprovisionStaffAccount,
+  getStaffIdentityReadiness,
   getStaffSession,
   grantStaffDelegation,
   listStaffAccountEvents,
@@ -56,6 +57,20 @@ const lifecycleEvent = {
   new_version: 2,
   occurred_at: '2026-09-28T12:30:00Z',
   reason_text: 'Recovery evidence recorded in provider ticket',
+};
+
+const identityReadiness = {
+  environment: 'production',
+  auth_mode: 'staff_oidc',
+  staff_identity_boundary: 'production_oidc_configured',
+  production_staff_auth_ready: true,
+  synthetic_staff_runtime_allowed: false,
+  recovery_and_session_revocation_evidence_only: true,
+  required_operator_actions: [
+    'create_staff_accounts_before_live_use',
+    'confirm_mfa_claim_mapping',
+    'record_recovery_and_session_revocation_provider_runbook',
+  ],
 };
 
 afterEach(() => {
@@ -164,6 +179,68 @@ it('reads the current staff session with account and delegation context', async 
       }],
     },
   });
+});
+
+it('reads staff identity readiness without exposing provider configuration values', async () => {
+  const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+    new Response(JSON.stringify(identityReadiness), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+
+  const result = await getStaffIdentityReadiness();
+
+  expect(fetchMock).toHaveBeenCalledWith('/api/staff/v1/staff-identity-readiness', {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+    credentials: 'same-origin',
+    mode: 'same-origin',
+    redirect: 'error',
+    referrerPolicy: 'no-referrer',
+  });
+  expect(result).toEqual({
+    ok: true,
+    value: {
+      environment: 'production',
+      authMode: 'staff_oidc',
+      staffIdentityBoundary: 'production_oidc_configured',
+      productionStaffAuthReady: true,
+      syntheticStaffRuntimeAllowed: false,
+      recoveryAndSessionRevocationEvidenceOnly: true,
+      requiredOperatorActions: [
+        'create_staff_accounts_before_live_use',
+        'confirm_mfa_claim_mapping',
+        'record_recovery_and_session_revocation_provider_runbook',
+      ],
+    },
+  });
+});
+
+it('rejects malformed staff identity readiness payloads', async () => {
+  const invalidPayloads = [
+    { ...identityReadiness, staff_oidc_issuer: 'https://issuer.example.test' },
+    { ...identityReadiness, environment: 'staging' },
+    { ...identityReadiness, auth_mode: 'provider' },
+    { ...identityReadiness, staff_identity_boundary: 'provider_live' },
+    { ...identityReadiness, production_staff_auth_ready: 'yes' },
+    { ...identityReadiness, synthetic_staff_runtime_allowed: 'no' },
+    { ...identityReadiness, recovery_and_session_revocation_evidence_only: 'yes' },
+    { ...identityReadiness, required_operator_actions: ['rotate_credentials'] },
+  ];
+
+  for (const payload of invalidPayloads) {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    ));
+
+    expect(await getStaffIdentityReadiness()).toEqual({ ok: false, failure: { kind: 'unexpected' } });
+  }
 });
 
 it('lists staff account lifecycle events with no-store options and strict parsing', async () => {

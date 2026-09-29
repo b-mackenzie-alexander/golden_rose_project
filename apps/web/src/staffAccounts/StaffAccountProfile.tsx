@@ -1,8 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 
-import { getStaffSession } from '../api/staffAccountClient';
-import type { StaffAccountFailureKind, StaffSession } from '../api/staffAccountClient';
+import { getStaffIdentityReadiness, getStaffSession } from '../api/staffAccountClient';
+import type {
+  StaffAccountFailureKind,
+  StaffIdentityBoundary,
+  StaffIdentityReadiness,
+  StaffIdentityReadinessAction,
+  StaffSession,
+} from '../api/staffAccountClient';
 import { IconSymbol } from '../dashboard/artwork';
 import { useLanguage } from '../i18n/LanguageProvider';
 
@@ -15,6 +21,52 @@ const statusLabels = {
 const authLabels = {
   synthetic: { en: 'Local synthetic session', es: 'Sesion sintetica local' },
   staff_oidc: { en: 'Staff identity provider session', es: 'Sesion del proveedor de identidad' },
+};
+
+const boundaryLabels: Record<StaffIdentityBoundary, { en: string; es: string }> = {
+  synthetic_local_or_test: {
+    en: 'Local/test synthetic staff identity',
+    es: 'Identidad sintetica local/de prueba',
+  },
+  synthetic_private_develop: {
+    en: 'Private develop synthetic staff identity',
+    es: 'Identidad sintetica privada de develop',
+  },
+  production_oidc_configured: {
+    en: 'Production staff OIDC configured',
+    es: 'OIDC de personal configurado para produccion',
+  },
+};
+
+const operatorActionLabels: Record<StaffIdentityReadinessAction, { en: string; es: string }> = {
+  use_only_for_local_or_test: {
+    en: 'Use this identity mode only for local or test work.',
+    es: 'Use este modo de identidad solo para trabajo local o de prueba.',
+  },
+  configure_staff_oidc_for_production: {
+    en: 'Configure staff OIDC before production.',
+    es: 'Configure OIDC de personal antes de produccion.',
+  },
+  replace_synthetic_staff_auth_before_production: {
+    en: 'Replace synthetic staff auth before production.',
+    es: 'Reemplace la autenticacion sintetica antes de produccion.',
+  },
+  configure_staff_oidc_issuer_audience_and_jwks: {
+    en: 'Set issuer, audience, and JWKS configuration from the approved provider.',
+    es: 'Configure emisor, audiencia y JWKS del proveedor aprobado.',
+  },
+  create_staff_accounts_before_live_use: {
+    en: 'Create staff accounts before live use.',
+    es: 'Cree cuentas de personal antes del uso con datos reales.',
+  },
+  confirm_mfa_claim_mapping: {
+    en: 'Confirm MFA claim mapping before admitting live staff sessions.',
+    es: 'Confirme el mapeo de MFA antes de admitir sesiones reales del personal.',
+  },
+  record_recovery_and_session_revocation_provider_runbook: {
+    en: 'Record the provider runbook for recovery and session revocation evidence.',
+    es: 'Registre el procedimiento del proveedor para evidencia de recuperacion y revocacion de sesiones.',
+  },
 };
 
 const failureLabels: Record<StaffAccountFailureKind, { en: string; es: string }> = {
@@ -74,11 +126,17 @@ function failureText(kind: StaffAccountFailureKind, language: 'en' | 'es') {
   return failureLabels[kind][language];
 }
 
+function yesNo(value: boolean, language: 'en' | 'es') {
+  return value ? (language === 'en' ? 'Yes' : 'Si') : 'No';
+}
+
 export function StaffAccountProfile() {
   const { language } = useLanguage();
   const [session, setSession] = useState<StaffSession | null>(null);
+  const [readiness, setReadiness] = useState<StaffIdentityReadiness | null>(null);
   const [loading, setLoading] = useState(true);
   const [failure, setFailure] = useState<StaffAccountFailureKind | null>(null);
+  const [readinessFailure, setReadinessFailure] = useState<StaffAccountFailureKind | null>(null);
   const [checkedAt, setCheckedAt] = useState(0);
   const activeDelegations = useMemo(
     () => session?.delegations.filter((item) => item.revokedAt === null && Date.parse(item.expiresAt) > checkedAt) ?? [],
@@ -88,12 +146,20 @@ export function StaffAccountProfile() {
   async function reload() {
     setLoading(true);
     setFailure(null);
-    const result = await getStaffSession();
-    if (result.ok) {
-      setSession(result.value);
+    setReadinessFailure(null);
+    const [sessionResult, readinessResult] = await Promise.all([getStaffSession(), getStaffIdentityReadiness()]);
+    if (sessionResult.ok) {
+      setSession(sessionResult.value);
+      if (readinessResult.ok) {
+        setReadiness(readinessResult.value);
+      } else {
+        setReadiness(null);
+        setReadinessFailure(readinessResult.failure.kind);
+      }
     } else {
       setSession(null);
-      setFailure(result.failure.kind);
+      setReadiness(null);
+      setFailure(sessionResult.failure.kind);
     }
     setCheckedAt(Date.now());
     setLoading(false);
@@ -101,14 +167,23 @@ export function StaffAccountProfile() {
 
   useEffect(() => {
     let cancelled = false;
-    void getStaffSession().then((result) => {
+    void Promise.all([getStaffSession(), getStaffIdentityReadiness()]).then(([sessionResult, readinessResult]) => {
       if (cancelled) return;
-      if (result.ok) {
-        setSession(result.value);
+      if (sessionResult.ok) {
+        setSession(sessionResult.value);
         setFailure(null);
+        if (readinessResult.ok) {
+          setReadiness(readinessResult.value);
+          setReadinessFailure(null);
+        } else {
+          setReadiness(null);
+          setReadinessFailure(readinessResult.failure.kind);
+        }
       } else {
         setSession(null);
-        setFailure(result.failure.kind);
+        setReadiness(null);
+        setReadinessFailure(null);
+        setFailure(sessionResult.failure.kind);
       }
       setCheckedAt(Date.now());
       setLoading(false);
@@ -179,6 +254,52 @@ export function StaffAccountProfile() {
               <Link className="staff-secondary-button focus-ring" to="/staff/admin/accounts">
                 {language === 'en' ? 'Open account administration' : 'Abrir administracion de cuentas'}
               </Link>
+            </section>
+
+            <section className="staff-account-panel">
+              <h3><IconSymbol name="document" /> {language === 'en' ? 'Operator readiness' : 'Preparacion operativa'}</h3>
+              {readinessFailure ? (
+                <p className="staff-account-error" role="alert">
+                  {language === 'en'
+                    ? `Readiness could not be loaded: ${failureText(readinessFailure, language)}`
+                    : `No se pudo cargar la preparacion: ${failureText(readinessFailure, language)}`}
+                </p>
+              ) : null}
+              {readiness ? (
+                <>
+                  <dl className="staff-profile-facts">
+                    <div>
+                      <dt>{language === 'en' ? 'Identity boundary' : 'Limite de identidad'}</dt>
+                      <dd>{boundaryLabels[readiness.staffIdentityBoundary][language]}</dd>
+                    </div>
+                    <div>
+                      <dt>{language === 'en' ? 'Production staff auth ready' : 'Autenticacion lista para produccion'}</dt>
+                      <dd>{yesNo(readiness.productionStaffAuthReady, language)}</dd>
+                    </div>
+                    <div>
+                      <dt>{language === 'en' ? 'Synthetic runtime allowed' : 'Runtime sintetico permitido'}</dt>
+                      <dd>{yesNo(readiness.syntheticStaffRuntimeAllowed, language)}</dd>
+                    </div>
+                    <div>
+                      <dt>{language === 'en' ? 'Recovery/session actions' : 'Acciones de recuperacion/sesion'}</dt>
+                      <dd>
+                        {readiness.recoveryAndSessionRevocationEvidenceOnly
+                          ? language === 'en'
+                            ? 'Evidence recording only'
+                            : 'Solo registro de evidencia'
+                          : language === 'en'
+                            ? 'Provider-side execution configured'
+                            : 'Ejecucion en proveedor configurada'}
+                      </dd>
+                    </div>
+                  </dl>
+                  <ul className="staff-profile-list staff-profile-list--compact" aria-label={language === 'en' ? 'Required operator actions' : 'Acciones operativas requeridas'}>
+                    {readiness.requiredOperatorActions.map((action) => (
+                      <li key={action}>{operatorActionLabels[action][language]}</li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
             </section>
           </div>
 

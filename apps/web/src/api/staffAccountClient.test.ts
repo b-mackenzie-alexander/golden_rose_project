@@ -4,6 +4,7 @@ import {
   activateStaffAccount,
   createStaffAccount,
   deprovisionStaffAccount,
+  getStaffSession,
   grantStaffDelegation,
   listStaffAccounts,
   listStaffDelegations,
@@ -83,6 +84,89 @@ it('lists staff accounts with no-store fetch options and strict response parsing
       version: account.version,
     }],
   });
+});
+
+it('reads the current staff session with account and delegation context', async () => {
+  const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+    new Response(JSON.stringify({
+      actor_id: account.staff_id,
+      role_name: 'operations_staff',
+      permission_names: ['intake:read', 'worker:read'],
+      auth_context: 'staff_oidc',
+      account,
+      delegations: [delegation],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+
+  const result = await getStaffSession();
+
+  expect(fetchMock).toHaveBeenCalledWith('/api/staff/v1/session', {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+    credentials: 'same-origin',
+    mode: 'same-origin',
+    redirect: 'error',
+    referrerPolicy: 'no-referrer',
+  });
+  expect(result).toEqual({
+    ok: true,
+    value: {
+      actorId: account.staff_id,
+      roleName: 'operations_staff',
+      permissionNames: ['intake:read', 'worker:read'],
+      authContext: 'staff_oidc',
+      account: {
+        staffId: account.staff_id,
+        providerSubject: account.provider_subject,
+        displayName: account.display_name,
+        roleName: account.role_name,
+        lifecycleStatus: account.lifecycle_status,
+        mfaEnrolled: account.mfa_enrolled,
+        createdAt: account.created_at,
+        createdBy: account.created_by,
+        updatedAt: account.updated_at,
+        updatedBy: account.updated_by,
+        version: account.version,
+      },
+      delegations: [{
+        delegationId: delegation.delegation_id,
+        grantorStaffId: delegation.grantor_staff_id,
+        granteeStaffId: delegation.grantee_staff_id,
+        permissionName: delegation.permission_name,
+        scopeKind: 'global',
+        scopeId: null,
+        reasonText: delegation.reason_text,
+        startsAt: delegation.starts_at,
+        expiresAt: delegation.expires_at,
+        revokedAt: null,
+        revokedBy: null,
+        revocationReason: null,
+      }],
+    },
+  });
+});
+
+it('maps staff authentication and account-state problem responses', async () => {
+  const problem = (type: string, status: number) => new Response(JSON.stringify({ type }), {
+    status,
+    headers: { 'Content-Type': 'application/problem+json' },
+  });
+  const fetchMock = vi.fn<typeof fetch>()
+    .mockResolvedValueOnce(problem('https://golden-rose.local/problems/staff-authentication-required', 401))
+    .mockResolvedValueOnce(problem('https://golden-rose.local/problems/staff-authentication-failed', 401))
+    .mockResolvedValueOnce(problem('https://golden-rose.local/problems/staff-account-unavailable', 403))
+    .mockResolvedValueOnce(problem('https://golden-rose.local/problems/staff-identity-provider-unavailable', 503));
+  vi.stubGlobal('fetch', fetchMock);
+
+  expect(await getStaffSession()).toEqual({ ok: false, failure: { kind: 'sign_in_required' } });
+  expect(await getStaffSession()).toEqual({ ok: false, failure: { kind: 'authentication_failed' } });
+  expect(await getStaffSession()).toEqual({ ok: false, failure: { kind: 'account_unavailable' } });
+  expect(await getStaffSession()).toEqual({ ok: false, failure: { kind: 'identity_provider_unavailable' } });
 });
 
 it('creates and activates accounts with idempotency headers and version validation', async () => {

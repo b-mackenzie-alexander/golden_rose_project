@@ -299,6 +299,17 @@ class StaffDelegationCommandResponse(BaseModel):
     result_version: int
 
 
+class StaffSessionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: UUID
+    role_name: str
+    permission_names: tuple[str, ...]
+    auth_context: Literal["synthetic", "staff_oidc"]
+    account: StaffAccountResponse | None
+    delegations: tuple[StaffDelegationResponse, ...]
+
+
 class StaffAccountLifecycleResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

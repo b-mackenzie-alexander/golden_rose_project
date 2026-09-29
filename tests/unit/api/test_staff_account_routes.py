@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.exc import NoResultFound, SQLAlchemyError
 
 from golden_rose.api.dependencies import get_db_session, get_identifier_factory, get_staff_principal
-from golden_rose.api.staff import staff_accounts
+from golden_rose.api.staff import staff_accounts, staff_session
 from golden_rose.application.errors import SafePersistenceError
 from golden_rose.application.staff_account_delegations import (
     StaffDelegationConflictError,
@@ -213,6 +213,111 @@ def test_staff_account_read_routes_preserve_forbidden_and_missing_boundaries(
         "https://golden-rose.local/problems/service-unavailable"
     )
     assert "private" not in service_unavailable.text
+
+
+def test_staff_session_returns_current_account_context_no_store(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = http
+    account = account_record(staff_id=ACTOR_ID, status="active", version=2, mfa_enrolled=True)
+    reader = Mock(return_value=account)
+    delegations = Mock(return_value=(delegation_record(),))
+    monkeypatch.setattr(staff_session, "get_staff_account_by_id", reader)
+    monkeypatch.setattr(staff_session, "list_staff_delegations", delegations)
+
+    response = client.get("/api/staff/v1/session")
+
+    assert response.status_code == 200, response.text
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["vary"] == "Authorization"
+    assert response.json() == {
+        "actor_id": str(ACTOR_ID),
+        "role_name": "owner",
+        "permission_names": [
+            "staff_account:activate",
+            "staff_account:create",
+            "staff_account:delegation:grant",
+            "staff_account:delegation:revoke",
+            "staff_account:deprovision",
+            "staff_account:read",
+            "staff_account:recovery:record",
+            "staff_account:session:revoke",
+            "staff_account:suspend",
+        ],
+        "auth_context": "synthetic",
+        "account": {
+            "staff_id": str(ACTOR_ID),
+            "provider_subject": "oidc:staff:123",
+            "display_name": "Mariela Torres",
+            "role_name": "operations_staff",
+            "lifecycle_status": "active",
+            "mfa_enrolled": True,
+            "created_at": NOW.isoformat().replace("+00:00", "Z"),
+            "created_by": str(ACTOR_ID),
+            "updated_at": NOW.isoformat().replace("+00:00", "Z"),
+            "updated_by": str(ACTOR_ID),
+            "version": 2,
+        },
+        "delegations": [
+            {
+                "delegation_id": str(DELEGATION_ID),
+                "grantor_staff_id": str(ACTOR_ID),
+                "grantee_staff_id": str(STAFF_ID),
+                "permission_name": "intake:read",
+                "scope_kind": "global",
+                "scope_id": None,
+                "reason_text": "Temporary coverage",
+                "starts_at": NOW.isoformat().replace("+00:00", "Z"),
+                "expires_at": "2026-09-29T12:00:00Z",
+                "revoked_at": None,
+                "revoked_by": None,
+                "revocation_reason": None,
+            }
+        ],
+    }
+    reader.assert_called_once()
+    delegations.assert_called_once()
+
+
+def test_staff_session_reports_synthetic_principal_without_durable_account(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = http
+    reader = Mock(side_effect=NoResultFound())
+    delegations = Mock()
+    monkeypatch.setattr(staff_session, "get_staff_account_by_id", reader)
+    monkeypatch.setattr(staff_session, "list_staff_delegations", delegations)
+
+    response = client.get("/api/staff/v1/session")
+
+    assert response.status_code == 200, response.text
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["actor_id"] == str(ACTOR_ID)
+    assert response.json()["auth_context"] == "synthetic"
+    assert response.json()["account"] is None
+    assert response.json()["delegations"] == []
+    delegations.assert_not_called()
+
+
+def test_staff_session_errors_are_value_safe(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = http
+    monkeypatch.setattr(
+        staff_session,
+        "get_staff_account_by_id",
+        Mock(side_effect=SQLAlchemyError("private database detail")),
+    )
+
+    response = client.get("/api/staff/v1/session")
+
+    assert response.status_code == 503
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["type"] == "https://golden-rose.local/problems/service-unavailable"
+    assert "private" not in response.text
 
 
 def test_create_staff_account_routes_normalized_admin_request(

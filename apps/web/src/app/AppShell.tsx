@@ -73,6 +73,7 @@ export function AppShell() {
     },
     { icon: 'calendar', label: language === 'en' ? 'Calendar' : 'Calendario', to: '/staff/calendar' },
     { icon: 'queue', label: language === 'en' ? 'Work queues' : 'Colas de trabajo', to: '/staff/queues' },
+    { icon: 'workers', label: language === 'en' ? 'My account' : 'Mi cuenta', to: '/staff/account' },
     { icon: 'workers', label: language === 'en' ? 'Staff accounts' : 'Cuentas del personal', to: '/staff/admin/accounts' },
     { icon: 'map', label: language === 'en' ? 'Map' : 'Mapa', to: '/staff/map' },
     { icon: 'reports', label: language === 'en' ? 'Reports' : 'Informes', to: '/staff/reports' },
@@ -161,6 +162,13 @@ export function AppShell() {
       keywords: 'catalog work interest skills positions catalogo intereses habilidades puestos',
       label: language === 'en' ? 'Work-interest catalog' : 'Catalogo de intereses',
       meta: language === 'en' ? 'Skills and work-interest labels' : 'Habilidades e intereses laborales',
+    },
+    {
+      href: '/staff/account',
+      icon: 'workers',
+      keywords: 'my account staff session sign in mfa permissions delegations personal cuenta sesion permisos',
+      label: language === 'en' ? 'My staff account' : 'Mi cuenta del personal',
+      meta: language === 'en' ? 'Session state, MFA evidence, and permissions' : 'Sesion, MFA y permisos',
     },
     {
       href: '/staff/admin/accounts',
@@ -379,7 +387,12 @@ export function AppShell() {
               <IconSymbol name="bell" />
               <span className="notification-badge">3</span>
             </button>
-            <button aria-label={language === 'en' ? 'User menu for Mariela Torres' : 'Menu de usuario de Mariela Torres'} className="user-menu focus-ring" type="button">
+            <button
+              aria-label={language === 'en' ? 'Open my staff account' : 'Abrir mi cuenta del personal'}
+              className="user-menu focus-ring"
+              type="button"
+              onClick={() => { void navigate('/staff/account'); }}
+            >
               <span className="user-avatar" aria-hidden="true">MT</span>
               <span>
                 <strong>Mariela Torres</strong>

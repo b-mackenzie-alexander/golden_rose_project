@@ -14,6 +14,9 @@ ENV_TEMPLATE_PATH = Path("deploy/gcp/templates/client-production.env.example")
 INPUTS_TEMPLATE_PATH = Path("deploy/gcp/templates/client-owned-gcp-inputs.example.json")
 POLICY_TEMPLATE_PATH = Path("deploy/gcp/templates/client-production-policy.example.json")
 HANDOFF_TEMPLATE_PATH = Path("deploy/gcp/templates/client-production-handoff.example.json")
+READINESS_CHECKLIST_PATH = Path(
+    "deploy/gcp/templates/client-production-readiness-checklist.example.json"
+)
 
 REQUIRED_RUNBOOK_PHRASES = (
     "not an approval to inspect or",
@@ -30,8 +33,10 @@ REQUIRED_RUNBOOK_PHRASES = (
     "state backend lineage identifier",
     "client-production-policy.example.json",
     "client-production-handoff.example.json",
+    "client-production-readiness-checklist.example.json",
     "scripts/validate_client_production_plan.py",
     "scripts/validate_client_handoff_evidence.py",
+    "scripts/validate_client_readiness_checklist.py",
     "delete/replace actions",
     "public SQL exposure",
     "broad IAM",
@@ -145,6 +150,45 @@ REQUIRED_HANDOFF_PLACEHOLDERS = (
     ("operations", "support_owner"),
     ("owner_acceptance", "acceptance_checklist"),
     ("owner_acceptance", "status"),
+)
+
+REQUIRED_READINESS_STRING_VALUES = {
+    ("authority_boundary", "cloud_execution"): "separate-approval-required",
+    ("authority_boundary", "terraform_plan"): "separate-approval-required",
+    ("authority_boundary", "production_deployment"): "separate-approval-required",
+    ("authority_boundary", "live_data_admission"): "separate-approval-required",
+    ("authority_boundary", "provider_side_identity_activation"): "separate-approval-required",
+    ("activation_boundary", "production_deployment"): ("not-executed-without-separate-approval"),
+    ("activation_boundary", "live_data_admission"): "not-admitted-without-separate-approval",
+    ("activation_boundary", "shared_runtime_rollout"): ("not-executed-without-separate-approval"),
+}
+
+REQUIRED_READINESS_PLACEHOLDERS = (
+    ("package_artifacts", "status"),
+    ("package_artifacts", "evidence"),
+    ("staff_identity", "status"),
+    ("staff_identity", "evidence"),
+    ("terraform_plan_review", "status"),
+    ("terraform_plan_review", "evidence"),
+    ("artifact_admission", "status"),
+    ("artifact_admission", "evidence"),
+    ("handoff_evidence", "status"),
+    ("handoff_evidence", "evidence"),
+    ("operations_owners", "status"),
+    ("operations_owners", "evidence"),
+    ("manual_acceptance_boundary", "accessibility_review"),
+    ("manual_acceptance_boundary", "fluent_spanish_review"),
+    ("manual_acceptance_boundary", "staff_workflow_acceptance"),
+)
+
+REQUIRED_READINESS_SECTIONS = (
+    "package_artifacts",
+    "staff_identity",
+    "terraform_plan_review",
+    "artifact_admission",
+    "handoff_evidence",
+    "operations_owners",
+    "manual_acceptance_boundary",
 )
 
 REQUIRED_ALLOWED_PLAN_ACTIONS = ("no-op", "create", "update-in-place")
@@ -379,6 +423,39 @@ def _validate_handoff_template(text: str) -> None:
             )
 
 
+def _validate_readiness_checklist_template(text: str) -> None:
+    document = _load_json_object(text, READINESS_CHECKLIST_PATH)
+    if document.get("checklist_type") != "deployable-package-review-not-production-activation":
+        raise PackageValidationError(
+            f"{READINESS_CHECKLIST_PATH} checklist_type must distinguish package review"
+        )
+    expected_command = (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_client_readiness_checklist.py <operator-held-readiness.json>"
+    )
+    if document.get("validator_command") != expected_command:
+        raise PackageValidationError(
+            f"{READINESS_CHECKLIST_PATH} validator_command must be {expected_command}"
+        )
+    required_sections = document.get("required_sections")
+    if required_sections != list(REQUIRED_READINESS_SECTIONS):
+        raise PackageValidationError(
+            f"{READINESS_CHECKLIST_PATH} required_sections must remain package-review scoped"
+        )
+    for (section, key), expected_text in REQUIRED_READINESS_STRING_VALUES.items():
+        value = _get_pointer(document, READINESS_CHECKLIST_PATH, section, key)
+        if value != expected_text:
+            raise PackageValidationError(
+                f"{READINESS_CHECKLIST_PATH} {section}.{key} must be {expected_text}"
+            )
+    for section, key in REQUIRED_READINESS_PLACEHOLDERS:
+        value = _get_pointer(document, READINESS_CHECKLIST_PATH, section, key)
+        if not isinstance(value, str) or not _is_placeholder(value):
+            raise PackageValidationError(
+                f"{READINESS_CHECKLIST_PATH} {section}.{key} must remain a placeholder"
+            )
+
+
 def _validate_runbook(text: str) -> None:
     for phrase in REQUIRED_RUNBOOK_PHRASES:
         if phrase not in text:
@@ -391,12 +468,14 @@ def validate(root: Path = ROOT) -> list[str]:
     inputs_template = _read(root, INPUTS_TEMPLATE_PATH)
     policy_template = _read(root, POLICY_TEMPLATE_PATH)
     handoff_template = _read(root, HANDOFF_TEMPLATE_PATH)
+    readiness_checklist = _read(root, READINESS_CHECKLIST_PATH)
     for relative_path, text in (
         (RUNBOOK_PATH, runbook),
         (ENV_TEMPLATE_PATH, env_template),
         (INPUTS_TEMPLATE_PATH, inputs_template),
         (POLICY_TEMPLATE_PATH, policy_template),
         (HANDOFF_TEMPLATE_PATH, handoff_template),
+        (READINESS_CHECKLIST_PATH, readiness_checklist),
     ):
         _validate_no_forbidden_values(relative_path, text)
     _validate_runbook(runbook)
@@ -404,12 +483,14 @@ def validate(root: Path = ROOT) -> list[str]:
     _validate_inputs_template(inputs_template)
     _validate_policy_template(policy_template)
     _validate_handoff_template(handoff_template)
+    _validate_readiness_checklist_template(readiness_checklist)
     return [
         str(RUNBOOK_PATH),
         str(ENV_TEMPLATE_PATH),
         str(INPUTS_TEMPLATE_PATH),
         str(POLICY_TEMPLATE_PATH),
         str(HANDOFF_TEMPLATE_PATH),
+        str(READINESS_CHECKLIST_PATH),
     ]
 
 

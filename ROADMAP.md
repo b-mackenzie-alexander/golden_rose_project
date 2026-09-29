@@ -1,5 +1,17 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-09-29 — Client readiness checklist validator active
+
+- **Staffing:** One independent developer; focused package/readiness/evidence/plan-validator tests, static checks, secret scans and later PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #131, `feat: add client handoff evidence validator`, merged into protected `develop` at `8b376c02a3ff15bf69ac03a2a9f95c87b5edfc4b`. Local `develop` was fetched/pruned and fast-forwarded to that exact `origin/develop` tip. The stale local `feat/client-handoff-evidence-validator` branch was deleted after GitHub merge confirmation, empty diff comparison and no-extra-worktree verification. Fresh work is active on `feat/client-readiness-checklist-validator`. This slice continues Tranche 2 by adding a placeholder-only deployable-package readiness checklist and an offline validator for later operator-held readiness JSON. The validator requires package artifacts, staff identity, Terraform plan review, artifact admission, handoff evidence and operations-owner sections to be ready with value-safe evidence, while manual accessibility/fluent-Spanish/staff-workflow acceptance, production deployment, live-data admission and shared-runtime rollout remain separate approval boundaries. The branch also updates `jsdom` from 30.0.1 to 30.1.1 so the frontend dependency tree resolves a patched `undici` and the required high-severity npm audit gate stays green.
+- **Gate budget:** Source/documentation/local-static-validation work only. No cloud inspection or mutation, Terraform plan/apply, production deployment, live/client data, live identity-provider activation, provider-side reset/revocation mechanics, credential rotation, default permission activation, persistent synthetic write qualification, cloud migration or shared-runtime rollout occurs in this branch.
+- **Next executable action:** Finish validating and publishing this readiness-checklist slice, then reassess whether Tranche 2 package guardrails are complete enough to proceed to the next planned tranche before any cloud migration or shared-runtime rollout.
+- **Do not regress:** Human staff decision boundaries; no automated matching/ranking/eligibility/referral/placement; private fictional-synthetic boundaries until live-data gates open; immutable intake history and exact retries; restricted-field permissions; bilingual/accessibility parity; separate public/staff identity planes; auth-sensitive no-store handling; evidence-only recovery/session-revocation wording; placeholder-only package materials for the client's later GCP environment.
+
+**Validation to date:** Focused package, client production plan, handoff evidence and readiness checklist validator tests passed with 43 tests; the deployable package validator passed; focused Ruff format/check and mypy with explicit package bases passed for the touched validators/tests; high-severity frontend audit passed after the `jsdom` bump; full `npm --prefix apps/web run verify` passed 404 tests with coverage gates and production build; `git diff --check` and `gitleaks dir --no-banner --redact .` passed.
+
+**Planning artifact:** [Production-readiness and staff identity plan](docs/planning/2026-09-27-production-readiness-plan.md).
+
 ## 2026-09-29 — Client handoff evidence validator active
 
 - **Staffing:** One independent developer; focused package/evidence/plan-validator tests, static checks, secret scans and later PR gates provide quality evidence, not independent-human authorization.

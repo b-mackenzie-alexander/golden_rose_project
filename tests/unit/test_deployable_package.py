@@ -7,6 +7,7 @@ from scripts.validate_deployable_package import (
     HANDOFF_TEMPLATE_PATH,
     INPUTS_TEMPLATE_PATH,
     POLICY_TEMPLATE_PATH,
+    READINESS_CHECKLIST_PATH,
     RUNBOOK_PATH,
     PackageValidationError,
     validate,
@@ -22,6 +23,7 @@ def _copy_package(tmp_path: Path) -> Path:
         INPUTS_TEMPLATE_PATH,
         POLICY_TEMPLATE_PATH,
         HANDOFF_TEMPLATE_PATH,
+        READINESS_CHECKLIST_PATH,
     ):
         source = ROOT / relative_path
         destination = tmp_path / relative_path
@@ -39,6 +41,7 @@ def test_deployable_package_artifacts_are_placeholder_only_and_complete() -> Non
         str(INPUTS_TEMPLATE_PATH),
         str(POLICY_TEMPLATE_PATH),
         str(HANDOFF_TEMPLATE_PATH),
+        str(READINESS_CHECKLIST_PATH),
     ]
 
 
@@ -182,4 +185,22 @@ def test_deployable_package_rejects_handoff_template_concrete_acceptance(
     )
 
     with pytest.raises(PackageValidationError, match="acceptance_checklist"):
+        validate(root)
+
+
+def test_deployable_package_rejects_readiness_checklist_production_activation(
+    tmp_path: Path,
+) -> None:
+    root = _copy_package(tmp_path)
+    readiness_path = root / READINESS_CHECKLIST_PATH
+    readiness_path.write_text(
+        readiness_path.read_text(encoding="utf-8").replace(
+            "not-executed-without-separate-approval",
+            "production-deployed",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PackageValidationError, match="activation_boundary"):
         validate(root)

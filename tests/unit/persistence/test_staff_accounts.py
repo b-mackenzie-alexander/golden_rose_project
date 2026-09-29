@@ -11,6 +11,7 @@ from golden_rose.persistence.staff_accounts import (
     insert_staff_delegation,
     insert_staff_permission_grants,
     list_active_staff_permissions,
+    list_staff_account_lifecycle_events,
     list_staff_accounts,
     list_staff_delegations,
     revoke_staff_delegation,
@@ -98,6 +99,22 @@ def _delegation_row(
         revoked_at,
         revoked_by,
         revocation_reason,
+    )
+
+
+def _event_row() -> tuple[object, ...]:
+    return (
+        EVENT_ID,
+        COMMAND_ID,
+        STAFF_ID,
+        ACTOR_ID,
+        "staff_account.created",
+        None,
+        "suspended",
+        None,
+        1,
+        NOW,
+        "Initial staff onboarding",
     )
 
 
@@ -318,6 +335,23 @@ def test_list_and_revoke_staff_delegations_map_rows() -> None:
     assert revoked.revoked_by == ACTOR_ID
     assert revoked.revocation_reason == "Coverage ended"
     assert len(session.calls) == 2
+
+
+def test_list_staff_account_lifecycle_events_maps_rows() -> None:
+    session = FakeSession(FakeRowsResult((_event_row(),)))
+
+    events = list_staff_account_lifecycle_events(
+        session=session,  # type: ignore[arg-type]
+        staff_id=STAFF_ID,
+        limit=1,
+    )
+
+    assert len(session.calls) == 1
+    assert events[0].event_id == EVENT_ID
+    assert events[0].event_type == "staff_account.created"
+    assert events[0].new_status == "suspended"
+    assert events[0].new_version == 1
+    assert events[0].reason_text == "Initial staff onboarding"
 
 
 def test_insert_lifecycle_event_executes_insert() -> None:

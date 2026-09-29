@@ -30,6 +30,20 @@ export type StaffAccountLifecycleResult = {
   resultVersion: number;
 };
 
+export type StaffAccountLifecycleEvent = {
+  eventId: string;
+  commandId: string;
+  staffId: string;
+  actorId: string;
+  eventType: StaffAccountEvent;
+  previousStatus: StaffAccountStatus | null;
+  newStatus: StaffAccountStatus;
+  previousVersion: number | null;
+  newVersion: number;
+  occurredAt: string;
+  reasonText: string;
+};
+
 export type StaffDelegation = {
   delegationId: string;
   grantorStaffId: string;
@@ -245,6 +259,47 @@ function parseLifecycle(value: unknown): StaffAccountLifecycleResult | null {
   };
 }
 
+function parseLifecycleEvent(value: unknown): StaffAccountLifecycleEvent | null {
+  if (!object(value)) return null;
+  const keys = new Set([
+    'event_id',
+    'command_id',
+    'staff_id',
+    'actor_id',
+    'event_type',
+    'previous_status',
+    'new_status',
+    'previous_version',
+    'new_version',
+    'occurred_at',
+    'reason_text',
+  ]);
+  if (Object.keys(value).some((key) => !keys.has(key))) return null;
+  if (typeof value.event_id !== 'string' || !uuid.test(value.event_id)) return null;
+  if (typeof value.command_id !== 'string' || !uuid.test(value.command_id)) return null;
+  if (typeof value.staff_id !== 'string' || !uuid.test(value.staff_id)) return null;
+  if (typeof value.actor_id !== 'string' || !uuid.test(value.actor_id)) return null;
+  if (typeof value.event_type !== 'string' || !events.has(value.event_type as StaffAccountEvent)) return null;
+  if (value.previous_status !== null && (typeof value.previous_status !== 'string' || !statuses.has(value.previous_status as StaffAccountStatus))) return null;
+  if (typeof value.new_status !== 'string' || !statuses.has(value.new_status as StaffAccountStatus)) return null;
+  if (value.previous_version !== null && !positive(value.previous_version)) return null;
+  if (!positive(value.new_version)) return null;
+  if (!timestamp(value.occurred_at) || !text(value.reason_text, 512)) return null;
+  return {
+    eventId: value.event_id,
+    commandId: value.command_id,
+    staffId: value.staff_id,
+    actorId: value.actor_id,
+    eventType: value.event_type as StaffAccountEvent,
+    previousStatus: value.previous_status as StaffAccountStatus | null,
+    newStatus: value.new_status as StaffAccountStatus,
+    previousVersion: value.previous_version,
+    newVersion: value.new_version,
+    occurredAt: value.occurred_at,
+    reasonText: value.reason_text,
+  };
+}
+
 function parseDelegation(value: unknown): StaffDelegation | null {
   if (!object(value)) return null;
   const keys = new Set([
@@ -376,6 +431,15 @@ export async function listStaffAccounts(): Promise<StaffAccountResult<StaffAccou
     const items = value.items.map(parseAccount);
     if (items.some((item) => item === null)) return null;
     return items as StaffAccount[];
+  });
+}
+
+export async function listStaffAccountEvents(staffId: string): Promise<StaffAccountResult<StaffAccountLifecycleEvent[]>> {
+  return request(`/staff-accounts/${staffId}/events`, { method: 'GET', headers: { Accept: 'application/json' } }, (value) => {
+    if (!object(value) || !Array.isArray(value.items) || value.items.length > 50) return null;
+    const items = value.items.map(parseLifecycleEvent);
+    if (items.some((item) => item === null)) return null;
+    return items as StaffAccountLifecycleEvent[];
   });
 }
 

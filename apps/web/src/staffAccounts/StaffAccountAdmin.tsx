@@ -7,17 +7,19 @@ import {
   deprovisionStaffAccount,
   grantStaffDelegation,
   listStaffAccounts,
+  listStaffAccountEvents,
   listStaffDelegations,
   recordRecoveryEvidence,
   recordSessionRevocationEvidence,
   revokeStaffDelegation,
   suspendStaffAccount,
 } from '../api/staffAccountClient';
-import type { StaffAccount, StaffAccountFailureKind, StaffAccountRole, StaffDelegation } from '../api/staffAccountClient';
+import type { StaffAccount, StaffAccountFailureKind, StaffAccountLifecycleEvent, StaffAccountRole, StaffDelegation } from '../api/staffAccountClient';
 import { IconSymbol } from '../dashboard/artwork';
 import { useLanguage } from '../i18n/LanguageProvider';
 
 type AccountAction = 'activate' | 'suspend' | 'deprovision' | 'recovery' | 'session';
+type AccountFilter = 'all' | 'active' | 'suspended' | 'deprovisioned' | 'mfa_pending';
 type CreateForm = {
   displayName: string;
   providerSubject: string;
@@ -40,6 +42,12 @@ type DelegationPanel = {
   expiresAt: string;
   reasonText: string;
   revokeReasonText: string;
+  error: string;
+};
+type HistoryPanel = {
+  account: StaffAccount;
+  items: StaffAccountLifecycleEvent[];
+  loading: boolean;
   error: string;
 };
 
@@ -71,12 +79,29 @@ const statusLabels = {
   deprovisioned: { en: 'Deprovisioned', es: 'Retirada' },
 };
 
+const filterLabels: Record<AccountFilter, { en: string; es: string }> = {
+  all: { en: 'All accounts', es: 'Todas las cuentas' },
+  active: { en: 'Active', es: 'Activas' },
+  suspended: { en: 'Suspended onboarding', es: 'Incorporacion suspendida' },
+  deprovisioned: { en: 'Deprovisioned', es: 'Retiradas' },
+  mfa_pending: { en: 'MFA pending', es: 'MFA pendiente' },
+};
+
 const actionLabels: Record<AccountAction, { en: string; es: string }> = {
   activate: { en: 'Activate', es: 'Activar' },
   suspend: { en: 'Suspend', es: 'Suspender' },
   deprovision: { en: 'Deprovision', es: 'Retirar' },
   recovery: { en: 'Record recovery evidence', es: 'Registrar evidencia de recuperacion' },
   session: { en: 'Record session revocation evidence', es: 'Registrar evidencia de sesion revocada' },
+};
+
+const eventLabels: Record<StaffAccountLifecycleEvent['eventType'], { en: string; es: string }> = {
+  'staff_account.created': { en: 'Account created', es: 'Cuenta creada' },
+  'staff_account.activated': { en: 'Account activated', es: 'Cuenta activada' },
+  'staff_account.suspended': { en: 'Account suspended', es: 'Cuenta suspendida' },
+  'staff_account.deprovisioned': { en: 'Account deprovisioned', es: 'Cuenta retirada' },
+  'staff_account.recovery_recorded': { en: 'Recovery evidence recorded', es: 'Evidencia de recuperacion registrada' },
+  'staff_account.sessions_revoked': { en: 'Session-revocation evidence recorded', es: 'Evidencia de revocacion de sesion registrada' },
 };
 
 const failureLabels: Record<StaffAccountFailureKind, { en: string; es: string }> = {
@@ -115,6 +140,28 @@ function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function formatStatusTransition(event: StaffAccountLifecycleEvent, language: 'en' | 'es') {
+  const version = language === 'en' ? 'version' : 'version';
+  if (event.previousStatus === null || event.previousVersion === null) {
+    return language === 'en'
+      ? `${statusLabels[event.newStatus][language]}, ${version} ${String(event.newVersion)}`
+      : `${statusLabels[event.newStatus][language]}, ${version} ${String(event.newVersion)}`;
+  }
+  if (event.previousStatus === event.newStatus && event.previousVersion === event.newVersion) {
+    return language === 'en'
+      ? `Evidence only, unchanged ${version} ${String(event.newVersion)}`
+      : `Solo evidencia, ${version} ${String(event.newVersion)} sin cambios`;
+  }
+  return language === 'en'
+    ? `${statusLabels[event.previousStatus][language]} to ${statusLabels[event.newStatus][language]}, ${version} ${String(event.newVersion)}`
+    : `${statusLabels[event.previousStatus][language]} a ${statusLabels[event.newStatus][language]}, ${version} ${String(event.newVersion)}`;
+}
+
+function isFutureLocal(value: string) {
+  const timestamp = Date.parse(value);
+  return !Number.isNaN(timestamp) && timestamp > Date.now();
 }
 
 function tomorrowLocalValue() {
@@ -159,8 +206,26 @@ export function StaffAccountAdmin() {
   const [actionForm, setActionForm] = useState<ActionForm | null>(null);
   const [actionError, setActionError] = useState('');
   const [delegationPanel, setDelegationPanel] = useState<DelegationPanel | null>(null);
+  const [historyPanel, setHistoryPanel] = useState<HistoryPanel | null>(null);
+  const [accountFilter, setAccountFilter] = useState<AccountFilter>('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const activeCount = useMemo(() => accounts.filter((account) => account.lifecycleStatus === 'active').length, [accounts]);
   const suspendedCount = useMemo(() => accounts.filter((account) => account.lifecycleStatus === 'suspended').length, [accounts]);
+  const deprovisionedCount = useMemo(() => accounts.filter((account) => account.lifecycleStatus === 'deprovisioned').length, [accounts]);
+  const filteredAccounts = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    return accounts.filter((account) => {
+      const matchesFilter = accountFilter === 'all'
+        || (accountFilter === 'active' && account.lifecycleStatus === 'active')
+        || (accountFilter === 'suspended' && account.lifecycleStatus === 'suspended')
+        || (accountFilter === 'deprovisioned' && account.lifecycleStatus === 'deprovisioned')
+        || (accountFilter === 'mfa_pending' && !account.mfaEnrolled && account.lifecycleStatus !== 'deprovisioned');
+      const matchesSearch = normalizedSearch.length === 0
+        || account.displayName.toLowerCase().includes(normalizedSearch)
+        || account.providerSubject.toLowerCase().includes(normalizedSearch);
+      return matchesFilter && matchesSearch;
+    });
+  }, [accountFilter, accounts, searchTerm]);
 
   async function reloadAccounts() {
     setLoading(true);
@@ -279,11 +344,26 @@ export function StaffAccountAdmin() {
     setDelegationPanel({ ...panel, loading: false, items: result.value });
   }
 
+  async function openHistory(account: StaffAccount) {
+    const panel: HistoryPanel = { account, items: [], loading: true, error: '' };
+    setHistoryPanel(panel);
+    const result = await listStaffAccountEvents(account.staffId);
+    if (!result.ok) {
+      setHistoryPanel({ ...panel, loading: false, error: failureText(result.failure.kind, language) });
+      return;
+    }
+    setHistoryPanel({ ...panel, loading: false, items: result.value });
+  }
+
   async function submitDelegation(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     if (delegationPanel === null) return;
     if (delegationPanel.reasonText.trim().length === 0 || delegationPanel.expiresAt.trim().length === 0) {
       setDelegationPanel({ ...delegationPanel, error: language === 'en' ? 'Permission, expiration and reason are required.' : 'Permiso, vencimiento y motivo requeridos.' });
+      return;
+    }
+    if (!isFutureLocal(delegationPanel.expiresAt)) {
+      setDelegationPanel({ ...delegationPanel, error: language === 'en' ? 'Expiration must be a future date and time.' : 'El vencimiento debe ser una fecha y hora futura.' });
       return;
     }
     const result = await grantStaffDelegation({
@@ -347,6 +427,7 @@ export function StaffAccountAdmin() {
         <div><strong>{accounts.length}</strong><span>{language === 'en' ? 'Total accounts' : 'Cuentas totales'}</span></div>
         <div><strong>{activeCount}</strong><span>{language === 'en' ? 'Active' : 'Activas'}</span></div>
         <div><strong>{suspendedCount}</strong><span>{language === 'en' ? 'Suspended' : 'Suspendidas'}</span></div>
+        <div><strong>{deprovisionedCount}</strong><span>{language === 'en' ? 'Deprovisioned' : 'Retiradas'}</span></div>
       </div>
 
       {notice ? <p className="staff-account-notice" role="status">{notice}</p> : null}
@@ -358,6 +439,25 @@ export function StaffAccountAdmin() {
             <h3 id="account-list-heading"><IconSymbol name="workers" /> {language === 'en' ? 'Account lifecycle' : 'Ciclo de cuentas'}</h3>
             {loading ? <span>{language === 'en' ? 'Loading' : 'Cargando'}</span> : null}
           </div>
+          <div className="staff-account-filters" aria-label={language === 'en' ? 'Account list filters' : 'Filtros de cuentas'}>
+            <label>
+              <span>{language === 'en' ? 'Find account' : 'Buscar cuenta'}</span>
+              <input
+                className="focus-ring"
+                placeholder={language === 'en' ? 'Name or provider subject' : 'Nombre o sujeto del proveedor'}
+                value={searchTerm}
+                onChange={(event) => { setSearchTerm(event.target.value); }}
+              />
+            </label>
+            <label>
+              <span>{language === 'en' ? 'Lifecycle filter' : 'Filtro de ciclo'}</span>
+              <select className="focus-ring" value={accountFilter} onChange={(event) => { setAccountFilter(event.target.value as AccountFilter); }}>
+                {(Object.keys(filterLabels) as AccountFilter[]).map((filter) => (
+                  <option key={filter} value={filter}>{filterLabels[filter][language]}</option>
+                ))}
+              </select>
+            </label>
+          </div>
           <div className="staff-account-table" role="table" aria-label={language === 'en' ? 'Staff account lifecycle table' : 'Tabla de cuentas'}>
             <div role="row" className="staff-account-row staff-account-row--head">
               <span role="columnheader">{language === 'en' ? 'Staff member' : 'Persona'}</span>
@@ -366,7 +466,7 @@ export function StaffAccountAdmin() {
               <span role="columnheader">{language === 'en' ? 'Updated' : 'Actualizada'}</span>
               <span role="columnheader">{language === 'en' ? 'Actions' : 'Acciones'}</span>
             </div>
-            {accounts.map((account) => (
+            {filteredAccounts.map((account) => (
               <div role="row" className="staff-account-row" key={account.staffId}>
                 <span role="cell">
                   <strong>{account.displayName}</strong>
@@ -375,7 +475,7 @@ export function StaffAccountAdmin() {
                 <span role="cell">{roleLabels[account.roleName][language]}</span>
                 <span role="cell">
                   <span className="staff-account-status" data-status={account.lifecycleStatus}>{statusLabels[account.lifecycleStatus][language]}</span>
-                  <small>{account.mfaEnrolled ? 'MFA' : language === 'en' ? 'MFA pending' : 'MFA pendiente'}</small>
+                  <small>{account.mfaEnrolled ? 'MFA' : language === 'en' ? 'MFA pending before activation' : 'MFA pendiente antes de activar'}</small>
                 </span>
                 <span role="cell">
                   <time dateTime={account.updatedAt}>{formatDate(account.updatedAt)}</time>
@@ -396,11 +496,16 @@ export function StaffAccountAdmin() {
                   ) : null}
                   <button className="focus-ring" type="button" onClick={() => { setActionForm({ account, action: 'session', reasonText: '', mfaEnrolled: account.mfaEnrolled }); }}>{language === 'en' ? 'Session evidence' : 'Evidencia sesion'}</button>
                   <button className="focus-ring" type="button" onClick={() => { void openDelegations(account); }}>{language === 'en' ? 'Delegations' : 'Delegaciones'}</button>
+                  <button className="focus-ring" type="button" onClick={() => { void openHistory(account); }}>{language === 'en' ? 'History' : 'Historial'}</button>
                 </span>
               </div>
             ))}
-            {!loading && accounts.length === 0 ? (
-              <p className="staff-account-empty">{language === 'en' ? 'No staff accounts are available to this session.' : 'No hay cuentas disponibles para esta sesion.'}</p>
+            {!loading && filteredAccounts.length === 0 ? (
+              <p className="staff-account-empty">
+                {accounts.length === 0
+                  ? language === 'en' ? 'No staff accounts are available to this session.' : 'No hay cuentas disponibles para esta sesion.'
+                  : language === 'en' ? 'No accounts match this filter.' : 'Ninguna cuenta coincide con este filtro.'}
+              </p>
             ) : null}
           </div>
         </section>
@@ -473,6 +578,41 @@ export function StaffAccountAdmin() {
             </label>
             <button className="staff-primary-button focus-ring" type="submit">{actionLabels[actionForm.action][language]}</button>
           </form>
+        </section>
+      ) : null}
+
+      {historyPanel ? (
+        <section className="staff-account-panel staff-action-panel" aria-labelledby="account-history-heading">
+          <div className="staff-account-panel-header">
+            <h3 id="account-history-heading">{language === 'en' ? 'Account history' : 'Historial de cuenta'}: {historyPanel.account.displayName}</h3>
+            <button className="staff-secondary-button focus-ring" type="button" onClick={() => { setHistoryPanel(null); }}>{language === 'en' ? 'Close' : 'Cerrar'}</button>
+          </div>
+          <p className="staff-account-helper">
+            {language === 'en'
+              ? 'This timeline records application evidence and lifecycle decisions. Recovery and session entries do not confirm provider-side reset or revocation.'
+              : 'Esta linea de tiempo registra evidencia de la aplicacion y decisiones de ciclo. Recuperacion y sesion no confirman restablecimiento o revocacion en el proveedor.'}
+          </p>
+          {historyPanel.loading ? <p>{language === 'en' ? 'Loading' : 'Cargando'}</p> : null}
+          {historyPanel.error ? <p className="staff-account-error" role="alert">{historyPanel.error}</p> : null}
+          <div className="staff-account-history-list" aria-label={language === 'en' ? 'Account evidence history' : 'Historial de evidencia de cuenta'}>
+            {historyPanel.items.map((event) => (
+              <article className="staff-account-history-row" key={event.eventId}>
+                <div>
+                  <strong>{eventLabels[event.eventType][language]}</strong>
+                  <small>
+                    <time dateTime={event.occurredAt}>{formatDate(event.occurredAt)}</time>
+                    {' · '}
+                    {formatStatusTransition(event, language)}
+                  </small>
+                </div>
+                <p>{event.reasonText}</p>
+                <small>{language === 'en' ? 'Actor' : 'Actor'} {event.actorId}</small>
+              </article>
+            ))}
+            {!historyPanel.loading && historyPanel.items.length === 0 ? (
+              <p className="staff-account-empty">{language === 'en' ? 'No lifecycle evidence has been recorded for this account.' : 'No hay evidencia de ciclo registrada para esta cuenta.'}</p>
+            ) : null}
+          </div>
         </section>
       ) : null}
 

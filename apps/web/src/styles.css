@@ -1482,7 +1482,7 @@ select {
 .staff-account-metrics {
   display: grid;
   gap: var(--space-3);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .staff-account-metrics div,
@@ -1548,6 +1548,37 @@ select {
   gap: var(--space-3);
   justify-content: space-between;
   margin-bottom: var(--space-4);
+}
+
+.staff-account-filters {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: minmax(14rem, 1fr) minmax(12rem, 0.55fr);
+  margin-bottom: var(--space-4);
+}
+
+.staff-account-filters label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.staff-account-filters span,
+.staff-account-helper {
+  color: var(--color-muted-text);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.staff-account-filters input,
+.staff-account-filters select {
+  background: #fffdfc;
+  border: 1px solid #77858e;
+  border-radius: 0.45rem;
+  color: #172b36;
+  font: inherit;
+  min-height: 2.6rem;
+  padding: 0.6rem;
+  width: 100%;
 }
 
 .staff-account-table {
@@ -1744,6 +1775,39 @@ select {
 
 .staff-action-panel {
   max-width: 54rem;
+}
+
+.staff-account-helper {
+  margin: 0 0 var(--space-3);
+}
+
+.staff-account-history-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.staff-account-history-row {
+  border-bottom: 1px solid var(--color-border);
+  display: grid;
+  gap: 0.45rem;
+  padding: 0 0 var(--space-3);
+}
+
+.staff-account-history-row strong,
+.staff-account-history-row small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.staff-account-history-row small {
+  color: var(--color-muted-text);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.staff-account-history-row p {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .staff-delegation-list {
@@ -2639,6 +2703,7 @@ select {
   .dashboard-map-card,
   .module-preview-grid,
   .staff-account-layout,
+  .staff-account-filters,
   .staff-calendar-hero,
   .calendar-layout {
     grid-template-columns: minmax(0, 1fr);
@@ -2696,6 +2761,10 @@ select {
 
   .app-brand {
     font-size: 1.3rem;
+  }
+
+  .staff-account-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .primary-navigation ul {

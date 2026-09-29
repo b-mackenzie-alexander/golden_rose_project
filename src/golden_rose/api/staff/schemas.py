@@ -299,6 +299,35 @@ class StaffDelegationCommandResponse(BaseModel):
     result_version: int
 
 
+class StaffAccountLifecycleEventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+    event_id: UUID
+    command_id: UUID
+    staff_id: UUID
+    actor_id: UUID
+    event_type: Literal[
+        "staff_account.created",
+        "staff_account.activated",
+        "staff_account.suspended",
+        "staff_account.deprovisioned",
+        "staff_account.recovery_recorded",
+        "staff_account.sessions_revoked",
+    ]
+    previous_status: StaffAccountLifecycleStatus | None
+    new_status: StaffAccountLifecycleStatus
+    previous_version: int | None
+    new_version: int
+    occurred_at: datetime
+    reason_text: str
+
+
+class StaffAccountLifecycleEventListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: tuple[StaffAccountLifecycleEventResponse, ...]
+
+
 class StaffSessionResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

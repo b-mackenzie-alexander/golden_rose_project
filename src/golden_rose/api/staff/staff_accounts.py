@@ -16,6 +16,8 @@ from golden_rose.api.errors import no_store_problem_response
 from golden_rose.api.staff.schemas import (
     ActivateStaffAccountRequest,
     CreateStaffAccountRequest,
+    StaffAccountLifecycleEventListResponse,
+    StaffAccountLifecycleEventResponse,
     StaffAccountLifecycleResponse,
     StaffAccountListResponse,
     StaffAccountResponse,
@@ -52,7 +54,11 @@ from golden_rose.auth.permissions import can_read_staff_account
 from golden_rose.auth.principal import StaffPrincipal
 from golden_rose.clock import Clock
 from golden_rose.identifiers import IdentifierFactory
-from golden_rose.persistence.staff_accounts import get_staff_account_by_id, list_staff_accounts
+from golden_rose.persistence.staff_accounts import (
+    get_staff_account_by_id,
+    list_staff_account_lifecycle_events,
+    list_staff_accounts,
+)
 
 router = APIRouter(prefix="/api/staff/v1/staff-accounts", tags=["staff-accounts"])
 
@@ -231,6 +237,29 @@ def get_staff_account_delegations(
     _read_response(response)
     return StaffDelegationListResponse(
         items=tuple(StaffDelegationResponse.model_validate(item) for item in delegations),
+    )
+
+
+@router.get("/{staff_id}/events", response_model=StaffAccountLifecycleEventListResponse)
+def get_staff_account_events(
+    staff_id: UUID,
+    response: Response,
+    session: Annotated[Session, Depends(get_db_session)],
+    principal: Annotated[StaffPrincipal, Depends(get_staff_principal)],
+) -> StaffAccountLifecycleEventListResponse | Response:
+    denied = _require_read_permission(principal)
+    if denied is not None:
+        return denied
+    try:
+        get_staff_account_by_id(session=session, staff_id=staff_id)
+        events = list_staff_account_lifecycle_events(session=session, staff_id=staff_id)
+    except NoResultFound:
+        return _problem_for_lifecycle_error(StaffAccountNotFoundError("staff account not found"))
+    except SQLAlchemyError:
+        return _problem_for_lifecycle_error(SafePersistenceError("persistence operation failed"))
+    _read_response(response)
+    return StaffAccountLifecycleEventListResponse(
+        items=tuple(StaffAccountLifecycleEventResponse.model_validate(item) for item in events),
     )
 
 

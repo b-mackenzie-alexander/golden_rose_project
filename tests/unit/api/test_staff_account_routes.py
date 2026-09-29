@@ -26,13 +26,18 @@ from golden_rose.application.staff_account_lifecycle import (
 )
 from golden_rose.auth.principal import StaffPrincipal
 from golden_rose.main import create_app
-from golden_rose.persistence.staff_accounts import StaffAccountRecord, StaffDelegationRecord
+from golden_rose.persistence.staff_accounts import (
+    StaffAccountLifecycleEventRecord,
+    StaffAccountRecord,
+    StaffDelegationRecord,
+)
 
 NOW = datetime(2026, 9, 28, 12, 0, tzinfo=UTC)
 ACTOR_ID = UUID("11111111-1111-4111-8111-111111111111")
 STAFF_ID = UUID("22222222-2222-4222-8222-222222222222")
 GENERATED_STAFF_ID = UUID("33333333-3333-4333-8333-333333333333")
 DELEGATION_ID = UUID("44444444-4444-4444-8444-444444444444")
+EVENT_ID = UUID("55555555-5555-4555-8555-555555555555")
 
 
 class FixedIdentifiers:
@@ -130,6 +135,22 @@ def delegation_result(*, event_type: str, revoked: bool = False) -> StaffDelegat
     )
 
 
+def lifecycle_event_record() -> StaffAccountLifecycleEventRecord:
+    return StaffAccountLifecycleEventRecord(
+        event_id=EVENT_ID,
+        command_id=GENERATED_STAFF_ID,
+        staff_id=STAFF_ID,
+        actor_id=ACTOR_ID,
+        event_type="staff_account.created",
+        previous_status=None,
+        new_status="suspended",
+        previous_version=None,
+        new_version=1,
+        occurred_at=NOW,
+        reason_text="Initial staff onboarding",
+    )
+
+
 def command_headers() -> dict[str, str]:
     return {"Idempotency-Key": str(uuid4())}
 
@@ -176,6 +197,42 @@ def test_get_staff_account_returns_exact_account_or_safe_not_found(
     assert reader.call_args.kwargs["staff_id"] == STAFF_ID
 
 
+def test_get_staff_account_events_returns_no_store_evidence_history(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = http
+    reader = Mock(return_value=account_record(status="suspended", version=1))
+    events = Mock(return_value=(lifecycle_event_record(),))
+    monkeypatch.setattr(staff_accounts, "get_staff_account_by_id", reader)
+    monkeypatch.setattr(staff_accounts, "list_staff_account_lifecycle_events", events)
+
+    response = client.get(f"/api/staff/v1/staff-accounts/{STAFF_ID}/events")
+
+    assert response.status_code == 200, response.text
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["vary"] == "Authorization"
+    assert response.json() == {
+        "items": [
+            {
+                "event_id": str(EVENT_ID),
+                "command_id": str(GENERATED_STAFF_ID),
+                "staff_id": str(STAFF_ID),
+                "actor_id": str(ACTOR_ID),
+                "event_type": "staff_account.created",
+                "previous_status": None,
+                "new_status": "suspended",
+                "previous_version": None,
+                "new_version": 1,
+                "occurred_at": NOW.isoformat().replace("+00:00", "Z"),
+                "reason_text": "Initial staff onboarding",
+            }
+        ]
+    }
+    reader.assert_called_once()
+    events.assert_called_once_with(session=reader.call_args.kwargs["session"], staff_id=STAFF_ID)
+
+
 def test_staff_account_read_routes_preserve_forbidden_and_missing_boundaries(
     http: tuple[TestClient, FixedIdentifiers],
     monkeypatch: pytest.MonkeyPatch,
@@ -199,6 +256,7 @@ def test_staff_account_read_routes_preserve_forbidden_and_missing_boundaries(
     missing = Mock(side_effect=NoResultFound())
     monkeypatch.setattr(staff_accounts, "get_staff_account_by_id", missing)
     not_found = client.get(f"/api/staff/v1/staff-accounts/{STAFF_ID}")
+    missing_events = client.get(f"/api/staff/v1/staff-accounts/{STAFF_ID}/events")
     unavailable = Mock(side_effect=SQLAlchemyError("private database details"))
     monkeypatch.setattr(staff_accounts, "list_staff_accounts", unavailable)
     service_unavailable = client.get("/api/staff/v1/staff-accounts")
@@ -208,6 +266,11 @@ def test_staff_account_read_routes_preserve_forbidden_and_missing_boundaries(
     listed.assert_not_called()
     assert not_found.status_code == 404
     assert not_found.json()["type"] == "https://golden-rose.local/problems/staff-account-not-found"
+    assert missing_events.status_code == 404
+    assert (
+        missing_events.json()["type"]
+        == "https://golden-rose.local/problems/staff-account-not-found"
+    )
     assert service_unavailable.status_code == 503
     assert service_unavailable.json()["type"] == (
         "https://golden-rose.local/problems/service-unavailable"

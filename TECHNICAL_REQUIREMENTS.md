@@ -1,5 +1,11 @@
 # Technical Requirements — Golden Rose Operations Platform
 
+## 2026-09-29 — Client production plan review validator
+
+The active Tranche 2 portability slice adds `scripts/validate_client_production_plan.py`, a local validator for operator-held Terraform JSON plan review in a later separately approved client-owned production packet. The validator requires a verifiable Cloud Run service/job using an immutable `@sha256:` image digest and production staff OIDC runtime configuration, rejects synthetic/demo production posture, rejects Secret Manager payload resources, and fails closed on delete/replacement actions, unsupported managed-resource actions, public Cloud SQL network exposure and broad IAM grants.
+
+The command is now recorded in `deploy/gcp/templates/client-production-policy.example.json` and `deploy/gcp/client-owned-production-package-runbook.md`. It is not a cloud command and does not replace future production packet approval, Terraform plan generation, image admission verification, migration qualification, backup/restore rehearsal, staff acceptance or live-data approval. The operator-held `.tfplan` and JSON output remain outside tracked source.
+
 ## 2026-09-29 — Client-owned package policy manifest guard
 
 The active Tranche 2 portability slice extends the deployable package source guard with `deploy/gcp/templates/client-production-policy.example.json`. The manifest is a placeholder-only review contract for a later approved production packet. It records separate-approval boundaries for cloud execution, Terraform plan, production deployment, live-data admission and provider-side identity activation; production app posture requiring staff OIDC; forbidden production demo/synthetic posture; plan-review fail-closed checks for delete/replace, public SQL, broad IAM, immutable digest, staff identity, secret payloads and operational owner evidence; and value-safe artifact/handoff evidence placeholders.

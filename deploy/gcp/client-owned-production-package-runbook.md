@@ -73,6 +73,20 @@ payloads. The policy also requires signed image/SBOM/provenance evidence,
 database-authority evidence, backup/restore ownership, and monitoring, incident
 and support owners.
 
+When an approved packet produces an operator-held Terraform plan, convert that
+private plan to JSON outside source control and run the offline plan validator:
+
+```bash
+terraform show -json <operator-held-plan.tfplan> > <operator-held-plan.json>
+UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_production_plan.py <operator-held-plan.json>
+```
+
+Do not commit the `.tfplan` file, plan JSON, private variable files, state files
+or command transcripts. The validator reads only the local JSON file. It does
+not authenticate to GCP, inspect Terraform state, create secrets, activate the
+staff identity provider, execute provider-side recovery or revocation, apply
+infrastructure, deploy production, or admit live/client data.
+
 ## Stop Conditions
 
 Stop before drafting or executing any production deployment packet if any of

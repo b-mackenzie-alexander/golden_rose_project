@@ -7,6 +7,7 @@ export type StaffAccountEvent =
   | 'staff_account.deprovisioned'
   | 'staff_account.recovery_recorded'
   | 'staff_account.sessions_revoked';
+export type StaffDelegationEvent = 'staff_delegation.granted' | 'staff_delegation.revoked';
 
 export type StaffAccount = {
   staffId: string;
@@ -25,6 +26,27 @@ export type StaffAccount = {
 export type StaffAccountLifecycleResult = {
   account: StaffAccount;
   eventType: StaffAccountEvent;
+  resultVersion: number;
+};
+
+export type StaffDelegation = {
+  delegationId: string;
+  grantorStaffId: string;
+  granteeStaffId: string;
+  permissionName: string;
+  scopeKind: 'global';
+  scopeId: string | null;
+  reasonText: string;
+  startsAt: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  revokedBy: string | null;
+  revocationReason: string | null;
+};
+
+export type StaffDelegationResult = {
+  delegation: StaffDelegation;
+  eventType: StaffDelegationEvent;
   resultVersion: number;
 };
 
@@ -60,6 +82,21 @@ export type ActivateStaffAccountInput = StaffAccountTransitionInput & {
   mfaEnrolled: boolean;
 };
 
+export type GrantStaffDelegationInput = {
+  staffId: string;
+  permissionName: string;
+  expiresAt: string;
+  reasonText: string;
+  commandId: string;
+};
+
+export type RevokeStaffDelegationInput = {
+  staffId: string;
+  delegationId: string;
+  reasonText: string;
+  commandId: string;
+};
+
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const roles = new Set<StaffAccountRole>(['owner', 'delegated_manager', 'operations_staff', 'platform_administrator']);
 const statuses = new Set<StaffAccountStatus>(['active', 'suspended', 'deprovisioned']);
@@ -71,6 +108,7 @@ const events = new Set<StaffAccountEvent>([
   'staff_account.recovery_recorded',
   'staff_account.sessions_revoked',
 ]);
+const delegationEvents = new Set<StaffDelegationEvent>(['staff_delegation.granted', 'staff_delegation.revoked']);
 
 function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -157,6 +195,61 @@ function parseLifecycle(value: unknown): StaffAccountLifecycleResult | null {
   return {
     account,
     eventType: value.event_type as StaffAccountEvent,
+    resultVersion: value.result_version,
+  };
+}
+
+function parseDelegation(value: unknown): StaffDelegation | null {
+  if (!object(value)) return null;
+  const keys = new Set([
+    'delegation_id',
+    'grantor_staff_id',
+    'grantee_staff_id',
+    'permission_name',
+    'scope_kind',
+    'scope_id',
+    'reason_text',
+    'starts_at',
+    'expires_at',
+    'revoked_at',
+    'revoked_by',
+    'revocation_reason',
+  ]);
+  if (Object.keys(value).some((key) => !keys.has(key))) return null;
+  if (typeof value.delegation_id !== 'string' || !uuid.test(value.delegation_id)) return null;
+  if (typeof value.grantor_staff_id !== 'string' || !uuid.test(value.grantor_staff_id)) return null;
+  if (typeof value.grantee_staff_id !== 'string' || !uuid.test(value.grantee_staff_id)) return null;
+  if (!text(value.permission_name, 120) || value.scope_kind !== 'global') return null;
+  if (value.scope_id !== null && (typeof value.scope_id !== 'string' || !uuid.test(value.scope_id))) return null;
+  if (!text(value.reason_text, 512)) return null;
+  if (!timestamp(value.starts_at) || !timestamp(value.expires_at)) return null;
+  if (value.revoked_at !== null && !timestamp(value.revoked_at)) return null;
+  if (value.revoked_by !== null && (typeof value.revoked_by !== 'string' || !uuid.test(value.revoked_by))) return null;
+  if (value.revocation_reason !== null && !text(value.revocation_reason, 512)) return null;
+  return {
+    delegationId: value.delegation_id,
+    grantorStaffId: value.grantor_staff_id,
+    granteeStaffId: value.grantee_staff_id,
+    permissionName: value.permission_name,
+    scopeKind: 'global',
+    scopeId: value.scope_id,
+    reasonText: value.reason_text,
+    startsAt: value.starts_at,
+    expiresAt: value.expires_at,
+    revokedAt: value.revoked_at,
+    revokedBy: value.revoked_by,
+    revocationReason: value.revocation_reason,
+  };
+}
+
+function parseDelegationCommand(value: unknown): StaffDelegationResult | null {
+  if (!object(value)) return null;
+  const delegation = parseDelegation(value.delegation);
+  if (delegation === null || typeof value.event_type !== 'string' || !delegationEvents.has(value.event_type as StaffDelegationEvent)) return null;
+  if (value.result_version !== 1) return null;
+  return {
+    delegation,
+    eventType: value.event_type as StaffDelegationEvent,
     resultVersion: value.result_version,
   };
 }
@@ -253,3 +346,33 @@ export const recordRecoveryEvidence = (input: StaffAccountTransitionInput) =>
   transition(`/staff-accounts/${input.staffId}/recovery-evidence`, input);
 export const recordSessionRevocationEvidence = (input: StaffAccountTransitionInput) =>
   transition(`/staff-accounts/${input.staffId}/session-revocations`, input);
+
+export async function listStaffDelegations(staffId: string): Promise<StaffAccountResult<StaffDelegation[]>> {
+  return request(`/staff-accounts/${staffId}/delegations`, { method: 'GET', headers: { Accept: 'application/json' } }, (value) => {
+    if (!object(value) || !Array.isArray(value.items) || value.items.length > 50) return null;
+    const items = value.items.map(parseDelegation);
+    if (items.some((item) => item === null)) return null;
+    return items as StaffDelegation[];
+  });
+}
+
+export async function grantStaffDelegation(input: GrantStaffDelegationInput): Promise<StaffAccountResult<StaffDelegationResult>> {
+  return request(`/staff-accounts/${input.staffId}/delegations`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'Idempotency-Key': input.commandId },
+    body: JSON.stringify({
+      permission_name: input.permissionName,
+      scope_kind: 'global',
+      expires_at: input.expiresAt,
+      reason_text: input.reasonText,
+    }),
+  }, parseDelegationCommand, true);
+}
+
+export async function revokeStaffDelegation(input: RevokeStaffDelegationInput): Promise<StaffAccountResult<StaffDelegationResult>> {
+  return request(`/staff-accounts/${input.staffId}/delegations/${input.delegationId}/revoke`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'Idempotency-Key': input.commandId },
+    body: JSON.stringify({ reason_text: input.reasonText }),
+  }, parseDelegationCommand, true);
+}

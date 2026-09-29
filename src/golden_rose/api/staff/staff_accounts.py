@@ -20,8 +20,22 @@ from golden_rose.api.staff.schemas import (
     StaffAccountListResponse,
     StaffAccountResponse,
     StaffAccountTransitionRequest,
+    StaffDelegationCommandResponse,
+    StaffDelegationGrantRequest,
+    StaffDelegationListResponse,
+    StaffDelegationResponse,
+    StaffDelegationRevokeRequest,
 )
 from golden_rose.application.errors import SafePersistenceError
+from golden_rose.application.staff_account_delegations import (
+    StaffDelegationConflictError,
+    StaffDelegationError,
+    StaffDelegationNotFoundError,
+    StaffDelegationResult,
+    grant_staff_delegation,
+    list_delegations_for_staff,
+    revoke_staff_account_delegation,
+)
 from golden_rose.application.staff_account_lifecycle import (
     StaffAccountLifecycleError,
     StaffAccountLifecycleResult,
@@ -90,6 +104,53 @@ def _problem_for_lifecycle_error(exc: Exception) -> Response:
     raise exc
 
 
+def _delegation_response(result: StaffDelegationResult, response: Response) -> Response:
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Vary"] = "Authorization"
+    response.headers["Idempotency-Result-Version"] = str(result.result_version)
+    return response
+
+
+def _delegation_body(result: StaffDelegationResult) -> StaffDelegationCommandResponse:
+    return StaffDelegationCommandResponse(
+        delegation=StaffDelegationResponse.model_validate(result.delegation),
+        event_type=result.event_type,  # type: ignore[arg-type]
+        result_version=result.result_version,
+    )
+
+
+def _problem_for_delegation_error(exc: Exception) -> Response:
+    if isinstance(exc, StaffDelegationNotFoundError):
+        return no_store_problem_response(
+            status_code=404,
+            title="Not Found",
+            detail="staff delegation not found",
+            type_="https://golden-rose.local/problems/staff-delegation-not-found",
+        )
+    if isinstance(exc, StaffDelegationConflictError):
+        return no_store_problem_response(
+            status_code=412,
+            title="Precondition Failed",
+            detail="staff delegation conflict",
+            type_="https://golden-rose.local/problems/staff-delegation-conflict",
+        )
+    if isinstance(exc, StaffDelegationError):
+        return no_store_problem_response(
+            status_code=422,
+            title="Unprocessable Entity",
+            detail="staff delegation request is invalid",
+            type_="https://golden-rose.local/problems/staff-delegation-invalid",
+        )
+    if isinstance(exc, SafePersistenceError):
+        return no_store_problem_response(
+            status_code=503,
+            title="Service Unavailable",
+            detail="service unavailable",
+            type_="https://golden-rose.local/problems/service-unavailable",
+        )
+    raise exc
+
+
 def _read_response(response: Response) -> None:
     response.headers["Cache-Control"] = "no-store"
     response.headers["Vary"] = "Authorization"
@@ -143,6 +204,111 @@ def get_staff_account(
         return _problem_for_lifecycle_error(SafePersistenceError("persistence operation failed"))
     _read_response(response)
     return StaffAccountResponse.model_validate(account)
+
+
+@router.get("/{staff_id}/delegations", response_model=StaffDelegationListResponse)
+def get_staff_account_delegations(
+    staff_id: UUID,
+    response: Response,
+    session: Annotated[Session, Depends(get_db_session)],
+    principal: Annotated[StaffPrincipal, Depends(get_staff_principal)],
+) -> StaffDelegationListResponse | Response:
+    try:
+        delegations = list_delegations_for_staff(
+            session=session,
+            principal=principal,
+            staff_id=staff_id,
+        )
+    except PermissionError:
+        return no_store_problem_response(
+            status_code=403,
+            title="Forbidden",
+            detail="forbidden",
+            type_="https://golden-rose.local/problems/forbidden",
+        )
+    except (StaffDelegationError, SafePersistenceError) as exc:
+        return _problem_for_delegation_error(exc)
+    _read_response(response)
+    return StaffDelegationListResponse(
+        items=tuple(StaffDelegationResponse.model_validate(item) for item in delegations),
+    )
+
+
+@router.post(
+    "/{staff_id}/delegations",
+    response_model=StaffDelegationCommandResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def post_staff_account_delegation(
+    staff_id: UUID,
+    request: StaffDelegationGrantRequest,
+    response: Response,
+    idempotency_key: Annotated[UUID, Depends(get_idempotency_key)],
+    session: Annotated[Session, Depends(get_db_session)],
+    principal: Annotated[StaffPrincipal, Depends(get_staff_principal)],
+    clock: Annotated[Clock, Depends(get_clock)],
+) -> StaffDelegationCommandResponse | Response:
+    try:
+        result = grant_staff_delegation(
+            session=session,
+            principal=principal,
+            delegation_id=idempotency_key,
+            grantee_staff_id=staff_id,
+            permission_name=request.permission_name,
+            scope_kind=request.scope_kind,
+            expires_at=request.expires_at,
+            clock=clock,
+            reason_text=request.reason_text,
+        )
+    except PermissionError:
+        return no_store_problem_response(
+            status_code=403,
+            title="Forbidden",
+            detail="forbidden",
+            type_="https://golden-rose.local/problems/forbidden",
+        )
+    except (StaffDelegationError, SafePersistenceError) as exc:
+        return _problem_for_delegation_error(exc)
+    _delegation_response(result, response)
+    return _delegation_body(result)
+
+
+@router.post(
+    "/{staff_id}/delegations/{delegation_id}/revoke",
+    response_model=StaffDelegationCommandResponse,
+    status_code=status.HTTP_200_OK,
+)
+def post_staff_account_delegation_revocation(
+    staff_id: UUID,
+    delegation_id: UUID,
+    request: StaffDelegationRevokeRequest,
+    response: Response,
+    idempotency_key: Annotated[UUID, Depends(get_idempotency_key)],
+    session: Annotated[Session, Depends(get_db_session)],
+    principal: Annotated[StaffPrincipal, Depends(get_staff_principal)],
+    clock: Annotated[Clock, Depends(get_clock)],
+) -> StaffDelegationCommandResponse | Response:
+    del idempotency_key
+    try:
+        result = revoke_staff_account_delegation(
+            session=session,
+            principal=principal,
+            delegation_id=delegation_id,
+            grantee_staff_id=staff_id,
+            clock=clock,
+            reason_text=request.reason_text,
+        )
+    except PermissionError:
+        return no_store_problem_response(
+            status_code=403,
+            title="Forbidden",
+            detail="forbidden",
+            type_="https://golden-rose.local/problems/forbidden",
+        )
+    except (StaffDelegationError, SafePersistenceError) as exc:
+        return _problem_for_delegation_error(exc)
+    _delegation_response(result, response)
+    return _delegation_body(result)
 
 
 @router.post(

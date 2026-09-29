@@ -2,12 +2,18 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from golden_rose.persistence.staff_accounts import (
+    get_staff_account_by_id,
     get_staff_account_by_id_for_update,
     get_staff_account_by_provider_subject,
+    get_staff_delegation_by_id,
     insert_lifecycle_event,
     insert_staff_account,
+    insert_staff_delegation,
     insert_staff_permission_grants,
     list_active_staff_permissions,
+    list_staff_accounts,
+    list_staff_delegations,
+    revoke_staff_delegation,
     update_staff_account_lifecycle,
 )
 
@@ -17,6 +23,8 @@ STAFF_ID = UUID("22222222-2222-4222-8222-222222222222")
 COMMAND_ID = UUID("33333333-3333-4333-8333-333333333333")
 EVENT_ID = UUID("44444444-4444-4444-8444-444444444444")
 GRANT_ID = UUID("55555555-5555-4555-8555-555555555555")
+DELEGATION_ID = UUID("66666666-6666-4666-8666-666666666666")
+GRANTEE_ID = UUID("77777777-7777-4777-8777-777777777777")
 
 
 class FakeOneResult:
@@ -35,6 +43,14 @@ class FakeScalarResult:
         return self.values
 
 
+class FakeRowsResult:
+    def __init__(self, rows: tuple[tuple[object, ...], ...]) -> None:
+        self.rows = rows
+
+    def __iter__(self):
+        return iter(self.rows)
+
+
 class FakeSession:
     def __init__(self, result: object | None = None) -> None:
         self.result = result
@@ -42,6 +58,8 @@ class FakeSession:
 
     def execute(self, statement, parameters=None):
         self.calls.append((statement, parameters))
+        if isinstance(self.result, list):
+            return self.result.pop(0)
         return self.result
 
 
@@ -58,6 +76,28 @@ def _row(*, status: str = "suspended", version: int = 1) -> tuple[object, ...]:
         NOW,
         ACTOR_ID,
         version,
+    )
+
+
+def _delegation_row(
+    *,
+    revoked_at: datetime | None = None,
+    revoked_by: UUID | None = None,
+    revocation_reason: str | None = None,
+) -> tuple[object, ...]:
+    return (
+        DELEGATION_ID,
+        ACTOR_ID,
+        GRANTEE_ID,
+        "intake:read",
+        "global",
+        None,
+        "Temporary coverage",
+        NOW,
+        datetime(2026, 9, 28, 20, 0, tzinfo=UTC),
+        revoked_at,
+        revoked_by,
+        revocation_reason,
     )
 
 
@@ -108,6 +148,39 @@ def test_get_staff_account_by_provider_subject_maps_row() -> None:
     assert len(session.calls) == 1
     assert record.provider_subject == "oidc:staff:123"
     assert record.lifecycle_status == "active"
+
+
+def test_get_staff_account_by_id_maps_row() -> None:
+    session = FakeSession(FakeOneResult(_row(status="active", version=2)))
+
+    record = get_staff_account_by_id(
+        session=session,  # type: ignore[arg-type]
+        staff_id=STAFF_ID,
+    )
+
+    assert len(session.calls) == 1
+    assert record.staff_id == STAFF_ID
+    assert record.lifecycle_status == "active"
+    assert record.version == 2
+
+
+def test_list_staff_accounts_maps_rows() -> None:
+    session = FakeSession(
+        FakeRowsResult(
+            (
+                _row(status="active", version=2),
+                _row(status="suspended", version=1),
+            )
+        )
+    )
+
+    records = list_staff_accounts(
+        session=session,  # type: ignore[arg-type]
+        limit=2,
+    )
+
+    assert len(session.calls) == 1
+    assert [record.lifecycle_status for record in records] == ["active", "suspended"]
 
 
 def test_update_staff_account_lifecycle_maps_returning_row() -> None:
@@ -168,7 +241,12 @@ def test_insert_staff_permission_grants_executes_bulk_insert() -> None:
 
 
 def test_list_active_staff_permissions_returns_frozenset() -> None:
-    session = FakeSession(FakeScalarResult(("intake:read", "worker:read")))
+    session = FakeSession(
+        [
+            FakeScalarResult(("intake:read",)),
+            FakeScalarResult(("worker:read",)),
+        ]
+    )
 
     permissions = list_active_staff_permissions(
         session=session,  # type: ignore[arg-type]
@@ -176,6 +254,70 @@ def test_list_active_staff_permissions_returns_frozenset() -> None:
     )
 
     assert permissions == frozenset({"intake:read", "worker:read"})
+    assert len(session.calls) == 2
+
+
+def test_staff_delegation_persistence_helpers_map_rows() -> None:
+    session = FakeSession(FakeOneResult(_delegation_row()))
+
+    inserted = insert_staff_delegation(
+        session=session,  # type: ignore[arg-type]
+        delegation_id=DELEGATION_ID,
+        grantor_staff_id=ACTOR_ID,
+        grantee_staff_id=GRANTEE_ID,
+        permission_name="intake:read",
+        scope_kind="global",
+        scope_id=None,
+        reason_text="Temporary coverage",
+        starts_at=NOW,
+        expires_at=datetime(2026, 9, 28, 20, 0, tzinfo=UTC),
+    )
+    fetched = get_staff_delegation_by_id(
+        session=session,  # type: ignore[arg-type]
+        delegation_id=DELEGATION_ID,
+    )
+
+    assert inserted.delegation_id == DELEGATION_ID
+    assert inserted.revoked_at is None
+    assert fetched.delegation_id == DELEGATION_ID
+    assert fetched.grantee_staff_id == GRANTEE_ID
+    assert len(session.calls) == 2
+
+
+def test_list_and_revoke_staff_delegations_map_rows() -> None:
+    revoked_at = datetime(2026, 9, 27, 21, 0, tzinfo=UTC)
+    session = FakeSession(
+        [
+            FakeRowsResult((_delegation_row(),)),
+            FakeOneResult(
+                _delegation_row(
+                    revoked_at=revoked_at,
+                    revoked_by=ACTOR_ID,
+                    revocation_reason="Coverage ended",
+                )
+            ),
+        ]
+    )
+
+    delegations = list_staff_delegations(
+        session=session,  # type: ignore[arg-type]
+        staff_id=GRANTEE_ID,
+    )
+    revoked = revoke_staff_delegation(
+        session=session,  # type: ignore[arg-type]
+        delegation_id=DELEGATION_ID,
+        grantee_staff_id=GRANTEE_ID,
+        revoked_at=revoked_at,
+        revoked_by=ACTOR_ID,
+        revocation_reason="Coverage ended",
+    )
+
+    assert delegations == (delegations[0],)
+    assert delegations[0].delegation_id == DELEGATION_ID
+    assert revoked.revoked_at == revoked_at
+    assert revoked.revoked_by == ACTOR_ID
+    assert revoked.revocation_reason == "Coverage ended"
+    assert len(session.calls) == 2
 
 
 def test_insert_lifecycle_event_executes_insert() -> None:

@@ -1,14 +1,15 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 from uuid import UUID
 
-from sqlalchemy import insert, select, update
+from sqlalchemy import Select, insert, or_, select, update
 from sqlalchemy.orm import Session
 
 from golden_rose.persistence.models import (
     staff_account_lifecycle_events,
     staff_accounts,
+    staff_delegations,
     staff_permission_grants,
 )
 
@@ -28,6 +29,22 @@ class StaffAccountRecord:
     updated_at: datetime
     updated_by: UUID
     version: int
+
+
+@dataclass(frozen=True, slots=True)
+class StaffDelegationRecord:
+    delegation_id: UUID
+    grantor_staff_id: UUID
+    grantee_staff_id: UUID
+    permission_name: str
+    scope_kind: str
+    scope_id: UUID | None
+    reason_text: str
+    starts_at: datetime
+    expires_at: datetime
+    revoked_at: datetime | None
+    revoked_by: UUID | None
+    revocation_reason: str | None
 
 
 def insert_staff_account(
@@ -224,14 +241,164 @@ def insert_staff_permission_grants(
 
 
 def list_active_staff_permissions(*, session: Session, staff_id: UUID) -> frozenset[str]:
-    rows = session.execute(
+    direct_permissions = session.execute(
         select(staff_permission_grants.c.permission_name).where(
             staff_permission_grants.c.staff_id == staff_id,
             staff_permission_grants.c.scope_kind == "global",
             staff_permission_grants.c.revoked_at.is_(None),
         )
     ).scalars()
-    return frozenset(rows)
+    now = datetime.now(UTC)
+    delegated_permissions = session.execute(
+        select(staff_delegations.c.permission_name).where(
+            staff_delegations.c.grantee_staff_id == staff_id,
+            staff_delegations.c.scope_kind == "global",
+            staff_delegations.c.revoked_at.is_(None),
+            staff_delegations.c.starts_at <= now,
+            staff_delegations.c.expires_at > now,
+        )
+    ).scalars()
+    return frozenset(direct_permissions) | frozenset(delegated_permissions)
+
+
+def insert_staff_delegation(
+    *,
+    session: Session,
+    delegation_id: UUID,
+    grantor_staff_id: UUID,
+    grantee_staff_id: UUID,
+    permission_name: str,
+    scope_kind: str,
+    scope_id: UUID | None,
+    reason_text: str,
+    starts_at: datetime,
+    expires_at: datetime,
+) -> StaffDelegationRecord:
+    session.execute(
+        insert(staff_delegations).values(
+            delegation_id=delegation_id,
+            grantor_staff_id=grantor_staff_id,
+            grantee_staff_id=grantee_staff_id,
+            permission_name=permission_name,
+            scope_kind=scope_kind,
+            scope_id=scope_id,
+            reason_text=reason_text,
+            starts_at=starts_at,
+            expires_at=expires_at,
+        )
+    )
+    return StaffDelegationRecord(
+        delegation_id=delegation_id,
+        grantor_staff_id=grantor_staff_id,
+        grantee_staff_id=grantee_staff_id,
+        permission_name=permission_name,
+        scope_kind=scope_kind,
+        scope_id=scope_id,
+        reason_text=reason_text,
+        starts_at=starts_at,
+        expires_at=expires_at,
+        revoked_at=None,
+        revoked_by=None,
+        revocation_reason=None,
+    )
+
+
+def _delegation_select() -> Select[
+    tuple[
+        UUID,
+        UUID,
+        UUID,
+        str,
+        str,
+        UUID | None,
+        str,
+        datetime,
+        datetime,
+        datetime | None,
+        UUID | None,
+        str | None,
+    ]
+]:
+    return select(
+        staff_delegations.c.delegation_id,
+        staff_delegations.c.grantor_staff_id,
+        staff_delegations.c.grantee_staff_id,
+        staff_delegations.c.permission_name,
+        staff_delegations.c.scope_kind,
+        staff_delegations.c.scope_id,
+        staff_delegations.c.reason_text,
+        staff_delegations.c.starts_at,
+        staff_delegations.c.expires_at,
+        staff_delegations.c.revoked_at,
+        staff_delegations.c.revoked_by,
+        staff_delegations.c.revocation_reason,
+    )
+
+
+def get_staff_delegation_by_id(*, session: Session, delegation_id: UUID) -> StaffDelegationRecord:
+    row = session.execute(
+        _delegation_select().where(staff_delegations.c.delegation_id == delegation_id)
+    ).one()
+    return StaffDelegationRecord(*row)
+
+
+def list_staff_delegations(
+    *,
+    session: Session,
+    staff_id: UUID,
+    limit: int = 50,
+) -> tuple[StaffDelegationRecord, ...]:
+    rows = session.execute(
+        _delegation_select()
+        .where(
+            or_(
+                staff_delegations.c.grantee_staff_id == staff_id,
+                staff_delegations.c.grantor_staff_id == staff_id,
+            )
+        )
+        .order_by(staff_delegations.c.starts_at.desc(), staff_delegations.c.delegation_id.asc())
+        .limit(limit)
+    )
+    return tuple(StaffDelegationRecord(*row) for row in rows)
+
+
+def revoke_staff_delegation(
+    *,
+    session: Session,
+    delegation_id: UUID,
+    grantee_staff_id: UUID,
+    revoked_at: datetime,
+    revoked_by: UUID,
+    revocation_reason: str,
+) -> StaffDelegationRecord:
+    row = session.execute(
+        update(staff_delegations)
+        .where(
+            staff_delegations.c.delegation_id == delegation_id,
+            staff_delegations.c.grantee_staff_id == grantee_staff_id,
+            staff_delegations.c.revoked_at.is_(None),
+        )
+        .values(
+            revoked_at=revoked_at,
+            revoked_by=revoked_by,
+            revocation_reason=revocation_reason,
+        )
+        .returning(
+            staff_delegations.c.delegation_id,
+            staff_delegations.c.grantor_staff_id,
+            staff_delegations.c.grantee_staff_id,
+            staff_delegations.c.permission_name,
+            staff_delegations.c.scope_kind,
+            staff_delegations.c.scope_id,
+            staff_delegations.c.reason_text,
+            staff_delegations.c.starts_at,
+            staff_delegations.c.expires_at,
+            staff_delegations.c.revoked_at,
+            staff_delegations.c.revoked_by,
+            staff_delegations.c.revocation_reason,
+        )
+    ).one()
+    return StaffDelegationRecord(*row)
 
 
 def insert_lifecycle_event(

@@ -2520,6 +2520,8 @@ def test_openapi_exposes_only_approved_staff_employer_routes() -> None:
             "/api/staff/v1/intakes/{intake_id}/addresses/{section}/revisions",
             "/api/staff/v1/staff-accounts",
             "/api/staff/v1/staff-accounts/{staff_id}",
+            "/api/staff/v1/staff-accounts/{staff_id}/delegations",
+            "/api/staff/v1/staff-accounts/{staff_id}/delegations/{delegation_id}/revoke",
             "/api/staff/v1/staff-accounts/{staff_id}/activate",
             "/api/staff/v1/staff-accounts/{staff_id}/suspend",
             "/api/staff/v1/staff-accounts/{staff_id}/deprovision",
@@ -2539,6 +2541,10 @@ def test_openapi_exposes_only_approved_staff_employer_routes() -> None:
         assert set(paths["/readiness"]) == {"get"}
         assert set(paths["/api/staff/v1/staff-accounts"]) == {"get", "post"}
         assert set(paths["/api/staff/v1/staff-accounts/{staff_id}"]) == {"get"}
+        assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/delegations"]) == {"get", "post"}
+        assert set(
+            paths["/api/staff/v1/staff-accounts/{staff_id}/delegations/{delegation_id}/revoke"]
+        ) == {"post"}
         assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/activate"]) == {"post"}
         assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/suspend"]) == {"post"}
         assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/deprovision"]) == {"post"}

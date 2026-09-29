@@ -232,6 +232,12 @@ class StaffAccountResponse(BaseModel):
     version: int
 
 
+class StaffAccountListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: tuple[StaffAccountResponse, ...]
+
+
 class StaffAccountLifecycleResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

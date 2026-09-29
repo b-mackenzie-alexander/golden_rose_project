@@ -1,0 +1,381 @@
+import { useEffect, useMemo, useState } from 'react';
+import type { SyntheticEvent } from 'react';
+
+import {
+  activateStaffAccount,
+  createStaffAccount,
+  deprovisionStaffAccount,
+  listStaffAccounts,
+  recordRecoveryEvidence,
+  recordSessionRevocationEvidence,
+  suspendStaffAccount,
+} from '../api/staffAccountClient';
+import type { StaffAccount, StaffAccountFailureKind, StaffAccountRole } from '../api/staffAccountClient';
+import { IconSymbol } from '../dashboard/artwork';
+import { useLanguage } from '../i18n/LanguageProvider';
+
+type AccountAction = 'activate' | 'suspend' | 'deprovision' | 'recovery' | 'session';
+type CreateForm = {
+  displayName: string;
+  providerSubject: string;
+  roleName: StaffAccountRole;
+  permissionNames: string[];
+  mfaEnrolled: boolean;
+  reasonText: string;
+};
+type ActionForm = {
+  account: StaffAccount;
+  action: AccountAction;
+  reasonText: string;
+  mfaEnrolled: boolean;
+};
+
+const permissions = [
+  'staff_account:read',
+  'staff_account:create',
+  'staff_account:activate',
+  'staff_account:suspend',
+  'staff_account:deprovision',
+  'staff_account:recovery:record',
+  'staff_account:session:revoke',
+  'intake:read',
+  'worker:read',
+  'employer:read',
+] as const;
+
+const roleLabels: Record<StaffAccountRole, { en: string; es: string }> = {
+  owner: { en: 'Owner', es: 'Propietaria' },
+  delegated_manager: { en: 'Delegated manager', es: 'Gerente delegada' },
+  operations_staff: { en: 'Operations staff', es: 'Personal operativo' },
+  platform_administrator: { en: 'Platform administrator', es: 'Administrador de plataforma' },
+};
+
+const statusLabels = {
+  active: { en: 'Active', es: 'Activa' },
+  suspended: { en: 'Suspended', es: 'Suspendida' },
+  deprovisioned: { en: 'Deprovisioned', es: 'Retirada' },
+};
+
+const actionLabels: Record<AccountAction, { en: string; es: string }> = {
+  activate: { en: 'Activate', es: 'Activar' },
+  suspend: { en: 'Suspend', es: 'Suspender' },
+  deprovision: { en: 'Deprovision', es: 'Retirar' },
+  recovery: { en: 'Record recovery evidence', es: 'Registrar evidencia de recuperacion' },
+  session: { en: 'Record session revocation evidence', es: 'Registrar evidencia de sesion revocada' },
+};
+
+const failureLabels: Record<StaffAccountFailureKind, { en: string; es: string }> = {
+  validation: { en: 'Check the highlighted account fields and try again.', es: 'Revise los campos marcados e intente otra vez.' },
+  forbidden: { en: 'This staff session does not have permission for that account action.', es: 'Esta sesion no tiene permiso para esa accion.' },
+  not_found: { en: 'The account is no longer available. Reload the list.', es: 'La cuenta ya no esta disponible. Recargue la lista.' },
+  stale: { en: 'The account changed in another session. Reload before trying again.', es: 'La cuenta cambio en otra sesion. Recargue antes de intentar otra vez.' },
+  unavailable: { en: 'The account service is unavailable. Try again after the connection recovers.', es: 'El servicio de cuentas no esta disponible. Intente cuando se recupere la conexion.' },
+  unknown_outcome: { en: 'The outcome is unknown. Retry the original account request before changing the form.', es: 'El resultado es desconocido. Reintente la solicitud original antes de cambiar el formulario.' },
+  unexpected: { en: 'The account response could not be used safely.', es: 'La respuesta de cuenta no se pudo usar con seguridad.' },
+};
+
+const emptyCreate: CreateForm = {
+  displayName: '',
+  providerSubject: '',
+  roleName: 'operations_staff',
+  permissionNames: ['staff_account:read'],
+  mfaEnrolled: false,
+  reasonText: '',
+};
+
+function createCommandId() {
+  return globalThis.crypto.randomUUID();
+}
+
+function upsertAccount(accounts: StaffAccount[], account: StaffAccount) {
+  const next = accounts.filter((item) => item.staffId !== account.staffId);
+  return [account, ...next].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+}
+
+function formatDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function failureText(kind: StaffAccountFailureKind, language: 'en' | 'es') {
+  return failureLabels[kind][language];
+}
+
+function actionHelp(action: AccountAction, language: 'en' | 'es') {
+  if (action === 'recovery') {
+    return language === 'en'
+      ? 'Evidence only. Identity-provider factor reset stays outside this application.'
+      : 'Solo evidencia. El restablecimiento del proveedor de identidad queda fuera de esta aplicacion.';
+  }
+  if (action === 'session') {
+    return language === 'en'
+      ? 'Evidence only. This does not confirm provider-side session revocation.'
+      : 'Solo evidencia. No confirma revocacion de sesiones en el proveedor.';
+  }
+  if (action === 'activate') {
+    return language === 'en'
+      ? 'Activation requires confirmed MFA enrollment.'
+      : 'La activacion requiere MFA confirmado.';
+  }
+  return language === 'en'
+    ? 'Lifecycle changes use the current account version.'
+    : 'Los cambios usan la version actual de la cuenta.';
+}
+
+export function StaffAccountAdmin() {
+  const { language } = useLanguage();
+  const [accounts, setAccounts] = useState<StaffAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+  const [createForm, setCreateForm] = useState<CreateForm>(emptyCreate);
+  const [createErrors, setCreateErrors] = useState<Partial<Record<keyof CreateForm, string>>>({});
+  const [actionForm, setActionForm] = useState<ActionForm | null>(null);
+  const [actionError, setActionError] = useState('');
+  const activeCount = useMemo(() => accounts.filter((account) => account.lifecycleStatus === 'active').length, [accounts]);
+  const suspendedCount = useMemo(() => accounts.filter((account) => account.lifecycleStatus === 'suspended').length, [accounts]);
+
+  async function reloadAccounts() {
+    setLoading(true);
+    setError('');
+    const result = await listStaffAccounts();
+    if (result.ok) {
+      setAccounts(result.value);
+    } else {
+      setError(failureText(result.failure.kind, language));
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    void listStaffAccounts().then((result) => {
+      if (cancelled) return;
+      if (result.ok) {
+        setAccounts(result.value);
+        setError('');
+      } else {
+        setError(failureText(result.failure.kind, language));
+      }
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [language]);
+
+  function validateCreate() {
+    const next: Partial<Record<keyof CreateForm, string>> = {};
+    if (createForm.displayName.trim().length === 0) next.displayName = language === 'en' ? 'Display name is required.' : 'Nombre visible requerido.';
+    if (createForm.providerSubject.trim().length === 0) next.providerSubject = language === 'en' ? 'Provider subject is required.' : 'Sujeto del proveedor requerido.';
+    if (createForm.permissionNames.length === 0) next.permissionNames = language === 'en' ? 'Select at least one permission.' : 'Seleccione al menos un permiso.';
+    if (createForm.reasonText.trim().length === 0) next.reasonText = language === 'en' ? 'Reason is required.' : 'Motivo requerido.';
+    setCreateErrors(next);
+    return Object.keys(next).length === 0;
+  }
+
+  async function submitCreate(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setNotice('');
+    setError('');
+    if (!validateCreate()) return;
+    const result = await createStaffAccount({ ...createForm, commandId: createCommandId() });
+    if (!result.ok) {
+      setError(failureText(result.failure.kind, language));
+      return;
+    }
+    setAccounts((current) => upsertAccount(current, result.value.account));
+    setNotice(language === 'en' ? 'Staff account created in suspended onboarding state.' : 'Cuenta creada en estado suspendido para incorporacion.');
+    setCreateForm(emptyCreate);
+    setCreateErrors({});
+  }
+
+  async function submitAction(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setActionError('');
+    setNotice('');
+    if (actionForm === null) return;
+    if (actionForm.reasonText.trim().length === 0) {
+      setActionError(language === 'en' ? 'Reason is required.' : 'Motivo requerido.');
+      return;
+    }
+    const base = {
+      staffId: actionForm.account.staffId,
+      expectedVersion: actionForm.account.version,
+      reasonText: actionForm.reasonText,
+      commandId: createCommandId(),
+    };
+    const result = actionForm.action === 'activate'
+      ? await activateStaffAccount({ ...base, mfaEnrolled: actionForm.mfaEnrolled })
+      : actionForm.action === 'suspend'
+        ? await suspendStaffAccount(base)
+        : actionForm.action === 'deprovision'
+          ? await deprovisionStaffAccount(base)
+          : actionForm.action === 'recovery'
+            ? await recordRecoveryEvidence(base)
+            : await recordSessionRevocationEvidence(base);
+    if (!result.ok) {
+      setActionError(failureText(result.failure.kind, language));
+      return;
+    }
+    setAccounts((current) => upsertAccount(current, result.value.account));
+    setNotice(actionLabels[actionForm.action][language]);
+    setActionForm(null);
+  }
+
+  function togglePermission(permission: string) {
+    setCreateForm((current) => ({
+      ...current,
+      permissionNames: current.permissionNames.includes(permission)
+        ? current.permissionNames.filter((item) => item !== permission)
+        : [...current.permissionNames, permission],
+    }));
+  }
+
+  return (
+    <section aria-labelledby="staff-account-heading" className="staff-account-page">
+      <div className="staff-account-header">
+        <div>
+          <p className="module-preview-eyebrow">{language === 'en' ? 'Staff administration' : 'Administracion del personal'}</p>
+          <h2 id="staff-account-heading">{language === 'en' ? 'Staff accounts' : 'Cuentas del personal'}</h2>
+        </div>
+        <button className="staff-secondary-button focus-ring" type="button" onClick={() => { void reloadAccounts(); }}>
+          {language === 'en' ? 'Reload accounts' : 'Recargar cuentas'}
+        </button>
+      </div>
+
+      <div className="staff-account-metrics" aria-label={language === 'en' ? 'Account lifecycle summary' : 'Resumen de cuentas'}>
+        <div><strong>{accounts.length}</strong><span>{language === 'en' ? 'Total accounts' : 'Cuentas totales'}</span></div>
+        <div><strong>{activeCount}</strong><span>{language === 'en' ? 'Active' : 'Activas'}</span></div>
+        <div><strong>{suspendedCount}</strong><span>{language === 'en' ? 'Suspended' : 'Suspendidas'}</span></div>
+      </div>
+
+      {notice ? <p className="staff-account-notice" role="status">{notice}</p> : null}
+      {error ? <p className="staff-account-error" role="alert">{error}</p> : null}
+
+      <div className="staff-account-layout">
+        <section className="staff-account-panel" aria-labelledby="account-list-heading">
+          <div className="staff-account-panel-header">
+            <h3 id="account-list-heading"><IconSymbol name="workers" /> {language === 'en' ? 'Account lifecycle' : 'Ciclo de cuentas'}</h3>
+            {loading ? <span>{language === 'en' ? 'Loading' : 'Cargando'}</span> : null}
+          </div>
+          <div className="staff-account-table" role="table" aria-label={language === 'en' ? 'Staff account lifecycle table' : 'Tabla de cuentas'}>
+            <div role="row" className="staff-account-row staff-account-row--head">
+              <span role="columnheader">{language === 'en' ? 'Staff member' : 'Persona'}</span>
+              <span role="columnheader">{language === 'en' ? 'Role' : 'Rol'}</span>
+              <span role="columnheader">{language === 'en' ? 'State' : 'Estado'}</span>
+              <span role="columnheader">{language === 'en' ? 'Updated' : 'Actualizada'}</span>
+              <span role="columnheader">{language === 'en' ? 'Actions' : 'Acciones'}</span>
+            </div>
+            {accounts.map((account) => (
+              <div role="row" className="staff-account-row" key={account.staffId}>
+                <span role="cell">
+                  <strong>{account.displayName}</strong>
+                  <small>{account.providerSubject}</small>
+                </span>
+                <span role="cell">{roleLabels[account.roleName][language]}</span>
+                <span role="cell">
+                  <span className="staff-account-status" data-status={account.lifecycleStatus}>{statusLabels[account.lifecycleStatus][language]}</span>
+                  <small>{account.mfaEnrolled ? 'MFA' : language === 'en' ? 'MFA pending' : 'MFA pendiente'}</small>
+                </span>
+                <span role="cell">
+                  <time dateTime={account.updatedAt}>{formatDate(account.updatedAt)}</time>
+                  <small>{language === 'en' ? `Version ${String(account.version)}` : `Version ${String(account.version)}`}</small>
+                </span>
+                <span role="cell" className="staff-account-actions">
+                  {account.lifecycleStatus !== 'active' && account.lifecycleStatus !== 'deprovisioned' ? (
+                    <button className="focus-ring" type="button" onClick={() => { setActionForm({ account, action: 'activate', reasonText: '', mfaEnrolled: true }); }}>{actionLabels.activate[language]}</button>
+                  ) : null}
+                  {account.lifecycleStatus === 'active' ? (
+                    <button className="focus-ring" type="button" onClick={() => { setActionForm({ account, action: 'suspend', reasonText: '', mfaEnrolled: false }); }}>{actionLabels.suspend[language]}</button>
+                  ) : null}
+                  {account.lifecycleStatus !== 'deprovisioned' ? (
+                    <button className="focus-ring" type="button" onClick={() => { setActionForm({ account, action: 'deprovision', reasonText: '', mfaEnrolled: false }); }}>{actionLabels.deprovision[language]}</button>
+                  ) : null}
+                  {account.lifecycleStatus !== 'deprovisioned' ? (
+                    <button className="focus-ring" type="button" onClick={() => { setActionForm({ account, action: 'recovery', reasonText: '', mfaEnrolled: account.mfaEnrolled }); }}>{language === 'en' ? 'Recovery evidence' : 'Evidencia recuperacion'}</button>
+                  ) : null}
+                  <button className="focus-ring" type="button" onClick={() => { setActionForm({ account, action: 'session', reasonText: '', mfaEnrolled: account.mfaEnrolled }); }}>{language === 'en' ? 'Session evidence' : 'Evidencia sesion'}</button>
+                </span>
+              </div>
+            ))}
+            {!loading && accounts.length === 0 ? (
+              <p className="staff-account-empty">{language === 'en' ? 'No staff accounts are available to this session.' : 'No hay cuentas disponibles para esta sesion.'}</p>
+            ) : null}
+          </div>
+        </section>
+
+        <section className="staff-account-panel" aria-labelledby="create-account-heading">
+          <h3 id="create-account-heading"><IconSymbol name="check" /> {language === 'en' ? 'Onboard staff account' : 'Crear cuenta de personal'}</h3>
+          <form className="staff-account-form" onSubmit={(event) => { void submitCreate(event); }}>
+            <label>
+              <span>{language === 'en' ? 'Display name' : 'Nombre visible'}</span>
+              <input className="focus-ring" value={createForm.displayName} onChange={(event) => { setCreateForm({ ...createForm, displayName: event.target.value }); }} />
+              {createErrors.displayName ? <small role="alert">{createErrors.displayName}</small> : null}
+            </label>
+            <label>
+              <span>{language === 'en' ? 'Provider subject' : 'Sujeto del proveedor'}</span>
+              <input className="focus-ring" value={createForm.providerSubject} onChange={(event) => { setCreateForm({ ...createForm, providerSubject: event.target.value }); }} />
+              {createErrors.providerSubject ? <small role="alert">{createErrors.providerSubject}</small> : null}
+            </label>
+            <div className="calendar-form-row">
+              <label>
+                <span>{language === 'en' ? 'Role' : 'Rol'}</span>
+                <select className="focus-ring" value={createForm.roleName} onChange={(event) => { setCreateForm({ ...createForm, roleName: event.target.value as StaffAccountRole }); }}>
+                  {(Object.keys(roleLabels) as StaffAccountRole[]).map((role) => (
+                    <option key={role} value={role}>{roleLabels[role][language]}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="staff-checkbox-label">
+                <input checked={createForm.mfaEnrolled} type="checkbox" onChange={(event) => { setCreateForm({ ...createForm, mfaEnrolled: event.target.checked }); }} />
+                <span>{language === 'en' ? 'MFA already enrolled' : 'MFA ya inscrito'}</span>
+              </label>
+            </div>
+            <fieldset className="staff-permission-fieldset">
+              <legend>{language === 'en' ? 'Named permissions' : 'Permisos nombrados'}</legend>
+              {permissions.map((permission) => (
+                <label key={permission}>
+                  <input checked={createForm.permissionNames.includes(permission)} type="checkbox" onChange={() => { togglePermission(permission); }} />
+                  <span>{permission}</span>
+                </label>
+              ))}
+              {createErrors.permissionNames ? <small role="alert">{createErrors.permissionNames}</small> : null}
+            </fieldset>
+            <label>
+              <span>{language === 'en' ? 'Reason' : 'Motivo'}</span>
+              <textarea className="focus-ring" value={createForm.reasonText} onChange={(event) => { setCreateForm({ ...createForm, reasonText: event.target.value }); }} />
+              {createErrors.reasonText ? <small role="alert">{createErrors.reasonText}</small> : null}
+            </label>
+            <button className="staff-primary-button focus-ring" type="submit">{language === 'en' ? 'Create staff account' : 'Crear cuenta'}</button>
+          </form>
+        </section>
+      </div>
+
+      {actionForm ? (
+        <section className="staff-account-panel staff-action-panel" aria-labelledby="account-action-heading">
+          <div className="staff-account-panel-header">
+            <h3 id="account-action-heading">{actionLabels[actionForm.action][language]}: {actionForm.account.displayName}</h3>
+            <button className="staff-secondary-button focus-ring" type="button" onClick={() => { setActionForm(null); }}>{language === 'en' ? 'Close' : 'Cerrar'}</button>
+          </div>
+          <p>{actionHelp(actionForm.action, language)}</p>
+          {actionError ? <p className="staff-account-error" role="alert">{actionError}</p> : null}
+          <form className="staff-account-form" onSubmit={(event) => { void submitAction(event); }}>
+            {actionForm.action === 'activate' ? (
+              <label className="staff-checkbox-label">
+                <input checked={actionForm.mfaEnrolled} type="checkbox" onChange={(event) => { setActionForm({ ...actionForm, mfaEnrolled: event.target.checked }); }} />
+                <span>{language === 'en' ? 'MFA enrollment confirmed' : 'MFA confirmado'}</span>
+              </label>
+            ) : null}
+            <label>
+              <span>{language === 'en' ? 'Reason' : 'Motivo'}</span>
+              <textarea className="focus-ring" value={actionForm.reasonText} onChange={(event) => { setActionForm({ ...actionForm, reasonText: event.target.value }); }} />
+            </label>
+            <button className="staff-primary-button focus-ring" type="submit">{actionLabels[actionForm.action][language]}</button>
+          </form>
+        </section>
+      ) : null}
+    </section>
+  );
+}

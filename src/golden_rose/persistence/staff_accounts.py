@@ -116,6 +116,46 @@ def get_staff_account_by_provider_subject(
     return StaffAccountRecord(*row)
 
 
+def get_staff_account_by_id(*, session: Session, staff_id: UUID) -> StaffAccountRecord:
+    row = session.execute(
+        select(
+            staff_accounts.c.staff_id,
+            staff_accounts.c.provider_subject,
+            staff_accounts.c.display_name,
+            staff_accounts.c.role_name,
+            staff_accounts.c.lifecycle_status,
+            staff_accounts.c.mfa_enrolled,
+            staff_accounts.c.created_at,
+            staff_accounts.c.created_by,
+            staff_accounts.c.updated_at,
+            staff_accounts.c.updated_by,
+            staff_accounts.c.version,
+        ).where(staff_accounts.c.staff_id == staff_id)
+    ).one()
+    return StaffAccountRecord(*row)
+
+
+def list_staff_accounts(*, session: Session, limit: int = 50) -> tuple[StaffAccountRecord, ...]:
+    rows = session.execute(
+        select(
+            staff_accounts.c.staff_id,
+            staff_accounts.c.provider_subject,
+            staff_accounts.c.display_name,
+            staff_accounts.c.role_name,
+            staff_accounts.c.lifecycle_status,
+            staff_accounts.c.mfa_enrolled,
+            staff_accounts.c.created_at,
+            staff_accounts.c.created_by,
+            staff_accounts.c.updated_at,
+            staff_accounts.c.updated_by,
+            staff_accounts.c.version,
+        )
+        .order_by(staff_accounts.c.updated_at.desc(), staff_accounts.c.staff_id.asc())
+        .limit(limit)
+    )
+    return tuple(StaffAccountRecord(*row) for row in rows)
+
+
 def update_staff_account_lifecycle(
     *,
     session: Session,

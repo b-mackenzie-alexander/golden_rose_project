@@ -2,6 +2,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Response, status
+from sqlalchemy.exc import NoResultFound, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from golden_rose.api.dependencies import (
@@ -16,6 +17,7 @@ from golden_rose.api.staff.schemas import (
     ActivateStaffAccountRequest,
     CreateStaffAccountRequest,
     StaffAccountLifecycleResponse,
+    StaffAccountListResponse,
     StaffAccountResponse,
     StaffAccountTransitionRequest,
 )
@@ -32,9 +34,11 @@ from golden_rose.application.staff_account_lifecycle import (
     record_staff_account_session_revocation_evidence,
     suspend_staff_account,
 )
+from golden_rose.auth.permissions import can_read_staff_account
 from golden_rose.auth.principal import StaffPrincipal
 from golden_rose.clock import Clock
 from golden_rose.identifiers import IdentifierFactory
+from golden_rose.persistence.staff_accounts import get_staff_account_by_id, list_staff_accounts
 
 router = APIRouter(prefix="/api/staff/v1/staff-accounts", tags=["staff-accounts"])
 
@@ -84,6 +88,61 @@ def _problem_for_lifecycle_error(exc: Exception) -> Response:
             type_="https://golden-rose.local/problems/service-unavailable",
         )
     raise exc
+
+
+def _read_response(response: Response) -> None:
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Vary"] = "Authorization"
+
+
+def _require_read_permission(principal: StaffPrincipal) -> Response | None:
+    if can_read_staff_account(principal):
+        return None
+    return no_store_problem_response(
+        status_code=403,
+        title="Forbidden",
+        detail="forbidden",
+        type_="https://golden-rose.local/problems/forbidden",
+    )
+
+
+@router.get("", response_model=StaffAccountListResponse)
+def get_staff_accounts(
+    response: Response,
+    session: Annotated[Session, Depends(get_db_session)],
+    principal: Annotated[StaffPrincipal, Depends(get_staff_principal)],
+) -> StaffAccountListResponse | Response:
+    denied = _require_read_permission(principal)
+    if denied is not None:
+        return denied
+    try:
+        accounts = list_staff_accounts(session=session)
+    except SQLAlchemyError:
+        return _problem_for_lifecycle_error(SafePersistenceError("persistence operation failed"))
+    _read_response(response)
+    return StaffAccountListResponse(
+        items=tuple(StaffAccountResponse.model_validate(account) for account in accounts),
+    )
+
+
+@router.get("/{staff_id}", response_model=StaffAccountResponse)
+def get_staff_account(
+    staff_id: UUID,
+    response: Response,
+    session: Annotated[Session, Depends(get_db_session)],
+    principal: Annotated[StaffPrincipal, Depends(get_staff_principal)],
+) -> StaffAccountResponse | Response:
+    denied = _require_read_permission(principal)
+    if denied is not None:
+        return denied
+    try:
+        account = get_staff_account_by_id(session=session, staff_id=staff_id)
+    except NoResultFound:
+        return _problem_for_lifecycle_error(StaffAccountNotFoundError("staff account not found"))
+    except SQLAlchemyError:
+        return _problem_for_lifecycle_error(SafePersistenceError("persistence operation failed"))
+    _read_response(response)
+    return StaffAccountResponse.model_validate(account)
 
 
 @router.post(

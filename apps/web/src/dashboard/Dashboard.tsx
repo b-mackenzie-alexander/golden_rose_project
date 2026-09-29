@@ -62,6 +62,7 @@ const englishDashboard: DashboardCopy = {
   quickActions: [
     { href: '/staff/intakes/workers', label: 'New worker intake' },
     { href: '/staff/intakes/employers', label: 'New employer intake' },
+    { href: '/staff/admin/accounts', label: 'Manage staff accounts' },
     { href: '/staff/calendar', label: 'View calendar' },
     { href: '/employers', label: 'Search records' },
   ],
@@ -123,6 +124,7 @@ const spanishDashboard: DashboardCopy = {
   quickActions: [
     { href: '/staff/intakes/workers', label: 'Nuevo registro de trabajador' },
     { href: '/staff/intakes/employers', label: 'Nuevo registro de empleador' },
+    { href: '/staff/admin/accounts', label: 'Administrar cuentas' },
     { href: '/staff/calendar', label: 'Ver calendario' },
     { href: '/employers', label: 'Buscar registros' },
   ],

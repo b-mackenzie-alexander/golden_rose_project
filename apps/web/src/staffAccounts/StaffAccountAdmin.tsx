@@ -80,6 +80,10 @@ const actionLabels: Record<AccountAction, { en: string; es: string }> = {
 };
 
 const failureLabels: Record<StaffAccountFailureKind, { en: string; es: string }> = {
+  sign_in_required: { en: 'Sign in with a staff session before managing accounts.', es: 'Inicie sesion del personal antes de administrar cuentas.' },
+  authentication_failed: { en: 'The staff session could not be verified. Sign in again through the configured provider.', es: 'No se pudo verificar la sesion del personal. Inicie sesion otra vez con el proveedor configurado.' },
+  account_unavailable: { en: 'This staff account is unavailable for account administration.', es: 'Esta cuenta del personal no esta disponible para administrar cuentas.' },
+  identity_provider_unavailable: { en: 'The staff identity provider is temporarily unavailable.', es: 'El proveedor de identidad del personal no esta disponible temporalmente.' },
   validation: { en: 'Check the highlighted account fields and try again.', es: 'Revise los campos marcados e intente otra vez.' },
   forbidden: { en: 'This staff session does not have permission for that account action.', es: 'Esta sesion no tiene permiso para esa accion.' },
   not_found: { en: 'The account is no longer available. Reload the list.', es: 'La cuenta ya no esta disponible. Recargue la lista.' },

@@ -8,6 +8,7 @@ export type StaffAccountEvent =
   | 'staff_account.recovery_recorded'
   | 'staff_account.sessions_revoked';
 export type StaffDelegationEvent = 'staff_delegation.granted' | 'staff_delegation.revoked';
+export type StaffAuthContext = 'synthetic' | 'staff_oidc';
 
 export type StaffAccount = {
   staffId: string;
@@ -50,7 +51,20 @@ export type StaffDelegationResult = {
   resultVersion: number;
 };
 
+export type StaffSession = {
+  actorId: string;
+  roleName: string;
+  permissionNames: string[];
+  authContext: StaffAuthContext;
+  account: StaffAccount | null;
+  delegations: StaffDelegation[];
+};
+
 export type StaffAccountFailureKind =
+  | 'sign_in_required'
+  | 'authentication_failed'
+  | 'account_unavailable'
+  | 'identity_provider_unavailable'
   | 'validation'
   | 'forbidden'
   | 'not_found'
@@ -100,6 +114,7 @@ export type RevokeStaffDelegationInput = {
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const roles = new Set<StaffAccountRole>(['owner', 'delegated_manager', 'operations_staff', 'platform_administrator']);
 const statuses = new Set<StaffAccountStatus>(['active', 'suspended', 'deprovisioned']);
+const authContexts = new Set<StaffAuthContext>(['synthetic', 'staff_oidc']);
 const events = new Set<StaffAccountEvent>([
   'staff_account.created',
   'staff_account.activated',
@@ -127,7 +142,7 @@ function timestamp(value: unknown): value is string {
 }
 
 function isJson(response: Response) {
-  return /^application\/json(?:\s*;.*)?$/i.test(response.headers.get('Content-Type') ?? '');
+  return /^application\/(?:json|problem\+json)(?:\s*;.*)?$/i.test(response.headers.get('Content-Type') ?? '');
 }
 
 async function cancelBody(response: Response) {
@@ -138,13 +153,44 @@ async function cancelBody(response: Response) {
   }
 }
 
-function failure(status: number, command = false): StaffAccountResult<never> {
+function parseProblemType(value: unknown): string | null {
+  if (!object(value)) return null;
+  return typeof value.type === 'string' ? value.type : null;
+}
+
+function failureFromProblem(status: number, type: string | null, command = false): StaffAccountResult<never> {
+  if (type === 'https://golden-rose.local/problems/staff-authentication-required') {
+    return { ok: false, failure: { kind: 'sign_in_required' } };
+  }
+  if (type === 'https://golden-rose.local/problems/staff-authentication-failed') {
+    return { ok: false, failure: { kind: 'authentication_failed' } };
+  }
+  if (type === 'https://golden-rose.local/problems/staff-account-unavailable') {
+    return { ok: false, failure: { kind: 'account_unavailable' } };
+  }
+  if (type === 'https://golden-rose.local/problems/staff-identity-provider-unavailable') {
+    return { ok: false, failure: { kind: 'identity_provider_unavailable' } };
+  }
   if (status === 400 || status === 422) return { ok: false, failure: { kind: 'validation' } };
   if (status === 403) return { ok: false, failure: { kind: 'forbidden' } };
   if (status === 404) return { ok: false, failure: { kind: 'not_found' } };
   if (status === 412) return { ok: false, failure: { kind: 'stale' } };
   if (status === 503) return { ok: false, failure: { kind: 'unavailable' } };
   return { ok: false, failure: { kind: command ? 'unknown_outcome' : 'unexpected' } };
+}
+
+async function responseFailure(response: Response, command = false): Promise<StaffAccountResult<never>> {
+  let type: string | null = null;
+  if (isJson(response)) {
+    try {
+      type = parseProblemType(await response.json());
+    } catch {
+      type = null;
+    }
+  } else {
+    await cancelBody(response);
+  }
+  return failureFromProblem(response.status, type, command);
 }
 
 function parseAccount(value: unknown): StaffAccount | null {
@@ -254,6 +300,30 @@ function parseDelegationCommand(value: unknown): StaffDelegationResult | null {
   };
 }
 
+function parseSession(value: unknown): StaffSession | null {
+  if (!object(value)) return null;
+  const keys = new Set(['actor_id', 'role_name', 'permission_names', 'auth_context', 'account', 'delegations']);
+  if (Object.keys(value).some((key) => !keys.has(key))) return null;
+  if (typeof value.actor_id !== 'string' || !uuid.test(value.actor_id)) return null;
+  if (!text(value.role_name, 120)) return null;
+  const permissionNames = value.permission_names;
+  if (!Array.isArray(permissionNames) || permissionNames.length > 100) return null;
+  if (permissionNames.some((permission) => !text(permission, 120))) return null;
+  if (typeof value.auth_context !== 'string' || !authContexts.has(value.auth_context as StaffAuthContext)) return null;
+  if (value.account !== null && parseAccount(value.account) === null) return null;
+  if (!Array.isArray(value.delegations) || value.delegations.length > 50) return null;
+  const delegations = value.delegations.map(parseDelegation);
+  if (delegations.some((delegation) => delegation === null)) return null;
+  return {
+    actorId: value.actor_id,
+    roleName: value.role_name,
+    permissionNames: permissionNames as string[],
+    authContext: value.auth_context as StaffAuthContext,
+    account: value.account === null ? null : parseAccount(value.account),
+    delegations: delegations as StaffDelegation[],
+  };
+}
+
 async function request<T>(
   path: string,
   init: RequestInit,
@@ -274,8 +344,7 @@ async function request<T>(
     return { ok: false, failure: { kind: command ? 'unknown_outcome' : 'unavailable' } };
   }
   if (response.status < 200 || response.status >= 300) {
-    await cancelBody(response);
-    return failure(response.status, command);
+    return responseFailure(response, command);
   }
   if (!isJson(response)) {
     await cancelBody(response);
@@ -295,6 +364,10 @@ async function request<T>(
   } catch {
     return { ok: false, failure: { kind: command ? 'unknown_outcome' : 'unexpected' } };
   }
+}
+
+export async function getStaffSession(): Promise<StaffAccountResult<StaffSession>> {
+  return request('/session', { method: 'GET', headers: { Accept: 'application/json' } }, parseSession);
 }
 
 export async function listStaffAccounts(): Promise<StaffAccountResult<StaffAccount[]>> {

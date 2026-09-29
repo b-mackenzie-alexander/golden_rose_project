@@ -14,6 +14,7 @@ import { NotFoundPage } from './NotFoundPage';
 import { reloadCanonicalDocument } from '../browser/privacyLifecycle';
 import { EmployerWorkspace } from '../employers/EmployerWorkspace';
 import { StaffAccountAdmin } from '../staffAccounts/StaffAccountAdmin';
+import { StaffAccountProfile } from '../staffAccounts/StaffAccountProfile';
 import { LanguageProvider } from '../i18n/LanguageProvider';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { IconSymbol, ZoneMapArtwork } from '../dashboard/artwork';
@@ -130,6 +131,7 @@ export function AppRoutes() {
         <Route path="staff/work-interests" element={<WorkInterestCatalog />} />
         <Route path="staff/calendar" element={<StaffCalendar />} />
         <Route path="staff/queues" element={<WorkQueues />} />
+        <Route path="staff/account" element={<StaffAccountProfile />} />
         <Route path="staff/admin/accounts" element={<StaffAccountAdmin />} />
         <Route path="staff/map" element={<StaffMapPreview />} />
         <Route path="staff/reports" element={<StaffReportsPreview />} />

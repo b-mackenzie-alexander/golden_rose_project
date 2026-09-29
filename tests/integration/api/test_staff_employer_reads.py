@@ -2518,6 +2518,7 @@ def test_openapi_exposes_only_approved_staff_employer_routes() -> None:
             "/api/staff/v1/intakes/{intake_id}/revisions",
             "/api/staff/v1/intakes/{intake_id}/addresses/{section}",
             "/api/staff/v1/intakes/{intake_id}/addresses/{section}/revisions",
+            "/api/staff/v1/session",
             "/api/staff/v1/staff-accounts",
             "/api/staff/v1/staff-accounts/{staff_id}",
             "/api/staff/v1/staff-accounts/{staff_id}/delegations",
@@ -2539,6 +2540,7 @@ def test_openapi_exposes_only_approved_staff_employer_routes() -> None:
         }
         assert set(paths["/health"]) == {"get"}
         assert set(paths["/readiness"]) == {"get"}
+        assert set(paths["/api/staff/v1/session"]) == {"get"}
         assert set(paths["/api/staff/v1/staff-accounts"]) == {"get", "post"}
         assert set(paths["/api/staff/v1/staff-accounts/{staff_id}"]) == {"get"}
         assert set(paths["/api/staff/v1/staff-accounts/{staff_id}/delegations"]) == {"get", "post"}

@@ -27,6 +27,10 @@ activate provider-side staff identity, or create shared runtime access.
   placeholder-only checklist for deciding whether the deployable package is
   reviewable. It is not a production activation checklist and must preserve the
   separate-approval boundary for deployment, live data and shared runtime.
+- `deploy/gcp/templates/client-production-package-index.example.json` is a
+  placeholder-only index of the source package artifacts and offline validators.
+  It is not a production packet, release attestation, live evidence record or
+  approval to execute cloud commands.
 - Real project IDs, billing IDs, principals, service URLs, database URLs,
   identity-provider URLs, JWKS URLs, secret names, passwords, tokens, state
   buckets, support contacts, and owner emails must remain in approved private
@@ -102,6 +106,21 @@ remain `separate-review-required`, and requires production deployment, live-data
 admission and shared-runtime rollout to remain not executed without separate
 approval.
 
+When a later operator wants one value-safe index of the reviewed package source
+artifacts and their offline validators, keep the filled package index outside
+source control and validate it locally:
+
+```bash
+UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_package_index.py <operator-held-package-index.json>
+```
+
+The package index validator requires the runbooks, placeholder templates and
+offline validator scripts to be marked reviewed with value-safe evidence. It
+also requires the validator commands to remain offline/local, manual
+accessibility, fluent Spanish and staff workflow acceptance to remain
+`separate-review-required`, and production deployment, live-data admission and
+shared-runtime rollout to remain not executed without separate approval.
+
 ## Later Plan Review Policy
 
 A later approved production packet must review Terraform plan output against the
@@ -157,6 +176,8 @@ A later approved production packet should produce value-safe handoff evidence:
   `deploy/gcp/templates/client-production-handoff.example.json`,
 - optional package-readiness summary structure from
   `deploy/gcp/templates/client-production-readiness-checklist.example.json`,
+- optional package-source index structure from
+  `deploy/gcp/templates/client-production-package-index.example.json`,
 - source commit and immutable image digest,
 - migration revision,
 - state backend lineage identifier,

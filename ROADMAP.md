@@ -1,5 +1,17 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-09-29 — Client package index validator active
+
+- **Staffing:** One independent developer; focused package/index/readiness/evidence/plan-validator tests, static checks, secret scans and later PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #132, `feat: add client readiness checklist validator`, merged into protected `develop` at `7cdd41f9faf7505781b33881720de11073c3c5da`. Local `develop` was fetched/pruned and fast-forwarded to that exact `origin/develop` tip. The stale local `feat/client-readiness-checklist-validator` branch was deleted after GitHub merge confirmation, empty diff comparison and no-extra-worktree verification. Fresh work is active on `feat/client-package-index-validator`. This slice continues Tranche 2 by adding a placeholder-only deployable-package source index and an offline validator for later operator-held package index JSON. The validator requires package runbooks, templates and validator scripts to be reviewed with value-safe evidence, while manual accessibility/fluent-Spanish/staff-workflow acceptance, production deployment, live-data admission and shared-runtime rollout remain separate approval boundaries.
+- **Gate budget:** Source/documentation/local-static-validation work only. No cloud inspection or mutation, Terraform plan/apply, production deployment, live/client data, live identity-provider activation, provider-side reset/revocation mechanics, credential rotation, default permission activation, persistent synthetic write qualification, cloud migration or shared-runtime rollout occurs in this branch.
+- **Next executable action:** Finish validating and publishing this package-index slice, then reassess whether Tranche 2 package guardrails are complete enough to proceed to Tranche 3 authoritative dashboard operations or a separately approved cloud migration path.
+- **Do not regress:** Human staff decision boundaries; no automated matching/ranking/eligibility/referral/placement; private fictional-synthetic boundaries until live-data gates open; immutable intake history and exact retries; restricted-field permissions; bilingual/accessibility parity; separate public/staff identity planes; auth-sensitive no-store handling; evidence-only recovery/session-revocation wording; placeholder-only package materials for the client's later GCP environment.
+
+**Validation to date:** Focused package, client package index, readiness checklist, handoff evidence and production plan validator tests passed with 56 tests; the deployable package validator passed; focused Ruff format/check and mypy with explicit package bases passed for the touched validators/tests; high-severity frontend audit, whitespace hygiene and full-tree redacted secret scanning passed. The existing moderate Vitest advisory remains outside the high gate.
+
+**Planning artifact:** [Production-readiness and staff identity plan](docs/planning/2026-09-27-production-readiness-plan.md).
+
 ## 2026-09-29 — Client readiness checklist validator active
 
 - **Staffing:** One independent developer; focused package/readiness/evidence/plan-validator tests, static checks, secret scans and later PR gates provide quality evidence, not independent-human authorization.

@@ -6,6 +6,7 @@ from scripts.validate_deployable_package import (
     ENV_TEMPLATE_PATH,
     HANDOFF_TEMPLATE_PATH,
     INPUTS_TEMPLATE_PATH,
+    PACKAGE_INDEX_PATH,
     POLICY_TEMPLATE_PATH,
     READINESS_CHECKLIST_PATH,
     RUNBOOK_PATH,
@@ -24,6 +25,7 @@ def _copy_package(tmp_path: Path) -> Path:
         POLICY_TEMPLATE_PATH,
         HANDOFF_TEMPLATE_PATH,
         READINESS_CHECKLIST_PATH,
+        PACKAGE_INDEX_PATH,
     ):
         source = ROOT / relative_path
         destination = tmp_path / relative_path
@@ -42,6 +44,7 @@ def test_deployable_package_artifacts_are_placeholder_only_and_complete() -> Non
         str(POLICY_TEMPLATE_PATH),
         str(HANDOFF_TEMPLATE_PATH),
         str(READINESS_CHECKLIST_PATH),
+        str(PACKAGE_INDEX_PATH),
     ]
 
 
@@ -203,4 +206,21 @@ def test_deployable_package_rejects_readiness_checklist_production_activation(
     )
 
     with pytest.raises(PackageValidationError, match="activation_boundary"):
+        validate(root)
+
+
+def test_deployable_package_rejects_package_index_missing_validator(
+    tmp_path: Path,
+) -> None:
+    root = _copy_package(tmp_path)
+    index_path = root / PACKAGE_INDEX_PATH
+    index_path.write_text(
+        index_path.read_text(encoding="utf-8").replace(
+            '"path": "scripts/validate_client_package_index.py"',
+            '"path": "scripts/validate_unreviewed_package_index.py"',
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PackageValidationError, match="source_artifacts"):
         validate(root)

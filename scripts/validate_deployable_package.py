@@ -17,6 +17,7 @@ HANDOFF_TEMPLATE_PATH = Path("deploy/gcp/templates/client-production-handoff.exa
 READINESS_CHECKLIST_PATH = Path(
     "deploy/gcp/templates/client-production-readiness-checklist.example.json"
 )
+PACKAGE_INDEX_PATH = Path("deploy/gcp/templates/client-production-package-index.example.json")
 
 REQUIRED_RUNBOOK_PHRASES = (
     "not an approval to inspect or",
@@ -34,9 +35,11 @@ REQUIRED_RUNBOOK_PHRASES = (
     "client-production-policy.example.json",
     "client-production-handoff.example.json",
     "client-production-readiness-checklist.example.json",
+    "client-production-package-index.example.json",
     "scripts/validate_client_production_plan.py",
     "scripts/validate_client_handoff_evidence.py",
     "scripts/validate_client_readiness_checklist.py",
+    "scripts/validate_client_package_index.py",
     "delete/replace actions",
     "public SQL exposure",
     "broad IAM",
@@ -190,6 +193,62 @@ REQUIRED_READINESS_SECTIONS = (
     "operations_owners",
     "manual_acceptance_boundary",
 )
+
+REQUIRED_PACKAGE_INDEX_STRING_VALUES = {
+    ("authority_boundary", "cloud_execution"): "separate-approval-required",
+    ("authority_boundary", "terraform_plan"): "separate-approval-required",
+    ("authority_boundary", "production_deployment"): "separate-approval-required",
+    ("authority_boundary", "live_data_admission"): "separate-approval-required",
+    ("authority_boundary", "provider_side_identity_activation"): "separate-approval-required",
+    ("activation_boundary", "production_deployment"): ("not-executed-without-separate-approval"),
+    ("activation_boundary", "live_data_admission"): "not-admitted-without-separate-approval",
+    ("activation_boundary", "shared_runtime_rollout"): ("not-executed-without-separate-approval"),
+}
+
+REQUIRED_PACKAGE_INDEX_SOURCE_ARTIFACTS = (
+    "deploy/gcp/client-owned-production-package-runbook.md",
+    "deploy/gcp/staff-identity-production-runbook.md",
+    "deploy/gcp/templates/client-production.env.example",
+    "deploy/gcp/templates/client-owned-gcp-inputs.example.json",
+    "deploy/gcp/templates/client-production-policy.example.json",
+    "deploy/gcp/templates/client-production-handoff.example.json",
+    "deploy/gcp/templates/client-production-readiness-checklist.example.json",
+    "deploy/gcp/templates/client-production-package-index.example.json",
+    "scripts/validate_deployable_package.py",
+    "scripts/validate_client_production_plan.py",
+    "scripts/validate_client_handoff_evidence.py",
+    "scripts/validate_client_readiness_checklist.py",
+    "scripts/validate_client_package_index.py",
+)
+
+REQUIRED_PACKAGE_INDEX_VALIDATOR_COMMANDS = {
+    "deployable_package": (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_deployable_package.py"
+    ),
+    "terraform_plan": (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_client_production_plan.py <operator-held-plan.json>"
+    ),
+    "handoff_evidence": (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_client_handoff_evidence.py <operator-held-handoff.json>"
+    ),
+    "readiness_checklist": (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_client_readiness_checklist.py <operator-held-readiness.json>"
+    ),
+    "package_index": (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_client_package_index.py <operator-held-package-index.json>"
+    ),
+}
+
+REQUIRED_PACKAGE_INDEX_MANUAL_BOUNDARY = {
+    "accessibility_review": "<not-run-or-separate-record>",
+    "fluent_spanish_review": "<not-run-or-separate-record>",
+    "staff_workflow_acceptance": "<not-run-or-separate-record>",
+}
 
 REQUIRED_ALLOWED_PLAN_ACTIONS = ("no-op", "create", "update-in-place")
 REQUIRED_FORBIDDEN_PLAN_ACTIONS = ("delete", "replace")
@@ -456,6 +515,70 @@ def _validate_readiness_checklist_template(text: str) -> None:
             )
 
 
+def _validate_package_index_template(text: str) -> None:
+    document = _load_json_object(text, PACKAGE_INDEX_PATH)
+    if (
+        document.get("index_type")
+        != "client-owned-deployable-package-index-not-production-activation"
+    ):
+        raise PackageValidationError(
+            f"{PACKAGE_INDEX_PATH} index_type must distinguish package review"
+        )
+    expected_command = (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_client_package_index.py <operator-held-package-index.json>"
+    )
+    if document.get("validator_command") != expected_command:
+        raise PackageValidationError(
+            f"{PACKAGE_INDEX_PATH} validator_command must be {expected_command}"
+        )
+    for (section, key), expected_text in REQUIRED_PACKAGE_INDEX_STRING_VALUES.items():
+        value = _get_pointer(document, PACKAGE_INDEX_PATH, section, key)
+        if value != expected_text:
+            raise PackageValidationError(
+                f"{PACKAGE_INDEX_PATH} {section}.{key} must be {expected_text}"
+            )
+    commands = document.get("validator_commands")
+    if commands != REQUIRED_PACKAGE_INDEX_VALIDATOR_COMMANDS:
+        raise PackageValidationError(
+            f"{PACKAGE_INDEX_PATH} validator_commands must remain package-review scoped"
+        )
+    manual = document.get("manual_acceptance_boundary")
+    if manual != REQUIRED_PACKAGE_INDEX_MANUAL_BOUNDARY:
+        raise PackageValidationError(
+            f"{PACKAGE_INDEX_PATH} manual_acceptance_boundary must remain separate"
+        )
+    artifacts = document.get("source_artifacts")
+    if not isinstance(artifacts, list):
+        raise PackageValidationError(f"{PACKAGE_INDEX_PATH} source_artifacts must be a list")
+    seen_paths: list[str] = []
+    for item in artifacts:
+        if not isinstance(item, dict):
+            raise PackageValidationError(
+                f"{PACKAGE_INDEX_PATH} source_artifacts entries must be objects"
+            )
+        path = item.get("path")
+        if not isinstance(path, str):
+            raise PackageValidationError(
+                f"{PACKAGE_INDEX_PATH} source_artifacts path must be a string"
+            )
+        seen_paths.append(path)
+        status = item.get("status")
+        evidence = item.get("evidence")
+        if not isinstance(status, str) or not _is_placeholder(status):
+            raise PackageValidationError(
+                f"{PACKAGE_INDEX_PATH} {path} status must remain a placeholder"
+            )
+        if not isinstance(evidence, str) or not _is_placeholder(evidence):
+            raise PackageValidationError(
+                f"{PACKAGE_INDEX_PATH} {path} evidence must remain a placeholder"
+            )
+    if tuple(seen_paths) != REQUIRED_PACKAGE_INDEX_SOURCE_ARTIFACTS:
+        raise PackageValidationError(
+            f"{PACKAGE_INDEX_PATH} source_artifacts must match package contract"
+        )
+
+
 def _validate_runbook(text: str) -> None:
     for phrase in REQUIRED_RUNBOOK_PHRASES:
         if phrase not in text:
@@ -469,6 +592,7 @@ def validate(root: Path = ROOT) -> list[str]:
     policy_template = _read(root, POLICY_TEMPLATE_PATH)
     handoff_template = _read(root, HANDOFF_TEMPLATE_PATH)
     readiness_checklist = _read(root, READINESS_CHECKLIST_PATH)
+    package_index = _read(root, PACKAGE_INDEX_PATH)
     for relative_path, text in (
         (RUNBOOK_PATH, runbook),
         (ENV_TEMPLATE_PATH, env_template),
@@ -476,6 +600,7 @@ def validate(root: Path = ROOT) -> list[str]:
         (POLICY_TEMPLATE_PATH, policy_template),
         (HANDOFF_TEMPLATE_PATH, handoff_template),
         (READINESS_CHECKLIST_PATH, readiness_checklist),
+        (PACKAGE_INDEX_PATH, package_index),
     ):
         _validate_no_forbidden_values(relative_path, text)
     _validate_runbook(runbook)
@@ -484,6 +609,7 @@ def validate(root: Path = ROOT) -> list[str]:
     _validate_policy_template(policy_template)
     _validate_handoff_template(handoff_template)
     _validate_readiness_checklist_template(readiness_checklist)
+    _validate_package_index_template(package_index)
     return [
         str(RUNBOOK_PATH),
         str(ENV_TEMPLATE_PATH),
@@ -491,6 +617,7 @@ def validate(root: Path = ROOT) -> list[str]:
         str(POLICY_TEMPLATE_PATH),
         str(HANDOFF_TEMPLATE_PATH),
         str(READINESS_CHECKLIST_PATH),
+        str(PACKAGE_INDEX_PATH),
     ]
 
 

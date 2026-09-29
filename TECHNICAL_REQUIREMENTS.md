@@ -1,5 +1,11 @@
 # Technical Requirements — Golden Rose Operations Platform
 
+## 2026-09-29 — Client handoff evidence validator
+
+The active Tranche 2 portability slice adds `deploy/gcp/templates/client-production-handoff.example.json` and `scripts/validate_client_handoff_evidence.py`. A later approved production packet can use the template outside source control to produce value-safe handoff evidence, then validate the filled JSON locally. The validator requires source commit and migration revision, immutable image digest, signed image/SBOM/provenance evidence, plan-review result, database-authority receipt, smoke/readiness results, rollback or forward-recovery note, named operational owners and owner acceptance.
+
+This validator is not a cloud command and does not replace future production packet approval, Terraform plan generation, image admission verification, migration qualification, backup/restore rehearsal, staff acceptance or live-data approval. Filled handoff evidence remains operator-held and outside tracked source; concrete URLs, email-like values, secret/payload terms, live-data claims and provider-side reset/revocation completion claims fail closed.
+
 ## 2026-09-29 — Client production plan review validator
 
 The active Tranche 2 portability slice adds `scripts/validate_client_production_plan.py`, a local validator for operator-held Terraform JSON plan review in a later separately approved client-owned production packet. The validator requires a verifiable Cloud Run service/job using an immutable `@sha256:` image digest and production staff OIDC runtime configuration, rejects synthetic/demo production posture, rejects Secret Manager payload resources, and fails closed on delete/replacement actions, unsupported managed-resource actions, public Cloud SQL network exposure and broad IAM grants.

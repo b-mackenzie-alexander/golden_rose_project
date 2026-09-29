@@ -1,5 +1,17 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-09-29 — Client handoff evidence validator active
+
+- **Staffing:** One independent developer; focused package/evidence/plan-validator tests, static checks, secret scans and later PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #130, `feat: add client production plan validator`, merged into protected `develop` at `cc52ed0e6ec5210276e1271e2b78755658b7545f`. Local `develop` was fetched/pruned and fast-forwarded to that exact `origin/develop` tip. The stale local `feat/client-plan-review-validator` branch was deleted after GitHub merge confirmation, empty diff comparison and no-extra-worktree verification. Fresh work is active on `feat/client-handoff-evidence-validator`. This slice continues Tranche 2 by adding a placeholder-only production handoff evidence template and an offline validator for later operator-held handoff evidence. The guard requires value-safe source commit, migration revision, immutable image digest, signed image/SBOM/provenance evidence, plan-review status, database-authority receipt, smoke/readiness status, rollback or forward-recovery note, operational owners and owner acceptance while rejecting concrete URLs, email-like values, secret/payload terms, live-data claims and provider-side reset/revocation claims.
+- **Gate budget:** Source/documentation/local-static-validation work only. No cloud inspection or mutation, Terraform plan/apply, production deployment, live/client data, live identity-provider activation, provider-side reset/revocation mechanics, credential rotation, default permission activation, persistent synthetic write qualification, cloud migration or shared-runtime rollout occurs in this branch.
+- **Next executable action:** Finish validating and publishing this handoff-evidence-validator slice, then reassess whether Tranche 2 has enough source package guardrails before the next cloud migration or shared-runtime rollout.
+- **Do not regress:** Human staff decision boundaries; no automated matching/ranking/eligibility/referral/placement; private fictional-synthetic boundaries until live-data gates open; immutable intake history and exact retries; restricted-field permissions; bilingual/accessibility parity; separate public/staff identity planes; auth-sensitive no-store handling; evidence-only recovery/session-revocation wording; placeholder-only package materials for the client's later GCP environment.
+
+**Validation to date:** Focused package, client production plan and handoff evidence validator tests passed with 31 tests; the deployable package validator passed; focused Ruff format/check and mypy with explicit package bases passed for the touched validators/tests.
+
+**Planning artifact:** [Production-readiness and staff identity plan](docs/planning/2026-09-27-production-readiness-plan.md).
+
 ## 2026-09-29 — Client production plan review validator active
 
 - **Staffing:** One independent developer; focused package/plan-validator tests, static checks, secret scans and later PR gates provide quality evidence, not independent-human authorization.

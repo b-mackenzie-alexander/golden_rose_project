@@ -13,6 +13,7 @@ RUNBOOK_PATH = Path("deploy/gcp/client-owned-production-package-runbook.md")
 ENV_TEMPLATE_PATH = Path("deploy/gcp/templates/client-production.env.example")
 INPUTS_TEMPLATE_PATH = Path("deploy/gcp/templates/client-owned-gcp-inputs.example.json")
 POLICY_TEMPLATE_PATH = Path("deploy/gcp/templates/client-production-policy.example.json")
+HANDOFF_TEMPLATE_PATH = Path("deploy/gcp/templates/client-production-handoff.example.json")
 
 REQUIRED_RUNBOOK_PHRASES = (
     "not an approval to inspect or",
@@ -28,7 +29,9 @@ REQUIRED_RUNBOOK_PHRASES = (
     "provider-side factor reset",
     "state backend lineage identifier",
     "client-production-policy.example.json",
+    "client-production-handoff.example.json",
     "scripts/validate_client_production_plan.py",
+    "scripts/validate_client_handoff_evidence.py",
     "delete/replace actions",
     "public SQL exposure",
     "broad IAM",
@@ -109,6 +112,39 @@ REQUIRED_POLICY_PLACEHOLDERS = (
     ("handoff_evidence", "smoke_evidence"),
     ("handoff_evidence", "rollback_or_forward_recovery_note"),
     ("handoff_evidence", "owner_acceptance_checklist"),
+)
+
+REQUIRED_HANDOFF_STRING_VALUES = {
+    ("authority_boundary", "cloud_execution"): "separate-approval-required",
+    ("authority_boundary", "production_deployment"): "separate-approval-required",
+    ("authority_boundary", "live_data_admission"): "separate-approval-required",
+    ("plan_review", "validator_command"): (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_client_production_plan.py <operator-held-plan.json>"
+    ),
+}
+
+REQUIRED_HANDOFF_PLACEHOLDERS = (
+    ("source", "source_commit"),
+    ("source", "migration_revision"),
+    ("artifact_admission", "signature_evidence"),
+    ("artifact_admission", "sbom_evidence"),
+    ("artifact_admission", "provenance_evidence"),
+    ("artifact_admission", "repository_subject_restriction"),
+    ("plan_review", "status"),
+    ("database_authority", "receipt"),
+    ("database_authority", "status"),
+    ("smoke", "health"),
+    ("smoke", "readiness"),
+    ("smoke", "staff_entry_boundary"),
+    ("recovery", "rollback_or_forward_recovery_note"),
+    ("recovery", "status"),
+    ("operations", "backup_restore_owner"),
+    ("operations", "monitoring_owner"),
+    ("operations", "incident_owner"),
+    ("operations", "support_owner"),
+    ("owner_acceptance", "acceptance_checklist"),
+    ("owner_acceptance", "status"),
 )
 
 REQUIRED_ALLOWED_PLAN_ACTIONS = ("no-op", "create", "update-in-place")
@@ -319,6 +355,30 @@ def _validate_policy_template(text: str) -> None:
     )
 
 
+def _validate_handoff_template(text: str) -> None:
+    document = _load_json_object(text, HANDOFF_TEMPLATE_PATH)
+    for (section, key), expected_text in REQUIRED_HANDOFF_STRING_VALUES.items():
+        value = _get_pointer(document, HANDOFF_TEMPLATE_PATH, section, key)
+        if value != expected_text:
+            raise PackageValidationError(
+                f"{HANDOFF_TEMPLATE_PATH} {section}.{key} must be {expected_text}"
+            )
+    image_digest = _get_pointer(
+        document, HANDOFF_TEMPLATE_PATH, "artifact_admission", "image_digest"
+    )
+    if image_digest != "sha256:<64-hex-digest>":
+        raise PackageValidationError(
+            f"{HANDOFF_TEMPLATE_PATH} artifact_admission.image_digest must remain "
+            "a digest placeholder"
+        )
+    for section, key in REQUIRED_HANDOFF_PLACEHOLDERS:
+        value = _get_pointer(document, HANDOFF_TEMPLATE_PATH, section, key)
+        if not isinstance(value, str) or not _is_placeholder(value):
+            raise PackageValidationError(
+                f"{HANDOFF_TEMPLATE_PATH} {section}.{key} must remain a placeholder"
+            )
+
+
 def _validate_runbook(text: str) -> None:
     for phrase in REQUIRED_RUNBOOK_PHRASES:
         if phrase not in text:
@@ -330,22 +390,26 @@ def validate(root: Path = ROOT) -> list[str]:
     env_template = _read(root, ENV_TEMPLATE_PATH)
     inputs_template = _read(root, INPUTS_TEMPLATE_PATH)
     policy_template = _read(root, POLICY_TEMPLATE_PATH)
+    handoff_template = _read(root, HANDOFF_TEMPLATE_PATH)
     for relative_path, text in (
         (RUNBOOK_PATH, runbook),
         (ENV_TEMPLATE_PATH, env_template),
         (INPUTS_TEMPLATE_PATH, inputs_template),
         (POLICY_TEMPLATE_PATH, policy_template),
+        (HANDOFF_TEMPLATE_PATH, handoff_template),
     ):
         _validate_no_forbidden_values(relative_path, text)
     _validate_runbook(runbook)
     _validate_env_template(env_template)
     _validate_inputs_template(inputs_template)
     _validate_policy_template(policy_template)
+    _validate_handoff_template(handoff_template)
     return [
         str(RUNBOOK_PATH),
         str(ENV_TEMPLATE_PATH),
         str(INPUTS_TEMPLATE_PATH),
         str(POLICY_TEMPLATE_PATH),
+        str(HANDOFF_TEMPLATE_PATH),
     ]
 
 

@@ -1,5 +1,11 @@
 # Security — Golden Rose Operations Platform
 
+## 2026-09-29 — Client handoff evidence source guard
+
+The active `feat/client-handoff-evidence-validator` source slice extends Tranche 2 portability with `deploy/gcp/templates/client-production-handoff.example.json` and `scripts/validate_client_handoff_evidence.py`. The template is placeholder-only. The validator is for later operator-held, value-safe production handoff evidence JSON and requires source commit, migration revision, immutable image digest, signed image/SBOM/provenance evidence, plan-review status, database-authority receipt, smoke/readiness status, rollback or forward-recovery note, operational owners and owner acceptance.
+
+The evidence validator is local static validation only. It reports missing or unsafe evidence shape without authenticating to cloud systems, inspecting state, running probes, applying infrastructure, creating secrets, activating identity, performing backup/restore, executing provider-side recovery or session revocation, deploying production, admitting live/client data or authorizing shared-runtime rollout. It rejects concrete URLs, email-like values, obvious credential/secret/payload terms, live-data claims and provider-side reset/revocation completion claims.
+
 ## 2026-09-29 — Client production plan review source guard
 
 The active `feat/client-plan-review-validator` source slice extends Tranche 2 portability with `scripts/validate_client_production_plan.py`, an offline validator for an operator-held Terraform JSON plan created only inside a later separately approved production packet. It fails closed on delete/replacement actions, unsupported managed-resource actions, public Cloud SQL IPv4 or authorized networks, broad IAM members/roles, mutable Cloud Run images, missing staff OIDC runtime configuration, synthetic/demo production drift and Secret Manager payload resources.

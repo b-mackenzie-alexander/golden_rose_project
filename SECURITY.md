@@ -1,5 +1,11 @@
 # Security — Golden Rose Operations Platform
 
+## 2026-09-29 — Client-owned package portability source guard
+
+The active `feat/staff-deployable-package-readiness` source slice begins Tranche 2 portability with placeholder-only client-owned GCP package artifacts and a local static validator. The new package runbook/templates define required client-owned inputs, production staff OIDC posture, handoff owners, evidence expectations and stop conditions without committing private project IDs, billing IDs, service URLs, principals, provider URLs, JWKS URLs, database URLs, staff subjects, credentials, tokens, state paths or support contacts.
+
+The validator is a source guard only. It authenticates to no cloud system, creates no Terraform plan, applies no infrastructure, creates no secrets, activates no identity provider and admits no live/client data. It fails closed when the production app template drifts into synthetic/demo auth, concrete private URLs or missing handoff owners. Recovery and session-revocation wording remains evidence-only; provider-side factor reset, session/token revocation and forced logout remain outside the application until separately approved and integrated.
+
 ## 2026-09-16 — PR #108 private develop service update
 
 PR #108 is merged at protected `develop@dd6697871986fa5677e722b2805a21a8a7776b64` and the current signed image has been deployed to the existing private fictional-synthetic `develop` stakeholder-review service. The rollout updated the staff service, migration job and database-authority job image references in place with a service-stage Terraform apply showing `0 added, 3 changed, 0 destroyed`; migration and database-verification executions were intentionally skipped for this UI-only service update.

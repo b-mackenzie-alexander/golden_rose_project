@@ -1,5 +1,11 @@
 # Technical Requirements — Golden Rose Operations Platform
 
+## 2026-09-29 — Client-owned deployable package source guard
+
+The active Tranche 2 portability slice adds source-controlled, placeholder-only package artifacts for a later client-owned GCP environment: `deploy/gcp/client-owned-production-package-runbook.md`, `deploy/gcp/templates/client-production.env.example`, and `deploy/gcp/templates/client-owned-gcp-inputs.example.json`. These artifacts are technical input inventories and stop-condition guides, not executable Terraform variables, plans, cloud credentials, runtime secrets, or production deployment authority.
+
+`scripts/validate_deployable_package.py` is the local static gate for these package artifacts. It requires production app posture to use `GOLDEN_ROSE_ENVIRONMENT=production` and `GOLDEN_ROSE_AUTH_MODE=staff_oidc`, keeps synthetic staff IDs/demo access/presentation seed disabled or unset, requires OIDC/database values to remain placeholders, requires client-owned GCP identity/state/artifact/secret/operations owners, and rejects concrete URLs and known private develop/demo fragments. This gate does not replace future Terraform plan validation, image admission, migration qualification, backup/restore rehearsal, staff acceptance or live-data approval.
+
 ## 2026-09-16 — Current develop stakeholder-review surface
 
 PR #108 is merged at protected `develop@dd6697871986fa5677e722b2805a21a8a7776b64` and deployed to the existing private fictional-synthetic `develop` service for stakeholder review. The current service includes the PR #107 dashboard shell/artwork plus PR #108's Activity by area NYC map, static calendar module and static work queues module. This updates the human-visible review surface, but it does not complete the authoritative backend contracts for map/calendar/queues/search and does not admit live/client data, production promotion, new access model, credential rotation or default permission activation.

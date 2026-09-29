@@ -1,5 +1,11 @@
 # Security — Golden Rose Operations Platform
 
+## 2026-09-29 — Client package policy manifest source guard
+
+The active `feat/client-package-policy-manifest` source slice extends Tranche 2 portability with a placeholder-only production package policy manifest and stricter local static validation. The policy manifest records later review requirements for delete/replace plan actions, public SQL exposure, broad IAM, immutable image digest admission, staff OIDC configuration, production demo-access and presentation-seed exclusion, secret-payload exclusion, database-authority evidence, backup/restore ownership and monitoring/incident/support owners. It contains no real project IDs, provider URLs, service URLs, principals, emails, credentials, state paths, secret payloads or production values.
+
+The validator remains a source guard only. It authenticates to no cloud system, creates no Terraform plan, applies no infrastructure, creates no secrets, activates no identity provider and admits no live/client data. The new manifest is not executable Terraform configuration and does not authorize production deployment, provider-side identity activation, credential rotation, session/token revocation or shared-runtime rollout.
+
 ## 2026-09-29 — Client-owned package portability source guard
 
 The active `feat/staff-deployable-package-readiness` source slice begins Tranche 2 portability with placeholder-only client-owned GCP package artifacts and a local static validator. The new package runbook/templates define required client-owned inputs, production staff OIDC posture, handoff owners, evidence expectations and stop conditions without committing private project IDs, billing IDs, service URLs, principals, provider URLs, JWKS URLs, database URLs, staff subjects, credentials, tokens, state paths or support contacts.

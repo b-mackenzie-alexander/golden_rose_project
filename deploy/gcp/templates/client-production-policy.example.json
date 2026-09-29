@@ -1,0 +1,58 @@
+{
+  "purpose": "Placeholder-only production package policy manifest. Do not commit real values.",
+  "authority_boundary": {
+    "cloud_execution": "separate-approval-required",
+    "terraform_plan": "separate-approval-required",
+    "production_deployment": "separate-approval-required",
+    "live_data_admission": "separate-approval-required",
+    "provider_side_identity_activation": "separate-approval-required"
+  },
+  "production_environment": {
+    "environment": "production",
+    "auth_mode": "staff_oidc",
+    "synthetic_staff_id": "<unset>",
+    "demo_access_enabled": false,
+    "presentation_demo_seed_enabled": false,
+    "staff_oidc_required": true,
+    "mfa_claim_mapping_required": true
+  },
+  "plan_review": {
+    "allowed_actions": [
+      "no-op",
+      "create",
+      "update-in-place"
+    ],
+    "forbidden_actions": [
+      "delete",
+      "replace"
+    ],
+    "fail_closed_checks": [
+      "no_delete_or_replace_without_separate_approval",
+      "no_public_sql_or_authorized_networks",
+      "no_broad_iam_members",
+      "immutable_image_digest_required",
+      "staff_oidc_configuration_required",
+      "demo_access_forbidden_in_production",
+      "presentation_seed_forbidden_in_production",
+      "secret_payloads_forbidden_in_source_or_plan",
+      "database_authority_receipt_required",
+      "backup_restore_owner_required",
+      "monitoring_incident_support_owners_required"
+    ]
+  },
+  "artifact_admission": {
+    "image_digest": "sha256:<64-hex-digest>",
+    "signature_evidence": "<value-safe-cosign-admission-record>",
+    "sbom_evidence": "<value-safe-sbom-validation-record>",
+    "provenance_evidence": "<value-safe-slsa-provenance-record>",
+    "repository_subject_restriction": "<approved-repository-subject>"
+  },
+  "handoff_evidence": {
+    "source_commit": "<git-commit-sha>",
+    "migration_revision": "<alembic-revision>",
+    "database_authority_receipt": "<value-safe-database-authority-record>",
+    "smoke_evidence": "<value-safe-smoke-readiness-record>",
+    "rollback_or_forward_recovery_note": "<value-safe-recovery-record>",
+    "owner_acceptance_checklist": "<private-acceptance-record>"
+  }
+}

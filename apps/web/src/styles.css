@@ -1459,6 +1459,293 @@ select {
   padding: 0 var(--space-4);
 }
 
+.staff-account-page {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.staff-account-header {
+  align-items: end;
+  display: flex;
+  gap: var(--space-4);
+  justify-content: space-between;
+}
+
+.staff-account-header h2 {
+  color: var(--color-brand);
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: clamp(2rem, 4vw, 3.1rem);
+  line-height: 1;
+  margin: 0;
+}
+
+.staff-account-metrics {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.staff-account-metrics div,
+.staff-account-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel);
+}
+
+.staff-account-metrics div {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: var(--space-4);
+}
+
+.staff-account-metrics strong {
+  color: var(--color-brand);
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.staff-account-metrics span,
+.staff-account-row small,
+.staff-account-panel-header > span {
+  color: var(--color-muted-text);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.staff-account-layout {
+  align-items: start;
+  display: grid;
+  gap: var(--space-5);
+  grid-template-columns: minmax(0, 1.35fr) minmax(20rem, 0.75fr);
+}
+
+.staff-account-panel {
+  min-width: 0;
+  padding: var(--space-5);
+}
+
+.staff-account-panel h3,
+.staff-account-panel-header h3 {
+  align-items: center;
+  color: var(--color-brand);
+  display: flex;
+  gap: var(--space-2);
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 1.45rem;
+  margin: 0;
+}
+
+.staff-account-panel .icon-symbol {
+  height: 1.25rem;
+  width: 1.25rem;
+}
+
+.staff-account-panel-header {
+  align-items: center;
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.staff-account-table {
+  display: grid;
+  gap: 0;
+  overflow-x: auto;
+}
+
+.staff-account-row {
+  align-items: stretch;
+  border-bottom: 1px solid var(--color-border);
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: minmax(12rem, 1.25fr) minmax(9rem, 0.75fr) minmax(9rem, 0.7fr) minmax(10rem, 0.9fr) minmax(13rem, 1fr);
+  min-width: 58rem;
+  padding: var(--space-3) 0;
+}
+
+.staff-account-row--head {
+  color: var(--color-muted-text);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.staff-account-row span[role='cell'] {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.staff-account-row strong,
+.staff-account-row small {
+  overflow-wrap: anywhere;
+}
+
+.staff-account-actions {
+  align-content: start;
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.staff-account-actions button,
+.staff-secondary-button,
+.staff-primary-button {
+  align-items: center;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-weight: 900;
+  justify-content: center;
+  min-height: 2.35rem;
+  padding: 0 var(--space-3);
+}
+
+.staff-account-actions button,
+.staff-secondary-button {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.staff-primary-button {
+  background: var(--color-brand);
+  border: 0;
+  color: #ffffff;
+  min-height: 2.75rem;
+}
+
+.staff-account-status {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 900;
+  justify-content: center;
+  min-height: 1.75rem;
+  padding: 0.3rem 0.65rem;
+  width: fit-content;
+}
+
+.staff-account-status[data-status='active'] {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.staff-account-status[data-status='suspended'] {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.staff-account-status[data-status='deprovisioned'] {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.staff-account-form {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.staff-account-form label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.staff-account-form label > span,
+.staff-permission-fieldset legend {
+  color: var(--color-muted-text);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.staff-account-form input:not([type='checkbox']),
+.staff-account-form select,
+.staff-account-form textarea {
+  background: #fffdfc;
+  border: 1px solid #77858e;
+  border-radius: 0.45rem;
+  color: #172b36;
+  font: inherit;
+  min-height: 2.75rem;
+  padding: 0.65rem;
+  width: 100%;
+}
+
+.staff-account-form textarea {
+  min-height: 5.5rem;
+  resize: vertical;
+}
+
+.staff-checkbox-label {
+  align-items: center;
+  display: flex !important;
+  gap: var(--space-2);
+}
+
+.staff-checkbox-label input,
+.staff-permission-fieldset input {
+  height: 1rem;
+  width: 1rem;
+}
+
+.staff-permission-fieldset {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+}
+
+.staff-permission-fieldset label {
+  align-items: center;
+  display: flex;
+  gap: var(--space-2);
+  overflow-wrap: anywhere;
+}
+
+.staff-account-notice,
+.staff-account-error {
+  border-radius: 0.55rem;
+  font-weight: 900;
+  margin: 0;
+  padding: 0.8rem 1rem;
+}
+
+.staff-account-notice {
+  background: var(--color-success-bg);
+  border: 1px solid rgba(22, 101, 52, 0.18);
+  color: var(--color-success);
+}
+
+.staff-account-error,
+.staff-account-form small[role='alert'] {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.staff-account-form small[role='alert'] {
+  border-radius: 0.45rem;
+  font-weight: 800;
+  padding: 0.45rem 0.6rem;
+}
+
+.staff-account-empty {
+  color: var(--color-muted-text);
+  font-weight: 800;
+  margin: var(--space-4) 0 0;
+}
+
+.staff-action-panel {
+  max-width: 54rem;
+}
+
 .staff-calendar-page {
   display: grid;
   gap: var(--space-5);
@@ -2249,6 +2536,7 @@ select {
   .dashboard-hero,
   .dashboard-map-card,
   .module-preview-grid,
+  .staff-account-layout,
   .staff-calendar-hero,
   .calendar-layout {
     grid-template-columns: minmax(0, 1fr);
@@ -2328,9 +2616,17 @@ select {
   .dashboard-side-grid,
   .dashboard-map-card,
   .module-preview-grid,
+  .staff-account-layout,
+  .staff-account-metrics,
   .staff-calendar-hero,
   .calendar-layout {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .staff-account-header,
+  .staff-account-panel-header {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .calendar-toolbar {

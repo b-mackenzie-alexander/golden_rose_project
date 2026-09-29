@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import NoResultFound
 
 from golden_rose.api.dependencies import get_db_session, get_identifier_factory, get_staff_principal
 from golden_rose.api.staff import staff_accounts
@@ -49,6 +50,7 @@ def http(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClient, FixedIde
                 "staff_account:activate",
                 "staff_account:suspend",
                 "staff_account:deprovision",
+                "staff_account:read",
                 "staff_account:recovery:record",
                 "staff_account:session:revoke",
             }
@@ -96,6 +98,79 @@ def lifecycle_result(
 
 def command_headers() -> dict[str, str]:
     return {"Idempotency-Key": str(uuid4())}
+
+
+def test_list_staff_accounts_requires_read_permission_and_returns_no_store(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = http
+    listed = Mock(
+        return_value=(
+            account_record(status="active", version=2, mfa_enrolled=True),
+            account_record(staff_id=GENERATED_STAFF_ID, status="suspended", version=1),
+        )
+    )
+    monkeypatch.setattr(staff_accounts, "list_staff_accounts", listed)
+
+    response = client.get("/api/staff/v1/staff-accounts")
+
+    assert response.status_code == 200, response.text
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["vary"] == "Authorization"
+    assert [item["staff_id"] for item in response.json()["items"]] == [
+        str(STAFF_ID),
+        str(GENERATED_STAFF_ID),
+    ]
+    listed.assert_called_once()
+
+
+def test_get_staff_account_returns_exact_account_or_safe_not_found(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = http
+    reader = Mock(return_value=account_record(status="active", version=2, mfa_enrolled=True))
+    monkeypatch.setattr(staff_accounts, "get_staff_account_by_id", reader)
+
+    response = client.get(f"/api/staff/v1/staff-accounts/{STAFF_ID}")
+
+    assert response.status_code == 200, response.text
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["staff_id"] == str(STAFF_ID)
+    assert response.json()["lifecycle_status"] == "active"
+    assert reader.call_args.kwargs["staff_id"] == STAFF_ID
+
+
+def test_staff_account_read_routes_preserve_forbidden_and_missing_boundaries(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = http
+    listed = Mock()
+    monkeypatch.setattr(staff_accounts, "list_staff_accounts", listed)
+    cast(FastAPI, client.app).dependency_overrides[get_staff_principal] = lambda: StaffPrincipal(
+        actor_id=ACTOR_ID,
+        role_name="operations_staff",
+        permissions=frozenset(),
+    )
+
+    forbidden = client.get("/api/staff/v1/staff-accounts")
+
+    cast(FastAPI, client.app).dependency_overrides[get_staff_principal] = lambda: StaffPrincipal(
+        actor_id=ACTOR_ID,
+        role_name="owner",
+        permissions=frozenset({"staff_account:read"}),
+    )
+    missing = Mock(side_effect=NoResultFound())
+    monkeypatch.setattr(staff_accounts, "get_staff_account_by_id", missing)
+    not_found = client.get(f"/api/staff/v1/staff-accounts/{STAFF_ID}")
+
+    assert forbidden.status_code == 403
+    assert forbidden.headers["cache-control"] == "no-store"
+    listed.assert_not_called()
+    assert not_found.status_code == 404
+    assert not_found.json()["type"] == "https://golden-rose.local/problems/staff-account-not-found"
 
 
 def test_create_staff_account_routes_normalized_admin_request(

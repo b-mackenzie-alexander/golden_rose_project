@@ -73,6 +73,7 @@ export function AppShell() {
     },
     { icon: 'calendar', label: language === 'en' ? 'Calendar' : 'Calendario', to: '/staff/calendar' },
     { icon: 'queue', label: language === 'en' ? 'Work queues' : 'Colas de trabajo', to: '/staff/queues' },
+    { icon: 'workers', label: language === 'en' ? 'Staff accounts' : 'Cuentas del personal', to: '/staff/admin/accounts' },
     { icon: 'map', label: language === 'en' ? 'Map' : 'Mapa', to: '/staff/map' },
     { icon: 'reports', label: language === 'en' ? 'Reports' : 'Informes', to: '/staff/reports' },
   ] satisfies Array<{ icon: IconName; label: string; to: string }>;
@@ -160,6 +161,13 @@ export function AppShell() {
       keywords: 'catalog work interest skills positions catalogo intereses habilidades puestos',
       label: language === 'en' ? 'Work-interest catalog' : 'Catalogo de intereses',
       meta: language === 'en' ? 'Skills and work-interest labels' : 'Habilidades e intereses laborales',
+    },
+    {
+      href: '/staff/admin/accounts',
+      icon: 'workers',
+      keywords: 'staff accounts admin onboarding activation suspension deprovision recovery session personal cuentas administracion activacion suspension',
+      label: language === 'en' ? 'Staff accounts' : 'Cuentas del personal',
+      meta: language === 'en' ? 'Onboarding, lifecycle, and access evidence' : 'Incorporacion, ciclo y evidencia de acceso',
     },
     {
       href: '/staff/map',

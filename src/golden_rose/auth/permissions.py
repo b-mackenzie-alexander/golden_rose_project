@@ -14,6 +14,8 @@ STAFF_ACCOUNT_RECOVERY_RECORD_PERMISSION = "staff_account:recovery:record"
 STAFF_ACCOUNT_SESSION_REVOKE_PERMISSION = "staff_account:session:revoke"
 STAFF_ACCOUNT_DELEGATION_GRANT_PERMISSION = "staff_account:delegation:grant"
 STAFF_ACCOUNT_DELEGATION_REVOKE_PERMISSION = "staff_account:delegation:revoke"
+SHIFT_NEED_CREATE_PERMISSION = "shift_need:create"
+SHIFT_NEED_READ_PERMISSION = "shift_need:read"
 
 
 def can_create_draft_employer(principal: StaffPrincipal) -> bool:
@@ -70,3 +72,11 @@ def can_grant_staff_account_delegation(principal: StaffPrincipal) -> bool:
 
 def can_revoke_staff_account_delegation(principal: StaffPrincipal) -> bool:
     return STAFF_ACCOUNT_DELEGATION_REVOKE_PERMISSION in principal.permissions
+
+
+def can_create_shift_need(principal: StaffPrincipal) -> bool:
+    return SHIFT_NEED_CREATE_PERMISSION in principal.permissions
+
+
+def can_read_shift_need(principal: StaffPrincipal) -> bool:
+    return SHIFT_NEED_READ_PERMISSION in principal.permissions

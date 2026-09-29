@@ -5,6 +5,8 @@ from golden_rose.auth.permissions import (
     EMPLOYER_CONTACT_READ_PERMISSION,
     EMPLOYER_DRAFT_REVISE_PERMISSION,
     EMPLOYER_READ_PERMISSION,
+    SHIFT_NEED_CREATE_PERMISSION,
+    SHIFT_NEED_READ_PERMISSION,
     STAFF_ACCOUNT_ACTIVATE_PERMISSION,
     STAFF_ACCOUNT_CREATE_PERMISSION,
     STAFF_ACCOUNT_DEPROVISION_PERMISSION,
@@ -15,10 +17,12 @@ from golden_rose.auth.permissions import (
     can_activate_staff_account,
     can_create_draft_employer,
     can_create_draft_employer_contact,
+    can_create_shift_need,
     can_create_staff_account,
     can_deprovision_staff_account,
     can_read_employer,
     can_read_employer_contact,
+    can_read_shift_need,
     can_read_staff_account,
     can_record_staff_account_recovery,
     can_revise_draft_employer,
@@ -222,3 +226,23 @@ def test_staff_account_permission_constants_have_exact_values_and_require_named_
     assert can_read_staff_account(account_admin) is True
     assert can_record_staff_account_recovery(account_admin) is True
     assert can_revoke_staff_account_sessions(account_admin) is True
+
+
+def test_shift_need_permission_constants_have_exact_values_and_require_named_grants() -> None:
+    owner_with_labels_only = StaffPrincipal(
+        actor_id=uuid4(),
+        role_name="owner",
+        permissions=frozenset({"employer:read", "staffing_request:read"}),
+    )
+    demand_staff = StaffPrincipal(
+        actor_id=uuid4(),
+        role_name="operations_staff",
+        permissions=frozenset({SHIFT_NEED_CREATE_PERMISSION, SHIFT_NEED_READ_PERMISSION}),
+    )
+
+    assert SHIFT_NEED_CREATE_PERMISSION == "shift_need:create"
+    assert SHIFT_NEED_READ_PERMISSION == "shift_need:read"
+    assert can_create_shift_need(owner_with_labels_only) is False
+    assert can_read_shift_need(owner_with_labels_only) is False
+    assert can_create_shift_need(demand_staff) is True
+    assert can_read_shift_need(demand_staff) is True

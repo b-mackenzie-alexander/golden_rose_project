@@ -12,6 +12,7 @@ import { useLanguage } from '../i18n/LanguageProvider';
 import { canonicalLabel, canonicalMessages } from './canonicalMessages';
 import { intakeMessages } from './messages';
 import { Snapshot } from './IntakeHistory';
+import { ShiftNeedsPanel } from './ShiftNeedsPanel';
 
 const messages = {
   en: { current: 'Current canonical facts', original: 'Original finalized reference', back: 'Original intake and history',
@@ -92,6 +93,16 @@ function OutputDetail({ intakeId, output }: { intakeId: string; output: string }
   function deny() {
     setFacts(null); setAddress(null); setDirtySections({}); setLockedSection(null); setFailed(true);
   }
+  function requestPanel(values: DraftObject) {
+    if (output !== 'request') return null;
+    const employerId = values.employer_id;
+    const requestId = values.staffing_request_id;
+    const version = values.version;
+    const title = values.role_title;
+    const count = values.worker_count;
+    if (typeof employerId !== 'string' || typeof requestId !== 'string' || typeof title !== 'string' || typeof version !== 'number' || typeof count !== 'number') return null;
+    return <ShiftNeedsPanel employerId={employerId} requestId={requestId} requestVersion={version} roleTitle={title} workerCount={count} />;
+  }
   function correction(values: DraftObject, addressSection = false) {
     if (!outputs) return null;
     const path = correctionPath(outputs, output, addressSection), reference = outputReference(outputs, output);
@@ -131,6 +142,7 @@ function OutputDetail({ intakeId, output }: { intakeId: string; output: string }
     {facts ? <section><h3>{m.current}</h3>
       {ref && facts.version !== ref.version ? <p role="status">{m.changed}</p> : null}
       <Snapshot value={facts} />
+      {requestPanel(facts)}
       {correction(facts)}
     </section> : null}
     {outputs && hasAddress(output, outputs) && facts ? <>

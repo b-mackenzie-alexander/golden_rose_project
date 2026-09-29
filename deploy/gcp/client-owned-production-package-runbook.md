@@ -15,6 +15,9 @@ activate provider-side staff identity, or create shared runtime access.
 - The example files under `deploy/gcp/templates/` are placeholders only. They
   are not secrets, not Terraform plans, not production values, and not complete
   authority to deploy.
+- `deploy/gcp/templates/client-production-policy.example.json` is a source
+  review manifest for later package checks. It is not a Terraform plan and does
+  not authorize cloud execution.
 - Real project IDs, billing IDs, principals, service URLs, database URLs,
   identity-provider URLs, JWKS URLs, secret names, passwords, tokens, state
   buckets, support contacts, and owner emails must remain in approved private
@@ -41,6 +44,8 @@ client-owned deployment packet can be considered:
   subjects before activation.
 - Monitoring, alerting, log-retention, incident, rollback, support, and
   acceptance owners.
+- Signed image, SBOM and provenance admission records for the immutable digest
+  that a client-owned environment would consume.
 
 ## Source Package Checks
 
@@ -57,6 +62,17 @@ develop/demo values out of the client-owned package materials. It does not
 authenticate to GCP, read Terraform state, inspect Cloud Run, create secrets,
 or verify provider-side identity.
 
+## Later Plan Review Policy
+
+A later approved production packet must review Terraform plan output against the
+placeholder policy manifest before any apply authority is considered. The packet
+must fail closed on delete/replace actions, public SQL exposure, broad IAM,
+missing immutable image digest, missing staff identity configuration, demo access
+or presentation seed configuration in production, and unqualified secret
+payloads. The policy also requires signed image/SBOM/provenance evidence,
+database-authority evidence, backup/restore ownership, and monitoring, incident
+and support owners.
+
 ## Stop Conditions
 
 Stop before drafting or executing any production deployment packet if any of
@@ -70,6 +86,9 @@ these are true:
 - A runbook asks an operator to apply Terraform, create Secret Manager payloads,
   deploy Cloud Run, rotate credentials, activate live staff identity, or admit
   live/client data without a separate approval packet.
+- A package policy omits delete/replace, public SQL, broad IAM, immutable
+  digest, staff OIDC, demo-access, unqualified-secret, signed-artifact,
+  database-authority, backup/restore or support-owner checks.
 - Staff recovery or session-revocation wording implies Golden Rose performs
   provider-side factor reset, provider-side session revocation, token
   revocation, or forced logout.

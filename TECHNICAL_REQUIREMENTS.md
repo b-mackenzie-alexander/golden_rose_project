@@ -1,5 +1,11 @@
 # Technical Requirements — Golden Rose Operations Platform
 
+## 2026-09-29 — Client-owned package policy manifest guard
+
+The active Tranche 2 portability slice extends the deployable package source guard with `deploy/gcp/templates/client-production-policy.example.json`. The manifest is a placeholder-only review contract for a later approved production packet. It records separate-approval boundaries for cloud execution, Terraform plan, production deployment, live-data admission and provider-side identity activation; production app posture requiring staff OIDC; forbidden production demo/synthetic posture; plan-review fail-closed checks for delete/replace, public SQL, broad IAM, immutable digest, staff identity, secret payloads and operational owner evidence; and value-safe artifact/handoff evidence placeholders.
+
+`scripts/validate_deployable_package.py` now requires the policy manifest alongside the existing runbook, app configuration template and client-owned input inventory. It rejects synthetic/develop/demo policy drift, missing fail-closed plan checks, missing owner/artifact evidence placeholders and concrete package values. This remains local static validation only; it does not replace future Terraform plan validation, image admission verification, migration qualification, backup/restore rehearsal, staff acceptance or live-data approval.
+
 ## 2026-09-29 — Client-owned deployable package source guard
 
 The active Tranche 2 portability slice adds source-controlled, placeholder-only package artifacts for a later client-owned GCP environment: `deploy/gcp/client-owned-production-package-runbook.md`, `deploy/gcp/templates/client-production.env.example`, and `deploy/gcp/templates/client-owned-gcp-inputs.example.json`. These artifacts are technical input inventories and stop-condition guides, not executable Terraform variables, plans, cloud credentials, runtime secrets, or production deployment authority.

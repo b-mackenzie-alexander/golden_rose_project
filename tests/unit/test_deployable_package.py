@@ -5,6 +5,7 @@ import pytest
 from scripts.validate_deployable_package import (
     ENV_TEMPLATE_PATH,
     INPUTS_TEMPLATE_PATH,
+    POLICY_TEMPLATE_PATH,
     RUNBOOK_PATH,
     PackageValidationError,
     validate,
@@ -14,7 +15,12 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def _copy_package(tmp_path: Path) -> Path:
-    for relative_path in (RUNBOOK_PATH, ENV_TEMPLATE_PATH, INPUTS_TEMPLATE_PATH):
+    for relative_path in (
+        RUNBOOK_PATH,
+        ENV_TEMPLATE_PATH,
+        INPUTS_TEMPLATE_PATH,
+        POLICY_TEMPLATE_PATH,
+    ):
         source = ROOT / relative_path
         destination = tmp_path / relative_path
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -29,6 +35,7 @@ def test_deployable_package_artifacts_are_placeholder_only_and_complete() -> Non
         str(RUNBOOK_PATH),
         str(ENV_TEMPLATE_PATH),
         str(INPUTS_TEMPLATE_PATH),
+        str(POLICY_TEMPLATE_PATH),
     ]
 
 
@@ -89,4 +96,70 @@ def test_deployable_package_rejects_missing_handoff_owner(tmp_path: Path) -> Non
     )
 
     with pytest.raises(PackageValidationError, match="operations.acceptance_owner"):
+        validate(root)
+
+
+def test_deployable_package_rejects_policy_with_demo_access(tmp_path: Path) -> None:
+    root = _copy_package(tmp_path)
+    policy_path = root / POLICY_TEMPLATE_PATH
+    policy_path.write_text(
+        policy_path.read_text(encoding="utf-8").replace(
+            '"demo_access_enabled": false',
+            '"demo_access_enabled": true',
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PackageValidationError, match="demo_access_enabled"):
+        validate(root)
+
+
+def test_deployable_package_rejects_policy_missing_forbidden_replacements(
+    tmp_path: Path,
+) -> None:
+    root = _copy_package(tmp_path)
+    policy_path = root / POLICY_TEMPLATE_PATH
+    policy_path.write_text(
+        policy_path.read_text(encoding="utf-8").replace(
+            '      "replace"\n',
+            '      "recreate"\n',
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PackageValidationError, match="forbidden_actions"):
+        validate(root)
+
+
+def test_deployable_package_rejects_policy_missing_staff_oidc_check(
+    tmp_path: Path,
+) -> None:
+    root = _copy_package(tmp_path)
+    policy_path = root / POLICY_TEMPLATE_PATH
+    policy_path.write_text(
+        policy_path.read_text(encoding="utf-8").replace(
+            '      "staff_oidc_configuration_required",\n',
+            "",
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PackageValidationError, match="fail_closed_checks"):
+        validate(root)
+
+
+def test_deployable_package_rejects_policy_concrete_artifact_evidence(
+    tmp_path: Path,
+) -> None:
+    root = _copy_package(tmp_path)
+    policy_path = root / POLICY_TEMPLATE_PATH
+    policy_path.write_text(
+        policy_path.read_text(encoding="utf-8").replace(
+            "<value-safe-cosign-admission-record>",
+            "signed-by-prod-operator",
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PackageValidationError, match="signature_evidence"):
         validate(root)

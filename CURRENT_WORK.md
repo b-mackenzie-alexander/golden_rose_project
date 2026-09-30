@@ -1,5 +1,17 @@
 # Current Work — Golden Rose Operations Platform
 
+## 2026-09-30 — Operations projection status slice active
+
+- **Staffing:** One independent developer; focused frontend tests, static checks and later PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #136, `feat: add request shift dashboard projections`, merged into protected `develop` at `db348b94d36740cc5f78172a8b8bd3267b513257`. Local `develop` was already fast-forwarded to that exact `origin/develop` tip, and stale local `feat/request-shift-dashboard-projections` was deleted after exact tree comparison against `origin/develop`; no extra linked worktree remained. Fresh source work is active on `feat/operations-projection-status`. This slice continues Tranche 3 by making dashboard, queue and calendar projection availability explicit: failed request/shift projection reads now show bilingual recoverable notices, preserved fallback rows are labeled as fallback, and successful empty projection reads render as empty operational state instead of sample queue/schedule/calendar data.
+- **Gate budget:** Source/frontend/backend-client/local-validation work only. No cloud inspection or mutation, Terraform plan/apply, production deployment, live/client data, live identity-provider activation, provider-side reset/revocation mechanics, credential rotation, default permission activation, persistent synthetic write qualification, cloud migration or shared-runtime rollout occurs in this branch.
+- **Next executable action:** Complete validation and publication hygiene for this projection-status slice, including focused dashboard/queue/calendar tests, frontend typecheck/lint/build, `git diff --check`, redacted secret scans and outgoing-range checks before PR publication. Later Tranche 3 work still needs broad-area map/reporting data, richer calendar coverage semantics and manual accessibility/fluent-Spanish/staff-workflow acceptance.
+- **Do not regress:** Human staff decision boundaries; no automated matching/ranking/eligibility/referral/placement; no active demand, coverage, referral or placement implication from request/shift records; private fictional-synthetic boundaries until live-data gates open; immutable intake history and exact retries; restricted-field permissions; bilingual/accessibility parity; separate public/staff identity planes; auth-sensitive no-store handling; evidence-only recovery/session-revocation wording; deployable package guardrails for the client's later GCP environment.
+
+**Validation to date:** Focused frontend dashboard, work-queue and calendar tests passed 21 tests with existing jsdom canvas notices. `npm --prefix apps/web run typecheck`, `npm --prefix apps/web run lint`, and `npm --prefix apps/web run build` passed; the build retains the existing Vite large-chunk warning. Full `npm --prefix apps/web run verify` passed lock validation, lock tests, lint, typecheck, 463 frontend tests with coverage gates, and production build. `git diff --check` and `gitleaks dir --no-banner --redact .` passed.
+
+**Planning artifact:** [Production-readiness and staff identity plan](docs/planning/2026-09-27-production-readiness-plan.md).
+
 ## 2026-09-30 — Request/shift dashboard projections active
 
 - **Staffing:** One independent developer; focused backend/frontend tests, static checks and later PR gates provide quality evidence, not independent-human authorization.

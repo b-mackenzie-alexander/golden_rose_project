@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { queryIntakes } from '../api/intakeClient';
 import type { IntakeKind, IntakeSummary } from '../api/intakeContracts';
-import { getOperationsProjection, type OperationsProjection, type OperationsRequestItem, type OperationsShiftItem } from '../api/operationsProjectionClient';
+import { getOperationsProjection, type OperationsProjection, type OperationsProjectionFailureKind, type OperationsRequestItem, type OperationsShiftItem } from '../api/operationsProjectionClient';
 import { IconSymbol } from '../dashboard/artwork';
 import type { IconName } from '../dashboard/artwork';
 import { useLanguage } from '../i18n/LanguageProvider';
@@ -27,6 +27,8 @@ type QueueItem = {
   status: QueueStatus;
   title: string;
 };
+
+type ProjectionStatus = 'loading' | 'ready' | OperationsProjectionFailureKind;
 
 type WorkQueuesCopy = {
   assignee: string;
@@ -127,9 +129,40 @@ function statusLabel(status: QueueStatus, language: 'en' | 'es') {
 
 type QueueData = {
   employers: IntakeSummary[];
+  loaded: boolean;
   operations: OperationsProjection | null;
+  operationsStatus: ProjectionStatus;
   workers: IntakeSummary[];
 };
+
+function isProjectionFailure(status: ProjectionStatus) {
+  return status !== 'loading' && status !== 'ready';
+}
+
+function projectionNotice(status: ProjectionStatus, language: 'en' | 'es') {
+  if (!isProjectionFailure(status)) return null;
+  const reason = {
+    forbidden: {
+      en: 'this account is not authorized to read the projection',
+      es: 'esta cuenta no tiene autorizacion para leer la proyeccion',
+    },
+    validation: {
+      en: 'the projection response could not be validated',
+      es: 'no se pudo validar la respuesta de la proyeccion',
+    },
+    unavailable: {
+      en: 'the projection service is unavailable',
+      es: 'el servicio de proyeccion no esta disponible',
+    },
+    unexpected: {
+      en: 'the projection response was unexpected',
+      es: 'la respuesta de la proyeccion fue inesperada',
+    },
+  }[status][language];
+  return language === 'es'
+    ? `No se pudieron leer las solicitudes y turnos porque ${reason}. La cola conserva registros guardados y muestra ejemplos solo cuando no hay una lectura autoritativa.`
+    : `Requests and shifts could not be read because ${reason}. The queue keeps saved intake rows visible and uses examples only where an authoritative read is unavailable.`;
+}
 
 function intakeHref(kind: IntakeKind, item: IntakeSummary) {
   return `/staff/intakes/${kind === 'worker' ? 'workers' : 'employers'}?reference=${item.intake_id}&open=match`;
@@ -315,10 +348,11 @@ function itemFromShift(item: OperationsShiftItem, language: 'en' | 'es'): QueueI
 function dynamicItems(copy: WorkQueuesCopy, data: QueueData | null, language: 'en' | 'es') {
   if (
     data === null ||
+    !data.loaded ||
     (data.workers.length === 0 && data.employers.length === 0 &&
       (!data.operations || (data.operations.requestItems.length === 0 && data.operations.shiftItems.length === 0)))
   ) {
-    return copy.items;
+    return data?.loaded && !isProjectionFailure(data.operationsStatus) ? [] : copy.items;
   }
   return [
     ...(data.operations?.shiftItems.map((item) => itemFromShift(item, language)) ?? []),
@@ -351,9 +385,16 @@ export function WorkQueues() {
   const { language } = useLanguage();
   const copy = language === 'es' ? spanishQueues : englishQueues;
   const [filter, setFilter] = useState<QueueFilter>('all');
-  const [queueData, setQueueData] = useState<QueueData | null>(null);
+  const [queueData, setQueueData] = useState<QueueData | null>({
+    employers: [],
+    loaded: false,
+    operations: null,
+    operationsStatus: 'loading',
+    workers: [],
+  });
   const items = useMemo(() => dynamicItems(copy, queueData, language), [copy, language, queueData]);
   const summaryItems = useMemo(() => dynamicSummary(copy, items), [copy, items]);
+  const operationsNotice = useMemo(() => projectionNotice(queueData?.operationsStatus ?? 'loading', language), [language, queueData?.operationsStatus]);
   const visibleItems = useMemo(
     () => items.filter((item) => filter === 'all' || (filter === 'urgent' ? item.priority === 'high' : item.category === filter)),
     [filter, items],
@@ -362,20 +403,22 @@ export function WorkQueues() {
   useEffect(() => {
     let cancelled = false;
     Promise.all([
-      queryIntakes('worker', { page_size: 50 }),
-      queryIntakes('employer', { page_size: 50 }),
-      getOperationsProjection(),
+      queryIntakes('worker', { page_size: 50 }).catch(() => ({ ok: false as const, failure: 'failed' as const })),
+      queryIntakes('employer', { page_size: 50 }).catch(() => ({ ok: false as const, failure: 'failed' as const })),
+      getOperationsProjection().catch(() => ({ ok: false as const, failure: { kind: 'unavailable' as const } })),
     ])
       .then(([workerResult, employerResult, operationsResult]) => {
         if (cancelled) return;
         setQueueData({
           workers: workerResult.ok ? workerResult.value.items : [],
           employers: employerResult.ok ? employerResult.value.items : [],
+          loaded: true,
           operations: operationsResult.ok ? operationsResult.value : null,
+          operationsStatus: operationsResult.ok ? 'ready' : operationsResult.failure.kind,
         });
       })
       .catch(() => {
-        if (!cancelled) setQueueData(null);
+        if (!cancelled) setQueueData({ employers: [], loaded: true, operations: null, operationsStatus: 'unavailable', workers: [] });
       });
     return () => {
       cancelled = true;
@@ -403,6 +446,10 @@ export function WorkQueues() {
           </div>
         ))}
       </div>
+
+      {operationsNotice ? (
+        <p className="projection-status-notice" role="status">{operationsNotice}</p>
+      ) : null}
 
       <section className="queue-panel" aria-labelledby="queue-list-heading">
         <div className="queue-panel-header">

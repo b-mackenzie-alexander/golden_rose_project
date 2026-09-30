@@ -128,4 +128,31 @@ describe('StaffCalendar', () => {
     expect(gatedButtons).toHaveLength(2);
     expect(gatedButtons.every((button) => button.hasAttribute('disabled'))).toBe(true);
   });
+
+  it('shows fallback calendar events with a projection notice when shift reads fail', async () => {
+    vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue({
+      ok: false,
+      failure: { kind: 'forbidden' },
+    });
+
+    renderCalendar();
+
+    expect(await screen.findByRole('status')).toHaveTextContent('not authorized to read projected shifts');
+    expect(screen.getAllByText('Team check-in').length).toBeGreaterThan(0);
+  });
+
+  it('keeps a successful empty shift projection empty instead of showing seeded events', async () => {
+    vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue({
+      ok: true,
+      value: { requestItems: [], shiftItems: [] },
+    });
+
+    renderCalendar();
+
+    await waitFor(() => {
+      expect(screen.getByText('Open slots')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Team check-in')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
 });

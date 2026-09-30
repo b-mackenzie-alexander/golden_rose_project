@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { createShiftNeed, listShiftNeeds } from '../api/shiftNeedClient';
+import { createShiftNeed, listShiftNeeds, submitShiftNeedForReview, submitStaffingRequestForReview } from '../api/shiftNeedClient';
 import type { ShiftNeed, ShiftNeedFailureKind } from '../api/shiftNeedClient';
 import { useLanguage } from '../i18n/LanguageProvider';
 
@@ -8,7 +8,7 @@ type Errors = Partial<Record<'roleTitle' | 'workerCount' | 'startsAt' | 'endsAt'
 const copy = {
   en: {
     heading: 'Draft shift needs',
-    boundary: 'Draft shift needs keep employer demand reviewable. They do not open demand, match workers, confirm coverage, or create referrals.',
+    boundary: 'Governed shift needs keep employer demand reviewable. Pending review does not open demand, match workers, confirm coverage, or create referrals.',
     empty: 'No shift needs have been created for this request.',
     roleTitle: 'Role title',
     workerCount: 'Workers needed',
@@ -20,6 +20,16 @@ const copy = {
     create: 'Create draft shift need',
     creating: 'Creating shift need...',
     created: 'Draft shift need recorded. Request review is still required before this becomes active demand.',
+    submittedShift: 'Shift need submitted for staff review evidence. It is not active demand yet.',
+    submittedRequest: 'Staffing request submitted for review evidence. Demand remains inactive until a later authorized workflow opens it.',
+    submitShift: 'Submit shift for review',
+    submittingShift: 'Submitting shift...',
+    submitRequest: 'Submit request for review',
+    submittingRequest: 'Submitting request...',
+    requestReady: 'At least one shift need is pending review. The staffing request can now be submitted for review.',
+    requestNeedsShift: 'Submit at least one shift need for review before submitting the staffing request.',
+    draftStatus: 'Draft',
+    pendingStatus: 'Pending review',
     required: 'This field is required.',
     count: 'Enter a whole number between 1 and the request worker count.',
     timeOrder: 'End time must be after start time.',
@@ -30,13 +40,12 @@ const copy = {
     validation: 'Review the shift details and try again.',
     unknown: 'The outcome is unknown. Refresh shift needs before retrying.',
     refresh: 'Refresh shift needs',
-    status: 'Draft',
     schedule: 'Schedule',
     rowCount: 'workers',
   },
   es: {
     heading: 'Turnos en borrador',
-    boundary: 'Los turnos en borrador mantienen la demanda lista para revision. No abren demanda, no emparejan trabajadores, no confirman cobertura ni crean referidos.',
+    boundary: 'Los turnos gobernados mantienen la demanda lista para revision. La revision pendiente no abre demanda, no empareja trabajadores, no confirma cobertura ni crea referidos.',
     empty: 'No se han creado turnos para esta solicitud.',
     roleTitle: 'Puesto',
     workerCount: 'Trabajadores necesarios',
@@ -48,6 +57,16 @@ const copy = {
     create: 'Crear turno en borrador',
     creating: 'Creando turno...',
     created: 'Turno en borrador registrado. La solicitud aun requiere revision antes de ser demanda activa.',
+    submittedShift: 'Turno enviado como evidencia de revision del personal. Todavia no es demanda activa.',
+    submittedRequest: 'Solicitud enviada como evidencia de revision. La demanda sigue inactiva hasta un flujo autorizado posterior.',
+    submitShift: 'Enviar turno a revision',
+    submittingShift: 'Enviando turno...',
+    submitRequest: 'Enviar solicitud a revision',
+    submittingRequest: 'Enviando solicitud...',
+    requestReady: 'Al menos un turno esta pendiente de revision. La solicitud ya puede enviarse a revision.',
+    requestNeedsShift: 'Envíe al menos un turno a revision antes de enviar la solicitud.',
+    draftStatus: 'Borrador',
+    pendingStatus: 'Pendiente de revision',
     required: 'Este campo es obligatorio.',
     count: 'Ingrese un numero entero entre 1 y el total de trabajadores solicitados.',
     timeOrder: 'La hora de fin debe ser posterior al inicio.',
@@ -58,7 +77,6 @@ const copy = {
     validation: 'Revise los datos del turno e intente otra vez.',
     unknown: 'El resultado es desconocido. Actualice los turnos antes de reintentar.',
     refresh: 'Actualizar turnos',
-    status: 'Borrador',
     schedule: 'Horario',
     rowCount: 'trabajadores',
   },
@@ -89,19 +107,26 @@ export function ShiftNeedsPanel({
   employerId,
   requestId,
   requestVersion,
+  requestStatus,
   roleTitle,
   workerCount,
+  onRequestReviewSubmitted,
 }: {
   employerId: string;
   requestId: string;
   requestVersion: number;
+  requestStatus: 'draft' | 'pending_review';
   roleTitle: string;
   workerCount: number;
+  onRequestReviewSubmitted?: () => void;
 }) {
   const { language } = useLanguage();
   const m = copy[language];
   const [items, setItems] = useState<ShiftNeed[]>([]);
   const [busy, setBusy] = useState(false);
+  const [requestBusy, setRequestBusy] = useState(false);
+  const [submittingShiftId, setSubmittingShiftId] = useState<string | null>(null);
+  const [submittedRequest, setSubmittedRequest] = useState<{ version: number; status: 'draft' | 'pending_review' } | null>(null);
   const [loading, setLoading] = useState(true);
   const [failure, setFailure] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -114,6 +139,7 @@ export function ShiftNeedsPanel({
     reasonText: '',
     notes: '',
   });
+  const localRequest = submittedRequest ?? { version: requestVersion, status: requestStatus };
   const errors = useMemo<Errors>(() => {
     const next: Errors = {};
     const count = Number(draft.workerCount);
@@ -181,13 +207,62 @@ export function ShiftNeedsPanel({
     setNotice(m.created);
   }
 
+  async function submitShift(item: ShiftNeed) {
+    setNotice(null);
+    setFailure(null);
+    if (item.shiftStatus !== 'draft' || submittingShiftId || requestBusy) return;
+    setSubmittingShiftId(item.shiftNeedId);
+    const result = await submitShiftNeedForReview({
+      employerId,
+      requestId,
+      shiftNeedId: item.shiftNeedId,
+      expectedVersion: item.version,
+      reasonText: language === 'en' ? 'Staff submitted shift need for review' : 'Personal envio el turno a revision',
+      commandId: crypto.randomUUID(),
+    });
+    setSubmittingShiftId(null);
+    if (!result.ok) {
+      setFailure(failureMessage(result.failure.kind, language));
+      return;
+    }
+    setItems((existing) => existing.map((current) => current.shiftNeedId === item.shiftNeedId ? result.value.current : current));
+    setNotice(m.submittedShift);
+  }
+
+  async function submitRequest() {
+    setNotice(null);
+    setFailure(null);
+    if (localRequest.status !== 'draft' || requestBusy || !items.some((item) => item.shiftStatus === 'pending_review')) return;
+    setRequestBusy(true);
+    const result = await submitStaffingRequestForReview({
+      employerId,
+      requestId,
+      expectedVersion: localRequest.version,
+      reasonText: language === 'en' ? 'Staff submitted staffing request for review' : 'Personal envio la solicitud a revision',
+      commandId: crypto.randomUUID(),
+    });
+    setRequestBusy(false);
+    if (!result.ok) {
+      setFailure(failureMessage(result.failure.kind, language));
+      return;
+    }
+    setSubmittedRequest({ version: result.value.current.version, status: result.value.current.requestStatus });
+    setNotice(m.submittedRequest);
+    onRequestReviewSubmitted?.();
+  }
+
+  const hasReviewableShift = items.some((item) => item.shiftStatus === 'pending_review');
+  const canSubmitRequest = localRequest.status === 'draft' && hasReviewableShift;
+
   return (
     <section className="shift-needs-panel" aria-labelledby="shift-needs-heading">
       <div className="shift-needs-panel__header">
         <div>
           <h3 id="shift-needs-heading">{m.heading}</h3>
           <p>{m.boundary}</p>
+          {localRequest.status === 'draft' ? <p>{hasReviewableShift ? m.requestReady : m.requestNeedsShift}</p> : <p>{m.pendingStatus}</p>}
         </div>
+        <button className="focus-ring" disabled={!canSubmitRequest || requestBusy || busy} type="button" onClick={() => void submitRequest()}>{requestBusy ? m.submittingRequest : m.submitRequest}</button>
         <button className="focus-ring" disabled={loading || busy} type="button" onClick={() => void refresh()}>{m.refresh}</button>
       </div>
       {failure ? <p className="staff-account-error" role="alert">{failure}</p> : null}
@@ -214,12 +289,17 @@ export function ShiftNeedsPanel({
           {!loading && items.length === 0 ? <p>{m.empty}</p> : null}
           {items.map((item) => (
             <article className="shift-need-row" key={item.shiftNeedId}>
-              <span className="status-chip" data-status="draft">{m.status}</span>
+              <span className="status-chip" data-status={item.shiftStatus}>{item.shiftStatus === 'pending_review' ? m.pendingStatus : m.draftStatus}</span>
               <strong>{item.roleTitle}</strong>
               <span>{item.workerCount} {m.rowCount}</span>
               <span>{m.schedule}: {localValue(item.startsAt)} - {localValue(item.endsAt)}</span>
               <small>{item.timeZone}</small>
               {item.notes ? <p>{item.notes}</p> : null}
+              {item.shiftStatus === 'draft' ? (
+                <button className="focus-ring" disabled={submittingShiftId !== null || requestBusy} type="button" onClick={() => void submitShift(item)}>
+                  {submittingShiftId === item.shiftNeedId ? m.submittingShift : m.submitShift}
+                </button>
+              ) : null}
             </article>
           ))}
         </section>

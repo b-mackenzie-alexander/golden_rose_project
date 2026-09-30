@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { createShiftNeed, listShiftNeeds } from './shiftNeedClient';
+import { createShiftNeed, listShiftNeeds, submitShiftNeedForReview, submitStaffingRequestForReview } from './shiftNeedClient';
 
 const employerId = '11111111-1111-4111-8111-111111111111';
 const requestId = '22222222-2222-4222-8222-222222222222';
@@ -89,6 +89,85 @@ it('creates a shift need only when command evidence headers match', async () => 
     timeZone: 'America/New_York',
     reasonText: 'Employer supplied a concrete shift',
     notes: null,
+    commandId,
+  })).toEqual({ ok: false, failure: { kind: 'unknown_outcome' } });
+});
+
+it('submits shift and request review commands with strict idempotent evidence parsing', async () => {
+  const fetcher = vi.fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify({
+      command_id: commandId,
+      result_record_version: 2,
+      event_type: 'shift_need.submitted_for_review',
+      current: { ...shift, shift_status: 'pending_review', version: 2, updated_at: '2026-09-29T12:05:00Z' },
+    }), { status: 200, headers: { 'Content-Type': 'application/json', 'Idempotency-Result-Version': '2' } }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({
+      command_id: commandId,
+      result_record_version: 3,
+      event_type: 'staffing_request.submitted_for_review',
+      current: {
+        staffing_request_id: requestId,
+        employer_id: employerId,
+        version: 3,
+        request_status: 'pending_review',
+      },
+    }), { status: 200, headers: { 'Content-Type': 'application/json', 'Idempotency-Result-Version': '3' } }));
+  vi.stubGlobal('fetch', fetcher);
+
+  expect(await submitShiftNeedForReview({
+    employerId,
+    requestId,
+    shiftNeedId,
+    expectedVersion: 1,
+    reasonText: 'Staff submitted shift need for review',
+    commandId,
+  })).toMatchObject({ ok: true, value: { eventType: 'shift_need.submitted_for_review', current: { shiftStatus: 'pending_review' } } });
+  expect(await submitStaffingRequestForReview({
+    employerId,
+    requestId,
+    expectedVersion: 2,
+    reasonText: 'Staff submitted staffing request for review',
+    commandId,
+  })).toMatchObject({ ok: true, value: { eventType: 'staffing_request.submitted_for_review', current: { requestStatus: 'pending_review' } } });
+
+  expect(fetcher.mock.calls[0]?.[0]).toBe(`/api/staff/v1/employers/${employerId}/requests/${requestId}/shift-needs/${shiftNeedId}/submit-review`);
+  expect(fetcher.mock.calls[1]?.[0]).toBe(`/api/staff/v1/employers/${employerId}/requests/${requestId}/submit-review`);
+});
+
+it('rejects malformed lifecycle command responses', async () => {
+  const fetcher = vi.fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify({
+      command_id: commandId,
+      result_record_version: 2,
+      event_type: 'shift_need.submitted_for_review',
+      current: { ...shift, shift_status: 'pending_review', version: 1 },
+    }), { status: 200, headers: { 'Content-Type': 'application/json', 'Idempotency-Result-Version': '2' } }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({
+      command_id: commandId,
+      result_record_version: 3,
+      event_type: 'staffing_request.submitted_for_review',
+      current: {
+        staffing_request_id: requestId,
+        employer_id: employerId,
+        version: 3,
+        request_status: 'active',
+      },
+    }), { status: 200, headers: { 'Content-Type': 'application/json', 'Idempotency-Result-Version': '3' } }));
+  vi.stubGlobal('fetch', fetcher);
+
+  expect(await submitShiftNeedForReview({
+    employerId,
+    requestId,
+    shiftNeedId,
+    expectedVersion: 1,
+    reasonText: 'Staff submitted shift need for review',
+    commandId,
+  })).toEqual({ ok: false, failure: { kind: 'unknown_outcome' } });
+  expect(await submitStaffingRequestForReview({
+    employerId,
+    requestId,
+    expectedVersion: 2,
+    reasonText: 'Staff submitted staffing request for review',
     commandId,
   })).toEqual({ ok: false, failure: { kind: 'unknown_outcome' } });
 });

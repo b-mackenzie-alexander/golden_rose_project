@@ -1750,7 +1750,8 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "TRUE)",
     "staffing_requests.staffing_requests_pkey": "PRIMARY KEY (staffing_request_id)",
     "staffing_requests.staffing_requests_request_status_check": "CHECK (request_status::text = "
-    "'draft'::text)",
+    "ANY (ARRAY['draft'::character varying, "
+    "'pending_review'::character varying]::text[]))",
     "staffing_requests.staffing_requests_request_type_check": "CHECK (request_type::text = ANY "
     "(ARRAY['household'::character varying, "
     "'general_labor'::character "

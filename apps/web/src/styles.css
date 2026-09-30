@@ -994,7 +994,8 @@ select {
   color: var(--color-danger);
 }
 
-.status-chip[data-status='pending'] {
+.status-chip[data-status='pending'],
+.status-chip[data-status='pending_review'] {
   background: var(--color-warning-bg);
   color: var(--color-warning);
 }

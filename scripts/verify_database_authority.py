@@ -448,7 +448,14 @@ for _table, _fields in {
     "employer_contact_details": _ADDRESS_COLUMNS | {"representative_name", "phone"},
     "employer_addresses": _ADDRESS_COLUMNS,
     "worksites": _ADDRESS_COLUMNS,
-    "staffing_requests": {"role_title", "duties_summary", "worker_count", "schedule", "offer"},
+    "staffing_requests": {
+        "role_title",
+        "duties_summary",
+        "worker_count",
+        "schedule",
+        "offer",
+        "request_status",
+    },
 }.items():
     EXPECTED_RUNTIME_UPDATE_COLUMNS[_table] = _fields | {"version", "updated_at", "updated_by"}
 EXPECTED_RUNTIME_UPDATE_COLUMNS["canonical_review_heads"] = {

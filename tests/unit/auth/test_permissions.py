@@ -7,6 +7,7 @@ from golden_rose.auth.permissions import (
     EMPLOYER_READ_PERMISSION,
     SHIFT_NEED_CREATE_PERMISSION,
     SHIFT_NEED_READ_PERMISSION,
+    SHIFT_NEED_SUBMIT_REVIEW_PERMISSION,
     STAFF_ACCOUNT_ACTIVATE_PERMISSION,
     STAFF_ACCOUNT_CREATE_PERMISSION,
     STAFF_ACCOUNT_DEPROVISION_PERMISSION,
@@ -14,6 +15,7 @@ from golden_rose.auth.permissions import (
     STAFF_ACCOUNT_RECOVERY_RECORD_PERMISSION,
     STAFF_ACCOUNT_SESSION_REVOKE_PERMISSION,
     STAFF_ACCOUNT_SUSPEND_PERMISSION,
+    STAFFING_REQUEST_SUBMIT_REVIEW_PERMISSION,
     can_activate_staff_account,
     can_create_draft_employer,
     can_create_draft_employer_contact,
@@ -27,6 +29,8 @@ from golden_rose.auth.permissions import (
     can_record_staff_account_recovery,
     can_revise_draft_employer,
     can_revoke_staff_account_sessions,
+    can_submit_shift_need_for_review,
+    can_submit_staffing_request_for_review,
     can_suspend_staff_account,
 )
 from golden_rose.auth.principal import StaffPrincipal
@@ -237,12 +241,25 @@ def test_shift_need_permission_constants_have_exact_values_and_require_named_gra
     demand_staff = StaffPrincipal(
         actor_id=uuid4(),
         role_name="operations_staff",
-        permissions=frozenset({SHIFT_NEED_CREATE_PERMISSION, SHIFT_NEED_READ_PERMISSION}),
+        permissions=frozenset(
+            {
+                SHIFT_NEED_CREATE_PERMISSION,
+                SHIFT_NEED_READ_PERMISSION,
+                SHIFT_NEED_SUBMIT_REVIEW_PERMISSION,
+                STAFFING_REQUEST_SUBMIT_REVIEW_PERMISSION,
+            }
+        ),
     )
 
     assert SHIFT_NEED_CREATE_PERMISSION == "shift_need:create"
     assert SHIFT_NEED_READ_PERMISSION == "shift_need:read"
+    assert SHIFT_NEED_SUBMIT_REVIEW_PERMISSION == "shift_need:submit_review"
+    assert STAFFING_REQUEST_SUBMIT_REVIEW_PERMISSION == "staffing_request:submit_review"
     assert can_create_shift_need(owner_with_labels_only) is False
     assert can_read_shift_need(owner_with_labels_only) is False
+    assert can_submit_shift_need_for_review(owner_with_labels_only) is False
+    assert can_submit_staffing_request_for_review(owner_with_labels_only) is False
     assert can_create_shift_need(demand_staff) is True
     assert can_read_shift_need(demand_staff) is True
+    assert can_submit_shift_need_for_review(demand_staff) is True
+    assert can_submit_staffing_request_for_review(demand_staff) is True

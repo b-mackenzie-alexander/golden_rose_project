@@ -1,0 +1,196 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { getOperationsProjection } from './operationsProjectionClient';
+
+const fetchMock = vi.fn<typeof fetch>();
+const validRequest = {
+  item_type: 'staffing_request',
+  source_intake_id: '11111111-1111-4111-8111-111111111111',
+  employer_id: '22222222-2222-4222-8222-222222222222',
+  employer_name: 'Projected Employer',
+  staffing_request_id: '33333333-3333-4333-8333-333333333333',
+  request_status: 'pending_review',
+  role_title: 'Home aide',
+  worker_count: 2,
+  version: 3,
+  received_at: '2026-10-01T13:00:00Z',
+  updated_at: '2026-10-01T13:30:00Z',
+};
+const validShift = {
+  item_type: 'shift_need',
+  source_intake_id: null,
+  employer_id: '22222222-2222-4222-8222-222222222222',
+  employer_name: 'Projected Employer',
+  staffing_request_id: '33333333-3333-4333-8333-333333333333',
+  shift_need_id: '44444444-4444-4444-8444-444444444444',
+  request_status: 'pending_review',
+  shift_status: 'draft',
+  role_title: 'Home aide',
+  worker_count: 1,
+  starts_at: '2026-10-01T14:00:00Z',
+  ends_at: '2026-10-01T18:00:00Z',
+  time_zone: 'America/New_York',
+  version: 1,
+  updated_at: '2026-10-01T13:45:00Z',
+};
+
+function jsonResponse(body: unknown, init: ResponseInit = {}) {
+  return new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' }, ...init });
+}
+
+function projection(
+  request: Record<string, unknown> = validRequest,
+  shift: Record<string, unknown> = validShift,
+) {
+  return { request_items: [request], shift_items: [shift] };
+}
+
+beforeEach(() => {
+  fetchMock.mockReset();
+  vi.stubGlobal('fetch', fetchMock);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe('operationsProjectionClient', () => {
+  it('reads the operations projection with no-store staff request handling', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(projection()));
+
+    const result = await getOperationsProjection();
+
+    expect(result.ok).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith('/api/staff/v1/operations/projection', expect.objectContaining({
+      cache: 'no-store',
+      credentials: 'same-origin',
+      referrerPolicy: 'no-referrer',
+    }));
+    if (!result.ok) throw new Error('Expected projection read to succeed.');
+    expect(result.value.requestItems[0]?.sourceIntakeId).toBe('11111111-1111-4111-8111-111111111111');
+    expect(result.value.shiftItems[0]?.sourceIntakeId).toBeNull();
+  });
+
+  it('rejects malformed projection payloads', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({
+      request_items: [],
+      shift_items: [{ item_type: 'shift_need', starts_at: '2026-10-01T18:00:00Z', ends_at: '2026-10-01T14:00:00Z' }],
+    }));
+
+    await expect(getOperationsProjection()).resolves.toEqual({
+      ok: false,
+      failure: { kind: 'unexpected' },
+    });
+  });
+
+  it('maps response and network failures into recoverable failure kinds', async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError('offline'));
+    await expect(getOperationsProjection()).resolves.toEqual({
+      ok: false,
+      failure: { kind: 'unavailable' },
+    });
+
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 403 }));
+    await expect(getOperationsProjection()).resolves.toEqual({
+      ok: false,
+      failure: { kind: 'forbidden' },
+    });
+
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 422 }));
+    await expect(getOperationsProjection()).resolves.toEqual({
+      ok: false,
+      failure: { kind: 'validation' },
+    });
+
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 400 }));
+    await expect(getOperationsProjection()).resolves.toEqual({
+      ok: false,
+      failure: { kind: 'validation' },
+    });
+
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 503 }));
+    await expect(getOperationsProjection()).resolves.toEqual({
+      ok: false,
+      failure: { kind: 'unavailable' },
+    });
+
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 500 }));
+    await expect(getOperationsProjection()).resolves.toEqual({
+      ok: false,
+      failure: { kind: 'unexpected' },
+    });
+  });
+
+  it('rejects non-json and unreadable successful responses', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('not json', { headers: { 'Content-Type': 'text/plain' } }));
+    await expect(getOperationsProjection()).resolves.toEqual({
+      ok: false,
+      failure: { kind: 'unexpected' },
+    });
+
+    fetchMock.mockResolvedValueOnce(new Response('{', { headers: { 'Content-Type': 'application/json' } }));
+    await expect(getOperationsProjection()).resolves.toEqual({
+      ok: false,
+      failure: { kind: 'unexpected' },
+    });
+  });
+
+  it('rejects malformed request and shift identifiers', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({
+      request_items: [{ ...validRequest, request_status: 'draft', source_intake_id: 'not-a-uuid' }],
+      shift_items: [],
+    }));
+
+    await expect(getOperationsProjection()).resolves.toEqual({
+      ok: false,
+      failure: { kind: 'unexpected' },
+    });
+  });
+
+  it.each([
+    ['non-object payload', null],
+    ['missing request array', { shift_items: [] }],
+    ['missing shift array', { request_items: [] }],
+    ['oversized request list', { request_items: Array.from({ length: 51 }, () => validRequest), shift_items: [] }],
+    ['oversized shift list', { request_items: [], shift_items: Array.from({ length: 51 }, () => validShift) }],
+    ['non-object request', { request_items: [null], shift_items: [] }],
+    ['wrong request type', { request_items: [{ ...validRequest, item_type: 'other' }], shift_items: [] }],
+    ['blank employer name', projection({ ...validRequest, employer_name: '   ' })],
+    ['overlong role title', projection({ ...validRequest, role_title: 'x'.repeat(201) })],
+    ['zero worker count', projection({ ...validRequest, worker_count: 0 })],
+    ['unsafe version', projection({ ...validRequest, version: Number.MAX_SAFE_INTEGER + 1 })],
+    ['invalid request status', projection({ ...validRequest, request_status: 'approved' })],
+    ['bad received timestamp', projection({ ...validRequest, received_at: 'not-a-date' })],
+    ['non-object shift', { request_items: [], shift_items: [null] }],
+    ['wrong shift type', { request_items: [], shift_items: [{ ...validShift, item_type: 'other' }] }],
+    ['invalid shift request status', projection(validRequest, { ...validShift, request_status: 'approved' })],
+    ['invalid shift status', projection(validRequest, { ...validShift, shift_status: 'approved' })],
+    ['same-time shift window', projection(validRequest, { ...validShift, starts_at: '2026-10-01T14:00:00Z', ends_at: '2026-10-01T14:00:00Z' })],
+    ['blank time zone', projection(validRequest, { ...validShift, time_zone: '' })],
+    ['bad shift update timestamp', projection(validRequest, { ...validShift, updated_at: 'not-a-date' })],
+    ['bad shift identifier length', projection(validRequest, { ...validShift, shift_need_id: '44444444-4444-4444-8444-44444444444' })],
+    ['bad shift identifier character', projection(validRequest, { ...validShift, shift_need_id: 'zzzzzzzz-4444-4444-8444-444444444444' })],
+  ])('rejects %s', async (_caseName, body) => {
+    fetchMock.mockResolvedValue(jsonResponse(body));
+
+    await expect(getOperationsProjection()).resolves.toEqual({
+      ok: false,
+      failure: { kind: 'unexpected' },
+    });
+  });
+
+  it('accepts omitted source intake identifiers as null', async () => {
+    const requestWithoutSource: Record<string, unknown> = { ...validRequest };
+    const shiftWithoutSource: Record<string, unknown> = { ...validShift };
+    delete requestWithoutSource.source_intake_id;
+    delete shiftWithoutSource.source_intake_id;
+    fetchMock.mockResolvedValue(jsonResponse(projection(requestWithoutSource, shiftWithoutSource)));
+
+    const result = await getOperationsProjection();
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('Expected projection read to succeed.');
+    expect(result.value.requestItems[0]?.sourceIntakeId).toBeNull();
+    expect(result.value.shiftItems[0]?.sourceIntakeId).toBeNull();
+  });
+});

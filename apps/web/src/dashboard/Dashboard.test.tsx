@@ -5,11 +5,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as intakeApi from '../api/intakeClient';
 import type { IntakeKind, IntakeSummary } from '../api/intakeContracts';
+import * as operationsApi from '../api/operationsProjectionClient';
 import { AppRoutes } from '../app/App';
 import { LanguageProvider } from '../i18n/LanguageProvider';
 import { runAxe } from '../test/axe';
 
 vi.mock('../api/intakeClient');
+vi.mock('../api/operationsProjectionClient');
 
 const summary = (
   kind: IntakeKind,
@@ -64,6 +66,45 @@ describe('Dashboard', () => {
         next_cursor: null,
       },
     }));
+    vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue({
+      ok: true,
+      value: {
+        requestItems: [
+          {
+            itemType: 'staffing_request',
+            sourceIntakeId: '66666666-6666-4666-8666-666666666666',
+            employerId: '77777777-7777-4777-8777-777777777777',
+            employerName: 'Projected Employer',
+            staffingRequestId: '88888888-8888-4888-8888-888888888888',
+            requestStatus: 'pending_review',
+            roleTitle: 'Home aide',
+            workerCount: 2,
+            version: 3,
+            receivedAt: '2026-10-01T13:00:00Z',
+            updatedAt: '2026-10-01T13:30:00Z',
+          },
+        ],
+        shiftItems: [
+          {
+            itemType: 'shift_need',
+            sourceIntakeId: '66666666-6666-4666-8666-666666666666',
+            employerId: '77777777-7777-4777-8777-777777777777',
+            employerName: 'Projected Employer',
+            staffingRequestId: '88888888-8888-4888-8888-888888888888',
+            shiftNeedId: '99999999-9999-4999-8999-999999999999',
+            requestStatus: 'pending_review',
+            shiftStatus: 'pending_review',
+            roleTitle: 'Home aide',
+            workerCount: 1,
+            startsAt: '2026-10-01T14:00:00Z',
+            endsAt: '2026-10-01T18:00:00Z',
+            timeZone: 'America/New_York',
+            version: 2,
+            updatedAt: '2026-10-01T13:45:00Z',
+          },
+        ],
+      },
+    });
   });
 
   it('renders the staff workspace dashboard from the home route', async () => {
@@ -79,6 +120,11 @@ describe('Dashboard', () => {
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('heading', { name: 'Good morning, Mariela' })).toBeInTheDocument();
     await screen.findAllByText('Dynamic Worker One');
+    await screen.findAllByText('Projected Employer');
+    expect(screen.getAllByRole('link').some((link) => (
+      link.getAttribute('href') === '/staff/intakes/66666666-6666-4666-8666-666666666666/outputs/request' &&
+      link.textContent.includes('Shift in review')
+    ))).toBe(true);
     expect(screen.getAllByRole('link', { name: /Dynamic Worker One/ }).some((link) => (
       link.getAttribute('href') === '/staff/intakes/workers?reference=11111111-1111-4111-8111-111111111111&open=match'
     ))).toBe(true);
@@ -91,6 +137,7 @@ describe('Dashboard', () => {
     })).toBe(true);
     expect(screen.getByRole('heading', { name: "Today's priorities" })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: "Today's schedule" })).toBeInTheDocument();
+    expect(screen.getAllByText('Home aide (1)').length).toBeGreaterThan(0);
     expect(screen.getByRole('heading', { name: 'Quick actions' })).toBeInTheDocument();
     expect(view.container.querySelector('.brand-rose')).toBeInTheDocument();
     expect(view.container.querySelector('.skyline-artwork')).toBeInTheDocument();
@@ -121,6 +168,86 @@ describe('Dashboard', () => {
     expect(screen.getByRole('heading', { name: 'Prioridades de hoy' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Agenda de hoy' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Acciones rapidas' })).toBeInTheDocument();
+  });
+
+  it('renders operations-only dashboard projections in Spanish with employer fallback links', async () => {
+    const user = userEvent.setup();
+    vi.mocked(intakeApi.queryIntakes).mockResolvedValue({
+      ok: true,
+      value: { items: [], next_cursor: null },
+    });
+    vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue({
+      ok: true,
+      value: {
+        requestItems: [
+          {
+            itemType: 'staffing_request',
+            sourceIntakeId: null,
+            employerId: '77777777-7777-4777-8777-777777777777',
+            employerName: 'Projected Employer',
+            staffingRequestId: '88888888-8888-4888-8888-888888888888',
+            requestStatus: 'draft',
+            roleTitle: 'Home aide',
+            workerCount: 2,
+            version: 3,
+            receivedAt: '2026-10-01T13:00:00Z',
+            updatedAt: '2026-10-01T13:30:00Z',
+          },
+        ],
+        shiftItems: [
+          {
+            itemType: 'shift_need',
+            sourceIntakeId: null,
+            employerId: '77777777-7777-4777-8777-777777777777',
+            employerName: 'Projected Employer',
+            staffingRequestId: '88888888-8888-4888-8888-888888888888',
+            shiftNeedId: '99999999-9999-4999-8999-999999999999',
+            requestStatus: 'draft',
+            shiftStatus: 'draft',
+            roleTitle: 'Home aide',
+            workerCount: 1,
+            startsAt: '2026-10-01T14:00:00Z',
+            endsAt: '2026-10-01T18:00:00Z',
+            timeZone: 'America/New_York',
+            version: 2,
+            updatedAt: '2026-10-01T13:45:00Z',
+          },
+        ],
+      },
+    });
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Cambiar a español' }));
+
+    expect(await screen.findByText('Turno en borrador')).toBeInTheDocument();
+    expect(screen.getByText('Preparar solicitud')).toBeInTheDocument();
+    expect(screen.getByText('Turnos registrados')).toBeInTheDocument();
+    expect(screen.getAllByRole('link').filter((link) => (
+      link.getAttribute('href') === '/staff/intakes/employers?reference=77777777-7777-4777-8777-777777777777&open=match'
+    )).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('keeps dashboard fallbacks when projection loading rejects', async () => {
+    vi.mocked(intakeApi.queryIntakes).mockRejectedValue(new TypeError('offline'));
+    vi.mocked(operationsApi.getOperationsProjection).mockRejectedValue(new TypeError('offline'));
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Ana Quispe').length).toBeGreaterThan(0);
+    });
+    expect(screen.getByText('Review new drafts')).toBeInTheDocument();
   });
 
   it('routes from the global dashboard search to reserved workflow areas', async () => {
@@ -189,7 +316,7 @@ describe('Dashboard', () => {
     expect(screen.getByRole('heading', { name: 'Work queues' })).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getAllByRole('link', { name: 'Open' }).some((link) => (
-        link.getAttribute('href') === '/staff/intakes/workers?reference=11111111-1111-4111-8111-111111111111&open=match'
+        link.getAttribute('href') === '/staff/intakes/66666666-6666-4666-8666-666666666666/outputs/request'
       ))).toBe(true);
     });
   });
@@ -206,17 +333,15 @@ describe('Dashboard', () => {
 
     expect(screen.getByRole('link', { name: 'Calendar' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('heading', { name: 'Calendar' })).toBeInTheDocument();
-    expect(screen.getAllByText('Team check-in')).toHaveLength(2);
-    expect(screen.getAllByText('Interview with Ana Quispe')).toHaveLength(2);
 
-    const tuesdayButton = screen.getByText('Jan 28').closest('button');
-    if (tuesdayButton === null) {
-      throw new Error('Tuesday calendar button was not rendered.');
+    const thursdayButton = screen.getByText('Jan 30').closest('button');
+    if (thursdayButton === null) {
+      throw new Error('Thursday calendar button was not rendered.');
     }
-    await user.click(tuesdayButton);
+    await user.click(thursdayButton);
 
-    expect(screen.getAllByText('Bright Horizons staffing call')).toHaveLength(2);
-    expect(screen.getAllByText('Meet Carlos Mendoza')).toHaveLength(2);
+    expect(await screen.findAllByText('Home aide (1)')).toHaveLength(2);
+    expect(screen.getAllByText('Projected Employer').length).toBeGreaterThan(0);
     expect(await runAxe(view.container)).toEqual([]);
   });
 
@@ -235,7 +360,7 @@ describe('Dashboard', () => {
     expect(screen.getByRole('heading', { name: 'Prioritized work' })).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getAllByRole('link', { name: 'Open' }).some((link) => (
-        link.getAttribute('href') === '/staff/intakes/workers?reference=11111111-1111-4111-8111-111111111111&open=match'
+        link.getAttribute('href') === '/staff/intakes/66666666-6666-4666-8666-666666666666/outputs/request'
       ))).toBe(true);
     });
     expect(screen.getAllByText('Employer follow-up').length).toBeGreaterThan(0);

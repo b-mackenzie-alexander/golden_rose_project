@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { queryIntakes } from '../api/intakeClient';
 import type { IntakeKind, IntakeSummary } from '../api/intakeContracts';
+import { getOperationsProjection, type OperationsProjection, type OperationsRequestItem, type OperationsShiftItem } from '../api/operationsProjectionClient';
 import { IconSymbol } from '../dashboard/artwork';
 import type { IconName } from '../dashboard/artwork';
 import { useLanguage } from '../i18n/LanguageProvider';
@@ -126,6 +127,7 @@ function statusLabel(status: QueueStatus, language: 'en' | 'es') {
 
 type QueueData = {
   employers: IntakeSummary[];
+  operations: OperationsProjection | null;
   workers: IntakeSummary[];
 };
 
@@ -239,11 +241,88 @@ function itemFromIntake(kind: IntakeKind, item: IntakeSummary, language: 'en' | 
   };
 }
 
+function requestHref(item: Pick<OperationsRequestItem, 'sourceIntakeId' | 'employerId'>) {
+  return item.sourceIntakeId
+    ? `/staff/intakes/${item.sourceIntakeId}/outputs/request`
+    : `/staff/intakes/employers?reference=${item.employerId}&open=match`;
+}
+
+function operationStatus(status: 'draft' | 'pending_review'): QueueStatus {
+  return status === 'pending_review' ? 'in_review' : 'draft';
+}
+
+function formatShiftWindow(item: OperationsShiftItem, language: 'en' | 'es') {
+  const starts = new Date(item.startsAt);
+  if (Number.isNaN(starts.getTime())) return language === 'es' ? 'Horario registrado' : 'Shift recorded';
+  return starts.toLocaleString(language === 'es' ? 'es-US' : 'en-US', {
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    month: 'short',
+  });
+}
+
+function itemFromRequest(item: OperationsRequestItem, language: 'en' | 'es'): QueueItem {
+  return {
+    age: item.requestStatus === 'pending_review'
+      ? language === 'es' ? 'Revision' : 'Review'
+      : language === 'es' ? 'Borrador' : 'Draft',
+    assignee: language === 'es' ? 'Operaciones' : 'Operations',
+    category: 'employer',
+    href: requestHref(item),
+    icon: 'building',
+    id: item.staffingRequestId,
+    nextStep: item.requestStatus === 'pending_review'
+      ? language === 'es' ? 'Revisar solicitud' : 'Review request'
+      : language === 'es' ? 'Agregar turnos o enviar a revision' : 'Add shifts or submit for review',
+    owner: item.employerName,
+    priority: item.requestStatus === 'pending_review' ? 'medium' : 'low',
+    reason: language === 'es'
+      ? `Solicitud de ${item.roleTitle} con ${String(item.workerCount)} trabajador(es)`
+      : `${item.roleTitle} request for ${String(item.workerCount)} worker(s)`,
+    reference: language === 'es' ? 'Solicitud de personal' : 'Staffing request',
+    status: operationStatus(item.requestStatus),
+    title: item.requestStatus === 'pending_review'
+      ? language === 'es' ? 'Solicitud en revision' : 'Request in review'
+      : language === 'es' ? 'Preparar solicitud de personal' : 'Prepare staffing request',
+  };
+}
+
+function itemFromShift(item: OperationsShiftItem, language: 'en' | 'es'): QueueItem {
+  return {
+    age: formatShiftWindow(item, language),
+    assignee: language === 'es' ? 'Operaciones' : 'Operations',
+    category: 'employer',
+    href: requestHref(item),
+    icon: 'schedule',
+    id: item.shiftNeedId,
+    nextStep: item.shiftStatus === 'pending_review'
+      ? language === 'es' ? 'Revisar turno' : 'Review shift'
+      : language === 'es' ? 'Enviar turno a revision' : 'Submit shift for review',
+    owner: item.employerName,
+    priority: item.shiftStatus === 'pending_review' ? 'high' : 'medium',
+    reason: language === 'es'
+      ? `${item.roleTitle}, ${String(item.workerCount)} trabajador(es)`
+      : `${item.roleTitle}, ${String(item.workerCount)} worker(s)`,
+    reference: language === 'es' ? 'Turno solicitado' : 'Requested shift',
+    status: operationStatus(item.shiftStatus),
+    title: item.shiftStatus === 'pending_review'
+      ? language === 'es' ? 'Turno pendiente de revision' : 'Shift pending review'
+      : language === 'es' ? 'Turno en borrador' : 'Draft shift need',
+  };
+}
+
 function dynamicItems(copy: WorkQueuesCopy, data: QueueData | null, language: 'en' | 'es') {
-  if (data === null || (data.workers.length === 0 && data.employers.length === 0)) {
+  if (
+    data === null ||
+    (data.workers.length === 0 && data.employers.length === 0 &&
+      (!data.operations || (data.operations.requestItems.length === 0 && data.operations.shiftItems.length === 0)))
+  ) {
     return copy.items;
   }
   return [
+    ...(data.operations?.shiftItems.map((item) => itemFromShift(item, language)) ?? []),
+    ...(data.operations?.requestItems.map((item) => itemFromRequest(item, language)) ?? []),
     ...data.workers.map((item) => itemFromIntake('worker', item, language)),
     ...data.employers.map((item) => itemFromIntake('employer', item, language)),
   ]
@@ -282,12 +361,17 @@ export function WorkQueues() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([queryIntakes('worker', { page_size: 50 }), queryIntakes('employer', { page_size: 50 })])
-      .then(([workerResult, employerResult]) => {
+    Promise.all([
+      queryIntakes('worker', { page_size: 50 }),
+      queryIntakes('employer', { page_size: 50 }),
+      getOperationsProjection(),
+    ])
+      .then(([workerResult, employerResult, operationsResult]) => {
         if (cancelled) return;
         setQueueData({
           workers: workerResult.ok ? workerResult.value.items : [],
           employers: employerResult.ok ? employerResult.value.items : [],
+          operations: operationsResult.ok ? operationsResult.value : null,
         });
       })
       .catch(() => {

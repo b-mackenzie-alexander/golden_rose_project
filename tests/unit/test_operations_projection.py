@@ -1,13 +1,19 @@
 from datetime import UTC, datetime
 from typing import Any
+from unittest.mock import Mock
 from uuid import UUID
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy.exc import SQLAlchemyError
 
+from golden_rose.api.dependencies import get_db_session, get_settings, get_staff_principal
+from golden_rose.api.staff import operations
 from golden_rose.application.intake_errors import IntakeError
 from golden_rose.application.operations_projection import query_operations_projection
 from golden_rose.auth.principal import StaffPrincipal
+from golden_rose.config import Settings
+from golden_rose.main import create_app
 
 ACTOR_ID = UUID("11111111-1111-4111-8111-111111111111")
 EMPLOYER_ID = UUID("22222222-2222-4222-8222-222222222222")
@@ -53,6 +59,72 @@ def principal(*permissions: str) -> StaffPrincipal:
 
 def all_permissions() -> StaffPrincipal:
     return principal("employer:read", "staffing_request:read", "shift_need:read")
+
+
+def test_operations_projection_route_returns_no_store_projection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = create_app(engine_factory=lambda: Mock())
+    app.dependency_overrides[get_db_session] = lambda: object()
+    app.dependency_overrides[get_staff_principal] = all_permissions
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        environment="test",
+        auth_mode="synthetic",
+        database_url="postgresql+psycopg://golden_rose_app:test@localhost/golden_rose",
+        synthetic_staff_id=ACTOR_ID,
+    )
+    projected = {
+        "request_items": [
+            {
+                "item_type": "staffing_request",
+                "source_intake_id": INTAKE_ID,
+                "employer_id": EMPLOYER_ID,
+                "employer_name": "Restaurante La Esperanza",
+                "staffing_request_id": REQUEST_ID,
+                "request_status": "pending_review",
+                "role_title": "Line cook",
+                "worker_count": 2,
+                "version": 3,
+                "received_at": NOW,
+                "updated_at": NOW,
+            }
+        ],
+        "shift_items": [],
+    }
+
+    def fake_projection(**kwargs: Any) -> dict[str, Any]:
+        assert kwargs["session"] is not None
+        assert kwargs["principal"].actor_id == ACTOR_ID
+        assert kwargs["page_size"] == 12
+        return projected
+
+    monkeypatch.setattr(operations, "query_operations_projection", fake_projection)
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.get("/api/staff/v1/operations/projection?page_size=12")
+
+    assert response.status_code == 200, response.text
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["vary"] == "Authorization"
+    assert response.json()["request_items"][0]["staffing_request_id"] == str(REQUEST_ID)
+    assert response.json()["shift_items"] == []
+
+
+def test_operations_projection_route_bounds_page_size() -> None:
+    app = create_app(engine_factory=lambda: Mock())
+    app.dependency_overrides[get_db_session] = lambda: object()
+    app.dependency_overrides[get_staff_principal] = all_permissions
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        environment="test",
+        auth_mode="synthetic",
+        database_url="postgresql+psycopg://golden_rose_app:test@localhost/golden_rose",
+        synthetic_staff_id=ACTOR_ID,
+    )
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.get("/api/staff/v1/operations/projection?page_size=51")
+
+    assert response.status_code == 422
 
 
 def test_operations_projection_requires_request_and_shift_read_permissions():

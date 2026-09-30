@@ -724,7 +724,7 @@ def test_successor_downgrade_refuses_link_history_before_ddl(client, migration_d
         migrate(migration_database, PREDECESSOR, downgrade=True)
     assert (
         rows(migration_database, "alembic_version")[0]["version_num"]
-        == "0012_staff_account_evidence"
+        == "0013_shift_need_foundation"
     )
     assert {table: rows(migration_database, table) for table in before} == before
     with migration_database.connect() as connection:

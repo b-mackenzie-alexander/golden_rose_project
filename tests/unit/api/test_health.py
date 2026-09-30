@@ -32,7 +32,7 @@ class FakeScalarResult:
 
 
 class FakeConnection:
-    def __init__(self, revision: str = "0013_shift_need_foundation") -> None:
+    def __init__(self, revision: str = "0014_request_shift_review") -> None:
         self.revision = revision
         self.statements: list[str] = []
 

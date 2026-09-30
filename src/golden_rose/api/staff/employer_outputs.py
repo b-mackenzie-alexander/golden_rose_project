@@ -14,8 +14,10 @@ from golden_rose.api.staff.employer_output_schemas import (
     ShiftNeedCommandResponse,
     ShiftNeedDetail,
     ShiftNeedPage,
+    StaffingRequestCommandResponse,
     StaffingRequestDetail,
     StaffingRequestPage,
+    SubmitForReviewRequest,
     WorksiteAddress,
     WorksiteDetail,
     WorksitePage,
@@ -29,6 +31,8 @@ from golden_rose.application.shift_needs import (
     create_shift_need,
     query_shift_needs,
     read_shift_need,
+    submit_shift_need_for_review,
+    submit_staffing_request_for_review,
 )
 
 router = APIRouter(prefix="/api/staff/v1/employers/{employer_id}", tags=["staff-employer-outputs"])
@@ -187,6 +191,38 @@ def staffing_request(
 
 
 @router.post(
+    "/requests/{request_id}/submit-review",
+    response_model=StaffingRequestCommandResponse,
+)
+def submit_request_for_review(
+    employer_id: UUID,
+    request_id: UUID,
+    body: SubmitForReviewRequest,
+    session: SessionDep,
+    principal: PrincipalDep,
+    settings: SettingsDep,
+    command_id: KeyDep,
+    clock: ClockDep,
+):
+    local_only(settings)
+    result = submit_staffing_request_for_review(
+        session=session,
+        principal=principal,
+        employer_id=employer_id,
+        request_id=request_id,
+        command_id=command_id,
+        body=body,
+        now=clock.now(),
+    )
+    validated = StaffingRequestCommandResponse.model_validate(result.payload)
+    headers = {
+        "Idempotency-Replayed": str(result.replayed).lower(),
+        "Idempotency-Result-Version": str(validated.result_record_version),
+    }
+    return JSONResponse(validated.model_dump(mode="json"), status_code=200, headers=headers)
+
+
+@router.post(
     "/requests/{request_id}/shift-needs/query",
     response_model=ShiftNeedPage,
 )
@@ -228,6 +264,40 @@ def request_shift_need(
         request_id=request_id,
         shift_need_id=shift_need_id,
     )
+
+
+@router.post(
+    "/requests/{request_id}/shift-needs/{shift_need_id}/submit-review",
+    response_model=ShiftNeedCommandResponse,
+)
+def submit_request_shift_need_for_review(
+    employer_id: UUID,
+    request_id: UUID,
+    shift_need_id: UUID,
+    body: SubmitForReviewRequest,
+    session: SessionDep,
+    principal: PrincipalDep,
+    settings: SettingsDep,
+    command_id: KeyDep,
+    clock: ClockDep,
+):
+    local_only(settings)
+    result = submit_shift_need_for_review(
+        session=session,
+        principal=principal,
+        employer_id=employer_id,
+        request_id=request_id,
+        shift_need_id=shift_need_id,
+        command_id=command_id,
+        body=body,
+        now=clock.now(),
+    )
+    validated = ShiftNeedCommandResponse.model_validate(result.payload)
+    headers = {
+        "Idempotency-Replayed": str(result.replayed).lower(),
+        "Idempotency-Result-Version": str(validated.result_record_version),
+    }
+    return JSONResponse(validated.model_dump(mode="json"), status_code=200, headers=headers)
 
 
 @router.post(

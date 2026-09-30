@@ -14,7 +14,7 @@ export type ShiftNeed = {
   employerId: string;
   staffingRequestId: string;
   requestVersionAtCreation: number;
-  shiftStatus: 'draft';
+  shiftStatus: 'draft' | 'pending_review';
   roleTitle: string;
   workerCount: number;
   startsAt: string;
@@ -29,8 +29,22 @@ export type ShiftNeed = {
 export type ShiftNeedCommandResult = {
   commandId: string;
   resultRecordVersion: number;
-  eventType: 'shift_need.created';
+  eventType: 'shift_need.created' | 'shift_need.submitted_for_review';
   current: ShiftNeed;
+};
+
+export type StaffingRequestDetail = {
+  staffingRequestId: string;
+  employerId: string;
+  version: number;
+  requestStatus: 'draft' | 'pending_review';
+};
+
+export type StaffingRequestCommandResult = {
+  commandId: string;
+  resultRecordVersion: number;
+  eventType: 'staffing_request.submitted_for_review';
+  current: StaffingRequestDetail;
 };
 
 export type CreateShiftNeedInput = {
@@ -45,6 +59,18 @@ export type CreateShiftNeedInput = {
   reasonText: string;
   notes: string | null;
   commandId: string;
+};
+
+export type SubmitForReviewInput = {
+  employerId: string;
+  requestId: string;
+  expectedVersion: number;
+  reasonText: string;
+  commandId: string;
+};
+
+export type SubmitShiftNeedForReviewInput = SubmitForReviewInput & {
+  shiftNeedId: string;
 };
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -96,7 +122,7 @@ function parseShiftNeed(value: unknown): ShiftNeed | null {
   if (typeof value.shift_need_id !== 'string' || !uuid.test(value.shift_need_id)) return null;
   if (typeof value.employer_id !== 'string' || !uuid.test(value.employer_id)) return null;
   if (typeof value.staffing_request_id !== 'string' || !uuid.test(value.staffing_request_id)) return null;
-  if (!positive(value.request_version_at_creation) || value.shift_status !== 'draft') return null;
+  if (!positive(value.request_version_at_creation) || !['draft', 'pending_review'].includes(String(value.shift_status))) return null;
   if (!text(value.role_title, 200) || !positive(value.worker_count, 1000)) return null;
   if (!timestamp(value.starts_at) || !timestamp(value.ends_at) || Date.parse(value.starts_at) >= Date.parse(value.ends_at)) return null;
   if (!text(value.time_zone, 100)) return null;
@@ -107,7 +133,7 @@ function parseShiftNeed(value: unknown): ShiftNeed | null {
     employerId: value.employer_id,
     staffingRequestId: value.staffing_request_id,
     requestVersionAtCreation: value.request_version_at_creation,
-    shiftStatus: 'draft',
+    shiftStatus: value.shift_status as ShiftNeed['shiftStatus'],
     roleTitle: value.role_title,
     workerCount: value.worker_count,
     startsAt: value.starts_at,
@@ -123,12 +149,33 @@ function parseCommand(value: unknown): ShiftNeedCommandResult | null {
   if (!object(value)) return null;
   const current = parseShiftNeed(value.current);
   if (typeof value.command_id !== 'string' || !uuid.test(value.command_id) || current === null) return null;
-  if (value.event_type !== 'shift_need.created' || value.result_record_version !== current.version) return null;
+  if (!['shift_need.created', 'shift_need.submitted_for_review'].includes(String(value.event_type)) || value.result_record_version !== current.version) return null;
   return {
     commandId: value.command_id,
     resultRecordVersion: value.result_record_version,
-    eventType: 'shift_need.created',
+    eventType: value.event_type as ShiftNeedCommandResult['eventType'],
     current,
+  };
+}
+function parseRequestCommand(value: unknown): StaffingRequestCommandResult | null {
+  if (!object(value) || !object(value.current)) return null;
+  const current = value.current;
+  if (typeof value.command_id !== 'string' || !uuid.test(value.command_id)) return null;
+  if (value.event_type !== 'staffing_request.submitted_for_review') return null;
+  if (typeof current.staffing_request_id !== 'string' || !uuid.test(current.staffing_request_id)) return null;
+  if (typeof current.employer_id !== 'string' || !uuid.test(current.employer_id)) return null;
+  if (!positive(current.version) || !['draft', 'pending_review'].includes(String(current.request_status))) return null;
+  if (value.result_record_version !== current.version) return null;
+  return {
+    commandId: value.command_id,
+    resultRecordVersion: value.result_record_version,
+    eventType: 'staffing_request.submitted_for_review',
+    current: {
+      staffingRequestId: current.staffing_request_id,
+      employerId: current.employer_id,
+      version: current.version,
+      requestStatus: current.request_status as StaffingRequestDetail['requestStatus'],
+    },
   };
 }
 async function request<T>(path: string, init: RequestInit, validate: (value: unknown) => T | null, command = false): Promise<ShiftNeedResult<T>> {
@@ -192,4 +239,26 @@ export async function createShiftNeed(input: CreateShiftNeedInput): Promise<Shif
       notes: input.notes,
     }),
   }, parseCommand, true);
+}
+
+export async function submitShiftNeedForReview(input: SubmitShiftNeedForReviewInput): Promise<ShiftNeedResult<ShiftNeedCommandResult>> {
+  return request(`/employers/${input.employerId}/requests/${input.requestId}/shift-needs/${input.shiftNeedId}/submit-review`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'Idempotency-Key': input.commandId },
+    body: JSON.stringify({
+      expected_version: input.expectedVersion,
+      reason_text: input.reasonText,
+    }),
+  }, parseCommand, true);
+}
+
+export async function submitStaffingRequestForReview(input: SubmitForReviewInput): Promise<ShiftNeedResult<StaffingRequestCommandResult>> {
+  return request(`/employers/${input.employerId}/requests/${input.requestId}/submit-review`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'Idempotency-Key': input.commandId },
+    body: JSON.stringify({
+      expected_version: input.expectedVersion,
+      reason_text: input.reasonText,
+    }),
+  }, parseRequestCommand, true);
 }

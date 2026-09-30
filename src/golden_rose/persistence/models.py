@@ -1259,16 +1259,15 @@ shift_needs = Table(
         "request_version_at_creation >= 1",
         name="ck_shift_needs_request_version_positive",
     ),
-    CheckConstraint("shift_status = 'draft'", name="ck_shift_needs_status_draft"),
+    CheckConstraint(
+        "shift_status IN ('draft', 'pending_review')",
+        name="ck_shift_needs_status_review_lifecycle",
+    ),
     CheckConstraint("btrim(role_title) <> ''", name="ck_shift_needs_role_title_nonblank"),
     CheckConstraint("worker_count BETWEEN 1 AND 1000", name="ck_shift_needs_worker_count_range"),
     CheckConstraint("starts_at < ends_at", name="ck_shift_needs_time_order"),
     CheckConstraint("btrim(time_zone) <> ''", name="ck_shift_needs_time_zone_nonblank"),
-    CheckConstraint("version = 1", name="ck_shift_needs_version_one"),
-    CheckConstraint(
-        "created_at = updated_at AND created_by = updated_by",
-        name="ck_shift_needs_creation_attribution",
-    ),
+    CheckConstraint("version >= 1", name="ck_shift_needs_version_positive"),
 )
 shift_need_events = Table(
     "shift_need_events",
@@ -1295,15 +1294,57 @@ shift_need_events = Table(
         ["employer_id", "staffing_request_id"],
         ["staffing_requests.employer_id", "staffing_requests.staffing_request_id"],
     ),
-    CheckConstraint("event_type = 'shift_need.created'", name="ck_shift_need_events_type"),
-    CheckConstraint("new_status = 'draft'", name="ck_shift_need_events_new_status"),
-    CheckConstraint("new_version = 1", name="ck_shift_need_events_new_version_one"),
+    CheckConstraint(
+        "event_type IN ('shift_need.created', 'shift_need.submitted_for_review')",
+        name="ck_shift_need_events_type",
+    ),
+    CheckConstraint(
+        "new_status IN ('draft', 'pending_review')",
+        name="ck_shift_need_events_new_status",
+    ),
+    CheckConstraint("new_version >= 1", name="ck_shift_need_events_new_version_positive"),
     CheckConstraint("request_version >= 1", name="ck_shift_need_events_request_version_positive"),
     CheckConstraint(
-        "previous_status IS NULL AND previous_version IS NULL",
-        name="ck_shift_need_events_create_shape",
+        "(event_type = 'shift_need.created' AND previous_status IS NULL "
+        "AND previous_version IS NULL "
+        "AND new_status = 'draft' AND new_version = 1) OR "
+        "(event_type = 'shift_need.submitted_for_review' AND previous_status = 'draft' "
+        "AND previous_version >= 1 AND new_status = 'pending_review' "
+        "AND new_version = previous_version + 1)",
+        name="ck_shift_need_events_lifecycle_shape",
     ),
     CheckConstraint("btrim(reason_text) <> ''", name="ck_shift_need_events_reason_nonblank"),
+)
+staffing_request_events = Table(
+    "staffing_request_events",
+    metadata,
+    Column("event_id", UUID(as_uuid=True), primary_key=True),
+    Column("command_id", UUID(as_uuid=True), nullable=False, unique=True),
+    Column("staffing_request_id", UUID(as_uuid=True), nullable=False),
+    Column("employer_id", UUID(as_uuid=True), nullable=False),
+    Column("actor_id", UUID(as_uuid=True), nullable=False),
+    Column("event_type", String(64), nullable=False),
+    Column("previous_status", String(32), nullable=False),
+    Column("new_status", String(32), nullable=False),
+    Column("previous_version", Integer, nullable=False),
+    Column("new_version", Integer, nullable=False),
+    Column("occurred_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("reason_text", String(512), nullable=False),
+    ForeignKeyConstraint(
+        ["employer_id", "staffing_request_id"],
+        ["staffing_requests.employer_id", "staffing_requests.staffing_request_id"],
+    ),
+    CheckConstraint(
+        "event_type = 'staffing_request.submitted_for_review'",
+        name="ck_staffing_request_events_type",
+    ),
+    CheckConstraint("previous_status = 'draft'", name="ck_staffing_request_events_previous_status"),
+    CheckConstraint("new_status = 'pending_review'", name="ck_staffing_request_events_new_status"),
+    CheckConstraint("previous_version >= 1", name="ck_staffing_request_events_previous_version"),
+    CheckConstraint(
+        "new_version = previous_version + 1", name="ck_staffing_request_events_new_version"
+    ),
+    CheckConstraint("btrim(reason_text) <> ''", name="ck_staffing_request_events_reason_nonblank"),
 )
 for _kind in ("employer_contact_details", "employer_address", "worksite", "staffing_request"):
     entity_authorities.append_column(Column(f"{_kind}_id", UUID(as_uuid=True)))

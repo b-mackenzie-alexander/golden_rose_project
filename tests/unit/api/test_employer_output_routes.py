@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from golden_rose.api.dependencies import get_db_session, get_settings
 from golden_rose.api.staff import employer_outputs
+from golden_rose.application.shift_needs import ShiftNeedResult, StaffingRequestResult
 from golden_rose.main import create_app
 from tests.unit.test_employer_finalization_outputs import PARTY, content
 
@@ -56,6 +57,27 @@ def projection(section) -> dict[str, Any]:
         },
         **{name: datetime.now(UTC) for name in ("created_at", "received_at", "updated_at")},
     }
+
+
+def shift_projection(**changes: Any) -> dict[str, Any]:
+    values = {
+        "shift_need_id": uuid4(),
+        "employer_id": uuid4(),
+        "staffing_request_id": uuid4(),
+        "request_version_at_creation": 2,
+        "shift_status": "pending_review",
+        "role_title": "Home aide",
+        "worker_count": 1,
+        "starts_at": datetime(2026, 10, 1, 13, 0, tzinfo=UTC),
+        "ends_at": datetime(2026, 10, 1, 17, 0, tzinfo=UTC),
+        "time_zone": "America/New_York",
+        "notes": None,
+        "version": 2,
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC),
+    }
+    values.update(changes)
+    return values
 
 
 @pytest.fixture
@@ -191,3 +213,76 @@ def test_request_list_rejects_terms(http, monkeypatch):
     response = client.post(f"/api/staff/v1/employers/{uuid4()}/requests/query", json={})
     assert response.status_code == 503
     assert "Fictional offer terms" not in response.text
+
+
+def test_submit_request_for_review_route_sets_idempotency_headers(http, monkeypatch):
+    client, reader, sink = http
+    request_id = uuid4()
+    detail = projection("requests")
+    detail["staffing_request_id"] = request_id
+    detail["request_status"] = "pending_review"
+    submit = Mock(
+        return_value=StaffingRequestResult(
+            {
+                "command_id": uuid4(),
+                "result_record_version": 3,
+                "event_type": "staffing_request.submitted_for_review",
+                "current": detail,
+            },
+            True,
+        )
+    )
+    monkeypatch.setattr(employer_outputs, "submit_staffing_request_for_review", submit)
+
+    response = client.post(
+        f"/api/staff/v1/employers/{detail['employer_id']}/requests/{request_id}/submit-review",
+        json={"expected_version": 2, "reason_text": "Ready for supervisor review"},
+        headers={"Idempotency-Key": str(uuid4())},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.headers["idempotency-replayed"] == "true"
+    assert response.headers["idempotency-result-version"] == "3"
+    assert response.json()["event_type"] == "staffing_request.submitted_for_review"
+    assert submit.call_args.kwargs["body"].expected_version == 2
+    reader.assert_not_called()
+    sink.assert_not_called()
+
+
+def test_submit_shift_need_for_review_route_sets_idempotency_headers(http, monkeypatch):
+    client, reader, sink = http
+    employer_id = uuid4()
+    request_id = uuid4()
+    shift_need_id = uuid4()
+    detail = shift_projection(
+        employer_id=employer_id,
+        staffing_request_id=request_id,
+        shift_need_id=shift_need_id,
+    )
+    submit = Mock(
+        return_value=ShiftNeedResult(
+            {
+                "command_id": uuid4(),
+                "result_record_version": 2,
+                "event_type": "shift_need.submitted_for_review",
+                "current": detail,
+            },
+            False,
+        )
+    )
+    monkeypatch.setattr(employer_outputs, "submit_shift_need_for_review", submit)
+
+    response = client.post(
+        f"/api/staff/v1/employers/{employer_id}/requests/{request_id}"
+        f"/shift-needs/{shift_need_id}/submit-review",
+        json={"expected_version": 1, "reason_text": "Ready for supervisor review"},
+        headers={"Idempotency-Key": str(uuid4())},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.headers["idempotency-replayed"] == "false"
+    assert response.headers["idempotency-result-version"] == "2"
+    assert response.json()["event_type"] == "shift_need.submitted_for_review"
+    assert submit.call_args.kwargs["body"].reason_text == "Ready for supervisor review"
+    reader.assert_not_called()
+    sink.assert_not_called()

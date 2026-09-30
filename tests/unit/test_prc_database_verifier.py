@@ -56,6 +56,12 @@ def test_prc_links_and_finalization_replace_closed_predecessor_gate() -> None:
     assert "command_results.guard_finalization_results" in EXPECTED_INTAKE_TRIGGERS
 
 
+def test_staffing_request_review_lifecycle_keeps_column_scoped_update() -> None:
+    assert "request_status" in EXPECTED_RUNTIME_UPDATE_COLUMNS["staffing_requests"]
+    assert EXPECTED_RUNTIME_TABLE_PRIVILEGES["staffing_requests"] == {"INSERT", "SELECT"}
+    assert "staffing_requests.staffing_requests_request_status_check" in EXPECTED_INTAKE_CONSTRAINTS
+
+
 def test_only_explicit_snapshot_functions_have_runtime_execute() -> None:
     for function in ("intake_canonical_record", "intake_link_refs", "intake_effective_snapshot"):
         assert EXPECTED_RUNTIME_FUNCTION_PRIVILEGES[function] == {"EXECUTE"}

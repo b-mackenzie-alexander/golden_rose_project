@@ -2030,9 +2030,11 @@ def test_openapi_exposes_only_intended_staff_route() -> None:
             "/api/staff/v1/employers/{employer_id}/worksites/{worksite_id}",
             "/api/staff/v1/employers/{employer_id}/worksites/{worksite_id}/address",
             "/api/staff/v1/employers/{employer_id}/requests/{request_id}",
+            "/api/staff/v1/employers/{employer_id}/requests/{request_id}/submit-review",
             "/api/staff/v1/employers/{employer_id}/requests/{request_id}/shift-needs",
             "/api/staff/v1/employers/{employer_id}/requests/{request_id}/shift-needs/query",
             "/api/staff/v1/employers/{employer_id}/requests/{request_id}/shift-needs/{shift_need_id}",
+            "/api/staff/v1/employers/{employer_id}/requests/{request_id}/shift-needs/{shift_need_id}/submit-review",
             "/api/staff/v1/employers/{employer_id}/contacts/{contact_id}/details",
             "/api/staff/v1/employers/{employer_id}/contacts/{contact_id}/details/address",
             "/api/staff/v1/intakes/{intake_id}/reviews",
@@ -2107,6 +2109,14 @@ def test_openapi_exposes_only_intended_staff_route() -> None:
                 "/api/staff/v1/employers/{employer_id}/requests/{request_id}/shift-needs/{shift_need_id}"
             ]
         ) == {"get"}
+        assert set(
+            paths["/api/staff/v1/employers/{employer_id}/requests/{request_id}/submit-review"]
+        ) == {"post"}
+        assert set(
+            paths[
+                "/api/staff/v1/employers/{employer_id}/requests/{request_id}/shift-needs/{shift_need_id}/submit-review"
+            ]
+        ) == {"post"}
 
 
 def test_openapi_exposes_only_create_search_detail_and_revision_routes() -> None:
@@ -2143,9 +2153,11 @@ def test_openapi_exposes_only_create_search_detail_and_revision_routes() -> None
             "/api/staff/v1/employers/{employer_id}/worksites/{worksite_id}",
             "/api/staff/v1/employers/{employer_id}/worksites/{worksite_id}/address",
             "/api/staff/v1/employers/{employer_id}/requests/{request_id}",
+            "/api/staff/v1/employers/{employer_id}/requests/{request_id}/submit-review",
             "/api/staff/v1/employers/{employer_id}/requests/{request_id}/shift-needs",
             "/api/staff/v1/employers/{employer_id}/requests/{request_id}/shift-needs/query",
             "/api/staff/v1/employers/{employer_id}/requests/{request_id}/shift-needs/{shift_need_id}",
+            "/api/staff/v1/employers/{employer_id}/requests/{request_id}/shift-needs/{shift_need_id}/submit-review",
             "/api/staff/v1/employers/{employer_id}/contacts/{contact_id}/details",
             "/api/staff/v1/employers/{employer_id}/contacts/{contact_id}/details/address",
             "/api/staff/v1/intakes/{intake_id}/reviews",
@@ -2248,9 +2260,11 @@ def test_staff_employer_revision_openapi_exposes_only_approved_contract() -> Non
             "/api/staff/v1/employers/{employer_id}/worksites/{worksite_id}",
             "/api/staff/v1/employers/{employer_id}/worksites/{worksite_id}/address",
             "/api/staff/v1/employers/{employer_id}/requests/{request_id}",
+            "/api/staff/v1/employers/{employer_id}/requests/{request_id}/submit-review",
             "/api/staff/v1/employers/{employer_id}/requests/{request_id}/shift-needs",
             "/api/staff/v1/employers/{employer_id}/requests/{request_id}/shift-needs/query",
             "/api/staff/v1/employers/{employer_id}/requests/{request_id}/shift-needs/{shift_need_id}",
+            "/api/staff/v1/employers/{employer_id}/requests/{request_id}/shift-needs/{shift_need_id}/submit-review",
             "/api/staff/v1/employers/{employer_id}/contacts/{contact_id}/details",
             "/api/staff/v1/employers/{employer_id}/contacts/{contact_id}/details/address",
             "/api/staff/v1/intakes/{intake_id}/reviews",

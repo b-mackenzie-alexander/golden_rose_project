@@ -51,11 +51,15 @@ class WorksiteAddress(WorksiteIdentity):
     address: Address
 
 
+RequestLifecycleStatus = Literal["draft", "pending_review"]
+ShiftNeedLifecycleStatus = Literal["draft", "pending_review"]
+
+
 class StaffingRequestSummary(IntakeValue):
     staffing_request_id: UUID
     employer_id: UUID
     version: int = Field(ge=1, le=2147483647)
-    request_status: Literal["draft"]
+    request_status: RequestLifecycleStatus
     role_title: Text200
     worker_count: int = Field(ge=1, le=1000)
     offer: OfferSummary
@@ -84,7 +88,7 @@ class StaffingRequestDetail(IntakeValue):
     worksite_id: UUID
     employer_address_id: UUID | None
     request_type: Literal["household", "general_labor"]
-    request_status: Literal["draft"]
+    request_status: RequestLifecycleStatus
     source_channel: Literal["staff_entry"]
     role_title: Text200
     duties_summary: Text1000
@@ -118,12 +122,17 @@ class CreateShiftNeedRequest(IntakeValue):
         return value
 
 
+class SubmitForReviewRequest(IntakeValue):
+    expected_version: int = Field(ge=1, le=2147483647)
+    reason_text: Text500
+
+
 class ShiftNeedDetail(IntakeValue):
     shift_need_id: UUID
     employer_id: UUID
     staffing_request_id: UUID
     request_version_at_creation: int = Field(ge=1, le=2147483647)
-    shift_status: Literal["draft"]
+    shift_status: ShiftNeedLifecycleStatus
     role_title: Text200
     worker_count: int = Field(ge=1, le=1000)
     starts_at: datetime
@@ -142,5 +151,12 @@ class ShiftNeedPage(IntakeValue):
 class ShiftNeedCommandResponse(IntakeValue):
     command_id: UUID
     result_record_version: int = Field(ge=1, le=2147483647)
-    event_type: Literal["shift_need.created"]
+    event_type: Literal["shift_need.created", "shift_need.submitted_for_review"]
     current: ShiftNeedDetail
+
+
+class StaffingRequestCommandResponse(IntakeValue):
+    command_id: UUID
+    result_record_version: int = Field(ge=1, le=2147483647)
+    event_type: Literal["staffing_request.submitted_for_review"]
+    current: StaffingRequestDetail

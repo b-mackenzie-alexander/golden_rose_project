@@ -19,14 +19,14 @@ const messages = {
     changed: 'Current facts have changed since finalization. The original intake and review remain unchanged.',
     unavailable: 'This record is unavailable or you do not have access.', reveal: 'Reveal restricted address', hide: 'Hide restricted address',
     refresh: 'Refresh current facts', separate: 'Address and detail versions differ. Refresh and reveal again to compare current facts.',
-    meaning: 'These are current records, not a new review. Worker preferences remain self-reported; a draft request does not open demand or create shifts.',
+    meaning: 'These are current records, not a new review. Worker preferences remain self-reported; a request under review does not open demand, match workers, or create referrals.',
     addressHint: 'Household contact addresses require separate access; business contacts may have no household address.',
   },
   es: { current: 'Datos canónicos actuales', original: 'Referencia original finalizada', back: 'Admisión original e historial',
     changed: 'Los datos actuales cambiaron desde la finalización. La admisión y revisión originales permanecen sin cambios.',
     unavailable: 'Este registro no está disponible o no tiene acceso.', reveal: 'Mostrar dirección restringida', hide: 'Ocultar dirección restringida',
     refresh: 'Actualizar datos actuales', separate: 'Las versiones de dirección y datos difieren. Actualice y vuelva a mostrar la dirección para comparar los datos actuales.',
-    meaning: 'Estos son registros actuales, no una nueva revisión. Las preferencias siguen siendo autodeclaradas; una solicitud en borrador no abre demanda ni crea turnos.',
+    meaning: 'Estos son registros actuales, no una nueva revisión. Las preferencias siguen siendo autodeclaradas; una solicitud en revisión no abre demanda, no empareja trabajadores ni crea referidos.',
     addressHint: 'Las direcciones de contactos de hogares requieren acceso separado; los contactos comerciales pueden no tener dirección de hogar.',
   },
 };
@@ -98,10 +98,12 @@ function OutputDetail({ intakeId, output }: { intakeId: string; output: string }
     const employerId = values.employer_id;
     const requestId = values.staffing_request_id;
     const version = values.version;
+    const status = values.request_status;
     const title = values.role_title;
     const count = values.worker_count;
     if (typeof employerId !== 'string' || typeof requestId !== 'string' || typeof title !== 'string' || typeof version !== 'number' || typeof count !== 'number') return null;
-    return <ShiftNeedsPanel employerId={employerId} requestId={requestId} requestVersion={version} roleTitle={title} workerCount={count} />;
+    if (status !== 'draft' && status !== 'pending_review') return null;
+    return <ShiftNeedsPanel employerId={employerId} requestId={requestId} requestVersion={version} requestStatus={status} roleTitle={title} workerCount={count} onRequestReviewSubmitted={() => void read()} />;
   }
   function correction(values: DraftObject, addressSection = false) {
     if (!outputs) return null;

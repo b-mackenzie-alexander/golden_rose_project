@@ -16,6 +16,8 @@ STAFF_ACCOUNT_DELEGATION_GRANT_PERMISSION = "staff_account:delegation:grant"
 STAFF_ACCOUNT_DELEGATION_REVOKE_PERMISSION = "staff_account:delegation:revoke"
 SHIFT_NEED_CREATE_PERMISSION = "shift_need:create"
 SHIFT_NEED_READ_PERMISSION = "shift_need:read"
+SHIFT_NEED_SUBMIT_REVIEW_PERMISSION = "shift_need:submit_review"
+STAFFING_REQUEST_SUBMIT_REVIEW_PERMISSION = "staffing_request:submit_review"
 
 
 def can_create_draft_employer(principal: StaffPrincipal) -> bool:
@@ -80,3 +82,11 @@ def can_create_shift_need(principal: StaffPrincipal) -> bool:
 
 def can_read_shift_need(principal: StaffPrincipal) -> bool:
     return SHIFT_NEED_READ_PERMISSION in principal.permissions
+
+
+def can_submit_shift_need_for_review(principal: StaffPrincipal) -> bool:
+    return SHIFT_NEED_SUBMIT_REVIEW_PERMISSION in principal.permissions
+
+
+def can_submit_staffing_request_for_review(principal: StaffPrincipal) -> bool:
+    return STAFFING_REQUEST_SUBMIT_REVIEW_PERMISSION in principal.permissions

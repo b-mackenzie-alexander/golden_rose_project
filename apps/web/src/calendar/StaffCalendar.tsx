@@ -1,5 +1,6 @@
-import { type SyntheticEvent, useMemo, useState } from 'react';
+import { type SyntheticEvent, useEffect, useMemo, useState } from 'react';
 
+import { getOperationsProjection, type OperationsShiftItem } from '../api/operationsProjectionClient';
 import { IconSymbol } from '../dashboard/artwork';
 import type { IconName } from '../dashboard/artwork';
 import { useLanguage } from '../i18n/LanguageProvider';
@@ -268,6 +269,46 @@ function toCalendarEvent(event: StoredCalendarEvent, language: 'en' | 'es'): Cal
   };
 }
 
+function dayIdFromInstant(value: string): string | null {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][date.getDay()] ?? null;
+}
+
+function durationLabel(startValue: string, endValue: string, language: 'en' | 'es') {
+  const start = new Date(startValue);
+  const end = new Date(endValue);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+    return language === 'es' ? 'Horario registrado' : 'Recorded time';
+  }
+  const minutes = Math.round((end.getTime() - start.getTime()) / 60_000);
+  return minutes >= 60 && minutes % 60 === 0
+    ? `${String(minutes / 60)} ${language === 'es' ? 'h' : 'hr'}`
+    : `${String(minutes)} min`;
+}
+
+function toShiftEvent(item: OperationsShiftItem, language: 'en' | 'es'): CalendarEvent | null {
+  const dayId = dayIdFromInstant(item.startsAt);
+  const starts = new Date(item.startsAt);
+  if (!dayId || Number.isNaN(starts.getTime())) return null;
+  return {
+    accent: item.shiftStatus === 'pending_review' ? 'warning' : 'info',
+    assignee: language === 'es' ? 'Operaciones' : 'Operations',
+    dayId,
+    duration: durationLabel(item.startsAt, item.endsAt, language),
+    id: `shift-${item.shiftNeedId}`,
+    kind: 'employer',
+    meta: item.employerName,
+    scope: 'system',
+    sortMinutes: starts.getHours() * 60 + starts.getMinutes(),
+    time: starts.toLocaleTimeString(language === 'es' ? 'es-US' : 'en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+    }),
+    title: `${item.roleTitle} (${String(item.workerCount)})`,
+  };
+}
+
 function canRemoveEvent(event: CalendarEvent) {
   return event.id.startsWith('manual-') && (event.scope === 'personal' || canManageCompanyCalendarEvents);
 }
@@ -281,6 +322,7 @@ export function StaffCalendar() {
   const copy = language === 'es' ? spanishCalendar : englishCalendar;
   const [selectedDayId, setSelectedDayId] = useState('mon');
   const [manualEvents, setManualEvents] = useState<StoredCalendarEvent[]>(() => readStoredEvents());
+  const [shiftEvents, setShiftEvents] = useState<OperationsShiftItem[]>([]);
   const [form, setForm] = useState<CalendarFormState>(defaultForm);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
@@ -288,13 +330,26 @@ export function StaffCalendar() {
   if (fallbackDay === undefined) {
     throw new Error('Staff calendar requires at least one day.');
   }
+  useEffect(() => {
+    let cancelled = false;
+    void getOperationsProjection().then((result) => {
+      if (!cancelled) setShiftEvents(result.ok ? result.value.shiftItems : []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const selectedDay = copy.weekDays.find((day) => day.id === selectedDayId) ?? fallbackDay;
   const events = useMemo(
     () => [
-      ...copy.events,
+      ...(shiftEvents.length
+        ? shiftEvents
+            .map((event) => toShiftEvent(event, language))
+            .filter((event): event is CalendarEvent => event !== null)
+        : copy.events),
       ...manualEvents.map((event) => toCalendarEvent(event, language)),
     ].sort((left, right) => left.sortMinutes - right.sortMinutes || left.title.localeCompare(right.title)),
-    [copy.events, language, manualEvents],
+    [copy.events, language, manualEvents, shiftEvents],
   );
   const selectedEvents = useMemo(
     () => events.filter((event) => event.dayId === selectedDay.id),

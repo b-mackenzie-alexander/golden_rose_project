@@ -5,10 +5,11 @@ import { IconSymbol, MissionStatementMark, SkylineArtwork, ZoneMapArtwork } from
 import type { IconName } from './artwork';
 import { queryIntakes } from '../api/intakeClient';
 import type { IntakeKind, IntakeSummary } from '../api/intakeContracts';
+import { getOperationsProjection, type OperationsProjection, type OperationsRequestItem, type OperationsShiftItem } from '../api/operationsProjectionClient';
 import { useLanguage } from '../i18n/LanguageProvider';
 
 type DashboardStatus = 'complete' | 'draft' | 'in_review' | 'incomplete' | 'pending';
-type DashboardIntakes = { employers: IntakeSummary[]; workers: IntakeSummary[] };
+type DashboardIntakes = { employers: IntakeSummary[]; operations: OperationsProjection | null; workers: IntakeSummary[] };
 
 type DashboardCopy = {
   activityHeading: string;
@@ -250,10 +251,16 @@ function recentRows(
 }
 
 function dynamicKpis(copy: DashboardCopy, data: DashboardIntakes, language: 'en' | 'es'): DashboardCopy['kpis'] {
-  if (data.workers.length === 0 && data.employers.length === 0) return copy.kpis;
+  if (
+    data.workers.length === 0 &&
+    data.employers.length === 0 &&
+    (!data.operations || (data.operations.requestItems.length === 0 && data.operations.shiftItems.length === 0))
+  ) return copy.kpis;
   const workerReviewCount = data.workers.filter((item) => item.review_status !== 'current').length;
   const employerReviewCount = data.employers.filter((item) => item.review_status !== 'current').length;
   const incompleteCount = [...data.workers, ...data.employers].filter((item) => item.complete === false).length;
+  const pendingShiftCount = data.operations?.shiftItems.filter((item) => item.shiftStatus === 'pending_review').length ?? 0;
+  const timedShiftCount = data.operations?.shiftItems.length ?? 0;
   const workerKpi = copy.kpis[0];
   const urgentKpi = copy.kpis[2];
   const calendarKpi = copy.kpis[3];
@@ -268,9 +275,64 @@ function dynamicKpis(copy: DashboardCopy, data: DashboardIntakes, language: 'en'
       meta: language === 'es' ? 'requieren revision' : 'need review',
       value: String(employerReviewCount),
     },
-    { ...urgentKpi, label: language === 'es' ? 'Registros incompletos' : 'Incomplete intakes', value: String(incompleteCount) },
-    calendarKpi,
+    {
+      ...urgentKpi,
+      href: pendingShiftCount ? '/staff/queues' : urgentKpi.href,
+      label: pendingShiftCount ? language === 'es' ? 'Turnos en revision' : 'Shifts in review' : language === 'es' ? 'Registros incompletos' : 'Incomplete intakes',
+      value: String(pendingShiftCount || incompleteCount),
+    },
+    {
+      ...calendarKpi,
+      label: language === 'es' ? 'Turnos registrados' : 'Recorded shifts',
+      meta: language === 'es' ? 'desde solicitudes' : 'from requests',
+      value: String(timedShiftCount),
+    },
   ];
+}
+
+function requestHref(item: OperationsRequestItem | OperationsShiftItem) {
+  return item.sourceIntakeId
+    ? `/staff/intakes/${item.sourceIntakeId}/outputs/request`
+    : `/staff/intakes/employers?reference=${item.employerId}&open=match`;
+}
+
+function rowFromRequest(item: OperationsRequestItem, template: DashboardCopy['queueRows'][number], language: 'en' | 'es'): DashboardCopy['queueRows'][number] {
+  return {
+    ...template,
+    days: item.requestStatus === 'pending_review'
+      ? language === 'es' ? 'Revision' : 'Review'
+      : language === 'es' ? 'Borrador' : 'Draft',
+    href: requestHref(item),
+    icon: 'building',
+    name: item.requestStatus === 'pending_review'
+      ? language === 'es' ? 'Solicitud en revision' : 'Request in review'
+      : language === 'es' ? 'Preparar solicitud' : 'Prepare request',
+    next: language === 'es'
+      ? `${item.roleTitle}, ${String(item.workerCount)} trabajador(es)`
+      : `${item.roleTitle}, ${String(item.workerCount)} worker(s)`,
+    ref: item.employerName,
+    status: item.requestStatus === 'pending_review' ? 'in_review' : 'draft',
+  };
+}
+
+function rowFromShift(item: OperationsShiftItem, template: DashboardCopy['queueRows'][number], language: 'en' | 'es'): DashboardCopy['queueRows'][number] {
+  const starts = new Date(item.startsAt);
+  return {
+    ...template,
+    days: Number.isNaN(starts.getTime())
+      ? language === 'es' ? 'Turno' : 'Shift'
+      : starts.toLocaleString(language === 'es' ? 'es-US' : 'en-US', { hour: 'numeric', minute: '2-digit', month: 'short', day: 'numeric' }),
+    href: requestHref(item),
+    icon: 'schedule',
+    name: item.shiftStatus === 'pending_review'
+      ? language === 'es' ? 'Turno en revision' : 'Shift in review'
+      : language === 'es' ? 'Turno en borrador' : 'Draft shift',
+    next: language === 'es'
+      ? `${item.roleTitle}, ${String(item.workerCount)} trabajador(es)`
+      : `${item.roleTitle}, ${String(item.workerCount)} worker(s)`,
+    ref: item.employerName,
+    status: item.shiftStatus === 'pending_review' ? 'in_review' : 'draft',
+  };
 }
 
 function rowFromIntake(
@@ -289,8 +351,23 @@ function rowFromIntake(
 }
 
 function dynamicQueueRows(copy: DashboardCopy, data: DashboardIntakes, language: 'en' | 'es'): DashboardCopy['queueRows'] {
-  if (data.workers.length === 0 && data.employers.length === 0) return copy.queueRows;
+  if (
+    data.workers.length === 0 &&
+    data.employers.length === 0 &&
+    (!data.operations || (data.operations.requestItems.length === 0 && data.operations.shiftItems.length === 0))
+  ) return copy.queueRows;
   const rows = [...copy.queueRows];
+  const operationRows = [
+    ...(data.operations?.shiftItems.map((item, index) => {
+      const template = rows[index] ?? rows[0];
+      return template ? rowFromShift(item, template, language) : null;
+    }) ?? []),
+    ...(data.operations?.requestItems.map((item, index) => {
+      const template = rows[(data.operations?.shiftItems.length ?? 0) + index] ?? rows[0];
+      return template ? rowFromRequest(item, template, language) : null;
+    }) ?? []),
+  ].filter((row): row is DashboardCopy['queueRows'][number] => row !== null);
+  if (operationRows.length) return [...operationRows, ...rows].slice(0, rows.length);
   const workerReviewCount = data.workers.filter((item) => item.review_status !== 'current').length;
   const primaryWorker = data.workers.find((item) => item.complete === false) ?? data.workers[0];
   const primaryEmployer = data.employers.find((item) => item.complete === false) ?? data.employers[0];
@@ -313,6 +390,25 @@ function dynamicQueueRows(copy: DashboardCopy, data: DashboardIntakes, language:
   return rows;
 }
 
+function dynamicScheduleRows(copy: DashboardCopy, data: DashboardIntakes, language: 'en' | 'es'): DashboardCopy['scheduleRows'] {
+  const shifts = data.operations?.shiftItems ?? [];
+  if (!shifts.length) return copy.scheduleRows;
+  return shifts.slice(0, 5).map((item) => {
+    const starts = new Date(item.startsAt);
+    const ends = new Date(item.endsAt);
+    return {
+      dot: item.shiftStatus === 'pending_review' ? 'warning' : 'info',
+      meta: Number.isNaN(ends.getTime())
+        ? item.employerName
+        : `${item.employerName} - ${ends.toLocaleTimeString(language === 'es' ? 'es-US' : 'en-US', { hour: 'numeric', minute: '2-digit' })}`,
+      time: Number.isNaN(starts.getTime())
+        ? language === 'es' ? 'Turno' : 'Shift'
+        : starts.toLocaleTimeString(language === 'es' ? 'es-US' : 'en-US', { hour: 'numeric', minute: '2-digit' }),
+      title: `${item.roleTitle} (${String(item.workerCount)})`,
+    };
+  });
+}
+
 function IconMark({ name }: { name: IconName }) {
   return (
     <span aria-hidden="true" className="dashboard-icon">
@@ -324,20 +420,25 @@ function IconMark({ name }: { name: IconName }) {
 export function Dashboard() {
   const { language } = useLanguage();
   const copy = language === 'es' ? spanishDashboard : englishDashboard;
-  const [intakes, setIntakes] = useState<DashboardIntakes>({ employers: [], workers: [] });
+  const [intakes, setIntakes] = useState<DashboardIntakes>({ employers: [], operations: null, workers: [] });
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([queryIntakes('worker', { page_size: 50 }), queryIntakes('employer', { page_size: 50 })])
-      .then(([workerResult, employerResult]) => {
+    Promise.all([
+      queryIntakes('worker', { page_size: 50 }),
+      queryIntakes('employer', { page_size: 50 }),
+      getOperationsProjection(),
+    ])
+      .then(([workerResult, employerResult, operationsResult]) => {
         if (cancelled) return;
         setIntakes({
           workers: workerResult.ok ? workerResult.value.items : [],
           employers: employerResult.ok ? employerResult.value.items : [],
+          operations: operationsResult.ok ? operationsResult.value : null,
         });
       })
       .catch(() => {
-        if (!cancelled) setIntakes({ employers: [], workers: [] });
+        if (!cancelled) setIntakes({ employers: [], operations: null, workers: [] });
       });
     return () => {
       cancelled = true;
@@ -346,6 +447,7 @@ export function Dashboard() {
 
   const kpis = useMemo(() => dynamicKpis(copy, intakes, language), [copy, intakes, language]);
   const queueRows = useMemo(() => dynamicQueueRows(copy, intakes, language), [copy, intakes, language]);
+  const scheduleRows = useMemo(() => dynamicScheduleRows(copy, intakes, language), [copy, intakes, language]);
   const workerRows = useMemo(
     () => recentRows('worker', intakes.workers, language, copy.recentRows),
     [copy.recentRows, intakes.workers, language],
@@ -431,7 +533,7 @@ export function Dashboard() {
             <Link className="dashboard-text-link focus-ring" to="/staff/calendar">{copy.scheduleLink}</Link>
           </div>
           <ol className="schedule-list">
-            {copy.scheduleRows.map((row) => (
+            {scheduleRows.map((row) => (
               <li className="schedule-row" data-dot={row.dot} key={`${row.time}-${row.title}`}>
                 <time>{row.time}</time>
                 <span aria-hidden="true" className="schedule-dot" />

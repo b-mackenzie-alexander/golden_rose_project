@@ -1,8 +1,12 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { beforeEach, vi } from 'vitest';
 
+import * as operationsApi from '../api/operationsProjectionClient';
 import { LanguageProvider } from '../i18n/LanguageProvider';
 import { StaffCalendar } from './StaffCalendar';
+
+vi.mock('../api/operationsProjectionClient');
 
 function renderCalendar() {
   return render(
@@ -24,12 +28,40 @@ function getDayButton(day: string, date: string, count: string) {
 describe('StaffCalendar', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue({
+      ok: true,
+      value: {
+        requestItems: [],
+        shiftItems: [
+          {
+            itemType: 'shift_need',
+            sourceIntakeId: '66666666-6666-4666-8666-666666666666',
+            employerId: '77777777-7777-4777-8777-777777777777',
+            employerName: 'Projected Employer',
+            staffingRequestId: '88888888-8888-4888-8888-888888888888',
+            shiftNeedId: '99999999-9999-4999-8999-999999999999',
+            requestStatus: 'pending_review',
+            shiftStatus: 'pending_review',
+            roleTitle: 'Home aide',
+            workerCount: 1,
+            startsAt: '2026-09-29T14:00:00Z',
+            endsAt: '2026-09-29T18:00:00Z',
+            timeZone: 'America/New_York',
+            version: 2,
+            updatedAt: '2026-09-29T13:45:00Z',
+          },
+        ],
+      },
+    });
   });
 
   it('adds and removes a personal calendar event from the selected day', async () => {
     const user = userEvent.setup();
     let view = renderCalendar();
-    await user.click(getDayButton('Tue', 'Jan 28', '2'));
+    await waitFor(() => {
+      expect(getDayButton('Tue', 'Jan 28', '1')).toBeInTheDocument();
+    });
+    await user.click(getDayButton('Tue', 'Jan 28', '1'));
     const form = screen.getByRole('heading', { name: 'Add event' }).closest('form');
     if (!form) throw new Error('Add event form was not rendered.');
     const eventForm = within(form);
@@ -45,11 +77,14 @@ describe('StaffCalendar', () => {
 
     expect(screen.getAllByText('Prepare demo script')).toHaveLength(2);
     expect(screen.getAllByText('Stakeholder presentation prep').length).toBeGreaterThanOrEqual(1);
-    expect(getDayButton('Tue', 'Jan 28', '3')).toBeInTheDocument();
+    expect(getDayButton('Tue', 'Jan 28', '2')).toBeInTheDocument();
 
     view.unmount();
     view = renderCalendar();
-    await user.click(getDayButton('Tue', 'Jan 28', '3'));
+    await waitFor(() => {
+      expect(getDayButton('Tue', 'Jan 28', '2')).toBeInTheDocument();
+    });
+    await user.click(getDayButton('Tue', 'Jan 28', '2'));
     expect(screen.getAllByText('Prepare demo script')).toHaveLength(2);
 
     await user.click(screen.getByRole('button', { name: 'Edit event' }));
@@ -66,11 +101,14 @@ describe('StaffCalendar', () => {
     await user.click(screen.getByRole('button', { name: 'Remove event' }));
     expect(screen.getByRole('status')).toHaveTextContent('Event removed');
     expect(screen.queryByText('Finalize demo script')).not.toBeInTheDocument();
-    expect(getDayButton('Tue', 'Jan 28', '2')).toBeInTheDocument();
+    expect(getDayButton('Tue', 'Jan 28', '1')).toBeInTheDocument();
 
     view.unmount();
     renderCalendar();
-    await user.click(getDayButton('Tue', 'Jan 28', '2'));
+    await waitFor(() => {
+      expect(getDayButton('Tue', 'Jan 28', '1')).toBeInTheDocument();
+    });
+    await user.click(getDayButton('Tue', 'Jan 28', '1'));
     expect(screen.queryByText('Finalize demo script')).not.toBeInTheDocument();
   });
 

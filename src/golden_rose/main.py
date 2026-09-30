@@ -16,6 +16,7 @@ from golden_rose.api.staff.employer_outputs import router as staff_employer_outp
 from golden_rose.api.staff.employers import router as staff_employers_router
 from golden_rose.api.staff.intake_workflows import router as staff_intake_workflows_router
 from golden_rose.api.staff.intakes import router as staff_intakes_router
+from golden_rose.api.staff.operations import router as staff_operations_router
 from golden_rose.api.staff.operator_readiness import router as staff_operator_readiness_router
 from golden_rose.api.staff.staff_accounts import router as staff_accounts_router
 from golden_rose.api.staff.staff_session import router as staff_session_router
@@ -72,6 +73,7 @@ def create_app(
     app.include_router(staff_contact_details_router)
     app.include_router(staff_intakes_router)
     app.include_router(staff_intake_workflows_router)
+    app.include_router(staff_operations_router)
     app.include_router(staff_operator_readiness_router)
     app.include_router(staff_session_router)
     app.include_router(staff_accounts_router)

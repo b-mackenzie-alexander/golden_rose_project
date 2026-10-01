@@ -1,0 +1,50 @@
+{
+  "purpose": "Placeholder-only client environment transition planning evidence template. Do not commit real values.",
+  "evidence_type": "client-environment-transition-planning-not-execution",
+  "validator_command": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_transition_planning.py <operator-held-client-transition-planning.json>",
+  "authority_boundary": {
+    "cloud_execution": "separate-approval-required",
+    "production_deployment": "separate-approval-required",
+    "live_data_admission": "separate-approval-required",
+    "data_export_execution": "separate-approval-required",
+    "data_import_execution": "separate-approval-required",
+    "destructive_cleanup": "separate-approval-required",
+    "client_owned_environment_transition": "separate-approval-required",
+    "github_account_creation": "separate-approval-required",
+    "business_repository_transfer": "separate-approval-required",
+    "credential_rotation": "separate-approval-required",
+    "support_channel_activation": "separate-approval-required"
+  },
+  "source": {
+    "source_commit": "<40-hex-source-commit>",
+    "migration_revision": "<alembic-revision>"
+  },
+  "transition_planning": {
+    "management_model_status": "<ready-or-blocked>",
+    "current_environment_record_inventory_status": "<ready-or-blocked>",
+    "data_classification_status": "<ready-or-blocked>",
+    "migration_candidate_scope_status": "<ready-or-blocked>",
+    "export_import_strategy_status": "<ready-or-blocked>",
+    "identity_access_transition_status": "<ready-or-blocked>",
+    "repository_stewardship_status": "<ready-or-blocked>",
+    "business_account_decision_status": "<ready-or-blocked>",
+    "support_ownership_status": "<ready-or-blocked>",
+    "rollback_or_abandonment_status": "<ready-or-blocked>",
+    "known_limitations_status": "<ready-or-blocked>"
+  },
+  "evidence": {
+    "management_model_note": "<value-safe-management-model-record>",
+    "record_inventory_note": "<value-safe-record-inventory-record>",
+    "data_classification_note": "<value-safe-data-classification-record>",
+    "migration_candidate_scope_note": "<value-safe-migration-scope-record>",
+    "export_import_strategy_note": "<value-safe-export-import-strategy-record>",
+    "identity_access_transition_note": "<value-safe-identity-access-transition-record>",
+    "repository_stewardship_note": "<value-safe-repository-stewardship-record>",
+    "business_account_decision_note": "<value-safe-business-account-decision-record>",
+    "support_ownership_note": "<value-safe-support-ownership-record>",
+    "rollback_or_abandonment_note": "<value-safe-rollback-abandonment-record>",
+    "known_limitations_acknowledgement": "<value-safe-known-limitations-record>",
+    "transition_owner": "<private-owner-record>",
+    "next_review_note": "<value-safe-next-review-record>"
+  }
+}

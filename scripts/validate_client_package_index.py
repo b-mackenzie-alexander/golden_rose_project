@@ -39,6 +39,7 @@ REQUIRED_SOURCE_ARTIFACTS = (
     "deploy/gcp/templates/client-production-copy-approval.example.json",
     "deploy/gcp/templates/client-production-manual-review.example.json",
     "deploy/gcp/templates/client-production-training-acceptance.example.json",
+    "deploy/gcp/templates/live-data-pilot-readiness.example.json",
     "scripts/validate_deployable_package.py",
     "scripts/validate_client_production_plan.py",
     "scripts/validate_client_handoff_evidence.py",
@@ -51,6 +52,7 @@ REQUIRED_SOURCE_ARTIFACTS = (
     "scripts/validate_client_copy_approval_evidence.py",
     "scripts/validate_client_manual_review_evidence.py",
     "scripts/validate_client_training_acceptance_evidence.py",
+    "scripts/validate_live_data_pilot_readiness.py",
 )
 REQUIRED_VALIDATOR_COMMANDS = {
     "deployable_package": (
@@ -103,6 +105,11 @@ REQUIRED_VALIDATOR_COMMANDS = {
         "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
         "scripts/validate_client_training_acceptance_evidence.py "
         "<operator-held-training-acceptance.json>"
+    ),
+    "live_data_pilot_readiness": (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_live_data_pilot_readiness.py "
+        "<operator-held-live-data-pilot-readiness.json>"
     ),
 }
 REQUIRED_MANUAL_ACCEPTANCE_BOUNDARY: dict[str, str] = {}

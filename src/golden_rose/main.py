@@ -66,7 +66,7 @@ def create_app(
         return intake_problem(exc.code, exc.status, missing_fields=exc.missing_fields)
 
     app.include_router(health_router)
-    if settings.environment == "develop":
+    if settings.environment in {"develop", "production"}:
         app.include_router(environment_router)
     app.include_router(staff_employers_router)
     app.include_router(staff_employer_outputs_router)

@@ -9,6 +9,7 @@ from scripts.validate_deployable_package import (
     ENV_TEMPLATE_PATH,
     HANDOFF_TEMPLATE_PATH,
     INPUTS_TEMPLATE_PATH,
+    LIVE_DATA_PILOT_TEMPLATE_PATH,
     MANUAL_REVIEW_TEMPLATE_PATH,
     OPERATIONS_READINESS_TEMPLATE_PATH,
     PACKAGE_INDEX_PATH,
@@ -40,6 +41,7 @@ def _copy_package(tmp_path: Path) -> Path:
         COPY_APPROVAL_TEMPLATE_PATH,
         MANUAL_REVIEW_TEMPLATE_PATH,
         TRAINING_ACCEPTANCE_TEMPLATE_PATH,
+        LIVE_DATA_PILOT_TEMPLATE_PATH,
     ):
         source = ROOT / relative_path
         destination = tmp_path / relative_path
@@ -66,6 +68,7 @@ def test_deployable_package_artifacts_are_placeholder_only_and_complete() -> Non
         str(COPY_APPROVAL_TEMPLATE_PATH),
         str(MANUAL_REVIEW_TEMPLATE_PATH),
         str(TRAINING_ACCEPTANCE_TEMPLATE_PATH),
+        str(LIVE_DATA_PILOT_TEMPLATE_PATH),
     ]
 
 
@@ -363,4 +366,21 @@ def test_deployable_package_rejects_training_acceptance_activation_claim(
     )
 
     with pytest.raises(PackageValidationError, match="current_environment_data_migration"):
+        validate(root)
+
+
+def test_deployable_package_rejects_live_data_pilot_seed_activation(
+    tmp_path: Path,
+) -> None:
+    root = _copy_package(tmp_path)
+    pilot_path = root / LIVE_DATA_PILOT_TEMPLATE_PATH
+    pilot_path.write_text(
+        pilot_path.read_text(encoding="utf-8").replace(
+            '"presentation_seed": "disabled"',
+            '"presentation_seed": "enabled"',
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PackageValidationError, match="presentation_seed"):
         validate(root)

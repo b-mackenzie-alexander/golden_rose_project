@@ -17,6 +17,7 @@
     "handoff_evidence",
     "backup_restore_rehearsal",
     "operations_readiness",
+    "runtime_lifecycle_review",
     "operations_owners",
     "manual_acceptance_boundary"
   ],
@@ -47,6 +48,10 @@
   "operations_readiness": {
     "status": "<ready-or-blocked>",
     "evidence": "<value-safe-operations-readiness-validator-record>"
+  },
+  "runtime_lifecycle_review": {
+    "status": "<ready-or-blocked>",
+    "evidence": "<value-safe-runtime-lifecycle-validator-record>"
   },
   "operations_owners": {
     "status": "<ready-or-blocked>",

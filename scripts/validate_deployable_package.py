@@ -18,6 +18,9 @@ READINESS_CHECKLIST_PATH = Path(
     "deploy/gcp/templates/client-production-readiness-checklist.example.json"
 )
 PACKAGE_INDEX_PATH = Path("deploy/gcp/templates/client-production-package-index.example.json")
+BACKUP_RESTORE_TEMPLATE_PATH = Path(
+    "deploy/gcp/templates/client-production-backup-restore.example.json"
+)
 
 REQUIRED_RUNBOOK_PHRASES = (
     "not an approval to inspect or",
@@ -36,15 +39,18 @@ REQUIRED_RUNBOOK_PHRASES = (
     "client-production-handoff.example.json",
     "client-production-readiness-checklist.example.json",
     "client-production-package-index.example.json",
+    "client-production-backup-restore.example.json",
     "scripts/validate_client_production_plan.py",
     "scripts/validate_client_handoff_evidence.py",
     "scripts/validate_client_readiness_checklist.py",
     "scripts/validate_client_package_index.py",
+    "scripts/validate_client_backup_restore_evidence.py",
     "delete/replace actions",
     "public SQL exposure",
     "broad IAM",
     "missing staff identity configuration",
     "signed image/SBOM/provenance evidence",
+    "validate_client_backup_restore_evidence.py <operator-held-backup-restore.json>",
 )
 
 REQUIRED_ENV_VALUES = {
@@ -177,6 +183,8 @@ REQUIRED_READINESS_PLACEHOLDERS = (
     ("artifact_admission", "evidence"),
     ("handoff_evidence", "status"),
     ("handoff_evidence", "evidence"),
+    ("backup_restore_rehearsal", "status"),
+    ("backup_restore_rehearsal", "evidence"),
     ("operations_owners", "status"),
     ("operations_owners", "evidence"),
     ("manual_acceptance_boundary", "accessibility_review"),
@@ -190,6 +198,7 @@ REQUIRED_READINESS_SECTIONS = (
     "terraform_plan_review",
     "artifact_admission",
     "handoff_evidence",
+    "backup_restore_rehearsal",
     "operations_owners",
     "manual_acceptance_boundary",
 )
@@ -214,11 +223,13 @@ REQUIRED_PACKAGE_INDEX_SOURCE_ARTIFACTS = (
     "deploy/gcp/templates/client-production-handoff.example.json",
     "deploy/gcp/templates/client-production-readiness-checklist.example.json",
     "deploy/gcp/templates/client-production-package-index.example.json",
+    "deploy/gcp/templates/client-production-backup-restore.example.json",
     "scripts/validate_deployable_package.py",
     "scripts/validate_client_production_plan.py",
     "scripts/validate_client_handoff_evidence.py",
     "scripts/validate_client_readiness_checklist.py",
     "scripts/validate_client_package_index.py",
+    "scripts/validate_client_backup_restore_evidence.py",
 )
 
 REQUIRED_PACKAGE_INDEX_VALIDATOR_COMMANDS = {
@@ -241,6 +252,10 @@ REQUIRED_PACKAGE_INDEX_VALIDATOR_COMMANDS = {
     "package_index": (
         "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
         "scripts/validate_client_package_index.py <operator-held-package-index.json>"
+    ),
+    "backup_restore_evidence": (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_client_backup_restore_evidence.py <operator-held-backup-restore.json>"
     ),
 }
 
@@ -579,6 +594,67 @@ def _validate_package_index_template(text: str) -> None:
         )
 
 
+def _validate_backup_restore_template(text: str) -> None:
+    document = _load_json_object(text, BACKUP_RESTORE_TEMPLATE_PATH)
+    if document.get("evidence_type") != "client-production-backup-restore-rehearsal-not-activation":
+        raise PackageValidationError(
+            f"{BACKUP_RESTORE_TEMPLATE_PATH} evidence_type must distinguish rehearsal"
+        )
+    expected_command = (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_client_backup_restore_evidence.py <operator-held-backup-restore.json>"
+    )
+    if document.get("validator_command") != expected_command:
+        raise PackageValidationError(
+            f"{BACKUP_RESTORE_TEMPLATE_PATH} validator_command must be {expected_command}"
+        )
+    for key in (
+        "cloud_execution",
+        "production_deployment",
+        "live_data_admission",
+        "destructive_recovery",
+    ):
+        value = _get_pointer(document, BACKUP_RESTORE_TEMPLATE_PATH, "authority_boundary", key)
+        if value != "separate-approval-required":
+            raise PackageValidationError(
+                f"{BACKUP_RESTORE_TEMPLATE_PATH} authority_boundary.{key} "
+                "must preserve approval boundary"
+            )
+    for section, key in (
+        ("source", "source_commit"),
+        ("source", "migration_revision"),
+        ("rehearsal", "backup_rehearsal_status"),
+        ("rehearsal", "restore_rehearsal_status"),
+        ("rehearsal", "restore_target"),
+        ("evidence", "backup_receipt"),
+        ("evidence", "restore_receipt"),
+        ("evidence", "integrity_check"),
+        ("evidence", "database_authority_receipt"),
+        ("evidence", "rollback_or_forward_recovery_note"),
+        ("evidence", "backup_restore_owner"),
+    ):
+        value = _get_pointer(document, BACKUP_RESTORE_TEMPLATE_PATH, section, key)
+        if not isinstance(value, str) or not _is_placeholder(value):
+            raise PackageValidationError(
+                f"{BACKUP_RESTORE_TEMPLATE_PATH} {section}.{key} must remain a placeholder"
+            )
+    live_data_value = _get_pointer(
+        document, BACKUP_RESTORE_TEMPLATE_PATH, "rehearsal", "live_data_in_source"
+    )
+    if live_data_value != "not-included":
+        raise PackageValidationError(
+            f"{BACKUP_RESTORE_TEMPLATE_PATH} rehearsal.live_data_in_source must be not-included"
+        )
+    if (
+        _get_pointer(document, BACKUP_RESTORE_TEMPLATE_PATH, "rehearsal", "destructive_recovery")
+        != "not-executed-without-separate-approval"
+    ):
+        raise PackageValidationError(
+            f"{BACKUP_RESTORE_TEMPLATE_PATH} rehearsal.destructive_recovery "
+            "must preserve approval boundary"
+        )
+
+
 def _validate_runbook(text: str) -> None:
     for phrase in REQUIRED_RUNBOOK_PHRASES:
         if phrase not in text:
@@ -593,6 +669,7 @@ def validate(root: Path = ROOT) -> list[str]:
     handoff_template = _read(root, HANDOFF_TEMPLATE_PATH)
     readiness_checklist = _read(root, READINESS_CHECKLIST_PATH)
     package_index = _read(root, PACKAGE_INDEX_PATH)
+    backup_restore_template = _read(root, BACKUP_RESTORE_TEMPLATE_PATH)
     for relative_path, text in (
         (RUNBOOK_PATH, runbook),
         (ENV_TEMPLATE_PATH, env_template),
@@ -601,6 +678,7 @@ def validate(root: Path = ROOT) -> list[str]:
         (HANDOFF_TEMPLATE_PATH, handoff_template),
         (READINESS_CHECKLIST_PATH, readiness_checklist),
         (PACKAGE_INDEX_PATH, package_index),
+        (BACKUP_RESTORE_TEMPLATE_PATH, backup_restore_template),
     ):
         _validate_no_forbidden_values(relative_path, text)
     _validate_runbook(runbook)
@@ -610,6 +688,7 @@ def validate(root: Path = ROOT) -> list[str]:
     _validate_handoff_template(handoff_template)
     _validate_readiness_checklist_template(readiness_checklist)
     _validate_package_index_template(package_index)
+    _validate_backup_restore_template(backup_restore_template)
     return [
         str(RUNBOOK_PATH),
         str(ENV_TEMPLATE_PATH),
@@ -618,6 +697,7 @@ def validate(root: Path = ROOT) -> list[str]:
         str(HANDOFF_TEMPLATE_PATH),
         str(READINESS_CHECKLIST_PATH),
         str(PACKAGE_INDEX_PATH),
+        str(BACKUP_RESTORE_TEMPLATE_PATH),
     ]
 
 

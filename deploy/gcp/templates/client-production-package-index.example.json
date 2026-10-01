@@ -51,6 +51,11 @@
       "evidence": "<value-safe-package-index-template-record>"
     },
     {
+      "path": "deploy/gcp/templates/client-production-backup-restore.example.json",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-backup-restore-template-record>"
+    },
+    {
       "path": "scripts/validate_deployable_package.py",
       "status": "<reviewed-or-blocked>",
       "evidence": "<value-safe-package-validator-record>"
@@ -74,6 +79,11 @@
       "path": "scripts/validate_client_package_index.py",
       "status": "<reviewed-or-blocked>",
       "evidence": "<value-safe-package-index-validator-record>"
+    },
+    {
+      "path": "scripts/validate_client_backup_restore_evidence.py",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-backup-restore-validator-record>"
     }
   ],
   "validator_commands": {
@@ -81,7 +91,8 @@
     "terraform_plan": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_production_plan.py <operator-held-plan.json>",
     "handoff_evidence": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_handoff_evidence.py <operator-held-handoff.json>",
     "readiness_checklist": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_readiness_checklist.py <operator-held-readiness.json>",
-    "package_index": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_package_index.py <operator-held-package-index.json>"
+    "package_index": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_package_index.py <operator-held-package-index.json>",
+    "backup_restore_evidence": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_backup_restore_evidence.py <operator-held-backup-restore.json>"
   },
   "manual_acceptance_boundary": {
     "accessibility_review": "<not-run-or-separate-record>",

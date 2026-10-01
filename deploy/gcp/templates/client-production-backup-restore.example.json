@@ -1,0 +1,30 @@
+{
+  "purpose": "Placeholder-only backup and restore rehearsal evidence template. Do not commit real values.",
+  "evidence_type": "client-production-backup-restore-rehearsal-not-activation",
+  "validator_command": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_backup_restore_evidence.py <operator-held-backup-restore.json>",
+  "authority_boundary": {
+    "cloud_execution": "separate-approval-required",
+    "production_deployment": "separate-approval-required",
+    "live_data_admission": "separate-approval-required",
+    "destructive_recovery": "separate-approval-required"
+  },
+  "source": {
+    "source_commit": "<40-hex-source-commit>",
+    "migration_revision": "<alembic-revision>"
+  },
+  "rehearsal": {
+    "backup_rehearsal_status": "<passed-or-blocked>",
+    "restore_rehearsal_status": "<passed-or-blocked>",
+    "restore_target": "<isolated-nonproduction-or-approved-production-shaped>",
+    "live_data_in_source": "not-included",
+    "destructive_recovery": "not-executed-without-separate-approval"
+  },
+  "evidence": {
+    "backup_receipt": "<value-safe-backup-receipt-record>",
+    "restore_receipt": "<value-safe-restore-receipt-record>",
+    "integrity_check": "<value-safe-integrity-check-record>",
+    "database_authority_receipt": "<value-safe-database-authority-record>",
+    "rollback_or_forward_recovery_note": "<value-safe-recovery-note>",
+    "backup_restore_owner": "<private-owner-record>"
+  }
+}

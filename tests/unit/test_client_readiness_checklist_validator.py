@@ -20,6 +20,7 @@ READY_SECTIONS = (
     "operations_readiness",
     "runtime_lifecycle_review",
     "data_governance_review",
+    "copy_approval_review",
     "operations_owners",
 )
 
@@ -45,6 +46,7 @@ def _valid_checklist() -> dict[str, Any]:
             "operations_readiness",
             "runtime_lifecycle_review",
             "data_governance_review",
+            "copy_approval_review",
             "operations_owners",
             "manual_acceptance_boundary",
         ],
@@ -83,6 +85,10 @@ def _valid_checklist() -> dict[str, Any]:
         "data_governance_review": {
             "status": "ready",
             "evidence": "data governance evidence validator passed",
+        },
+        "copy_approval_review": {
+            "status": "ready",
+            "evidence": "copy approval evidence validator passed",
         },
         "operations_owners": {
             "status": "ready",

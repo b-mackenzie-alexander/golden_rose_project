@@ -30,6 +30,9 @@ RUNTIME_LIFECYCLE_TEMPLATE_PATH = Path(
 DATA_GOVERNANCE_TEMPLATE_PATH = Path(
     "deploy/gcp/templates/client-production-data-governance.example.json"
 )
+COPY_APPROVAL_TEMPLATE_PATH = Path(
+    "deploy/gcp/templates/client-production-copy-approval.example.json"
+)
 
 REQUIRED_RUNBOOK_PHRASES = (
     "not an approval to inspect or",
@@ -52,6 +55,7 @@ REQUIRED_RUNBOOK_PHRASES = (
     "client-production-operations-readiness.example.json",
     "client-production-runtime-lifecycle.example.json",
     "client-production-data-governance.example.json",
+    "client-production-copy-approval.example.json",
     "scripts/validate_client_production_plan.py",
     "scripts/validate_client_handoff_evidence.py",
     "scripts/validate_client_readiness_checklist.py",
@@ -60,6 +64,7 @@ REQUIRED_RUNBOOK_PHRASES = (
     "scripts/validate_client_operations_readiness_evidence.py",
     "scripts/validate_client_runtime_lifecycle_evidence.py",
     "scripts/validate_client_data_governance_evidence.py",
+    "scripts/validate_client_copy_approval_evidence.py",
     "delete/replace actions",
     "public SQL exposure",
     "broad IAM",
@@ -69,6 +74,7 @@ REQUIRED_RUNBOOK_PHRASES = (
     "validate_client_operations_readiness_evidence.py <operator-held-operations-readiness.json>",
     "validate_client_runtime_lifecycle_evidence.py <operator-held-runtime-lifecycle.json>",
     "validate_client_data_governance_evidence.py <operator-held-data-governance.json>",
+    "validate_client_copy_approval_evidence.py <operator-held-copy-approval.json>",
 )
 
 REQUIRED_ENV_VALUES = {
@@ -209,6 +215,8 @@ REQUIRED_READINESS_PLACEHOLDERS = (
     ("runtime_lifecycle_review", "evidence"),
     ("data_governance_review", "status"),
     ("data_governance_review", "evidence"),
+    ("copy_approval_review", "status"),
+    ("copy_approval_review", "evidence"),
     ("operations_owners", "status"),
     ("operations_owners", "evidence"),
     ("manual_acceptance_boundary", "accessibility_review"),
@@ -226,6 +234,7 @@ REQUIRED_READINESS_SECTIONS = (
     "operations_readiness",
     "runtime_lifecycle_review",
     "data_governance_review",
+    "copy_approval_review",
     "operations_owners",
     "manual_acceptance_boundary",
 )
@@ -254,6 +263,7 @@ REQUIRED_PACKAGE_INDEX_SOURCE_ARTIFACTS = (
     "deploy/gcp/templates/client-production-operations-readiness.example.json",
     "deploy/gcp/templates/client-production-runtime-lifecycle.example.json",
     "deploy/gcp/templates/client-production-data-governance.example.json",
+    "deploy/gcp/templates/client-production-copy-approval.example.json",
     "scripts/validate_deployable_package.py",
     "scripts/validate_client_production_plan.py",
     "scripts/validate_client_handoff_evidence.py",
@@ -263,6 +273,7 @@ REQUIRED_PACKAGE_INDEX_SOURCE_ARTIFACTS = (
     "scripts/validate_client_operations_readiness_evidence.py",
     "scripts/validate_client_runtime_lifecycle_evidence.py",
     "scripts/validate_client_data_governance_evidence.py",
+    "scripts/validate_client_copy_approval_evidence.py",
 )
 
 REQUIRED_PACKAGE_INDEX_VALIDATOR_COMMANDS = {
@@ -304,6 +315,11 @@ REQUIRED_PACKAGE_INDEX_VALIDATOR_COMMANDS = {
         "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
         "scripts/validate_client_data_governance_evidence.py "
         "<operator-held-data-governance.json>"
+    ),
+    "copy_approval_evidence": (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_client_copy_approval_evidence.py "
+        "<operator-held-copy-approval.json>"
     ),
 }
 
@@ -867,6 +883,57 @@ def _validate_data_governance_template(text: str) -> None:
             )
 
 
+def _validate_copy_approval_template(text: str) -> None:
+    document = _load_json_object(text, COPY_APPROVAL_TEMPLATE_PATH)
+    expected_type = "client-production-copy-approval-review-not-activation"
+    if document.get("evidence_type") != expected_type:
+        raise PackageValidationError(
+            f"{COPY_APPROVAL_TEMPLATE_PATH} evidence_type must distinguish review"
+        )
+    expected_command = (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_client_copy_approval_evidence.py "
+        "<operator-held-copy-approval.json>"
+    )
+    if document.get("validator_command") != expected_command:
+        raise PackageValidationError(
+            f"{COPY_APPROVAL_TEMPLATE_PATH} validator_command must be {expected_command}"
+        )
+    for key in (
+        "cloud_execution",
+        "production_deployment",
+        "live_data_admission",
+        "legal_approval_execution",
+        "business_copy_activation",
+    ):
+        value = _get_pointer(document, COPY_APPROVAL_TEMPLATE_PATH, "authority_boundary", key)
+        if value != "separate-approval-required":
+            raise PackageValidationError(
+                f"{COPY_APPROVAL_TEMPLATE_PATH} authority_boundary.{key} "
+                "must preserve approval boundary"
+            )
+    for section, key in (
+        ("source", "source_commit"),
+        ("source", "migration_revision"),
+        ("copy_approval", "copy_inventory_status"),
+        ("copy_approval", "legal_review_status"),
+        ("copy_approval", "business_review_status"),
+        ("copy_approval", "translation_review_status"),
+        ("copy_approval", "controlled_copy_owner_status"),
+        ("evidence", "copy_inventory_receipt"),
+        ("evidence", "legal_review_receipt"),
+        ("evidence", "business_review_receipt"),
+        ("evidence", "translation_review_receipt"),
+        ("evidence", "controlled_copy_owner"),
+        ("evidence", "next_review_note"),
+    ):
+        value = _get_pointer(document, COPY_APPROVAL_TEMPLATE_PATH, section, key)
+        if not isinstance(value, str) or not _is_placeholder(value):
+            raise PackageValidationError(
+                f"{COPY_APPROVAL_TEMPLATE_PATH} {section}.{key} must remain a placeholder"
+            )
+
+
 def _validate_runbook(text: str) -> None:
     for phrase in REQUIRED_RUNBOOK_PHRASES:
         if phrase not in text:
@@ -885,6 +952,7 @@ def validate(root: Path = ROOT) -> list[str]:
     operations_readiness_template = _read(root, OPERATIONS_READINESS_TEMPLATE_PATH)
     runtime_lifecycle_template = _read(root, RUNTIME_LIFECYCLE_TEMPLATE_PATH)
     data_governance_template = _read(root, DATA_GOVERNANCE_TEMPLATE_PATH)
+    copy_approval_template = _read(root, COPY_APPROVAL_TEMPLATE_PATH)
     for relative_path, text in (
         (RUNBOOK_PATH, runbook),
         (ENV_TEMPLATE_PATH, env_template),
@@ -897,6 +965,7 @@ def validate(root: Path = ROOT) -> list[str]:
         (OPERATIONS_READINESS_TEMPLATE_PATH, operations_readiness_template),
         (RUNTIME_LIFECYCLE_TEMPLATE_PATH, runtime_lifecycle_template),
         (DATA_GOVERNANCE_TEMPLATE_PATH, data_governance_template),
+        (COPY_APPROVAL_TEMPLATE_PATH, copy_approval_template),
     ):
         _validate_no_forbidden_values(relative_path, text)
     _validate_runbook(runbook)
@@ -910,6 +979,7 @@ def validate(root: Path = ROOT) -> list[str]:
     _validate_operations_readiness_template(operations_readiness_template)
     _validate_runtime_lifecycle_template(runtime_lifecycle_template)
     _validate_data_governance_template(data_governance_template)
+    _validate_copy_approval_template(copy_approval_template)
     return [
         str(RUNBOOK_PATH),
         str(ENV_TEMPLATE_PATH),
@@ -922,6 +992,7 @@ def validate(root: Path = ROOT) -> list[str]:
         str(OPERATIONS_READINESS_TEMPLATE_PATH),
         str(RUNTIME_LIFECYCLE_TEMPLATE_PATH),
         str(DATA_GOVERNANCE_TEMPLATE_PATH),
+        str(COPY_APPROVAL_TEMPLATE_PATH),
     ]
 
 

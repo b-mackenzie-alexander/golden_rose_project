@@ -19,6 +19,7 @@
     "operations_readiness",
     "runtime_lifecycle_review",
     "data_governance_review",
+    "copy_approval_review",
     "operations_owners",
     "manual_acceptance_boundary"
   ],
@@ -57,6 +58,10 @@
   "data_governance_review": {
     "status": "<ready-or-blocked>",
     "evidence": "<value-safe-data-governance-validator-record>"
+  },
+  "copy_approval_review": {
+    "status": "<ready-or-blocked>",
+    "evidence": "<value-safe-copy-approval-validator-record>"
   },
   "operations_owners": {
     "status": "<ready-or-blocked>",

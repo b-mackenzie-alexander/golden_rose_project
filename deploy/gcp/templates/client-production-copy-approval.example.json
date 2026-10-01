@@ -1,0 +1,31 @@
+{
+  "purpose": "Placeholder-only legal and business copy approval evidence template. Do not commit real values.",
+  "evidence_type": "client-production-copy-approval-review-not-activation",
+  "validator_command": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_copy_approval_evidence.py <operator-held-copy-approval.json>",
+  "authority_boundary": {
+    "cloud_execution": "separate-approval-required",
+    "production_deployment": "separate-approval-required",
+    "live_data_admission": "separate-approval-required",
+    "legal_approval_execution": "separate-approval-required",
+    "business_copy_activation": "separate-approval-required"
+  },
+  "source": {
+    "source_commit": "<40-hex-source-commit>",
+    "migration_revision": "<alembic-revision>"
+  },
+  "copy_approval": {
+    "copy_inventory_status": "<ready-or-blocked>",
+    "legal_review_status": "<ready-or-blocked>",
+    "business_review_status": "<ready-or-blocked>",
+    "translation_review_status": "<ready-or-blocked>",
+    "controlled_copy_owner_status": "<ready-or-blocked>"
+  },
+  "evidence": {
+    "copy_inventory_receipt": "<value-safe-copy-inventory-record>",
+    "legal_review_receipt": "<value-safe-legal-review-record>",
+    "business_review_receipt": "<value-safe-business-review-record>",
+    "translation_review_receipt": "<value-safe-translation-review-record>",
+    "controlled_copy_owner": "<private-owner-record>",
+    "next_review_note": "<value-safe-next-review-record>"
+  }
+}

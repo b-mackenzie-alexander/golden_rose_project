@@ -3,10 +3,15 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, vi } from 'vitest';
 
 import * as operationsApi from '../api/operationsProjectionClient';
+import * as runtimeApi from '../api/runtimeEnvironmentClient';
 import { LanguageProvider } from '../i18n/LanguageProvider';
 import { StaffCalendar } from './StaffCalendar';
 
 vi.mock('../api/operationsProjectionClient');
+vi.mock('../api/runtimeEnvironmentClient', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/runtimeEnvironmentClient')>();
+  return { ...actual, getStaticOperationalFallbackPolicy: vi.fn() };
+});
 
 function renderCalendar() {
   return render(
@@ -88,6 +93,7 @@ describe('StaffCalendar', () => {
         ...projectionExtras,
       },
     });
+    vi.mocked(runtimeApi.getStaticOperationalFallbackPolicy).mockResolvedValue('allow');
   });
 
   it('adds and removes a personal calendar event from the selected day', async () => {
@@ -177,6 +183,21 @@ describe('StaffCalendar', () => {
 
     expect(await screen.findByRole('status')).toHaveTextContent('not authorized to read projected shifts');
     expect(screen.getAllByText('Team check-in').length).toBeGreaterThan(0);
+  });
+
+  it('does not show seeded calendar events in production mode when shift reads fail', async () => {
+    vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue({
+      ok: false,
+      failure: { kind: 'forbidden' },
+    });
+    vi.mocked(runtimeApi.getStaticOperationalFallbackPolicy).mockResolvedValue('deny');
+
+    renderCalendar();
+
+    expect(await screen.findByRole('status')).toHaveTextContent('static examples are disabled');
+    expect(screen.getByText('Open slots')).toBeInTheDocument();
+    expect(screen.queryByText('Team check-in')).not.toBeInTheDocument();
+    expect(screen.queryByText('Call Restaurante La Esperanza')).not.toBeInTheDocument();
   });
 
   it('keeps a successful empty shift projection empty instead of showing seeded events', async () => {

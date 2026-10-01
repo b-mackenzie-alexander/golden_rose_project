@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { queryIntakes } from '../api/intakeClient';
 import type { IntakeKind, IntakeSummary } from '../api/intakeContracts';
 import { getOperationsProjection, type OperationsProjection, type OperationsProjectionFailureKind, type OperationsQueueSummary, type OperationsRequestItem, type OperationsShiftItem } from '../api/operationsProjectionClient';
+import { getStaticOperationalFallbackPolicy, staticOperationalFallbackNotice, staticOperationalFallbacksAllowed, type StaticOperationalFallbackPolicy } from '../api/runtimeEnvironmentClient';
 import { IconSymbol } from '../dashboard/artwork';
 import type { IconName } from '../dashboard/artwork';
 import { useLanguage } from '../i18n/LanguageProvider';
@@ -132,6 +133,7 @@ type QueueData = {
   loaded: boolean;
   operations: OperationsProjection | null;
   operationsStatus: ProjectionStatus;
+  staticFallbackPolicy: StaticOperationalFallbackPolicy;
   workers: IntakeSummary[];
 };
 
@@ -139,8 +141,9 @@ function isProjectionFailure(status: ProjectionStatus) {
   return status !== 'loading' && status !== 'ready';
 }
 
-function projectionNotice(status: ProjectionStatus, language: 'en' | 'es') {
+function projectionNotice(status: ProjectionStatus, language: 'en' | 'es', fallbackPolicy: StaticOperationalFallbackPolicy) {
   if (!isProjectionFailure(status)) return null;
+  const fallbackNotice = staticOperationalFallbackNotice(fallbackPolicy, language);
   const reason = {
     forbidden: {
       en: 'this account is not authorized to read the projection',
@@ -159,9 +162,14 @@ function projectionNotice(status: ProjectionStatus, language: 'en' | 'es') {
       es: 'la respuesta de la proyeccion fue inesperada',
     },
   }[status][language];
+  const suffix = fallbackNotice === null
+    ? language === 'es'
+      ? 'La cola conserva registros guardados y muestra ejemplos solo cuando no hay una lectura autoritativa.'
+      : 'The queue keeps saved intake rows visible and uses examples only where an authoritative read is unavailable.'
+    : fallbackNotice;
   return language === 'es'
-    ? `No se pudieron leer las solicitudes y turnos porque ${reason}. La cola conserva registros guardados y muestra ejemplos solo cuando no hay una lectura autoritativa.`
-    : `Requests and shifts could not be read because ${reason}. The queue keeps saved intake rows visible and uses examples only where an authoritative read is unavailable.`;
+    ? `No se pudieron leer las solicitudes y turnos porque ${reason}. ${suffix}`
+    : `Requests and shifts could not be read because ${reason}. ${suffix}`;
 }
 
 function formatQueueTimestamp(value: string | null, language: 'en' | 'es') {
@@ -366,13 +374,16 @@ function itemFromShift(item: OperationsShiftItem, language: 'en' | 'es'): QueueI
 }
 
 function dynamicItems(copy: WorkQueuesCopy, data: QueueData | null, language: 'en' | 'es') {
+  const allowStaticFallbacks = data ? staticOperationalFallbacksAllowed(data.staticFallbackPolicy) : false;
   if (
     data === null ||
     !data.loaded ||
     (data.workers.length === 0 && data.employers.length === 0 &&
       (!data.operations || (data.operations.requestItems.length === 0 && data.operations.shiftItems.length === 0)))
   ) {
-    return data?.loaded && !isProjectionFailure(data.operationsStatus) ? [] : copy.items;
+    return data?.loaded && !isProjectionFailure(data.operationsStatus)
+      ? []
+      : allowStaticFallbacks ? copy.items : [];
   }
   return [
     ...(data.operations?.shiftItems.map((item) => itemFromShift(item, language)) ?? []),
@@ -410,11 +421,15 @@ export function WorkQueues() {
     loaded: false,
     operations: null,
     operationsStatus: 'loading',
+    staticFallbackPolicy: 'loading',
     workers: [],
   });
   const items = useMemo(() => dynamicItems(copy, queueData, language), [copy, language, queueData]);
   const summaryItems = useMemo(() => dynamicSummary(copy, items), [copy, items]);
-  const operationsNotice = useMemo(() => projectionNotice(queueData?.operationsStatus ?? 'loading', language), [language, queueData?.operationsStatus]);
+  const operationsNotice = useMemo(
+    () => projectionNotice(queueData?.operationsStatus ?? 'loading', language, queueData?.staticFallbackPolicy ?? 'loading'),
+    [language, queueData?.operationsStatus, queueData?.staticFallbackPolicy],
+  );
   const queueNotice = useMemo(
     () => (queueData?.operationsStatus === 'ready' && queueData.operations !== null
       ? queueSummaryNotice(queueData.operations.queueSummary, language)
@@ -432,8 +447,9 @@ export function WorkQueues() {
       queryIntakes('worker', { page_size: 50 }).catch(() => ({ ok: false as const, failure: 'failed' as const })),
       queryIntakes('employer', { page_size: 50 }).catch(() => ({ ok: false as const, failure: 'failed' as const })),
       getOperationsProjection().catch(() => ({ ok: false as const, failure: { kind: 'unavailable' as const } })),
+      getStaticOperationalFallbackPolicy().catch(() => 'deny' as const),
     ])
-      .then(([workerResult, employerResult, operationsResult]) => {
+      .then(([workerResult, employerResult, operationsResult, fallbackPolicy]) => {
         if (cancelled) return;
         setQueueData({
           workers: workerResult.ok ? workerResult.value.items : [],
@@ -441,10 +457,11 @@ export function WorkQueues() {
           loaded: true,
           operations: operationsResult.ok ? operationsResult.value : null,
           operationsStatus: operationsResult.ok ? 'ready' : operationsResult.failure.kind,
+          staticFallbackPolicy: fallbackPolicy,
         });
       })
       .catch(() => {
-        if (!cancelled) setQueueData({ employers: [], loaded: true, operations: null, operationsStatus: 'unavailable', workers: [] });
+        if (!cancelled) setQueueData({ employers: [], loaded: true, operations: null, operationsStatus: 'unavailable', staticFallbackPolicy: 'deny', workers: [] });
       });
     return () => {
       cancelled = true;

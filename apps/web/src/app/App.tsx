@@ -19,6 +19,7 @@ import { LanguageProvider } from '../i18n/LanguageProvider';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { IconSymbol, ZoneMapArtwork } from '../dashboard/artwork';
 import { getOperationsProjection, type OperationsProjection, type OperationsProjectionFailureKind } from '../api/operationsProjectionClient';
+import { getStaticOperationalFallbackPolicy, staticOperationalFallbackNotice, staticOperationalFallbacksAllowed, type StaticOperationalFallbackPolicy } from '../api/runtimeEnvironmentClient';
 
 type ProjectionStatus = 'loading' | 'ready' | OperationsProjectionFailureKind;
 
@@ -37,11 +38,14 @@ const fallbackAreas: ZoneArea[] = [
   { count: 3, intensity: 'low', label: 'Staten Island', name: 'Staten Island' },
 ];
 
+const emptyAreas: ZoneArea[] = fallbackAreas.map((area) => ({ ...area, count: 0, intensity: 'low' as const }));
+
 function isProjectionFailure(status: ProjectionStatus) {
   return status !== 'loading' && status !== 'ready';
 }
 
-function projectionNotice(status: ProjectionStatus, language: 'en' | 'es') {
+function projectionNotice(status: ProjectionStatus, language: 'en' | 'es', fallbackPolicy: StaticOperationalFallbackPolicy) {
+  const fallbackNotice = staticOperationalFallbackNotice(fallbackPolicy, language);
   if (!isProjectionFailure(status)) return null;
   const reason = {
     forbidden: {
@@ -61,9 +65,14 @@ function projectionNotice(status: ProjectionStatus, language: 'en' | 'es') {
       es: 'la respuesta de agregados fue inesperada',
     },
   }[status][language];
+  const suffix = fallbackNotice === null
+    ? language === 'es'
+      ? 'Se muestran datos de respaldo y ninguna direccion exacta.'
+      : 'Fallback data is shown and no exact addresses are exposed.'
+    : fallbackNotice;
   return language === 'es'
-    ? `No se pudieron leer los agregados porque ${reason}. Se muestran datos de respaldo y ninguna direccion exacta.`
-    : `Operational aggregates could not be read because ${reason}. Fallback data is shown and no exact addresses are exposed.`;
+    ? `No se pudieron leer los agregados porque ${reason}. ${suffix}`
+    : `Operational aggregates could not be read because ${reason}. ${suffix}`;
 }
 
 function intensityFor(value: number, maximum: number): ZoneArea['intensity'] {
@@ -75,8 +84,10 @@ function intensityFor(value: number, maximum: number): ZoneArea['intensity'] {
   return 'low';
 }
 
-function areasFromProjection(projection: OperationsProjection | null, status: ProjectionStatus): ZoneArea[] {
-  if (projection === null || isProjectionFailure(status) || status === 'loading') return fallbackAreas;
+function areasFromProjection(projection: OperationsProjection | null, status: ProjectionStatus, fallbackPolicy: StaticOperationalFallbackPolicy): ZoneArea[] {
+  if (projection === null || isProjectionFailure(status) || status === 'loading') {
+    return staticOperationalFallbacksAllowed(fallbackPolicy) ? fallbackAreas : emptyAreas;
+  }
   const maximum = Math.max(...projection.areaSummary.map((area) => area.workerSlots), 0);
   return projection.areaSummary.map((area) => ({
     count: area.workerSlots,
@@ -89,31 +100,37 @@ function areasFromProjection(projection: OperationsProjection | null, status: Pr
 function useOperationsProjection() {
   const [projection, setProjection] = useState<OperationsProjection | null>(null);
   const [status, setStatus] = useState<ProjectionStatus>('loading');
+  const [fallbackPolicy, setFallbackPolicy] = useState<StaticOperationalFallbackPolicy>('loading');
   useEffect(() => {
     let cancelled = false;
-    void getOperationsProjection()
-      .then((result) => {
+    void Promise.all([
+      getOperationsProjection().catch(() => ({ ok: false as const, failure: { kind: 'unavailable' as const } })),
+      getStaticOperationalFallbackPolicy().catch(() => 'deny' as const),
+    ])
+      .then(([result, policy]) => {
         if (cancelled) return;
         setProjection(result.ok ? result.value : null);
         setStatus(result.ok ? 'ready' : result.failure.kind);
+        setFallbackPolicy(policy);
       })
       .catch(() => {
         if (cancelled) return;
         setProjection(null);
         setStatus('unavailable');
+        setFallbackPolicy('deny');
       });
     return () => {
       cancelled = true;
     };
   }, []);
-  return { projection, status };
+  return { fallbackPolicy, projection, status };
 }
 
 function StaffMapPreview() {
   const { language } = useLanguage();
-  const { projection, status } = useOperationsProjection();
-  const areas = areasFromProjection(projection, status);
-  const notice = projectionNotice(status, language);
+  const { fallbackPolicy, projection, status } = useOperationsProjection();
+  const areas = areasFromProjection(projection, status, fallbackPolicy);
+  const notice = projectionNotice(status, language, fallbackPolicy);
   const totalWorkerSlots = projection && status === 'ready'
     ? projection.reportSummary.workerSlots
     : areas.reduce((total, area) => total + area.count, 0);
@@ -160,8 +177,8 @@ function StaffMapPreview() {
 
 function StaffReportsPreview() {
   const { language } = useLanguage();
-  const { projection, status } = useOperationsProjection();
-  const notice = projectionNotice(status, language);
+  const { fallbackPolicy, projection, status } = useOperationsProjection();
+  const notice = projectionNotice(status, language, fallbackPolicy);
   const summary = projection && status === 'ready' ? projection.reportSummary : null;
   const metrics = summary
     ? language === 'en'
@@ -177,7 +194,7 @@ function StaffReportsPreview() {
           ['Zonas activas', String(summary.activeAreaCount), `${String(summary.unmappedRequestCount)} solicitudes sin zona`],
           ['Estado de exportacion', '0', 'La exportacion sigue deshabilitada'],
         ]
-    : language === 'en'
+    : staticOperationalFallbacksAllowed(fallbackPolicy) ? language === 'en'
     ? [
         ['Worker drafts reviewed', '12', '4 urgent'],
         ['Employer follow-ups', '8', '3 due today'],
@@ -189,6 +206,19 @@ function StaffReportsPreview() {
         ['Seguimientos', '8', '3 vencen hoy'],
         ['Elementos abiertos', '5', '1 alta prioridad'],
         ['Eventos nuevos', '2', 'Planificador local'],
+      ]
+    : language === 'en'
+    ? [
+        ['Requests in projection', '0', 'Projection unavailable'],
+        ['Projected shifts', '0', 'Projection unavailable'],
+        ['Active service areas', '0', 'Projection unavailable'],
+        ['Export status', '0', 'Export remains disabled'],
+      ]
+    : [
+        ['Solicitudes proyectadas', '0', 'Proyeccion no disponible'],
+        ['Turnos proyectados', '0', 'Proyeccion no disponible'],
+        ['Zonas activas', '0', 'Proyeccion no disponible'],
+        ['Estado de exportacion', '0', 'La exportacion sigue deshabilitada'],
       ];
 
   return (

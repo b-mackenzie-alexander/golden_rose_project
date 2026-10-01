@@ -6,11 +6,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as intakeApi from '../api/intakeClient';
 import type { IntakeKind, IntakeSummary } from '../api/intakeContracts';
 import * as operationsApi from '../api/operationsProjectionClient';
+import * as runtimeApi from '../api/runtimeEnvironmentClient';
 import { LanguageProvider, useLanguage } from '../i18n/LanguageProvider';
 import { WorkQueues } from './WorkQueues';
 
 vi.mock('../api/intakeClient');
 vi.mock('../api/operationsProjectionClient');
+vi.mock('../api/runtimeEnvironmentClient', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/runtimeEnvironmentClient')>();
+  return { ...actual, getStaticOperationalFallbackPolicy: vi.fn() };
+});
 
 const summary = (
   kind: IntakeKind,
@@ -136,6 +141,7 @@ describe('WorkQueues', () => {
         ...projectionExtras,
       },
     });
+    vi.mocked(runtimeApi.getStaticOperationalFallbackPolicy).mockResolvedValue('allow');
   });
 
   it('lists projected request and shift work ahead of intake fallback rows', async () => {
@@ -184,6 +190,22 @@ describe('WorkQueues', () => {
       expect(screen.getByText('Urgent intake review')).toBeInTheDocument();
     });
     expect(screen.getByRole('status')).toHaveTextContent('projection service is unavailable');
+  });
+
+  it('does not show static queue rows in production mode when projection and intake reads fail', async () => {
+    vi.mocked(intakeApi.queryIntakes).mockResolvedValue({ ok: false, failure: 'failed' });
+    vi.mocked(operationsApi.getOperationsProjection).mockRejectedValue(new TypeError('offline'));
+    vi.mocked(runtimeApi.getStaticOperationalFallbackPolicy).mockResolvedValue('deny');
+
+    renderQueues();
+
+    await waitFor(() => {
+      expect(screen.getByText('No queue items match this view.')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('status')).toHaveTextContent('static examples are disabled');
+    expect(screen.queryByText('Urgent intake review')).not.toBeInTheDocument();
+    expect(screen.queryByText('Employer follow-up')).not.toBeInTheDocument();
+    expect(screen.getByText('Open queue items')).toBeInTheDocument();
   });
 
   it('keeps a successful empty projection visibly empty instead of showing fallback queue rows', async () => {

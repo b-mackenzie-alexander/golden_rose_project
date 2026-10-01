@@ -1,0 +1,48 @@
+{
+  "purpose": "Placeholder-only staff feedback readiness evidence template. Do not commit real values.",
+  "evidence_type": "staff-feedback-readiness-review-not-activation",
+  "validator_command": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_staff_feedback_readiness.py <operator-held-staff-feedback-readiness.json>",
+  "authority_boundary": {
+    "cloud_execution": "separate-approval-required",
+    "runtime_access_change": "separate-approval-required",
+    "production_deployment": "separate-approval-required",
+    "live_data_admission": "separate-approval-required",
+    "credential_rotation": "separate-approval-required",
+    "support_channel_activation": "separate-approval-required",
+    "current_environment_data_migration": "separate-approval-required",
+    "client_owned_environment_transition": "separate-approval-required",
+    "business_repository_transfer": "separate-approval-required"
+  },
+  "source": {
+    "source_commit": "<40-hex-source-commit>",
+    "migration_revision": "<alembic-revision>"
+  },
+  "feedback_readiness": {
+    "current_environment_scope_status": "<ready-or-blocked>",
+    "staff_identity_access_status": "<ready-or-blocked>",
+    "no_store_auth_sensitive_status": "<ready-or-blocked>",
+    "staff_training_status": "<ready-or-blocked>",
+    "support_escalation_status": "<ready-or-blocked>",
+    "data_entry_scope_status": "<ready-or-blocked>",
+    "feedback_triage_status": "<ready-or-blocked>",
+    "migration_disposition_status": "<ready-or-blocked>",
+    "repository_stewardship_status": "<ready-or-blocked>",
+    "rollback_or_closeout_status": "<ready-or-blocked>",
+    "known_limitations_status": "<ready-or-blocked>"
+  },
+  "evidence": {
+    "current_environment_scope_note": "<value-safe-current-environment-scope-record>",
+    "staff_identity_access_receipt": "<value-safe-staff-access-record>",
+    "no_store_auth_sensitive_receipt": "<value-safe-auth-sensitive-record>",
+    "staff_training_receipt": "<value-safe-staff-training-record>",
+    "support_escalation_receipt": "<value-safe-support-escalation-record>",
+    "data_entry_scope_note": "<value-safe-data-entry-scope-record>",
+    "feedback_triage_note": "<value-safe-feedback-triage-record>",
+    "migration_disposition_note": "<value-safe-migration-disposition-record>",
+    "repository_stewardship_note": "<value-safe-repository-stewardship-record>",
+    "rollback_or_closeout_note": "<value-safe-rollback-closeout-record>",
+    "known_limitations_acknowledgement": "<value-safe-known-limitations-record>",
+    "readiness_owner": "<private-owner-record>",
+    "next_review_note": "<value-safe-next-review-record>"
+  }
+}

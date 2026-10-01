@@ -16,6 +16,7 @@ READY_SECTIONS = (
     "terraform_plan_review",
     "artifact_admission",
     "handoff_evidence",
+    "backup_restore_rehearsal",
     "operations_owners",
 )
 
@@ -37,6 +38,7 @@ def _valid_checklist() -> dict[str, Any]:
             "terraform_plan_review",
             "artifact_admission",
             "handoff_evidence",
+            "backup_restore_rehearsal",
             "operations_owners",
             "manual_acceptance_boundary",
         ],
@@ -59,6 +61,10 @@ def _valid_checklist() -> dict[str, Any]:
         "handoff_evidence": {
             "status": "ready",
             "evidence": "handoff evidence validator passed",
+        },
+        "backup_restore_rehearsal": {
+            "status": "ready",
+            "evidence": "backup restore evidence validator passed",
         },
         "operations_owners": {
             "status": "ready",

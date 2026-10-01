@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from scripts.validate_deployable_package import (
+    BACKUP_RESTORE_TEMPLATE_PATH,
     ENV_TEMPLATE_PATH,
     HANDOFF_TEMPLATE_PATH,
     INPUTS_TEMPLATE_PATH,
@@ -26,6 +27,7 @@ def _copy_package(tmp_path: Path) -> Path:
         HANDOFF_TEMPLATE_PATH,
         READINESS_CHECKLIST_PATH,
         PACKAGE_INDEX_PATH,
+        BACKUP_RESTORE_TEMPLATE_PATH,
     ):
         source = ROOT / relative_path
         destination = tmp_path / relative_path
@@ -45,6 +47,7 @@ def test_deployable_package_artifacts_are_placeholder_only_and_complete() -> Non
         str(HANDOFF_TEMPLATE_PATH),
         str(READINESS_CHECKLIST_PATH),
         str(PACKAGE_INDEX_PATH),
+        str(BACKUP_RESTORE_TEMPLATE_PATH),
     ]
 
 
@@ -223,4 +226,21 @@ def test_deployable_package_rejects_package_index_missing_validator(
     )
 
     with pytest.raises(PackageValidationError, match="source_artifacts"):
+        validate(root)
+
+
+def test_deployable_package_rejects_backup_restore_activation_claim(
+    tmp_path: Path,
+) -> None:
+    root = _copy_package(tmp_path)
+    backup_restore_path = root / BACKUP_RESTORE_TEMPLATE_PATH
+    backup_restore_path.write_text(
+        backup_restore_path.read_text(encoding="utf-8").replace(
+            '"destructive_recovery": "not-executed-without-separate-approval"',
+            '"destructive_recovery": "executed"',
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PackageValidationError, match="destructive_recovery"):
         validate(root)

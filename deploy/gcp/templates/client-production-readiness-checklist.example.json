@@ -15,6 +15,7 @@
     "terraform_plan_review",
     "artifact_admission",
     "handoff_evidence",
+    "backup_restore_rehearsal",
     "operations_owners",
     "manual_acceptance_boundary"
   ],
@@ -37,6 +38,10 @@
   "handoff_evidence": {
     "status": "<ready-or-blocked>",
     "evidence": "<value-safe-handoff-validator-record>"
+  },
+  "backup_restore_rehearsal": {
+    "status": "<ready-or-blocked>",
+    "evidence": "<value-safe-backup-restore-validator-record>"
   },
   "operations_owners": {
     "status": "<ready-or-blocked>",

@@ -31,6 +31,10 @@ activate provider-side staff identity, or create shared runtime access.
   placeholder-only index of the source package artifacts and offline validators.
   It is not a production packet, release attestation, live evidence record or
   approval to execute cloud commands.
+- `deploy/gcp/templates/client-production-backup-restore.example.json` is a
+  placeholder-only template for later backup/restore rehearsal evidence. It is
+  not a backup receipt, not a restore receipt, not proof of recovery execution,
+  and not approval to run destructive recovery or use live/client data.
 - Real project IDs, billing IDs, principals, service URLs, database URLs,
   identity-provider URLs, JWKS URLs, secret names, passwords, tokens, state
   buckets, support contacts, and owner emails must remain in approved private
@@ -121,6 +125,22 @@ accessibility, fluent Spanish and staff workflow acceptance to remain
 `separate-review-required`, and production deployment, live-data admission and
 shared-runtime rollout to remain not executed without separate approval.
 
+When a later approved production packet records value-safe backup/restore
+rehearsal evidence, keep the filled JSON outside source control and validate it
+locally:
+
+```bash
+UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_backup_restore_evidence.py <operator-held-backup-restore.json>
+```
+
+The backup/restore evidence validator checks the source commit, migration
+revision, passed backup and restore rehearsal status, approved isolated restore
+target, no live data in source, database-authority receipt, rollback or
+forward-recovery note, and backup/restore owner. It does not authenticate to
+GCP, inspect resources, execute backups, execute restores, run destructive
+recovery, deploy production, roll out a shared runtime, admit live/client data,
+or prove provider-side recovery or session revocation.
+
 ## Later Plan Review Policy
 
 A later approved production packet must review Terraform plan output against the
@@ -178,10 +198,13 @@ A later approved production packet should produce value-safe handoff evidence:
   `deploy/gcp/templates/client-production-readiness-checklist.example.json`,
 - optional package-source index structure from
   `deploy/gcp/templates/client-production-package-index.example.json`,
+- optional backup/restore rehearsal structure from
+  `deploy/gcp/templates/client-production-backup-restore.example.json`,
 - source commit and immutable image digest,
 - migration revision,
 - state backend lineage identifier,
 - database-authority receipt,
+- backup and restore rehearsal receipts,
 - staff identity readiness result,
 - smoke/readiness results,
 - rollback or forward-recovery note,

@@ -29,6 +29,7 @@ READY_SECTIONS = (
     "terraform_plan_review",
     "artifact_admission",
     "handoff_evidence",
+    "backup_restore_rehearsal",
     "operations_owners",
 )
 MANUAL_ACCEPTANCE_KEYS = (

@@ -55,6 +55,24 @@ const employerSummaries = [
   }),
 ];
 
+const projectionExtras = {
+  areaSummary: [
+    { areaKey: 'bronx' as const, areaLabel: 'Bronx' as const, requestCount: 0, shiftCount: 0, workerSlots: 0, pendingReviewCount: 0 },
+    { areaKey: 'brooklyn' as const, areaLabel: 'Brooklyn' as const, requestCount: 1, shiftCount: 1, workerSlots: 2, pendingReviewCount: 2 },
+    { areaKey: 'manhattan' as const, areaLabel: 'Manhattan' as const, requestCount: 0, shiftCount: 0, workerSlots: 0, pendingReviewCount: 0 },
+    { areaKey: 'queens' as const, areaLabel: 'Queens' as const, requestCount: 0, shiftCount: 0, workerSlots: 0, pendingReviewCount: 0 },
+    { areaKey: 'staten_island' as const, areaLabel: 'Staten Island' as const, requestCount: 0, shiftCount: 0, workerSlots: 0, pendingReviewCount: 0 },
+  ],
+  reportSummary: {
+    requestCount: 1,
+    shiftCount: 1,
+    workerSlots: 2,
+    pendingReviewCount: 2,
+    activeAreaCount: 1,
+    unmappedRequestCount: 0,
+  },
+};
+
 describe('Dashboard', () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -103,6 +121,7 @@ describe('Dashboard', () => {
             updatedAt: '2026-10-01T13:45:00Z',
           },
         ],
+        ...projectionExtras,
       },
     });
   });
@@ -144,8 +163,8 @@ describe('Dashboard', () => {
     expect(screen.getByRole('img', { name: 'La comunidad nos mueve' })).toHaveClass('mission-statement-mark');
     expect(view.container.querySelector('.zone-map-artwork')).toBeInTheDocument();
     expect(view.container.querySelectorAll('.zone-map-artwork__borough')).toHaveLength(5);
-    expect(view.container.querySelector('.zone-map-artwork')?.textContent).toContain('Staten Island3');
-    expect(view.container.querySelector('.zone-map-artwork')?.textContent).toContain('Manhattan18');
+    expect(view.container.querySelector('.zone-map-artwork')?.textContent).toContain('Brooklyn2');
+    expect(view.container.querySelector('.zone-map-artwork')?.textContent).toContain('Manhattan0');
     expect(await runAxe(view.container)).toEqual([]);
   });
 
@@ -213,6 +232,7 @@ describe('Dashboard', () => {
             updatedAt: '2026-10-01T13:45:00Z',
           },
         ],
+        ...projectionExtras,
       },
     });
     render(
@@ -258,7 +278,25 @@ describe('Dashboard', () => {
     });
     vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue({
       ok: true,
-      value: { requestItems: [], shiftItems: [] },
+      value: {
+        requestItems: [],
+        shiftItems: [],
+        areaSummary: projectionExtras.areaSummary.map((area) => ({
+          ...area,
+          requestCount: 0,
+          shiftCount: 0,
+          workerSlots: 0,
+          pendingReviewCount: 0,
+        })),
+        reportSummary: {
+          requestCount: 0,
+          shiftCount: 0,
+          workerSlots: 0,
+          pendingReviewCount: 0,
+          activeAreaCount: 0,
+          unmappedRequestCount: 0,
+        },
+      },
     });
 
     render(
@@ -416,6 +454,8 @@ describe('Dashboard', () => {
     expect(screen.getByRole('heading', { name: 'Activity map' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Zone snapshot' })).toBeInTheDocument();
     expect(screen.getByText(/Exact household and worksite locations remain restricted/)).toBeInTheDocument();
+    expect(await screen.findByText('Projected worker slots')).toBeInTheDocument();
+    expect(view.container.querySelector('.zone-map-artwork')?.textContent).toContain('Brooklyn2');
     expect(await runAxe(view.container)).toEqual([]);
 
     view.unmount();
@@ -427,7 +467,8 @@ describe('Dashboard', () => {
       </LanguageProvider>,
     );
     expect(screen.getByRole('heading', { name: 'Reports' })).toBeInTheDocument();
-    expect(screen.getByText('Worker drafts reviewed')).toBeInTheDocument();
+    expect(await screen.findByText('Requests in projection')).toBeInTheDocument();
+    expect(screen.getByText('2 pending review')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Export requires report permission' })).toBeDisabled();
   });
 });

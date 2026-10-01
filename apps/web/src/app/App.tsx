@@ -18,16 +18,106 @@ import { StaffAccountProfile } from '../staffAccounts/StaffAccountProfile';
 import { LanguageProvider } from '../i18n/LanguageProvider';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { IconSymbol, ZoneMapArtwork } from '../dashboard/artwork';
+import { getOperationsProjection, type OperationsProjection, type OperationsProjectionFailureKind } from '../api/operationsProjectionClient';
+
+type ProjectionStatus = 'loading' | 'ready' | OperationsProjectionFailureKind;
+
+type ZoneArea = {
+  count: number;
+  intensity: 'high' | 'low' | 'medium' | 'mediumHigh';
+  label: string;
+  name: 'Bronx' | 'Brooklyn' | 'Manhattan' | 'Queens' | 'Staten Island';
+};
+
+const fallbackAreas: ZoneArea[] = [
+  { count: 18, intensity: 'high', label: 'Manhattan', name: 'Manhattan' },
+  { count: 14, intensity: 'mediumHigh', label: 'Brooklyn', name: 'Brooklyn' },
+  { count: 12, intensity: 'medium', label: 'Bronx', name: 'Bronx' },
+  { count: 9, intensity: 'medium', label: 'Queens', name: 'Queens' },
+  { count: 3, intensity: 'low', label: 'Staten Island', name: 'Staten Island' },
+];
+
+function isProjectionFailure(status: ProjectionStatus) {
+  return status !== 'loading' && status !== 'ready';
+}
+
+function projectionNotice(status: ProjectionStatus, language: 'en' | 'es') {
+  if (!isProjectionFailure(status)) return null;
+  const reason = {
+    forbidden: {
+      en: 'this account is not authorized to read broad operational aggregates',
+      es: 'esta cuenta no tiene autorizacion para leer agregados operativos amplios',
+    },
+    validation: {
+      en: 'the aggregate projection response could not be validated',
+      es: 'no se pudo validar la respuesta de agregados',
+    },
+    unavailable: {
+      en: 'the aggregate projection service is unavailable',
+      es: 'el servicio de agregados no esta disponible',
+    },
+    unexpected: {
+      en: 'the aggregate projection response was unexpected',
+      es: 'la respuesta de agregados fue inesperada',
+    },
+  }[status][language];
+  return language === 'es'
+    ? `No se pudieron leer los agregados porque ${reason}. Se muestran datos de respaldo y ninguna direccion exacta.`
+    : `Operational aggregates could not be read because ${reason}. Fallback data is shown and no exact addresses are exposed.`;
+}
+
+function intensityFor(value: number, maximum: number): ZoneArea['intensity'] {
+  if (maximum <= 0 || value <= 0) return 'low';
+  const ratio = value / maximum;
+  if (ratio >= 0.8) return 'high';
+  if (ratio >= 0.55) return 'mediumHigh';
+  if (ratio >= 0.25) return 'medium';
+  return 'low';
+}
+
+function areasFromProjection(projection: OperationsProjection | null, status: ProjectionStatus): ZoneArea[] {
+  if (projection === null || isProjectionFailure(status) || status === 'loading') return fallbackAreas;
+  const maximum = Math.max(...projection.areaSummary.map((area) => area.workerSlots), 0);
+  return projection.areaSummary.map((area) => ({
+    count: area.workerSlots,
+    intensity: intensityFor(area.workerSlots, maximum),
+    label: area.areaLabel,
+    name: area.areaLabel,
+  }));
+}
+
+function useOperationsProjection() {
+  const [projection, setProjection] = useState<OperationsProjection | null>(null);
+  const [status, setStatus] = useState<ProjectionStatus>('loading');
+  useEffect(() => {
+    let cancelled = false;
+    void getOperationsProjection()
+      .then((result) => {
+        if (cancelled) return;
+        setProjection(result.ok ? result.value : null);
+        setStatus(result.ok ? 'ready' : result.failure.kind);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setProjection(null);
+        setStatus('unavailable');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return { projection, status };
+}
 
 function StaffMapPreview() {
   const { language } = useLanguage();
-  const areas = [
-    { count: 18, intensity: 'high' as const, label: 'Manhattan', name: 'Manhattan' as const },
-    { count: 14, intensity: 'mediumHigh' as const, label: 'Brooklyn', name: 'Brooklyn' as const },
-    { count: 12, intensity: 'medium' as const, label: 'Bronx', name: 'Bronx' as const },
-    { count: 9, intensity: 'medium' as const, label: 'Queens', name: 'Queens' as const },
-    { count: 3, intensity: 'low' as const, label: 'Staten Island', name: 'Staten Island' as const },
-  ];
+  const { projection, status } = useOperationsProjection();
+  const areas = areasFromProjection(projection, status);
+  const notice = projectionNotice(status, language);
+  const totalWorkerSlots = projection && status === 'ready'
+    ? projection.reportSummary.workerSlots
+    : areas.reduce((total, area) => total + area.count, 0);
+  const totalLabel = language === 'en' ? 'Projected worker slots' : 'Cupos de trabajadores proyectados';
 
   return (
     <section className="module-preview-page" aria-labelledby="staff-map-heading">
@@ -40,12 +130,14 @@ function StaffMapPreview() {
             : 'Actividad por zona amplia para planificacion del personal. Las direcciones exactas siguen restringidas.'}
         </p>
       </div>
+      {notice ? <p className="projection-status-notice" role="status">{notice}</p> : null}
       <div className="module-preview-grid">
         <section className="module-preview-panel module-preview-map" aria-label={language === 'en' ? 'NYC activity by area' : 'Actividad por zona de NYC'}>
           <ZoneMapArtwork areas={areas} />
         </section>
         <section className="module-preview-panel" aria-labelledby="service-zone-heading">
           <h3 id="service-zone-heading">{language === 'en' ? 'Zone snapshot' : 'Resumen de zonas'}</h3>
+          <p className="module-preview-total"><strong>{totalWorkerSlots}</strong> {totalLabel}</p>
           <ol className="module-metric-list">
             {areas.map((area) => (
               <li key={area.name}>
@@ -68,7 +160,24 @@ function StaffMapPreview() {
 
 function StaffReportsPreview() {
   const { language } = useLanguage();
-  const metrics = language === 'en'
+  const { projection, status } = useOperationsProjection();
+  const notice = projectionNotice(status, language);
+  const summary = projection && status === 'ready' ? projection.reportSummary : null;
+  const metrics = summary
+    ? language === 'en'
+      ? [
+          ['Requests in projection', String(summary.requestCount), `${String(summary.pendingReviewCount)} pending review`],
+          ['Projected shifts', String(summary.shiftCount), `${String(summary.workerSlots)} worker slots`],
+          ['Active service areas', String(summary.activeAreaCount), `${String(summary.unmappedRequestCount)} unmapped requests`],
+          ['Export status', '0', 'Export remains disabled'],
+        ]
+      : [
+          ['Solicitudes proyectadas', String(summary.requestCount), `${String(summary.pendingReviewCount)} en revision`],
+          ['Turnos proyectados', String(summary.shiftCount), `${String(summary.workerSlots)} cupos`],
+          ['Zonas activas', String(summary.activeAreaCount), `${String(summary.unmappedRequestCount)} solicitudes sin zona`],
+          ['Estado de exportacion', '0', 'La exportacion sigue deshabilitada'],
+        ]
+    : language === 'en'
     ? [
         ['Worker drafts reviewed', '12', '4 urgent'],
         ['Employer follow-ups', '8', '3 due today'],
@@ -91,6 +200,7 @@ function StaffReportsPreview() {
           ? 'Staff metrics that summarize intake, follow-up, calendar, and queue activity.'
           : 'Metricas del personal para registros, seguimientos, calendario y colas.'}</p>
       </div>
+      {notice ? <p className="projection-status-notice" role="status">{notice}</p> : null}
       <div className="module-report-grid">
         {metrics.map(([label, value, meta]) => (
           <section className="module-report-card" key={label}>

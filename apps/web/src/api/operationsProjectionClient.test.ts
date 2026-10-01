@@ -33,6 +33,21 @@ const validShift = {
   version: 1,
   updated_at: '2026-10-01T13:45:00Z',
 };
+const validAreaSummary = [
+  { area_key: 'bronx', area_label: 'Bronx', request_count: 0, shift_count: 0, worker_slots: 0, pending_review_count: 0 },
+  { area_key: 'brooklyn', area_label: 'Brooklyn', request_count: 1, shift_count: 1, worker_slots: 2, pending_review_count: 1 },
+  { area_key: 'manhattan', area_label: 'Manhattan', request_count: 0, shift_count: 0, worker_slots: 0, pending_review_count: 0 },
+  { area_key: 'queens', area_label: 'Queens', request_count: 0, shift_count: 0, worker_slots: 0, pending_review_count: 0 },
+  { area_key: 'staten_island', area_label: 'Staten Island', request_count: 0, shift_count: 0, worker_slots: 0, pending_review_count: 0 },
+];
+const validReportSummary = {
+  request_count: 1,
+  shift_count: 1,
+  worker_slots: 2,
+  pending_review_count: 1,
+  active_area_count: 1,
+  unmapped_request_count: 0,
+};
 
 function jsonResponse(body: unknown, init: ResponseInit = {}) {
   return new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' }, ...init });
@@ -42,7 +57,12 @@ function projection(
   request: Record<string, unknown> = validRequest,
   shift: Record<string, unknown> = validShift,
 ) {
-  return { request_items: [request], shift_items: [shift] };
+  return {
+    request_items: [request],
+    shift_items: [shift],
+    area_summary: validAreaSummary,
+    report_summary: validReportSummary,
+  };
 }
 
 beforeEach(() => {
@@ -69,6 +89,22 @@ describe('operationsProjectionClient', () => {
     if (!result.ok) throw new Error('Expected projection read to succeed.');
     expect(result.value.requestItems[0]?.sourceIntakeId).toBe('11111111-1111-4111-8111-111111111111');
     expect(result.value.shiftItems[0]?.sourceIntakeId).toBeNull();
+    expect(result.value.areaSummary[1]).toEqual({
+      areaKey: 'brooklyn',
+      areaLabel: 'Brooklyn',
+      requestCount: 1,
+      shiftCount: 1,
+      workerSlots: 2,
+      pendingReviewCount: 1,
+    });
+    expect(result.value.reportSummary).toEqual({
+      requestCount: 1,
+      shiftCount: 1,
+      workerSlots: 2,
+      pendingReviewCount: 1,
+      activeAreaCount: 1,
+      unmappedRequestCount: 0,
+    });
   });
 
   it('rejects malformed projection payloads', async () => {
@@ -150,19 +186,26 @@ describe('operationsProjectionClient', () => {
   it.each([
     ['non-object payload', null],
     ['missing request array', { shift_items: [] }],
-    ['missing shift array', { request_items: [] }],
+    ['missing shift array', { request_items: [], area_summary: validAreaSummary, report_summary: validReportSummary }],
+    ['missing area summary', { request_items: [], shift_items: [], report_summary: validReportSummary }],
+    ['missing report summary', { request_items: [], shift_items: [], area_summary: validAreaSummary }],
     ['oversized request list', { request_items: Array.from({ length: 51 }, () => validRequest), shift_items: [] }],
-    ['oversized shift list', { request_items: [], shift_items: Array.from({ length: 51 }, () => validShift) }],
-    ['non-object request', { request_items: [null], shift_items: [] }],
-    ['wrong request type', { request_items: [{ ...validRequest, item_type: 'other' }], shift_items: [] }],
+    ['oversized shift list', { request_items: [], shift_items: Array.from({ length: 51 }, () => validShift), area_summary: validAreaSummary, report_summary: validReportSummary }],
+    ['short area summary', { request_items: [], shift_items: [], area_summary: validAreaSummary.slice(1), report_summary: validReportSummary }],
+    ['duplicate area summary', { request_items: [], shift_items: [], area_summary: [validAreaSummary[0], ...validAreaSummary.slice(0, 4)], report_summary: validReportSummary }],
+    ['invalid area label', { request_items: [], shift_items: [], area_summary: [{ ...validAreaSummary[0], area_label: 'Queens' }, ...validAreaSummary.slice(1)], report_summary: validReportSummary }],
+    ['invalid area count', { request_items: [], shift_items: [], area_summary: [{ ...validAreaSummary[0], worker_slots: -1 }, ...validAreaSummary.slice(1)], report_summary: validReportSummary }],
+    ['invalid report active area count', { request_items: [], shift_items: [], area_summary: validAreaSummary, report_summary: { ...validReportSummary, active_area_count: 6 } }],
+    ['non-object request', { request_items: [null], shift_items: [], area_summary: validAreaSummary, report_summary: validReportSummary }],
+    ['wrong request type', { request_items: [{ ...validRequest, item_type: 'other' }], shift_items: [], area_summary: validAreaSummary, report_summary: validReportSummary }],
     ['blank employer name', projection({ ...validRequest, employer_name: '   ' })],
     ['overlong role title', projection({ ...validRequest, role_title: 'x'.repeat(201) })],
     ['zero worker count', projection({ ...validRequest, worker_count: 0 })],
     ['unsafe version', projection({ ...validRequest, version: Number.MAX_SAFE_INTEGER + 1 })],
     ['invalid request status', projection({ ...validRequest, request_status: 'approved' })],
     ['bad received timestamp', projection({ ...validRequest, received_at: 'not-a-date' })],
-    ['non-object shift', { request_items: [], shift_items: [null] }],
-    ['wrong shift type', { request_items: [], shift_items: [{ ...validShift, item_type: 'other' }] }],
+    ['non-object shift', { request_items: [], shift_items: [null], area_summary: validAreaSummary, report_summary: validReportSummary }],
+    ['wrong shift type', { request_items: [], shift_items: [{ ...validShift, item_type: 'other' }], area_summary: validAreaSummary, report_summary: validReportSummary }],
     ['invalid shift request status', projection(validRequest, { ...validShift, request_status: 'approved' })],
     ['invalid shift status', projection(validRequest, { ...validShift, shift_status: 'approved' })],
     ['same-time shift window', projection(validRequest, { ...validShift, starts_at: '2026-10-01T14:00:00Z', ends_at: '2026-10-01T14:00:00Z' })],

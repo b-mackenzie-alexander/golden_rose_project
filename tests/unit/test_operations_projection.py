@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from unittest.mock import Mock
 from uuid import UUID
 
@@ -90,6 +90,24 @@ def test_operations_projection_route_returns_no_store_projection(
             }
         ],
         "shift_items": [],
+        "area_summary": [
+            {
+                "area_key": "brooklyn",
+                "area_label": "Brooklyn",
+                "request_count": 1,
+                "shift_count": 0,
+                "worker_slots": 0,
+                "pending_review_count": 1,
+            }
+        ],
+        "report_summary": {
+            "request_count": 1,
+            "shift_count": 0,
+            "worker_slots": 0,
+            "pending_review_count": 1,
+            "active_area_count": 1,
+            "unmapped_request_count": 0,
+        },
     }
 
     def fake_projection(**kwargs: Any) -> dict[str, Any]:
@@ -108,6 +126,8 @@ def test_operations_projection_route_returns_no_store_projection(
     assert response.headers["vary"] == "Authorization"
     assert response.json()["request_items"][0]["staffing_request_id"] == str(REQUEST_ID)
     assert response.json()["shift_items"] == []
+    assert response.json()["area_summary"][0]["area_label"] == "Brooklyn"
+    assert response.json()["report_summary"]["pending_review_count"] == 1
 
 
 def test_operations_projection_route_bounds_page_size() -> None:
@@ -177,9 +197,108 @@ def test_operations_projection_returns_request_and_shift_items():
     assert result == {
         "request_items": [{"item_type": "staffing_request", **request_row}],
         "shift_items": [{"item_type": "shift_need", **shift_row}],
+        "area_summary": [
+            {
+                "area_key": "bronx",
+                "area_label": "Bronx",
+                "request_count": 0,
+                "shift_count": 0,
+                "worker_slots": 0,
+                "pending_review_count": 0,
+            },
+            {
+                "area_key": "brooklyn",
+                "area_label": "Brooklyn",
+                "request_count": 0,
+                "shift_count": 0,
+                "worker_slots": 0,
+                "pending_review_count": 0,
+            },
+            {
+                "area_key": "manhattan",
+                "area_label": "Manhattan",
+                "request_count": 0,
+                "shift_count": 0,
+                "worker_slots": 0,
+                "pending_review_count": 0,
+            },
+            {
+                "area_key": "queens",
+                "area_label": "Queens",
+                "request_count": 0,
+                "shift_count": 0,
+                "worker_slots": 0,
+                "pending_review_count": 0,
+            },
+            {
+                "area_key": "staten_island",
+                "area_label": "Staten Island",
+                "request_count": 0,
+                "shift_count": 0,
+                "worker_slots": 0,
+                "pending_review_count": 0,
+            },
+        ],
+        "report_summary": {
+            "request_count": 0,
+            "shift_count": 0,
+            "worker_slots": 0,
+            "pending_review_count": 0,
+            "active_area_count": 0,
+            "unmapped_request_count": 0,
+        },
     }
-    assert len(session.executed) == 2
+    assert len(session.executed) == 4
     assert session.rollbacks == 0
+
+
+def test_operations_projection_aggregates_broad_area_and_reporting_totals():
+    session = FakeSession(
+        [
+            FakeResult([]),
+            FakeResult([]),
+            FakeResult(
+                [
+                    {"locality": "Brooklyn", "request_status": "pending_review"},
+                    {"locality": "New York", "request_status": "draft"},
+                    {"locality": "Fictional City", "request_status": "pending_review"},
+                ]
+            ),
+            FakeResult(
+                [
+                    {"locality": "Brooklyn", "shift_status": "pending_review", "worker_count": 2},
+                    {"locality": "Queens", "shift_status": "draft", "worker_count": 3},
+                    {"locality": "Outside", "shift_status": "draft", "worker_count": 4},
+                ]
+            ),
+        ]
+    )
+
+    result = query_operations_projection(
+        session=session,  # type: ignore[arg-type]
+        principal=all_permissions(),
+    )
+
+    area_items = cast(list[dict[str, object]], result["area_summary"])
+    areas = {item["area_key"]: item for item in area_items}
+    assert areas["brooklyn"] == {
+        "area_key": "brooklyn",
+        "area_label": "Brooklyn",
+        "request_count": 1,
+        "shift_count": 1,
+        "worker_slots": 2,
+        "pending_review_count": 2,
+    }
+    assert areas["manhattan"]["request_count"] == 1
+    assert areas["queens"]["worker_slots"] == 3
+    assert result["report_summary"] == {
+        "request_count": 3,
+        "shift_count": 3,
+        "worker_slots": 9,
+        "pending_review_count": 2,
+        "active_area_count": 3,
+        "unmapped_request_count": 1,
+    }
 
 
 def test_operations_projection_rolls_back_persistence_errors():

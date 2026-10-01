@@ -40,9 +40,39 @@ export type OperationsShiftItem = {
   updatedAt: string;
 };
 
+export type OperationsAreaKey = 'bronx' | 'brooklyn' | 'manhattan' | 'queens' | 'staten_island';
+
+export type OperationsAreaSummaryItem = {
+  areaKey: OperationsAreaKey;
+  areaLabel: 'Bronx' | 'Brooklyn' | 'Manhattan' | 'Queens' | 'Staten Island';
+  requestCount: number;
+  shiftCount: number;
+  workerSlots: number;
+  pendingReviewCount: number;
+};
+
+export type OperationsReportSummary = {
+  requestCount: number;
+  shiftCount: number;
+  workerSlots: number;
+  pendingReviewCount: number;
+  activeAreaCount: number;
+  unmappedRequestCount: number;
+};
+
 export type OperationsProjection = {
   requestItems: OperationsRequestItem[];
   shiftItems: OperationsShiftItem[];
+  areaSummary: OperationsAreaSummaryItem[];
+  reportSummary: OperationsReportSummary;
+};
+
+const areaLabels: Record<OperationsAreaKey, OperationsAreaSummaryItem['areaLabel']> = {
+  bronx: 'Bronx',
+  brooklyn: 'Brooklyn',
+  manhattan: 'Manhattan',
+  queens: 'Queens',
+  staten_island: 'Staten Island',
 };
 
 function object(value: unknown): value is Record<string, unknown> {
@@ -130,15 +160,77 @@ function parseShiftItem(value: unknown): OperationsShiftItem | null {
   };
 }
 
+function nonNegative(value: unknown, max = 2147483647): value is number {
+  return Number.isSafeInteger(value) && Number(value) >= 0 && Number(value) <= max;
+}
+
+function parseAreaSummaryItem(value: unknown): OperationsAreaSummaryItem | null {
+  if (!object(value)) return null;
+  const key = value.area_key;
+  if (!['bronx', 'brooklyn', 'manhattan', 'queens', 'staten_island'].includes(String(key))) return null;
+  const areaKey = key as OperationsAreaKey;
+  if (value.area_label !== areaLabels[areaKey]) return null;
+  if (
+    !nonNegative(value.request_count) ||
+    !nonNegative(value.shift_count) ||
+    !nonNegative(value.worker_slots) ||
+    !nonNegative(value.pending_review_count)
+  ) return null;
+  return {
+    areaKey,
+    areaLabel: areaLabels[areaKey],
+    requestCount: value.request_count,
+    shiftCount: value.shift_count,
+    workerSlots: value.worker_slots,
+    pendingReviewCount: value.pending_review_count,
+  };
+}
+
+function parseReportSummary(value: unknown): OperationsReportSummary | null {
+  if (!object(value)) return null;
+  if (
+    !nonNegative(value.request_count) ||
+    !nonNegative(value.shift_count) ||
+    !nonNegative(value.worker_slots) ||
+    !nonNegative(value.pending_review_count) ||
+    !nonNegative(value.active_area_count, 5) ||
+    !nonNegative(value.unmapped_request_count)
+  ) return null;
+  return {
+    requestCount: value.request_count,
+    shiftCount: value.shift_count,
+    workerSlots: value.worker_slots,
+    pendingReviewCount: value.pending_review_count,
+    activeAreaCount: value.active_area_count,
+    unmappedRequestCount: value.unmapped_request_count,
+  };
+}
+
 function parseProjection(value: unknown): OperationsProjection | null {
-  if (!object(value) || !Array.isArray(value.request_items) || !Array.isArray(value.shift_items)) return null;
-  if (value.request_items.length > 50 || value.shift_items.length > 50) return null;
+  if (
+    !object(value) ||
+    !Array.isArray(value.request_items) ||
+    !Array.isArray(value.shift_items) ||
+    !Array.isArray(value.area_summary)
+  ) return null;
+  if (value.request_items.length > 50 || value.shift_items.length > 50 || value.area_summary.length !== 5) return null;
   const requestItems = value.request_items.map(parseRequestItem);
   const shiftItems = value.shift_items.map(parseShiftItem);
-  if (requestItems.some((item) => item === null) || shiftItems.some((item) => item === null)) return null;
+  const areaSummary = value.area_summary.map(parseAreaSummaryItem);
+  const reportSummary = parseReportSummary(value.report_summary);
+  const areaKeys = new Set(areaSummary.map((item) => item?.areaKey));
+  if (
+    requestItems.some((item) => item === null) ||
+    shiftItems.some((item) => item === null) ||
+    areaSummary.some((item) => item === null) ||
+    areaKeys.size !== 5 ||
+    reportSummary === null
+  ) return null;
   return {
     requestItems: requestItems as OperationsRequestItem[],
     shiftItems: shiftItems as OperationsShiftItem[],
+    areaSummary: areaSummary as OperationsAreaSummaryItem[],
+    reportSummary,
   };
 }
 

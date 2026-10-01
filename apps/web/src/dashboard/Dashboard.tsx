@@ -454,6 +454,36 @@ function dynamicScheduleRows(copy: DashboardCopy, data: DashboardIntakes, langua
   });
 }
 
+function zoneIntensity(value: number, maximum: number): DashboardCopy['zoneAreas'][number]['intensity'] {
+  if (maximum <= 0 || value <= 0) return 'low';
+  const ratio = value / maximum;
+  if (ratio >= 0.8) return 'high';
+  if (ratio >= 0.55) return 'mediumHigh';
+  if (ratio >= 0.25) return 'medium';
+  return 'low';
+}
+
+function dynamicZoneAreas(copy: DashboardCopy, data: DashboardIntakes): DashboardCopy['zoneAreas'] {
+  if (!data.loaded || data.operations === null || isProjectionFailure(data.operationsStatus)) return copy.zoneAreas;
+  const maximum = Math.max(...data.operations.areaSummary.map((area) => area.workerSlots), 0);
+  return data.operations.areaSummary.map((area) => ({
+    count: area.workerSlots,
+    intensity: zoneIntensity(area.workerSlots, maximum),
+    label: area.areaLabel,
+    name: area.areaLabel,
+  }));
+}
+
+function dynamicZonesMetric(copy: DashboardCopy, data: DashboardIntakes, language: 'en' | 'es') {
+  if (!data.loaded || data.operations === null || isProjectionFailure(data.operationsStatus)) {
+    return { meta: copy.zonesMeta, value: copy.zonesMetric };
+  }
+  return {
+    meta: language === 'es' ? 'Cupos de trabajadores proyectados' : 'Projected worker slots',
+    value: String(data.operations.reportSummary.workerSlots),
+  };
+}
+
 function IconMark({ name }: { name: IconName }) {
   return (
     <span aria-hidden="true" className="dashboard-icon">
@@ -501,6 +531,8 @@ export function Dashboard() {
   const kpis = useMemo(() => dynamicKpis(copy, intakes, language), [copy, intakes, language]);
   const queueRows = useMemo(() => dynamicQueueRows(copy, intakes, language), [copy, intakes, language]);
   const scheduleRows = useMemo(() => dynamicScheduleRows(copy, intakes, language), [copy, intakes, language]);
+  const zoneAreas = useMemo(() => dynamicZoneAreas(copy, intakes), [copy, intakes]);
+  const zonesMetric = useMemo(() => dynamicZonesMetric(copy, intakes, language), [copy, intakes, language]);
   const operationsNotice = useMemo(() => projectionNotice(intakes.operationsStatus, language), [intakes.operationsStatus, language]);
   const workerRows = useMemo(
     () => recentRows('worker', intakes.workers, language, copy.recentRows),
@@ -640,10 +672,10 @@ export function Dashboard() {
         <section className="dashboard-card dashboard-map-card" aria-labelledby="zones-heading">
           <div>
             <h3 id="zones-heading"><IconMark name="map" /> {copy.zonesHeading}</h3>
-            <p><strong>{copy.zonesMetric}</strong> {copy.zonesMeta}</p>
+            <p><strong>{zonesMetric.value}</strong> {zonesMetric.meta}</p>
           </div>
           <div aria-hidden="true" className="dashboard-map">
-            <ZoneMapArtwork areas={copy.zoneAreas} />
+            <ZoneMapArtwork areas={zoneAreas} />
           </div>
         </section>
 

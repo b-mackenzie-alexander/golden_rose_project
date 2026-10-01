@@ -1,5 +1,8 @@
 """Read-only staff operations projection for dashboard modules."""
 
+from collections.abc import Mapping, Sequence
+from typing import Any, cast
+
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -12,7 +15,98 @@ from golden_rose.persistence.models import (
     intake_finalizations,
     shift_needs,
     staffing_requests,
+    worksites,
 )
+
+AREA_BUCKETS: tuple[tuple[str, str], ...] = (
+    ("bronx", "Bronx"),
+    ("brooklyn", "Brooklyn"),
+    ("manhattan", "Manhattan"),
+    ("queens", "Queens"),
+    ("staten_island", "Staten Island"),
+)
+
+LOCALITY_TO_AREA: dict[str, str] = {
+    "bronx": "bronx",
+    "brooklyn": "brooklyn",
+    "kings": "brooklyn",
+    "manhattan": "manhattan",
+    "new york": "manhattan",
+    "new york city": "manhattan",
+    "queens": "queens",
+    "staten island": "staten_island",
+    "richmond": "staten_island",
+}
+
+
+def _empty_area_summary() -> dict[str, dict[str, int | str]]:
+    return {
+        key: {
+            "area_key": key,
+            "area_label": label,
+            "request_count": 0,
+            "shift_count": 0,
+            "worker_slots": 0,
+            "pending_review_count": 0,
+        }
+        for key, label in AREA_BUCKETS
+    }
+
+
+def _area_key(locality: object) -> str | None:
+    if not isinstance(locality, str):
+        return None
+    normalized = " ".join(locality.strip().lower().replace("-", " ").split())
+    if not normalized:
+        return None
+    return LOCALITY_TO_AREA.get(normalized)
+
+
+def _build_area_and_report_summary(
+    *,
+    request_area_rows: Sequence[Mapping[str, Any]],
+    shift_area_rows: Sequence[Mapping[str, Any]],
+) -> tuple[list[dict[str, int | str]], dict[str, int]]:
+    areas = _empty_area_summary()
+    report = {
+        "request_count": 0,
+        "shift_count": 0,
+        "worker_slots": 0,
+        "pending_review_count": 0,
+        "active_area_count": 0,
+        "unmapped_request_count": 0,
+    }
+    for row in request_area_rows:
+        report["request_count"] += 1
+        key = _area_key(row.get("locality"))
+        if key is None:
+            report["unmapped_request_count"] += 1
+            continue
+        area = areas[key]
+        area["request_count"] = int(area["request_count"]) + 1
+        if row.get("request_status") == "pending_review":
+            area["pending_review_count"] = int(area["pending_review_count"]) + 1
+            report["pending_review_count"] += 1
+
+    for row in shift_area_rows:
+        report["shift_count"] += 1
+        worker_slots = int(row.get("worker_count") or 0)
+        report["worker_slots"] += worker_slots
+        key = _area_key(row.get("locality"))
+        if key is None:
+            continue
+        area = areas[key]
+        area["shift_count"] = int(area["shift_count"]) + 1
+        area["worker_slots"] = int(area["worker_slots"]) + worker_slots
+        if row.get("shift_status") == "pending_review":
+            area["pending_review_count"] = int(area["pending_review_count"]) + 1
+            report["pending_review_count"] += 1
+
+    area_items = [areas[key] for key, _label in AREA_BUCKETS]
+    report["active_area_count"] = sum(
+        1 for area in area_items if int(area["request_count"]) > 0 or int(area["shift_count"]) > 0
+    )
+    return area_items, report
 
 
 def query_operations_projection(
@@ -107,9 +201,64 @@ def query_operations_projection(
             .mappings()
             .all()
         )
+        request_area_rows = (
+            session.execute(
+                select(
+                    worksites.c.locality,
+                    staffing_requests.c.request_status,
+                )
+                .join(
+                    staffing_requests,
+                    (staffing_requests.c.employer_id == worksites.c.employer_id)
+                    & (staffing_requests.c.worksite_id == worksites.c.worksite_id),
+                )
+                .join(employers, employers.c.employer_id == staffing_requests.c.employer_id)
+                .where(
+                    employers.c.lifecycle_status == "draft",
+                    staffing_requests.c.request_status.in_(("draft", "pending_review")),
+                )
+                .limit(500)
+            )
+            .mappings()
+            .all()
+        )
+        shift_area_rows = (
+            session.execute(
+                select(
+                    worksites.c.locality,
+                    shift_needs.c.shift_status,
+                    shift_needs.c.worker_count,
+                )
+                .join(
+                    staffing_requests,
+                    (staffing_requests.c.employer_id == shift_needs.c.employer_id)
+                    & (
+                        staffing_requests.c.staffing_request_id == shift_needs.c.staffing_request_id
+                    ),
+                )
+                .join(
+                    worksites,
+                    (worksites.c.employer_id == staffing_requests.c.employer_id)
+                    & (worksites.c.worksite_id == staffing_requests.c.worksite_id),
+                )
+                .join(employers, employers.c.employer_id == shift_needs.c.employer_id)
+                .where(
+                    employers.c.lifecycle_status == "draft",
+                    staffing_requests.c.request_status.in_(("draft", "pending_review")),
+                    shift_needs.c.shift_status.in_(("draft", "pending_review")),
+                )
+                .limit(500)
+            )
+            .mappings()
+            .all()
+        )
     except SQLAlchemyError as exc:
         session.rollback()
         raise IntakeError("persistence_unavailable", 503) from exc
+    area_summary, report_summary = _build_area_and_report_summary(
+        request_area_rows=cast(Sequence[Mapping[str, Any]], request_area_rows),
+        shift_area_rows=cast(Sequence[Mapping[str, Any]], shift_area_rows),
+    )
     return {
         "request_items": [
             {
@@ -125,4 +274,6 @@ def query_operations_projection(
             }
             for row in shift_rows
         ],
+        "area_summary": area_summary,
+        "report_summary": report_summary,
     }

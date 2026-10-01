@@ -25,6 +25,24 @@ function getDayButton(day: string, date: string, count: string) {
   return button;
 }
 
+const projectionExtras = {
+  areaSummary: [
+    { areaKey: 'bronx' as const, areaLabel: 'Bronx' as const, requestCount: 0, shiftCount: 0, workerSlots: 0, pendingReviewCount: 0 },
+    { areaKey: 'brooklyn' as const, areaLabel: 'Brooklyn' as const, requestCount: 1, shiftCount: 1, workerSlots: 2, pendingReviewCount: 2 },
+    { areaKey: 'manhattan' as const, areaLabel: 'Manhattan' as const, requestCount: 0, shiftCount: 0, workerSlots: 0, pendingReviewCount: 0 },
+    { areaKey: 'queens' as const, areaLabel: 'Queens' as const, requestCount: 0, shiftCount: 0, workerSlots: 0, pendingReviewCount: 0 },
+    { areaKey: 'staten_island' as const, areaLabel: 'Staten Island' as const, requestCount: 0, shiftCount: 0, workerSlots: 0, pendingReviewCount: 0 },
+  ],
+  reportSummary: {
+    requestCount: 1,
+    shiftCount: 1,
+    workerSlots: 2,
+    pendingReviewCount: 2,
+    activeAreaCount: 1,
+    unmappedRequestCount: 0,
+  },
+};
+
 describe('StaffCalendar', () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -51,6 +69,7 @@ describe('StaffCalendar', () => {
             updatedAt: '2026-09-29T13:45:00Z',
           },
         ],
+        ...projectionExtras,
       },
     });
   });
@@ -144,7 +163,25 @@ describe('StaffCalendar', () => {
   it('keeps a successful empty shift projection empty instead of showing seeded events', async () => {
     vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue({
       ok: true,
-      value: { requestItems: [], shiftItems: [] },
+      value: {
+        requestItems: [],
+        shiftItems: [],
+        areaSummary: projectionExtras.areaSummary.map((area) => ({
+          ...area,
+          requestCount: 0,
+          shiftCount: 0,
+          workerSlots: 0,
+          pendingReviewCount: 0,
+        })),
+        reportSummary: {
+          requestCount: 0,
+          shiftCount: 0,
+          workerSlots: 0,
+          pendingReviewCount: 0,
+          activeAreaCount: 0,
+          unmappedRequestCount: 0,
+        },
+      },
     });
 
     renderCalendar();

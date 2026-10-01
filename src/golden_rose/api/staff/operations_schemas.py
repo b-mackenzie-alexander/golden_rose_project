@@ -41,6 +41,26 @@ class OperationsShiftNeedItem(IntakeValue):
     updated_at: datetime
 
 
+class OperationsAreaSummaryItem(IntakeValue):
+    area_key: Literal["bronx", "brooklyn", "manhattan", "queens", "staten_island"]
+    area_label: Literal["Bronx", "Brooklyn", "Manhattan", "Queens", "Staten Island"]
+    request_count: int = Field(ge=0, le=2147483647)
+    shift_count: int = Field(ge=0, le=2147483647)
+    worker_slots: int = Field(ge=0, le=2147483647)
+    pending_review_count: int = Field(ge=0, le=2147483647)
+
+
+class OperationsReportSummary(IntakeValue):
+    request_count: int = Field(ge=0, le=2147483647)
+    shift_count: int = Field(ge=0, le=2147483647)
+    worker_slots: int = Field(ge=0, le=2147483647)
+    pending_review_count: int = Field(ge=0, le=2147483647)
+    active_area_count: int = Field(ge=0, le=5)
+    unmapped_request_count: int = Field(ge=0, le=2147483647)
+
+
 class OperationsProjectionResponse(IntakeValue):
     request_items: list[OperationsStaffingRequestItem]
     shift_items: list[OperationsShiftNeedItem]
+    area_summary: list[OperationsAreaSummaryItem]
+    report_summary: OperationsReportSummary

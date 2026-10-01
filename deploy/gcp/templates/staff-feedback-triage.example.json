@@ -1,0 +1,58 @@
+{
+  "purpose": "Placeholder-only staff feedback triage evidence template. Do not commit real values.",
+  "evidence_type": "staff-feedback-triage-review-not-acceptance",
+  "validator_command": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_staff_feedback_triage.py <operator-held-staff-feedback-triage.json>",
+  "authority_boundary": {
+    "cloud_execution": "separate-approval-required",
+    "runtime_access_change": "separate-approval-required",
+    "production_deployment": "separate-approval-required",
+    "live_data_admission": "separate-approval-required",
+    "credential_rotation": "separate-approval-required",
+    "support_channel_activation": "separate-approval-required",
+    "current_environment_data_migration": "separate-approval-required",
+    "client_owned_environment_transition": "separate-approval-required",
+    "github_account_creation": "separate-approval-required",
+    "business_repository_transfer": "separate-approval-required"
+  },
+  "source": {
+    "source_commit": "<40-hex-source-commit>",
+    "migration_revision": "<alembic-revision>"
+  },
+  "triage_summary": {
+    "feedback_window_scope_status": "<recorded-or-blocked>",
+    "issue_inventory_status": "<recorded-or-blocked>",
+    "blocker_disposition_status": "<recorded-or-blocked>",
+    "accessibility_impact_status": "<recorded-or-blocked>",
+    "privacy_impact_status": "<recorded-or-blocked>",
+    "security_impact_status": "<recorded-or-blocked>",
+    "defect_disposition_status": "<recorded-or-blocked>",
+    "retest_status": "<recorded-or-blocked>",
+    "migration_disposition_status": "<recorded-or-blocked>",
+    "known_limitations_status": "<recorded-or-blocked>"
+  },
+  "issue_counts": {
+    "blocker_count": 0,
+    "high_count": 0,
+    "medium_count": 0,
+    "low_count": 0,
+    "open_count": 0,
+    "fixed_count": 0,
+    "deferred_count": 0,
+    "accepted_risk_count": 0,
+    "not_a_defect_count": 0
+  },
+  "evidence": {
+    "feedback_window_scope_note": "<value-safe-feedback-window-scope-record>",
+    "issue_inventory_note": "<value-safe-issue-inventory-record>",
+    "blocker_disposition_note": "<value-safe-blocker-disposition-record>",
+    "accessibility_impact_note": "<value-safe-accessibility-impact-record>",
+    "privacy_impact_note": "<value-safe-privacy-impact-record>",
+    "security_impact_note": "<value-safe-security-impact-record>",
+    "defect_disposition_note": "<value-safe-defect-disposition-record>",
+    "retest_note": "<value-safe-retest-record>",
+    "migration_disposition_note": "<value-safe-migration-disposition-record>",
+    "known_limitations_acknowledgement": "<value-safe-known-limitations-record>",
+    "triage_owner": "<private-owner-record>",
+    "next_review_note": "<value-safe-next-review-record>"
+  }
+}

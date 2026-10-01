@@ -69,6 +69,16 @@
       "evidence": "<value-safe-qualification-status-contract-record>"
     },
     {
+      "path": "deploy/gcp/templates/staff-feedback-triage.example.json",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-staff-feedback-triage-template-record>"
+    },
+    {
+      "path": "scripts/validate_staff_feedback_triage.py",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-staff-feedback-triage-validator-record>"
+    },
+    {
       "path": "deploy/gcp/templates/staff-feedback-package-index.example.json",
       "status": "<reviewed-or-blocked>",
       "evidence": "<value-safe-staff-feedback-package-index-template-record>"
@@ -82,6 +92,7 @@
   "validator_commands": {
     "staff_feedback_readiness": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_staff_feedback_readiness.py <operator-held-staff-feedback-readiness.json>",
     "client_transition_planning": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_transition_planning.py <operator-held-client-transition-planning.json>",
+    "staff_feedback_triage": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_staff_feedback_triage.py <operator-held-staff-feedback-triage.json>",
     "staff_feedback_package_index": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_staff_feedback_package_index.py <operator-held-staff-feedback-package-index.json>"
   },
   "activation_boundary": {

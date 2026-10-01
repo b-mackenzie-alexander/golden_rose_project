@@ -45,6 +45,8 @@ REQUIRED_SOURCE_ARTIFACTS = (
     "deploy/gcp/qualification-status-contract.md",
     "deploy/gcp/templates/staff-feedback-activation-approval.example.json",
     "scripts/validate_staff_feedback_activation_approval.py",
+    "deploy/gcp/templates/staff-feedback-activation-receipt.example.json",
+    "scripts/validate_staff_feedback_activation_receipt.py",
     "deploy/gcp/templates/staff-feedback-triage.example.json",
     "scripts/validate_staff_feedback_triage.py",
     "deploy/gcp/templates/staff-feedback-package-index.example.json",
@@ -70,6 +72,11 @@ REQUIRED_VALIDATOR_COMMANDS = {
         "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
         "scripts/validate_staff_feedback_activation_approval.py "
         "<operator-held-staff-feedback-activation-approval.json>"
+    ),
+    "staff_feedback_activation_receipt": (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_staff_feedback_activation_receipt.py "
+        "<operator-held-staff-feedback-activation-receipt.json>"
     ),
     "staff_feedback_package_index": EXPECTED_VALIDATOR_COMMAND,
 }

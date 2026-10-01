@@ -43,6 +43,14 @@ cover:
 - repository stewardship and business-account decision tracking
 - rollback, closeout or access-removal posture
 
+For deeper planning on eventual data disposition, client-owned management,
+business account decisions and repository stewardship, use
+`deploy/gcp/client-transition-planning-runbook.md` and validate the
+operator-held planning record with
+`scripts/validate_client_transition_planning.py`. That planning evidence is
+still not export/import execution, account creation, repository transfer,
+production deployment or live-data admission.
+
 Validate the filled operator-held JSON locally:
 
 ```bash

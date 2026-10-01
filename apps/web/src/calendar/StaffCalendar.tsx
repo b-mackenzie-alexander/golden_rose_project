@@ -1,6 +1,7 @@
 import { type SyntheticEvent, useEffect, useMemo, useState } from 'react';
 
 import { getOperationsProjection, type OperationsCalendarSummary, type OperationsProjectionFailureKind, type OperationsShiftItem } from '../api/operationsProjectionClient';
+import { getStaticOperationalFallbackPolicy, staticOperationalFallbackNotice, staticOperationalFallbacksAllowed, type StaticOperationalFallbackPolicy } from '../api/runtimeEnvironmentClient';
 import { IconSymbol } from '../dashboard/artwork';
 import type { IconName } from '../dashboard/artwork';
 import { useLanguage } from '../i18n/LanguageProvider';
@@ -332,8 +333,9 @@ function isProjectionFailure(status: ProjectionStatus) {
   return status !== 'loading' && status !== 'ready';
 }
 
-function projectionNotice(status: ProjectionStatus, language: 'en' | 'es') {
+function projectionNotice(status: ProjectionStatus, language: 'en' | 'es', fallbackPolicy: StaticOperationalFallbackPolicy) {
   if (!isProjectionFailure(status)) return null;
+  const fallbackNotice = staticOperationalFallbackNotice(fallbackPolicy, language);
   const reason = {
     forbidden: {
       en: 'this account is not authorized to read projected shifts',
@@ -352,9 +354,16 @@ function projectionNotice(status: ProjectionStatus, language: 'en' | 'es') {
       es: 'la respuesta de turnos proyectados fue inesperada',
     },
   }[status][language];
+  const suffix = fallbackNotice === null
+    ? language === 'es'
+      ? 'Los eventos personales siguen separados; se muestran eventos de respaldo cuando la proyeccion no esta disponible.'
+      : 'Personal events remain separate; fallback events are shown while the projection is unavailable.'
+    : language === 'es'
+      ? `Los eventos personales siguen separados. ${fallbackNotice}`
+      : `Personal events remain separate. ${fallbackNotice}`;
   return language === 'es'
-    ? `El calendario no pudo leer turnos de solicitudes porque ${reason}. Los eventos personales siguen separados; se muestran eventos de respaldo cuando la proyeccion no esta disponible.`
-    : `The calendar could not read request-derived shifts because ${reason}. Personal events remain separate; fallback events are shown while the projection is unavailable.`;
+    ? `El calendario no pudo leer turnos de solicitudes porque ${reason}. ${suffix}`
+    : `The calendar could not read request-derived shifts because ${reason}. ${suffix}`;
 }
 
 export function StaffCalendar() {
@@ -365,6 +374,7 @@ export function StaffCalendar() {
   const [shiftEvents, setShiftEvents] = useState<OperationsShiftItem[]>([]);
   const [calendarSummary, setCalendarSummary] = useState<OperationsCalendarSummary | null>(null);
   const [projectionStatus, setProjectionStatus] = useState<ProjectionStatus>('loading');
+  const [staticFallbackPolicy, setStaticFallbackPolicy] = useState<StaticOperationalFallbackPolicy>('loading');
   const [form, setForm] = useState<CalendarFormState>(defaultForm);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
@@ -374,18 +384,23 @@ export function StaffCalendar() {
   }
   useEffect(() => {
     let cancelled = false;
-    void getOperationsProjection()
-      .then((result) => {
+    void Promise.all([
+      getOperationsProjection().catch(() => ({ ok: false as const, failure: { kind: 'unavailable' as const } })),
+      getStaticOperationalFallbackPolicy().catch(() => 'deny' as const),
+    ])
+      .then(([result, fallbackPolicy]) => {
         if (cancelled) return;
         setShiftEvents(result.ok ? result.value.shiftItems : []);
         setCalendarSummary(result.ok ? result.value.calendarSummary : null);
         setProjectionStatus(result.ok ? 'ready' : result.failure.kind);
+        setStaticFallbackPolicy(fallbackPolicy);
       })
       .catch(() => {
         if (cancelled) return;
         setShiftEvents([]);
         setCalendarSummary(null);
         setProjectionStatus('unavailable');
+        setStaticFallbackPolicy('deny');
       });
     return () => {
       cancelled = true;
@@ -398,12 +413,15 @@ export function StaffCalendar() {
         ? shiftEvents
             .map((event) => toShiftEvent(event, language))
             .filter((event): event is CalendarEvent => event !== null)
-        : projectionStatus === 'ready' ? [] : copy.events),
+        : projectionStatus === 'ready' || !staticOperationalFallbacksAllowed(staticFallbackPolicy) ? [] : copy.events),
       ...manualEvents.map((event) => toCalendarEvent(event, language)),
     ].sort((left, right) => left.sortMinutes - right.sortMinutes || left.title.localeCompare(right.title)),
-    [copy.events, language, manualEvents, projectionStatus, shiftEvents],
+    [copy.events, language, manualEvents, projectionStatus, shiftEvents, staticFallbackPolicy],
   );
-  const operationsNotice = useMemo(() => projectionNotice(projectionStatus, language), [language, projectionStatus]);
+  const operationsNotice = useMemo(
+    () => projectionNotice(projectionStatus, language, staticFallbackPolicy),
+    [language, projectionStatus, staticFallbackPolicy],
+  );
   const selectedEvents = useMemo(
     () => events.filter((event) => event.dayId === selectedDay.id),
     [events, selectedDay.id],

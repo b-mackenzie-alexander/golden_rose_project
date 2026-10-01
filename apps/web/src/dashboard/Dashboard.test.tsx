@@ -6,12 +6,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as intakeApi from '../api/intakeClient';
 import type { IntakeKind, IntakeSummary } from '../api/intakeContracts';
 import * as operationsApi from '../api/operationsProjectionClient';
+import * as runtimeApi from '../api/runtimeEnvironmentClient';
 import { AppRoutes } from '../app/App';
 import { LanguageProvider } from '../i18n/LanguageProvider';
 import { runAxe } from '../test/axe';
 
 vi.mock('../api/intakeClient');
 vi.mock('../api/operationsProjectionClient');
+vi.mock('../api/runtimeEnvironmentClient', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/runtimeEnvironmentClient')>();
+  return { ...actual, getStaticOperationalFallbackPolicy: vi.fn() };
+});
 
 const summary = (
   kind: IntakeKind,
@@ -140,6 +145,7 @@ describe('Dashboard', () => {
         ...projectionExtras,
       },
     });
+    vi.mocked(runtimeApi.getStaticOperationalFallbackPolicy).mockResolvedValue('allow');
   });
 
   it('renders the staff workspace dashboard from the home route', async () => {
@@ -285,6 +291,28 @@ describe('Dashboard', () => {
     });
     expect(screen.getByRole('status')).toHaveTextContent('projection service is unavailable');
     expect(screen.getByText('Review new drafts')).toBeInTheDocument();
+  });
+
+  it('removes static dashboard fallbacks in production mode when reads fail', async () => {
+    vi.mocked(intakeApi.queryIntakes).mockRejectedValue(new TypeError('offline'));
+    vi.mocked(operationsApi.getOperationsProjection).mockRejectedValue(new TypeError('offline'));
+    vi.mocked(runtimeApi.getStaticOperationalFallbackPolicy).mockResolvedValue('deny');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    expect(await screen.findByText('No request, shift, or intake work is waiting in the projection.')).toBeInTheDocument();
+    expect(screen.getByText('No projected shifts are scheduled for this view.')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('static examples are disabled');
+    expect(screen.getByText('No recent activity read is available.')).toBeInTheDocument();
+    expect(screen.queryByText('Ana Quispe')).not.toBeInTheDocument();
+    expect(screen.queryByText('Review new drafts')).not.toBeInTheDocument();
+    expect(screen.queryByText('Team check-in')).not.toBeInTheDocument();
   });
 
   it('renders empty operational projection states without fallback queue or schedule rows', async () => {
@@ -502,5 +530,42 @@ describe('Dashboard', () => {
     expect(await screen.findByText('Requests in projection')).toBeInTheDocument();
     expect(screen.getByText('2 pending review')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Export requires report permission' })).toBeDisabled();
+  });
+
+  it('removes static map and report metrics in production mode when projection reads fail', async () => {
+    vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue({
+      ok: false,
+      failure: { kind: 'unavailable' },
+    });
+    vi.mocked(runtimeApi.getStaticOperationalFallbackPolicy).mockResolvedValue('deny');
+
+    const view = render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/staff/map']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    expect(await screen.findByRole('status')).toHaveTextContent('static examples are disabled');
+    const total = screen.getByText('Projected worker slots').closest('p');
+    expect(total).toHaveTextContent('0 Projected worker slots');
+    expect(view.container.querySelector('.zone-map-artwork')?.textContent).toContain('Brooklyn0');
+    expect(view.container.querySelector('.zone-map-artwork')?.textContent).toContain('Manhattan0');
+
+    view.unmount();
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/staff/reports']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    expect(await screen.findByRole('status')).toHaveTextContent('static examples are disabled');
+    expect(screen.getByText('Requests in projection')).toBeInTheDocument();
+    expect(screen.getAllByText('Projection unavailable').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Worker drafts reviewed')).not.toBeInTheDocument();
+    expect(screen.queryByText('Employer follow-ups')).not.toBeInTheDocument();
   });
 });

@@ -6,6 +6,7 @@ import type { IconName } from './artwork';
 import { queryIntakes } from '../api/intakeClient';
 import type { IntakeKind, IntakeSummary } from '../api/intakeContracts';
 import { getOperationsProjection, type OperationsProjection, type OperationsProjectionFailureKind, type OperationsRequestItem, type OperationsShiftItem } from '../api/operationsProjectionClient';
+import { getStaticOperationalFallbackPolicy, staticOperationalFallbackNotice, staticOperationalFallbacksAllowed, type StaticOperationalFallbackPolicy } from '../api/runtimeEnvironmentClient';
 import { useLanguage } from '../i18n/LanguageProvider';
 
 type DashboardStatus = 'complete' | 'draft' | 'in_review' | 'incomplete' | 'pending';
@@ -15,6 +16,7 @@ type DashboardIntakes = {
   loaded: boolean;
   operations: OperationsProjection | null;
   operationsStatus: ProjectionStatus;
+  staticFallbackPolicy: StaticOperationalFallbackPolicy;
   workers: IntakeSummary[];
 };
 
@@ -22,6 +24,7 @@ type DashboardCopy = {
   activityHeading: string;
   activityLink: string;
   activityRows: Array<{ icon: IconName; meta: string; title: string }>;
+  emptyActivity: string;
   emptyQueue: string;
   emptySchedule: string;
   greeting: string;
@@ -53,6 +56,7 @@ const englishDashboard: DashboardCopy = {
     { icon: 'document', meta: '3 hours ago - Mariela Torres', title: 'Preview worker draft created' },
     { icon: 'building', meta: '5 hours ago - Sofia Diaz', title: 'Clean Homes LLC added' },
   ],
+  emptyActivity: 'No recent activity read is available.',
   emptyQueue: 'No request, shift, or intake work is waiting in the projection.',
   emptySchedule: 'No projected shifts are scheduled for this view.',
   greeting: 'Good morning, Mariela',
@@ -117,6 +121,7 @@ const spanishDashboard: DashboardCopy = {
     { icon: 'document', meta: 'hace 3 horas - Mariela Torres', title: 'Nuevo borrador de trabajador creado' },
     { icon: 'building', meta: 'hace 5 horas - Sofia Diaz', title: 'Se agrego Clean Homes LLC' },
   ],
+  emptyActivity: 'No hay lectura de actividad reciente disponible.',
   emptyQueue: 'No hay solicitudes, turnos ni registros pendientes en la proyeccion.',
   emptySchedule: 'No hay turnos proyectados para esta vista.',
   greeting: 'Buenos días, Mariela',
@@ -249,8 +254,9 @@ function isProjectionFailure(status: ProjectionStatus) {
   return status !== 'loading' && status !== 'ready';
 }
 
-function projectionNotice(status: ProjectionStatus, language: 'en' | 'es') {
+function projectionNotice(status: ProjectionStatus, language: 'en' | 'es', fallbackPolicy: StaticOperationalFallbackPolicy) {
   if (!isProjectionFailure(status)) return null;
+  const fallbackNotice = staticOperationalFallbackNotice(fallbackPolicy, language);
   const reason = {
     forbidden: {
       en: 'this account is not authorized to read the projection',
@@ -269,9 +275,14 @@ function projectionNotice(status: ProjectionStatus, language: 'en' | 'es') {
       es: 'la respuesta de la proyeccion fue inesperada',
     },
   }[status][language];
+  const suffix = fallbackNotice === null
+    ? language === 'es'
+      ? 'Se muestran registros guardados y datos de respaldo cuando no hay una lectura autoritativa.'
+      : 'Saved intakes and fallback data are shown where an authoritative read is unavailable.'
+    : fallbackNotice;
   return language === 'es'
-    ? `No se pudieron leer las solicitudes y turnos porque ${reason}. Se muestran registros guardados y datos de respaldo cuando no hay una lectura autoritativa.`
-    : `Requests and shifts could not be read because ${reason}. Saved intakes and fallback data are shown where an authoritative read is unavailable.`;
+    ? `No se pudieron leer las solicitudes y turnos porque ${reason}. ${suffix}`
+    : `Requests and shifts could not be read because ${reason}. ${suffix}`;
 }
 
 function recentRows(
@@ -279,8 +290,9 @@ function recentRows(
   items: IntakeSummary[],
   language: 'en' | 'es',
   fallback: DashboardCopy['recentRows'],
+  allowStaticFallbacks: boolean,
 ): DashboardCopy['recentRows'] {
-  if (items.length === 0) return fallback;
+  if (items.length === 0) return allowStaticFallbacks ? fallback : [];
   return [...items]
     .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))
     .slice(0, 3)
@@ -293,7 +305,8 @@ function recentRows(
 }
 
 function dynamicKpis(copy: DashboardCopy, data: DashboardIntakes, language: 'en' | 'es'): DashboardCopy['kpis'] {
-  if (!data.loaded) return copy.kpis;
+  const allowStaticFallbacks = staticOperationalFallbacksAllowed(data.staticFallbackPolicy);
+  if (!data.loaded && allowStaticFallbacks) return copy.kpis;
   const workerReviewCount = data.workers.filter((item) => item.review_status !== 'current').length;
   const employerReviewCount = data.employers.filter((item) => item.review_status !== 'current').length;
   const incompleteCount = [...data.workers, ...data.employers].filter((item) => item.complete === false).length;
@@ -394,12 +407,13 @@ function rowFromIntake(
 }
 
 function dynamicQueueRows(copy: DashboardCopy, data: DashboardIntakes, language: 'en' | 'es'): DashboardCopy['queueRows'] {
-  if (!data.loaded) return copy.queueRows;
+  const allowStaticFallbacks = staticOperationalFallbacksAllowed(data.staticFallbackPolicy);
+  if (!data.loaded) return allowStaticFallbacks ? copy.queueRows : [];
   if (
     data.workers.length === 0 &&
     data.employers.length === 0 &&
     (!data.operations || (data.operations.requestItems.length === 0 && data.operations.shiftItems.length === 0))
-  ) return isProjectionFailure(data.operationsStatus) ? copy.queueRows : [];
+  ) return isProjectionFailure(data.operationsStatus) && allowStaticFallbacks ? copy.queueRows : [];
   const rows = [...copy.queueRows];
   const operationRows = [
     ...(data.operations?.shiftItems.map((item, index) => {
@@ -436,7 +450,8 @@ function dynamicQueueRows(copy: DashboardCopy, data: DashboardIntakes, language:
 
 function dynamicScheduleRows(copy: DashboardCopy, data: DashboardIntakes, language: 'en' | 'es'): DashboardCopy['scheduleRows'] {
   const shifts = data.operations?.shiftItems ?? [];
-  if (!data.loaded || isProjectionFailure(data.operationsStatus)) return copy.scheduleRows;
+  const allowStaticFallbacks = staticOperationalFallbacksAllowed(data.staticFallbackPolicy);
+  if (!data.loaded || isProjectionFailure(data.operationsStatus)) return allowStaticFallbacks ? copy.scheduleRows : [];
   if (!shifts.length) return [];
   return shifts.slice(0, 5).map((item) => {
     const starts = new Date(item.startsAt);
@@ -464,7 +479,12 @@ function zoneIntensity(value: number, maximum: number): DashboardCopy['zoneAreas
 }
 
 function dynamicZoneAreas(copy: DashboardCopy, data: DashboardIntakes): DashboardCopy['zoneAreas'] {
-  if (!data.loaded || data.operations === null || isProjectionFailure(data.operationsStatus)) return copy.zoneAreas;
+  const allowStaticFallbacks = staticOperationalFallbacksAllowed(data.staticFallbackPolicy);
+  if (!data.loaded || data.operations === null || isProjectionFailure(data.operationsStatus)) {
+    return allowStaticFallbacks
+      ? copy.zoneAreas
+      : copy.zoneAreas.map((area) => ({ ...area, count: 0, intensity: 'low' as const }));
+  }
   const maximum = Math.max(...data.operations.areaSummary.map((area) => area.workerSlots), 0);
   return data.operations.areaSummary.map((area) => ({
     count: area.workerSlots,
@@ -476,7 +496,9 @@ function dynamicZoneAreas(copy: DashboardCopy, data: DashboardIntakes): Dashboar
 
 function dynamicZonesMetric(copy: DashboardCopy, data: DashboardIntakes, language: 'en' | 'es') {
   if (!data.loaded || data.operations === null || isProjectionFailure(data.operationsStatus)) {
-    return { meta: copy.zonesMeta, value: copy.zonesMetric };
+    return staticOperationalFallbacksAllowed(data.staticFallbackPolicy)
+      ? { meta: copy.zonesMeta, value: copy.zonesMetric }
+      : { meta: language === 'es' ? 'Cupos de trabajadores proyectados' : 'Projected worker slots', value: '0' };
   }
   return {
     meta: language === 'es' ? 'Cupos de trabajadores proyectados' : 'Projected worker slots',
@@ -500,6 +522,7 @@ export function Dashboard() {
     loaded: false,
     operations: null,
     operationsStatus: 'loading',
+    staticFallbackPolicy: 'loading',
     workers: [],
   });
 
@@ -509,8 +532,9 @@ export function Dashboard() {
       queryIntakes('worker', { page_size: 50 }).catch(() => ({ ok: false as const, failure: 'failed' as const })),
       queryIntakes('employer', { page_size: 50 }).catch(() => ({ ok: false as const, failure: 'failed' as const })),
       getOperationsProjection().catch(() => ({ ok: false as const, failure: { kind: 'unavailable' as const } })),
+      getStaticOperationalFallbackPolicy().catch(() => 'deny' as const),
     ])
-      .then(([workerResult, employerResult, operationsResult]) => {
+      .then(([workerResult, employerResult, operationsResult, fallbackPolicy]) => {
         if (cancelled) return;
         setIntakes({
           workers: workerResult.ok ? workerResult.value.items : [],
@@ -518,10 +542,11 @@ export function Dashboard() {
           loaded: true,
           operations: operationsResult.ok ? operationsResult.value : null,
           operationsStatus: operationsResult.ok ? 'ready' : operationsResult.failure.kind,
+          staticFallbackPolicy: fallbackPolicy,
         });
       })
       .catch(() => {
-        if (!cancelled) setIntakes({ employers: [], loaded: true, operations: null, operationsStatus: 'unavailable', workers: [] });
+        if (!cancelled) setIntakes({ employers: [], loaded: true, operations: null, operationsStatus: 'unavailable', staticFallbackPolicy: 'deny', workers: [] });
       });
     return () => {
       cancelled = true;
@@ -533,10 +558,11 @@ export function Dashboard() {
   const scheduleRows = useMemo(() => dynamicScheduleRows(copy, intakes, language), [copy, intakes, language]);
   const zoneAreas = useMemo(() => dynamicZoneAreas(copy, intakes), [copy, intakes]);
   const zonesMetric = useMemo(() => dynamicZonesMetric(copy, intakes, language), [copy, intakes, language]);
-  const operationsNotice = useMemo(() => projectionNotice(intakes.operationsStatus, language), [intakes.operationsStatus, language]);
+  const operationsNotice = useMemo(() => projectionNotice(intakes.operationsStatus, language, intakes.staticFallbackPolicy), [intakes.operationsStatus, intakes.staticFallbackPolicy, language]);
+  const allowStaticFallbacks = staticOperationalFallbacksAllowed(intakes.staticFallbackPolicy);
   const workerRows = useMemo(
-    () => recentRows('worker', intakes.workers, language, copy.recentRows),
-    [copy.recentRows, intakes.workers, language],
+    () => recentRows('worker', intakes.workers, language, copy.recentRows, allowStaticFallbacks),
+    [allowStaticFallbacks, copy.recentRows, intakes.workers, language],
   );
   const employerRows = useMemo(
     () => recentRows(
@@ -548,9 +574,11 @@ export function Dashboard() {
         { href: '/staff/intakes/employers', meta: language === 'es' ? 'hace 1 dia' : '1 day ago', name: 'Family First LLC', status: 'incomplete' },
         { href: '/staff/intakes/employers', meta: language === 'es' ? 'hace 2 dias' : '2 days ago', name: 'Caring Hands', status: 'complete' },
       ],
+      allowStaticFallbacks,
     ),
-    [intakes.employers, language],
+    [allowStaticFallbacks, intakes.employers, language],
   );
+  const activityRows = allowStaticFallbacks ? copy.activityRows : [];
 
   return (
     <section aria-labelledby="dashboard-heading" className="dashboard-page">
@@ -685,7 +713,7 @@ export function Dashboard() {
             <Link className="dashboard-text-link focus-ring" to="/staff/queues">{copy.activityLink}</Link>
           </div>
           <ol className="activity-list">
-            {copy.activityRows.map((row) => (
+            {activityRows.map((row) => (
               <li key={row.title}>
                 <IconMark name={row.icon} />
                 <div>
@@ -695,6 +723,7 @@ export function Dashboard() {
               </li>
             ))}
           </ol>
+          {activityRows.length === 0 ? <p className="dashboard-empty-state">{copy.emptyActivity}</p> : null}
         </section>
       </div>
     </section>

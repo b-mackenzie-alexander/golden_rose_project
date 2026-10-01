@@ -1,5 +1,17 @@
 # Current Work — Golden Rose Operations Platform
 
+## 2026-10-01 — Production fallback boundaries active
+
+- **Staffing:** One independent developer; focused frontend tests, static checks and later PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #140, `feat: add operations queue aging`, merged into protected `develop` at `32697acb0b2ed5fefd4b3f63931dbacdfe002ae3`. Local `develop` was fetched/pruned and fast-forwarded to that exact `origin/develop` tip; stale local `feat/operations-queue-aging` was deleted after exact tree comparison against `origin/develop`; no extra linked worktree remained. Fresh source work is active on `feat/production-fallback-boundaries`. This slice continues Tranche 3 by adding a typed frontend runtime policy over the existing no-store staff identity readiness endpoint so production-mode dashboard, queue, calendar, map and report surfaces show saved records and authoritative projections only, while local/test/develop may continue to use clearly noticed static examples when projections are unavailable.
+- **Gate budget:** Source/frontend/backend-client/local-validation work only. No cloud inspection or mutation, Terraform plan/apply, production deployment, live/client data, live identity-provider activation, provider-side reset/revocation mechanics, credential rotation, default permission activation, persistent synthetic write qualification, cloud migration or shared-runtime rollout occurs in this branch.
+- **Next executable action:** Complete full frontend verification and publication hygiene for this production-fallback-boundary slice, including full `npm --prefix apps/web run verify`, whitespace and redacted secret scans plus outgoing-range checks before PR publication. Later Tranche 3 work still needs manual accessibility, fluent-Spanish and staff-workflow acceptance; those are human acceptance gates and are not claimed by this source branch.
+- **Do not regress:** Human staff decision boundaries; no automated matching/ranking/eligibility/referral/placement; no static demo operational examples in production mode; no active demand, coverage, referral, assignment or placement implication from request/shift queue records; personal browser-local calendar notes remain separate from request-derived operational coverage; private fictional-synthetic boundaries until live-data gates open; immutable intake history and exact retries; restricted-field permissions; bilingual/accessibility parity; separate public/staff identity planes; auth-sensitive no-store handling; deployable package guardrails for the client's later GCP environment.
+
+**Validation to date:** Focused frontend runtime-policy, dashboard, work-queue, staff-calendar and app-route tests passed 36 tests with existing jsdom canvas notices. `npm --prefix apps/web run typecheck`, `npm --prefix apps/web run lint`, and `npm --prefix apps/web run build` passed. Full `npm --prefix apps/web run verify` passed lock validation, lock tests, lint, typecheck, 486 frontend tests with coverage gates, and production build. The build retains the existing Vite large-chunk warning.
+
+**Planning artifact:** [Production-readiness and staff identity plan](docs/planning/2026-09-27-production-readiness-plan.md).
+
 ## 2026-09-30 — Operations queue aging active
 
 - **Staffing:** One independent developer; focused backend/frontend tests, static checks and later PR gates provide quality evidence, not independent-human authorization.

@@ -1,5 +1,17 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-10-01 — Staff feedback activation approval validator active
+
+- **Staffing:** One independent developer; focused static validators, unit tests and later PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #152, `feat: add staff feedback triage validator`, merged into protected `develop` at `e0c72fe6ae8ede55fc834a58b10e28db9194c76e`. Local `develop` was fetched/pruned and fast-forwarded to that exact `origin/develop` tip; stale local `feat/staff-feedback-triage-validator` was deleted after exact tree comparison against `origin/develop`; no extra linked worktree remained. Fresh work is active on `feat/staff-feedback-activation-approval-validator`. This slice extends the staff-feedback deployment/use packet with a placeholder-only activation approval template and offline validator for later operator-held approval evidence, then updates the staff-feedback package index so this approval record is reviewed alongside readiness, transition planning and triage materials.
+- **Gate budget:** Source/documentation/local-static-validation work only. No cloud inspection or mutation, Terraform plan/apply, production deployment, live/client data admission, runtime access change, live identity-provider activation, provider-side reset/revocation execution, credential rotation, support-channel activation, business account creation, repository transfer, data export/import execution, current-environment data migration, client-owned environment transition, destructive cleanup, persistent synthetic write qualification, default permission activation, cloud migration or shared-runtime rollout occurs in this branch.
+- **Next executable action:** Finish local static/type validation and PR publication hygiene for this staff-feedback-activation-approval slice. Then reassess whether source guardrails are sufficient for a separately approved staff-feedback deployment/use packet.
+- **Do not regress:** Human staff decision boundaries; no automated matching/ranking/eligibility/referral/placement; no static demo operational examples in production mode; no active demand, coverage, referral, assignment or placement implication from request/shift records; personal browser-local calendar notes remain separate from request-derived operational coverage; private fictional-synthetic boundaries until live-data gates open; immutable intake history and exact retries; restricted-field permissions; bilingual/accessibility parity; separate public/staff identity planes; auth-sensitive no-store handling; deployable package guardrails for the client's later GCP environment; activation approval evidence must not become cloud execution, runtime access mutation, staff-use activation, support activation, production activation, live-data admission, export/import execution, current-environment migration, business repository transfer, GitHub account creation or shared-runtime rollout.
+
+**Validation to date:** Focused staff feedback activation approval, package index, triage, readiness and client transition planning validator tests passed 73 tests. Focused Ruff format/check passed for the touched validators and tests.
+
+**Planning artifact:** [Production-readiness and staff identity plan](docs/planning/2026-09-27-production-readiness-plan.md).
+
 ## 2026-10-01 — Staff feedback triage validator active
 
 - **Staffing:** One independent developer; focused static validators, unit tests and later PR gates provide quality evidence, not independent-human authorization.

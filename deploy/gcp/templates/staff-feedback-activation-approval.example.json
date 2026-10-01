@@ -1,0 +1,69 @@
+{
+  "purpose": "Placeholder-only staff feedback activation approval evidence template. Do not commit real values.",
+  "evidence_type": "staff-feedback-activation-approval-not-execution",
+  "validator_command": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_staff_feedback_activation_approval.py <operator-held-staff-feedback-activation-approval.json>",
+  "authority_boundary": {
+    "cloud_execution": "separate-approval-required",
+    "runtime_access_change": "separate-approval-required",
+    "production_deployment": "separate-approval-required",
+    "live_data_admission": "separate-approval-required",
+    "credential_rotation": "separate-approval-required",
+    "support_channel_activation": "separate-approval-required",
+    "current_environment_data_migration": "separate-approval-required",
+    "client_owned_environment_transition": "separate-approval-required",
+    "github_account_creation": "separate-approval-required",
+    "business_repository_transfer": "separate-approval-required",
+    "data_export_execution": "separate-approval-required",
+    "data_import_execution": "separate-approval-required",
+    "destructive_cleanup": "separate-approval-required"
+  },
+  "source": {
+    "source_commit": "<40-hex-source-commit>",
+    "migration_revision": "<alembic-revision>"
+  },
+  "prerequisites": {
+    "staff_feedback_readiness_status": "<ready-or-blocked>",
+    "staff_feedback_package_index_status": "<ready-or-blocked>",
+    "staff_feedback_triage_process_status": "<ready-or-blocked>",
+    "training_known_limitations_status": "<ready-or-blocked>",
+    "staff_access_scope_status": "<ready-or-blocked>",
+    "data_entry_scope_status": "<ready-or-blocked>",
+    "support_escalation_status": "<ready-or-blocked>",
+    "rollback_closeout_status": "<ready-or-blocked>",
+    "migration_disposition_status": "<ready-or-blocked>"
+  },
+  "approval_decision": {
+    "decision_status": "<approved-for-bounded-staff-feedback-or-blocked>",
+    "scope_limit": "<current-environment-feedback-only>",
+    "activation_execution": "<not-executed-by-this-record>",
+    "live_data_boundary": "<not-admitted-without-separate-approval>",
+    "support_boundary": "<not-activated-without-separate-approval>"
+  },
+  "activation_boundary": {
+    "staff_feedback_window": "not-activated-by-this-record",
+    "runtime_access_change": "not-executed-without-separate-approval",
+    "production_deployment": "not-executed-without-separate-approval",
+    "live_data_admission": "not-admitted-without-separate-approval",
+    "support_channel_activation": "not-activated-without-separate-approval",
+    "current_environment_data_migration": "not-executed-without-separate-approval",
+    "client_owned_environment_transition": "not-executed-without-separate-approval",
+    "data_export_execution": "not-executed-without-separate-approval",
+    "data_import_execution": "not-executed-without-separate-approval",
+    "github_account_creation": "not-executed-without-separate-approval",
+    "business_repository_transfer": "not-executed-without-separate-approval",
+    "shared_runtime_rollout": "not-executed-without-separate-approval"
+  },
+  "evidence": {
+    "readiness_review_receipt": "<value-safe-readiness-review-record>",
+    "package_index_receipt": "<value-safe-package-index-record>",
+    "triage_process_receipt": "<value-safe-triage-process-record>",
+    "training_known_limitations_receipt": "<value-safe-training-limitations-record>",
+    "staff_access_scope_note": "<value-safe-staff-access-scope-record>",
+    "data_entry_scope_note": "<value-safe-data-entry-scope-record>",
+    "support_escalation_note": "<value-safe-support-escalation-record>",
+    "rollback_closeout_note": "<value-safe-rollback-closeout-record>",
+    "migration_disposition_note": "<value-safe-migration-disposition-record>",
+    "approval_owner": "<private-owner-record>",
+    "next_review_note": "<value-safe-next-review-record>"
+  }
+}

@@ -56,6 +56,20 @@ The triage record is not client acceptance, product completion, production
 qualification, support activation, live-data admission or authority to migrate
 current-environment records.
 
+Before any bounded feedback window is activated, use
+`deploy/gcp/templates/staff-feedback-activation-approval.example.json` to record
+the value-safe approval decision and unresolved execution boundaries. Validate
+that operator-held approval record locally:
+
+```bash
+UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_staff_feedback_activation_approval.py <operator-held-staff-feedback-activation-approval.json>
+```
+
+The approval record is still not cloud execution, runtime access mutation,
+support activation, live-data admission, production deployment, export/import
+execution, current-environment migration, account creation, repository transfer
+or shared-runtime rollout.
+
 For deeper planning on eventual data disposition, client-owned management,
 business account decisions and repository stewardship, use
 `deploy/gcp/client-transition-planning-runbook.md` and validate the
@@ -72,9 +86,9 @@ UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_st
 
 If the feedback window is being assembled as an operator packet, use
 `deploy/gcp/templates/staff-feedback-package-index.example.json` to record the
-value-safe review of the staff-feedback readiness materials, feedback triage
-materials, transition-planning materials and human-feedback templates. Validate
-that operator-held package
+value-safe review of the staff-feedback readiness materials, activation-approval
+materials, feedback triage materials, transition-planning materials and
+human-feedback templates. Validate that operator-held package
 index locally:
 
 ```bash

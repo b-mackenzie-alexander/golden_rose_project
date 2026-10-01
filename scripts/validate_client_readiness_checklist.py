@@ -31,6 +31,7 @@ READY_SECTIONS = (
     "handoff_evidence",
     "backup_restore_rehearsal",
     "operations_readiness",
+    "runtime_lifecycle_review",
     "operations_owners",
 )
 MANUAL_ACCEPTANCE_KEYS = (

@@ -1,0 +1,34 @@
+{
+  "purpose": "Placeholder-only runtime lifecycle evidence template. Do not commit real values.",
+  "evidence_type": "client-production-runtime-lifecycle-review-not-activation",
+  "validator_command": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_runtime_lifecycle_evidence.py <operator-held-runtime-lifecycle.json>",
+  "authority_boundary": {
+    "cloud_execution": "separate-approval-required",
+    "production_deployment": "separate-approval-required",
+    "live_data_admission": "separate-approval-required",
+    "dependency_update_execution": "separate-approval-required",
+    "shared_runtime_rollout": "separate-approval-required"
+  },
+  "source": {
+    "source_commit": "<40-hex-source-commit>",
+    "migration_revision": "<alembic-revision>"
+  },
+  "runtime_lifecycle": {
+    "github_actions_runtime_status": "<ready-or-blocked>",
+    "runner_image_status": "<ready-or-blocked>",
+    "node_runtime_status": "<ready-or-blocked>",
+    "python_runtime_status": "<ready-or-blocked>",
+    "dependency_audit_status": "<ready-or-blocked>",
+    "container_base_image_status": "<ready-or-blocked>"
+  },
+  "evidence": {
+    "github_actions_runtime_receipt": "<value-safe-github-actions-runtime-record>",
+    "runner_image_receipt": "<value-safe-runner-image-record>",
+    "node_runtime_receipt": "<value-safe-node-runtime-record>",
+    "python_runtime_receipt": "<value-safe-python-runtime-record>",
+    "dependency_audit_receipt": "<value-safe-dependency-audit-record>",
+    "container_base_image_receipt": "<value-safe-container-base-image-record>",
+    "runtime_review_owner": "<private-owner-record>",
+    "next_review_note": "<value-safe-next-review-record>"
+  }
+}

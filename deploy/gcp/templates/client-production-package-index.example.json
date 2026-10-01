@@ -61,6 +61,11 @@
       "evidence": "<value-safe-operations-readiness-template-record>"
     },
     {
+      "path": "deploy/gcp/templates/client-production-runtime-lifecycle.example.json",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-runtime-lifecycle-template-record>"
+    },
+    {
       "path": "scripts/validate_deployable_package.py",
       "status": "<reviewed-or-blocked>",
       "evidence": "<value-safe-package-validator-record>"
@@ -94,6 +99,11 @@
       "path": "scripts/validate_client_operations_readiness_evidence.py",
       "status": "<reviewed-or-blocked>",
       "evidence": "<value-safe-operations-readiness-validator-record>"
+    },
+    {
+      "path": "scripts/validate_client_runtime_lifecycle_evidence.py",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-runtime-lifecycle-validator-record>"
     }
   ],
   "validator_commands": {
@@ -103,7 +113,8 @@
     "readiness_checklist": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_readiness_checklist.py <operator-held-readiness.json>",
     "package_index": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_package_index.py <operator-held-package-index.json>",
     "backup_restore_evidence": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_backup_restore_evidence.py <operator-held-backup-restore.json>",
-    "operations_readiness_evidence": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_operations_readiness_evidence.py <operator-held-operations-readiness.json>"
+    "operations_readiness_evidence": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_operations_readiness_evidence.py <operator-held-operations-readiness.json>",
+    "runtime_lifecycle_evidence": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_runtime_lifecycle_evidence.py <operator-held-runtime-lifecycle.json>"
   },
   "manual_acceptance_boundary": {
     "accessibility_review": "<not-run-or-separate-record>",

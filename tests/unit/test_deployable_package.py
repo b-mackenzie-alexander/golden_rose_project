@@ -12,6 +12,7 @@ from scripts.validate_deployable_package import (
     POLICY_TEMPLATE_PATH,
     READINESS_CHECKLIST_PATH,
     RUNBOOK_PATH,
+    RUNTIME_LIFECYCLE_TEMPLATE_PATH,
     PackageValidationError,
     validate,
 )
@@ -30,6 +31,7 @@ def _copy_package(tmp_path: Path) -> Path:
         PACKAGE_INDEX_PATH,
         BACKUP_RESTORE_TEMPLATE_PATH,
         OPERATIONS_READINESS_TEMPLATE_PATH,
+        RUNTIME_LIFECYCLE_TEMPLATE_PATH,
     ):
         source = ROOT / relative_path
         destination = tmp_path / relative_path
@@ -51,6 +53,7 @@ def test_deployable_package_artifacts_are_placeholder_only_and_complete() -> Non
         str(PACKAGE_INDEX_PATH),
         str(BACKUP_RESTORE_TEMPLATE_PATH),
         str(OPERATIONS_READINESS_TEMPLATE_PATH),
+        str(RUNTIME_LIFECYCLE_TEMPLATE_PATH),
     ]
 
 
@@ -263,4 +266,21 @@ def test_deployable_package_rejects_operations_readiness_activation_claim(
     )
 
     with pytest.raises(PackageValidationError, match="incident_contact_activation"):
+        validate(root)
+
+
+def test_deployable_package_rejects_runtime_lifecycle_activation_claim(
+    tmp_path: Path,
+) -> None:
+    root = _copy_package(tmp_path)
+    lifecycle_path = root / RUNTIME_LIFECYCLE_TEMPLATE_PATH
+    lifecycle_path.write_text(
+        lifecycle_path.read_text(encoding="utf-8").replace(
+            '"dependency_update_execution": "separate-approval-required"',
+            '"dependency_update_execution": "executed"',
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PackageValidationError, match="dependency_update_execution"):
         validate(root)

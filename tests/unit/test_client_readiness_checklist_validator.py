@@ -19,6 +19,7 @@ READY_SECTIONS = (
     "backup_restore_rehearsal",
     "operations_readiness",
     "runtime_lifecycle_review",
+    "data_governance_review",
     "operations_owners",
 )
 
@@ -43,6 +44,7 @@ def _valid_checklist() -> dict[str, Any]:
             "backup_restore_rehearsal",
             "operations_readiness",
             "runtime_lifecycle_review",
+            "data_governance_review",
             "operations_owners",
             "manual_acceptance_boundary",
         ],
@@ -77,6 +79,10 @@ def _valid_checklist() -> dict[str, Any]:
         "runtime_lifecycle_review": {
             "status": "ready",
             "evidence": "runtime lifecycle evidence validator passed",
+        },
+        "data_governance_review": {
+            "status": "ready",
+            "evidence": "data governance evidence validator passed",
         },
         "operations_owners": {
             "status": "ready",

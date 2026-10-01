@@ -46,6 +46,11 @@ activate provider-side staff identity, or create shared runtime access.
   evidence. It is not a dependency update, not a runner or image rollout, not a
   production runtime change, and not approval to mutate CI or deployment
   resources.
+- `deploy/gcp/templates/client-production-data-governance.example.json` is a
+  placeholder-only template for later data classification, retention, deletion,
+  export, disclosure and restricted-history-recipient governance evidence. It
+  is not live-data admission, not a data export, not a disclosure approval, not
+  destructive deletion execution and not approval to mutate client records.
 - Real project IDs, billing IDs, principals, service URLs, database URLs,
   identity-provider URLs, JWKS URLs, secret names, passwords, tokens, state
   buckets, support contacts, and owner emails must remain in approved private
@@ -117,8 +122,8 @@ The readiness checklist validator requires the package artifacts, staff
 identity, Terraform plan review, artifact admission, handoff evidence,
 backup/restore rehearsal, operations readiness and operations-owner sections to
 be marked ready with value-safe evidence. It also requires runtime lifecycle
-review to be marked ready with value-safe evidence, manual accessibility, fluent
-Spanish and staff workflow acceptance to remain
+review and data governance review to be marked ready with value-safe evidence,
+manual accessibility, fluent Spanish and staff workflow acceptance to remain
 `separate-review-required`, and requires production deployment, live-data
 admission and shared-runtime rollout to remain not executed without separate
 approval.
@@ -184,6 +189,22 @@ review owner and next-review note. It does not authenticate to GCP, inspect
 resources, update dependencies, change CI runners, push container images,
 deploy production, roll out a shared runtime, admit live/client data, or prove
 provider-side recovery or session revocation.
+
+When a later approved production packet records value-safe data governance
+review evidence, keep the filled JSON outside source control and validate it
+locally:
+
+```bash
+UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_data_governance_evidence.py <operator-held-data-governance.json>
+```
+
+The data governance evidence validator checks the source commit, migration
+revision, ready classification, retention, deletion, export, disclosure and
+restricted-history-recipient statuses, value-safe receipts, governance owner and
+next-review note. It does not authenticate to GCP, inspect resources, admit live
+data, export records, approve disclosures, perform destructive deletion, deploy
+production, roll out a shared runtime, or prove provider-side recovery or
+session revocation.
 
 ## Later Plan Review Policy
 
@@ -251,6 +272,8 @@ A later approved production packet should produce value-safe handoff evidence:
   `deploy/gcp/templates/client-production-operations-readiness.example.json`,
 - optional runtime lifecycle review structure from
   `deploy/gcp/templates/client-production-runtime-lifecycle.example.json`,
+- optional data governance review structure from
+  `deploy/gcp/templates/client-production-data-governance.example.json`,
 - source commit and immutable image digest,
 - migration revision,
 - state backend lineage identifier,
@@ -260,6 +283,8 @@ A later approved production packet should produce value-safe handoff evidence:
   receipts,
 - GitHub Actions runtime, runner-image, language-runtime, dependency-audit and
   container-base-image lifecycle receipts,
+- classification, retention, deletion, export, disclosure and restricted-history
+  recipient governance receipts,
 - staff identity readiness result,
 - smoke/readiness results,
 - rollback or forward-recovery note,

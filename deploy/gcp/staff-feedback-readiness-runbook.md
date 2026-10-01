@@ -43,6 +43,19 @@ cover:
 - repository stewardship and business-account decision tracking
 - rollback, closeout or access-removal posture
 
+Use `deploy/gcp/templates/staff-feedback-triage.example.json` after a bounded
+feedback window to summarize value-safe staff-reported issue counts,
+accessibility/privacy/security impact review, disposition and retest posture.
+Validate that operator-held triage record locally:
+
+```bash
+UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_staff_feedback_triage.py <operator-held-staff-feedback-triage.json>
+```
+
+The triage record is not client acceptance, product completion, production
+qualification, support activation, live-data admission or authority to migrate
+current-environment records.
+
 For deeper planning on eventual data disposition, client-owned management,
 business account decisions and repository stewardship, use
 `deploy/gcp/client-transition-planning-runbook.md` and validate the
@@ -59,8 +72,9 @@ UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_st
 
 If the feedback window is being assembled as an operator packet, use
 `deploy/gcp/templates/staff-feedback-package-index.example.json` to record the
-value-safe review of the staff-feedback readiness materials, transition-planning
-materials and human-feedback templates. Validate that operator-held package
+value-safe review of the staff-feedback readiness materials, feedback triage
+materials, transition-planning materials and human-feedback templates. Validate
+that operator-held package
 index locally:
 
 ```bash

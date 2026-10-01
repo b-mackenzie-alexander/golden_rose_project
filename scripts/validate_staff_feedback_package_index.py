@@ -43,6 +43,8 @@ REQUIRED_SOURCE_ARTIFACTS = (
     "deploy/gcp/human-feedback-template.md",
     "deploy/gcp/human-qualification-checklist.md",
     "deploy/gcp/qualification-status-contract.md",
+    "deploy/gcp/templates/staff-feedback-triage.example.json",
+    "scripts/validate_staff_feedback_triage.py",
     "deploy/gcp/templates/staff-feedback-package-index.example.json",
     "scripts/validate_staff_feedback_package_index.py",
 )
@@ -56,6 +58,11 @@ REQUIRED_VALIDATOR_COMMANDS = {
         "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
         "scripts/validate_client_transition_planning.py "
         "<operator-held-client-transition-planning.json>"
+    ),
+    "staff_feedback_triage": (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_staff_feedback_triage.py "
+        "<operator-held-staff-feedback-triage.json>"
     ),
     "staff_feedback_package_index": EXPECTED_VALIDATOR_COMMAND,
 }

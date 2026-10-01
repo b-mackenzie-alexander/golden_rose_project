@@ -61,6 +61,14 @@ activate provider-side staff identity, or create shared runtime access.
   contrast, fluent-Spanish and bilingual-parity review evidence. It is not a
   public accessibility claim, not a certification, not a translation
   certification, not production deployment and not approval to publish.
+- `deploy/gcp/templates/client-production-training-acceptance.example.json` is
+  a placeholder-only template for later staff training, support escalation,
+  staff workflow acceptance, management-model review, working-environment
+  feedback, data-migration planning, repository-stewardship and known-limits
+  evidence. It is not support-channel activation, not live-data admission, not
+  current-environment migration execution, not business repository transfer,
+  not GitHub account creation, not production deployment and not a declaration
+  that the product is complete.
 - Real project IDs, billing IDs, principals, service URLs, database URLs,
   identity-provider URLs, JWKS URLs, secret names, passwords, tokens, state
   buckets, support contacts, and owner emails must remain in approved private
@@ -133,11 +141,11 @@ identity, Terraform plan review, artifact admission, handoff evidence,
 backup/restore rehearsal, operations readiness and operations-owner sections to
 be marked ready with value-safe evidence. It also requires runtime lifecycle
 review and data governance review to be marked ready with value-safe evidence,
-copy approval review and manual accessibility/language review to be marked
-ready with value-safe evidence, staff workflow acceptance to remain
-`separate-review-required`, and requires production deployment, live-data
-admission and shared-runtime rollout to remain not executed without separate
-approval.
+copy approval review, manual accessibility/language review and training or
+workflow acceptance review to be marked ready with value-safe evidence. Its
+remaining manual-acceptance boundary must be empty once that validator-backed
+training evidence exists, and production deployment, live-data admission and
+shared-runtime rollout must remain not executed without separate approval.
 
 When a later operator wants one value-safe index of the reviewed package source
 artifacts and their offline validators, keep the filled package index outside
@@ -149,10 +157,10 @@ UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_cl
 
 The package index validator requires the runbooks, placeholder templates and
 offline validator scripts to be marked reviewed with value-safe evidence. It
-also requires the validator commands to remain offline/local, staff workflow
-acceptance to remain `separate-review-required`, and production deployment,
-live-data admission and shared-runtime rollout to remain not executed without
-separate approval.
+also requires the validator commands to remain offline/local, its remaining
+manual-acceptance boundary to be empty once training acceptance evidence is
+validator-backed, and production deployment, live-data admission and
+shared-runtime rollout to remain not executed without separate approval.
 
 When a later approved production packet records value-safe backup/restore
 rehearsal evidence, keep the filled JSON outside source control and validate it
@@ -248,6 +256,26 @@ next-review note. It does not authenticate to GCP, inspect resources, make a
 public accessibility claim, certify accessibility, certify translations, deploy
 production, roll out a shared runtime, admit live/client data, or prove
 provider-side recovery or session revocation.
+
+When a later approved production packet records value-safe staff training,
+support escalation, workflow acceptance and management-transition evidence,
+keep the filled JSON outside source control and validate it locally:
+
+```bash
+UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_training_acceptance_evidence.py <operator-held-training-acceptance.json>
+```
+
+The training acceptance evidence validator checks the source commit, migration
+revision, ready staff training, support escalation, staff workflow acceptance,
+management-model review, working-environment feedback, data-migration planning,
+repository-stewardship and known-limit statuses, value-safe receipts, acceptance
+owner and next-review note. It is intended to capture the reality that a working
+environment may be used by staff to gather daily-use feedback before the product
+is complete. It does not authenticate to GCP, inspect resources, activate
+support channels, create business accounts, transfer repositories, migrate
+current-environment records, deploy production, roll out a shared runtime,
+admit live/client data, activate provider-side identity, or prove provider-side
+recovery or session revocation.
 
 ## Later Plan Review Policy
 

@@ -38,6 +38,7 @@ REQUIRED_SOURCE_ARTIFACTS = (
     "deploy/gcp/templates/client-production-data-governance.example.json",
     "deploy/gcp/templates/client-production-copy-approval.example.json",
     "deploy/gcp/templates/client-production-manual-review.example.json",
+    "deploy/gcp/templates/client-production-training-acceptance.example.json",
     "scripts/validate_deployable_package.py",
     "scripts/validate_client_production_plan.py",
     "scripts/validate_client_handoff_evidence.py",
@@ -49,6 +50,7 @@ REQUIRED_SOURCE_ARTIFACTS = (
     "scripts/validate_client_data_governance_evidence.py",
     "scripts/validate_client_copy_approval_evidence.py",
     "scripts/validate_client_manual_review_evidence.py",
+    "scripts/validate_client_training_acceptance_evidence.py",
 )
 REQUIRED_VALIDATOR_COMMANDS = {
     "deployable_package": (
@@ -97,8 +99,13 @@ REQUIRED_VALIDATOR_COMMANDS = {
         "scripts/validate_client_manual_review_evidence.py "
         "<operator-held-manual-review.json>"
     ),
+    "training_acceptance_evidence": (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_client_training_acceptance_evidence.py "
+        "<operator-held-training-acceptance.json>"
+    ),
 }
-MANUAL_ACCEPTANCE_KEYS = ("staff_workflow_acceptance",)
+REQUIRED_MANUAL_ACCEPTANCE_BOUNDARY: dict[str, str] = {}
 REQUIRED_ACTIVATION_BOUNDARY = {
     "production_deployment": "not-executed-without-separate-approval",
     "live_data_admission": "not-admitted-without-separate-approval",
@@ -221,12 +228,11 @@ def validate_package_index(path: Path) -> list[str]:
     checked.append("validator_commands")
 
     manual = _section(document, "manual_acceptance_boundary")
-    for key in MANUAL_ACCEPTANCE_KEYS:
-        value = manual.get(key)
-        if value != "separate-review-required":
-            raise PackageIndexValidationError(
-                f"manual_acceptance_boundary.{key} must be separate-review-required"
-            )
+    if manual != REQUIRED_MANUAL_ACCEPTANCE_BOUNDARY:
+        raise PackageIndexValidationError(
+            "manual_acceptance_boundary must be empty after validator-backed "
+            "training acceptance evidence is present"
+        )
     checked.append("manual_acceptance_boundary")
 
     activation = _section(document, "activation_boundary")

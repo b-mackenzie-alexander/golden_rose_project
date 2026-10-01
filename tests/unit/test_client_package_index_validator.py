@@ -33,9 +33,7 @@ def _valid_package_index() -> dict[str, Any]:
             for path in REQUIRED_SOURCE_ARTIFACTS
         ],
         "validator_commands": dict(REQUIRED_VALIDATOR_COMMANDS),
-        "manual_acceptance_boundary": {
-            "staff_workflow_acceptance": "separate-review-required",
-        },
+        "manual_acceptance_boundary": {},
         "activation_boundary": {
             "production_deployment": "not-executed-without-separate-approval",
             "live_data_admission": "not-admitted-without-separate-approval",
@@ -132,7 +130,7 @@ def test_client_package_index_rejects_manual_acceptance_overclaim(
     document = _valid_package_index()
     document["manual_acceptance_boundary"]["staff_workflow_acceptance"] = "passed"
 
-    with pytest.raises(PackageIndexValidationError, match="staff_workflow_acceptance"):
+    with pytest.raises(PackageIndexValidationError, match="must be empty"):
         validate_package_index(_write_index(tmp_path, document))
 
 

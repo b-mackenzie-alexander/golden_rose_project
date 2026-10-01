@@ -108,6 +108,14 @@ def test_operations_projection_route_returns_no_store_projection(
             "active_area_count": 1,
             "unmapped_request_count": 0,
         },
+        "calendar_summary": {
+            "projected_shift_count": 0,
+            "worker_slots": 0,
+            "pending_review_shift_count": 0,
+            "coverage_day_count": 0,
+            "first_shift_starts_at": None,
+            "last_shift_ends_at": None,
+        },
     }
 
     def fake_projection(**kwargs: Any) -> dict[str, Any]:
@@ -128,6 +136,7 @@ def test_operations_projection_route_returns_no_store_projection(
     assert response.json()["shift_items"] == []
     assert response.json()["area_summary"][0]["area_label"] == "Brooklyn"
     assert response.json()["report_summary"]["pending_review_count"] == 1
+    assert response.json()["calendar_summary"]["projected_shift_count"] == 0
 
 
 def test_operations_projection_route_bounds_page_size() -> None:
@@ -186,7 +195,15 @@ def test_operations_projection_returns_request_and_shift_items():
         "version": 2,
         "updated_at": NOW,
     }
-    session = FakeSession([FakeResult([request_row]), FakeResult([shift_row])])
+    session = FakeSession(
+        [
+            FakeResult([request_row]),
+            FakeResult([shift_row]),
+            FakeResult([]),
+            FakeResult([]),
+            FakeResult([]),
+        ]
+    )
 
     result = query_operations_projection(
         session=session,  # type: ignore[arg-type]
@@ -247,8 +264,16 @@ def test_operations_projection_returns_request_and_shift_items():
             "active_area_count": 0,
             "unmapped_request_count": 0,
         },
+        "calendar_summary": {
+            "projected_shift_count": 0,
+            "worker_slots": 0,
+            "pending_review_shift_count": 0,
+            "coverage_day_count": 0,
+            "first_shift_starts_at": None,
+            "last_shift_ends_at": None,
+        },
     }
-    assert len(session.executed) == 4
+    assert len(session.executed) == 5
     assert session.rollbacks == 0
 
 
@@ -269,6 +294,34 @@ def test_operations_projection_aggregates_broad_area_and_reporting_totals():
                     {"locality": "Brooklyn", "shift_status": "pending_review", "worker_count": 2},
                     {"locality": "Queens", "shift_status": "draft", "worker_count": 3},
                     {"locality": "Outside", "shift_status": "draft", "worker_count": 4},
+                ]
+            ),
+            FakeResult(
+                [
+                    {
+                        "shift_status": "pending_review",
+                        "worker_count": 2,
+                        "starts_at": NOW,
+                        "ends_at": datetime(2026, 9, 30, 18, 0, tzinfo=UTC),
+                    },
+                    {
+                        "shift_status": "draft",
+                        "worker_count": 3,
+                        "starts_at": datetime(2026, 10, 1, 14, 0, tzinfo=UTC),
+                        "ends_at": datetime(2026, 10, 1, 18, 0, tzinfo=UTC),
+                    },
+                    {
+                        "shift_status": "draft",
+                        "worker_count": 4,
+                        "starts_at": datetime(2026, 10, 1, 19, 0, tzinfo=UTC),
+                        "ends_at": datetime(2026, 10, 1, 21, 0, tzinfo=UTC),
+                    },
+                    {
+                        "shift_status": "pending_review",
+                        "worker_count": 1,
+                        "starts_at": "not-a-datetime",
+                        "ends_at": datetime(2026, 10, 2, 18, 0, tzinfo=UTC),
+                    },
                 ]
             ),
         ]
@@ -298,6 +351,14 @@ def test_operations_projection_aggregates_broad_area_and_reporting_totals():
         "pending_review_count": 2,
         "active_area_count": 3,
         "unmapped_request_count": 1,
+    }
+    assert result["calendar_summary"] == {
+        "projected_shift_count": 3,
+        "worker_slots": 9,
+        "pending_review_shift_count": 1,
+        "coverage_day_count": 2,
+        "first_shift_starts_at": NOW,
+        "last_shift_ends_at": datetime(2026, 10, 1, 21, 0, tzinfo=UTC),
     }
 
 

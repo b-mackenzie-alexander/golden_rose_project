@@ -59,8 +59,18 @@ class OperationsReportSummary(IntakeValue):
     unmapped_request_count: int = Field(ge=0, le=2147483647)
 
 
+class OperationsCalendarSummary(IntakeValue):
+    projected_shift_count: int = Field(ge=0, le=2147483647)
+    worker_slots: int = Field(ge=0, le=2147483647)
+    pending_review_shift_count: int = Field(ge=0, le=2147483647)
+    coverage_day_count: int = Field(ge=0, le=366)
+    first_shift_starts_at: datetime | None = None
+    last_shift_ends_at: datetime | None = None
+
+
 class OperationsProjectionResponse(IntakeValue):
     request_items: list[OperationsStaffingRequestItem]
     shift_items: list[OperationsShiftNeedItem]
     area_summary: list[OperationsAreaSummaryItem]
     report_summary: OperationsReportSummary
+    calendar_summary: OperationsCalendarSummary

@@ -41,6 +41,14 @@ const projectionExtras = {
     activeAreaCount: 1,
     unmappedRequestCount: 0,
   },
+  calendarSummary: {
+    projectedShiftCount: 1,
+    workerSlots: 1,
+    pendingReviewShiftCount: 1,
+    coverageDayCount: 1,
+    firstShiftStartsAt: '2026-09-29T14:00:00Z',
+    lastShiftEndsAt: '2026-09-29T18:00:00Z',
+  },
 };
 
 describe('StaffCalendar', () => {
@@ -80,6 +88,9 @@ describe('StaffCalendar', () => {
     await waitFor(() => {
       expect(getDayButton('Tue', 'Jan 28', '1')).toBeInTheDocument();
     });
+    expect(screen.getByText('Projected shifts')).toBeInTheDocument();
+    expect(screen.getByText('Projected worker slots')).toBeInTheDocument();
+    expect(screen.getByText('Request-derived shifts only; personal events stay separate.')).toBeInTheDocument();
     await user.click(getDayButton('Tue', 'Jan 28', '1'));
     const form = screen.getByRole('heading', { name: 'Add event' }).closest('form');
     if (!form) throw new Error('Add event form was not rendered.');
@@ -181,6 +192,14 @@ describe('StaffCalendar', () => {
           activeAreaCount: 0,
           unmappedRequestCount: 0,
         },
+        calendarSummary: {
+          projectedShiftCount: 0,
+          workerSlots: 0,
+          pendingReviewShiftCount: 0,
+          coverageDayCount: 0,
+          firstShiftStartsAt: null,
+          lastShiftEndsAt: null,
+        },
       },
     });
 
@@ -189,6 +208,9 @@ describe('StaffCalendar', () => {
     await waitFor(() => {
       expect(screen.getByText('Open slots')).toBeInTheDocument();
     });
+    expect(screen.getByText('Projected shifts')).toBeInTheDocument();
+    expect(screen.getByText('Projected worker slots')).toBeInTheDocument();
+    expect(screen.getAllByText('0').length).toBeGreaterThanOrEqual(3);
     expect(screen.queryByText('Team check-in')).not.toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });

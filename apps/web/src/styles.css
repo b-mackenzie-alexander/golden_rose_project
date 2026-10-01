@@ -2119,6 +2119,13 @@ select {
   font-weight: 800;
 }
 
+.calendar-coverage-note {
+  color: var(--color-muted-text);
+  font-size: 0.9rem;
+  font-weight: 800;
+  margin: 0;
+}
+
 .calendar-layout {
   align-items: start;
   display: grid;

@@ -1,6 +1,7 @@
 """Read-only staff operations projection for dashboard modules."""
 
 from collections.abc import Mapping, Sequence
+from datetime import date, datetime
 from typing import Any, cast
 
 from sqlalchemy import select
@@ -107,6 +108,40 @@ def _build_area_and_report_summary(
         1 for area in area_items if int(area["request_count"]) > 0 or int(area["shift_count"]) > 0
     )
     return area_items, report
+
+
+def _build_calendar_summary(calendar_rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    summary: dict[str, Any] = {
+        "projected_shift_count": 0,
+        "worker_slots": 0,
+        "pending_review_shift_count": 0,
+        "coverage_day_count": 0,
+        "first_shift_starts_at": None,
+        "last_shift_ends_at": None,
+    }
+    coverage_days: set[date] = set()
+    first_shift: datetime | None = None
+    last_shift: datetime | None = None
+    for row in calendar_rows:
+        starts_at = row.get("starts_at")
+        ends_at = row.get("ends_at")
+        if not isinstance(starts_at, datetime) or not isinstance(ends_at, datetime):
+            continue
+        if ends_at <= starts_at:
+            continue
+        summary["projected_shift_count"] += 1
+        summary["worker_slots"] += int(row.get("worker_count") or 0)
+        if row.get("shift_status") == "pending_review":
+            summary["pending_review_shift_count"] += 1
+        coverage_days.add(starts_at.date())
+        if first_shift is None or starts_at < first_shift:
+            first_shift = starts_at
+        if last_shift is None or ends_at > last_shift:
+            last_shift = ends_at
+    summary["coverage_day_count"] = len(coverage_days)
+    summary["first_shift_starts_at"] = first_shift
+    summary["last_shift_ends_at"] = last_shift
+    return summary
 
 
 def query_operations_projection(
@@ -252,12 +287,41 @@ def query_operations_projection(
             .mappings()
             .all()
         )
+        shift_calendar_rows = (
+            session.execute(
+                select(
+                    shift_needs.c.shift_status,
+                    shift_needs.c.worker_count,
+                    shift_needs.c.starts_at,
+                    shift_needs.c.ends_at,
+                )
+                .join(
+                    staffing_requests,
+                    (staffing_requests.c.employer_id == shift_needs.c.employer_id)
+                    & (
+                        staffing_requests.c.staffing_request_id == shift_needs.c.staffing_request_id
+                    ),
+                )
+                .join(employers, employers.c.employer_id == shift_needs.c.employer_id)
+                .where(
+                    employers.c.lifecycle_status == "draft",
+                    staffing_requests.c.request_status.in_(("draft", "pending_review")),
+                    shift_needs.c.shift_status.in_(("draft", "pending_review")),
+                )
+                .limit(500)
+            )
+            .mappings()
+            .all()
+        )
     except SQLAlchemyError as exc:
         session.rollback()
         raise IntakeError("persistence_unavailable", 503) from exc
     area_summary, report_summary = _build_area_and_report_summary(
         request_area_rows=cast(Sequence[Mapping[str, Any]], request_area_rows),
         shift_area_rows=cast(Sequence[Mapping[str, Any]], shift_area_rows),
+    )
+    calendar_summary = _build_calendar_summary(
+        cast(Sequence[Mapping[str, Any]], shift_calendar_rows)
     )
     return {
         "request_items": [
@@ -276,4 +340,5 @@ def query_operations_projection(
         ],
         "area_summary": area_summary,
         "report_summary": report_summary,
+        "calendar_summary": calendar_summary,
     }

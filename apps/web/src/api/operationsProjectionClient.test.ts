@@ -48,6 +48,14 @@ const validReportSummary = {
   active_area_count: 1,
   unmapped_request_count: 0,
 };
+const validCalendarSummary = {
+  projected_shift_count: 1,
+  worker_slots: 1,
+  pending_review_shift_count: 0,
+  coverage_day_count: 1,
+  first_shift_starts_at: '2026-10-01T14:00:00Z',
+  last_shift_ends_at: '2026-10-01T18:00:00Z',
+};
 
 function jsonResponse(body: unknown, init: ResponseInit = {}) {
   return new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' }, ...init });
@@ -62,6 +70,7 @@ function projection(
     shift_items: [shift],
     area_summary: validAreaSummary,
     report_summary: validReportSummary,
+    calendar_summary: validCalendarSummary,
   };
 }
 
@@ -104,6 +113,14 @@ describe('operationsProjectionClient', () => {
       pendingReviewCount: 1,
       activeAreaCount: 1,
       unmappedRequestCount: 0,
+    });
+    expect(result.value.calendarSummary).toEqual({
+      projectedShiftCount: 1,
+      workerSlots: 1,
+      pendingReviewShiftCount: 0,
+      coverageDayCount: 1,
+      firstShiftStartsAt: '2026-10-01T14:00:00Z',
+      lastShiftEndsAt: '2026-10-01T18:00:00Z',
     });
   });
 
@@ -186,26 +203,30 @@ describe('operationsProjectionClient', () => {
   it.each([
     ['non-object payload', null],
     ['missing request array', { shift_items: [] }],
-    ['missing shift array', { request_items: [], area_summary: validAreaSummary, report_summary: validReportSummary }],
-    ['missing area summary', { request_items: [], shift_items: [], report_summary: validReportSummary }],
-    ['missing report summary', { request_items: [], shift_items: [], area_summary: validAreaSummary }],
+    ['missing shift array', { request_items: [], area_summary: validAreaSummary, report_summary: validReportSummary, calendar_summary: validCalendarSummary }],
+    ['missing area summary', { request_items: [], shift_items: [], report_summary: validReportSummary, calendar_summary: validCalendarSummary }],
+    ['missing report summary', { request_items: [], shift_items: [], area_summary: validAreaSummary, calendar_summary: validCalendarSummary }],
+    ['missing calendar summary', { request_items: [], shift_items: [], area_summary: validAreaSummary, report_summary: validReportSummary }],
     ['oversized request list', { request_items: Array.from({ length: 51 }, () => validRequest), shift_items: [] }],
-    ['oversized shift list', { request_items: [], shift_items: Array.from({ length: 51 }, () => validShift), area_summary: validAreaSummary, report_summary: validReportSummary }],
-    ['short area summary', { request_items: [], shift_items: [], area_summary: validAreaSummary.slice(1), report_summary: validReportSummary }],
-    ['duplicate area summary', { request_items: [], shift_items: [], area_summary: [validAreaSummary[0], ...validAreaSummary.slice(0, 4)], report_summary: validReportSummary }],
-    ['invalid area label', { request_items: [], shift_items: [], area_summary: [{ ...validAreaSummary[0], area_label: 'Queens' }, ...validAreaSummary.slice(1)], report_summary: validReportSummary }],
-    ['invalid area count', { request_items: [], shift_items: [], area_summary: [{ ...validAreaSummary[0], worker_slots: -1 }, ...validAreaSummary.slice(1)], report_summary: validReportSummary }],
-    ['invalid report active area count', { request_items: [], shift_items: [], area_summary: validAreaSummary, report_summary: { ...validReportSummary, active_area_count: 6 } }],
-    ['non-object request', { request_items: [null], shift_items: [], area_summary: validAreaSummary, report_summary: validReportSummary }],
-    ['wrong request type', { request_items: [{ ...validRequest, item_type: 'other' }], shift_items: [], area_summary: validAreaSummary, report_summary: validReportSummary }],
+    ['oversized shift list', { request_items: [], shift_items: Array.from({ length: 51 }, () => validShift), area_summary: validAreaSummary, report_summary: validReportSummary, calendar_summary: validCalendarSummary }],
+    ['short area summary', { request_items: [], shift_items: [], area_summary: validAreaSummary.slice(1), report_summary: validReportSummary, calendar_summary: validCalendarSummary }],
+    ['duplicate area summary', { request_items: [], shift_items: [], area_summary: [validAreaSummary[0], ...validAreaSummary.slice(0, 4)], report_summary: validReportSummary, calendar_summary: validCalendarSummary }],
+    ['invalid area label', { request_items: [], shift_items: [], area_summary: [{ ...validAreaSummary[0], area_label: 'Queens' }, ...validAreaSummary.slice(1)], report_summary: validReportSummary, calendar_summary: validCalendarSummary }],
+    ['invalid area count', { request_items: [], shift_items: [], area_summary: [{ ...validAreaSummary[0], worker_slots: -1 }, ...validAreaSummary.slice(1)], report_summary: validReportSummary, calendar_summary: validCalendarSummary }],
+    ['invalid report active area count', { request_items: [], shift_items: [], area_summary: validAreaSummary, report_summary: { ...validReportSummary, active_area_count: 6 }, calendar_summary: validCalendarSummary }],
+    ['invalid calendar day count', { request_items: [], shift_items: [], area_summary: validAreaSummary, report_summary: validReportSummary, calendar_summary: { ...validCalendarSummary, coverage_day_count: 367 } }],
+    ['invalid calendar timestamp pairing', { request_items: [], shift_items: [], area_summary: validAreaSummary, report_summary: validReportSummary, calendar_summary: { ...validCalendarSummary, first_shift_starts_at: null } }],
+    ['invalid calendar window', { request_items: [], shift_items: [], area_summary: validAreaSummary, report_summary: validReportSummary, calendar_summary: { ...validCalendarSummary, first_shift_starts_at: '2026-10-01T18:00:00Z', last_shift_ends_at: '2026-10-01T14:00:00Z' } }],
+    ['non-object request', { request_items: [null], shift_items: [], area_summary: validAreaSummary, report_summary: validReportSummary, calendar_summary: validCalendarSummary }],
+    ['wrong request type', { request_items: [{ ...validRequest, item_type: 'other' }], shift_items: [], area_summary: validAreaSummary, report_summary: validReportSummary, calendar_summary: validCalendarSummary }],
     ['blank employer name', projection({ ...validRequest, employer_name: '   ' })],
     ['overlong role title', projection({ ...validRequest, role_title: 'x'.repeat(201) })],
     ['zero worker count', projection({ ...validRequest, worker_count: 0 })],
     ['unsafe version', projection({ ...validRequest, version: Number.MAX_SAFE_INTEGER + 1 })],
     ['invalid request status', projection({ ...validRequest, request_status: 'approved' })],
     ['bad received timestamp', projection({ ...validRequest, received_at: 'not-a-date' })],
-    ['non-object shift', { request_items: [], shift_items: [null], area_summary: validAreaSummary, report_summary: validReportSummary }],
-    ['wrong shift type', { request_items: [], shift_items: [{ ...validShift, item_type: 'other' }], area_summary: validAreaSummary, report_summary: validReportSummary }],
+    ['non-object shift', { request_items: [], shift_items: [null], area_summary: validAreaSummary, report_summary: validReportSummary, calendar_summary: validCalendarSummary }],
+    ['wrong shift type', { request_items: [], shift_items: [{ ...validShift, item_type: 'other' }], area_summary: validAreaSummary, report_summary: validReportSummary, calendar_summary: validCalendarSummary }],
     ['invalid shift request status', projection(validRequest, { ...validShift, request_status: 'approved' })],
     ['invalid shift status', projection(validRequest, { ...validShift, shift_status: 'approved' })],
     ['same-time shift window', projection(validRequest, { ...validShift, starts_at: '2026-10-01T14:00:00Z', ends_at: '2026-10-01T14:00:00Z' })],

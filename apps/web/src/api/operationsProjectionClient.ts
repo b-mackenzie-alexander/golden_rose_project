@@ -60,11 +60,21 @@ export type OperationsReportSummary = {
   unmappedRequestCount: number;
 };
 
+export type OperationsCalendarSummary = {
+  projectedShiftCount: number;
+  workerSlots: number;
+  pendingReviewShiftCount: number;
+  coverageDayCount: number;
+  firstShiftStartsAt: string | null;
+  lastShiftEndsAt: string | null;
+};
+
 export type OperationsProjection = {
   requestItems: OperationsRequestItem[];
   shiftItems: OperationsShiftItem[];
   areaSummary: OperationsAreaSummaryItem[];
   reportSummary: OperationsReportSummary;
+  calendarSummary: OperationsCalendarSummary;
 };
 
 const areaLabels: Record<OperationsAreaKey, OperationsAreaSummaryItem['areaLabel']> = {
@@ -206,6 +216,39 @@ function parseReportSummary(value: unknown): OperationsReportSummary | null {
   };
 }
 
+function optionalTimestamp(value: unknown): string | null | false {
+  if (value === null) return null;
+  return timestamp(value) ? value : false;
+}
+
+function parseCalendarSummary(value: unknown): OperationsCalendarSummary | null {
+  if (!object(value)) return null;
+  const firstShiftStartsAt = optionalTimestamp(value.first_shift_starts_at);
+  const lastShiftEndsAt = optionalTimestamp(value.last_shift_ends_at);
+  if (
+    !nonNegative(value.projected_shift_count) ||
+    !nonNegative(value.worker_slots) ||
+    !nonNegative(value.pending_review_shift_count) ||
+    !nonNegative(value.coverage_day_count, 366) ||
+    firstShiftStartsAt === false ||
+    lastShiftEndsAt === false ||
+    (firstShiftStartsAt === null) !== (lastShiftEndsAt === null) ||
+    (
+      firstShiftStartsAt !== null &&
+      lastShiftEndsAt !== null &&
+      Date.parse(firstShiftStartsAt) >= Date.parse(lastShiftEndsAt)
+    )
+  ) return null;
+  return {
+    projectedShiftCount: value.projected_shift_count,
+    workerSlots: value.worker_slots,
+    pendingReviewShiftCount: value.pending_review_shift_count,
+    coverageDayCount: value.coverage_day_count,
+    firstShiftStartsAt,
+    lastShiftEndsAt,
+  };
+}
+
 function parseProjection(value: unknown): OperationsProjection | null {
   if (
     !object(value) ||
@@ -218,19 +261,22 @@ function parseProjection(value: unknown): OperationsProjection | null {
   const shiftItems = value.shift_items.map(parseShiftItem);
   const areaSummary = value.area_summary.map(parseAreaSummaryItem);
   const reportSummary = parseReportSummary(value.report_summary);
+  const calendarSummary = parseCalendarSummary(value.calendar_summary);
   const areaKeys = new Set(areaSummary.map((item) => item?.areaKey));
   if (
     requestItems.some((item) => item === null) ||
     shiftItems.some((item) => item === null) ||
     areaSummary.some((item) => item === null) ||
     areaKeys.size !== 5 ||
-    reportSummary === null
+    reportSummary === null ||
+    calendarSummary === null
   ) return null;
   return {
     requestItems: requestItems as OperationsRequestItem[],
     shiftItems: shiftItems as OperationsShiftItem[],
     areaSummary: areaSummary as OperationsAreaSummaryItem[],
     reportSummary,
+    calendarSummary,
   };
 }
 

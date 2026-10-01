@@ -76,6 +76,11 @@
       "evidence": "<value-safe-copy-approval-template-record>"
     },
     {
+      "path": "deploy/gcp/templates/client-production-manual-review.example.json",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-manual-review-template-record>"
+    },
+    {
       "path": "scripts/validate_deployable_package.py",
       "status": "<reviewed-or-blocked>",
       "evidence": "<value-safe-package-validator-record>"
@@ -124,6 +129,11 @@
       "path": "scripts/validate_client_copy_approval_evidence.py",
       "status": "<reviewed-or-blocked>",
       "evidence": "<value-safe-copy-approval-validator-record>"
+    },
+    {
+      "path": "scripts/validate_client_manual_review_evidence.py",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-manual-review-validator-record>"
     }
   ],
   "validator_commands": {
@@ -136,11 +146,10 @@
     "operations_readiness_evidence": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_operations_readiness_evidence.py <operator-held-operations-readiness.json>",
     "runtime_lifecycle_evidence": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_runtime_lifecycle_evidence.py <operator-held-runtime-lifecycle.json>",
     "data_governance_evidence": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_data_governance_evidence.py <operator-held-data-governance.json>",
-    "copy_approval_evidence": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_copy_approval_evidence.py <operator-held-copy-approval.json>"
+    "copy_approval_evidence": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_copy_approval_evidence.py <operator-held-copy-approval.json>",
+    "manual_review_evidence": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_manual_review_evidence.py <operator-held-manual-review.json>"
   },
   "manual_acceptance_boundary": {
-    "accessibility_review": "<not-run-or-separate-record>",
-    "fluent_spanish_review": "<not-run-or-separate-record>",
     "staff_workflow_acceptance": "<not-run-or-separate-record>"
   },
   "activation_boundary": {

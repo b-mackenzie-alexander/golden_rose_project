@@ -56,6 +56,11 @@ activate provider-side staff identity, or create shared runtime access.
   legal review, business review, translation review and controlled-copy owner
   evidence. It is not legal approval completion, not production copy
   activation, not public publishing and not approval to change production text.
+- `deploy/gcp/templates/client-production-manual-review.example.json` is a
+  placeholder-only template for later manual keyboard, screen-reader, reflow,
+  contrast, fluent-Spanish and bilingual-parity review evidence. It is not a
+  public accessibility claim, not a certification, not a translation
+  certification, not production deployment and not approval to publish.
 - Real project IDs, billing IDs, principals, service URLs, database URLs,
   identity-provider URLs, JWKS URLs, secret names, passwords, tokens, state
   buckets, support contacts, and owner emails must remain in approved private
@@ -128,8 +133,8 @@ identity, Terraform plan review, artifact admission, handoff evidence,
 backup/restore rehearsal, operations readiness and operations-owner sections to
 be marked ready with value-safe evidence. It also requires runtime lifecycle
 review and data governance review to be marked ready with value-safe evidence,
-copy approval review to be marked ready with value-safe evidence, manual
-accessibility, fluent Spanish and staff workflow acceptance to remain
+copy approval review and manual accessibility/language review to be marked
+ready with value-safe evidence, staff workflow acceptance to remain
 `separate-review-required`, and requires production deployment, live-data
 admission and shared-runtime rollout to remain not executed without separate
 approval.
@@ -144,10 +149,10 @@ UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_cl
 
 The package index validator requires the runbooks, placeholder templates and
 offline validator scripts to be marked reviewed with value-safe evidence. It
-also requires the validator commands to remain offline/local, manual
-accessibility, fluent Spanish and staff workflow acceptance to remain
-`separate-review-required`, and production deployment, live-data admission and
-shared-runtime rollout to remain not executed without separate approval.
+also requires the validator commands to remain offline/local, staff workflow
+acceptance to remain `separate-review-required`, and production deployment,
+live-data admission and shared-runtime rollout to remain not executed without
+separate approval.
 
 When a later approved production packet records value-safe backup/restore
 rehearsal evidence, keep the filled JSON outside source control and validate it
@@ -228,6 +233,22 @@ legal approval, activate production copy, publish public content, deploy
 production, roll out a shared runtime, admit live/client data, or prove
 provider-side recovery or session revocation.
 
+When a later approved production packet records value-safe manual accessibility
+and language review evidence, keep the filled JSON outside source control and
+validate it locally:
+
+```bash
+UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_manual_review_evidence.py <operator-held-manual-review.json>
+```
+
+The manual review evidence validator checks the source commit, migration
+revision, ready keyboard navigation, screen-reader, reflow, contrast,
+fluent-Spanish and bilingual-parity statuses, value-safe receipts, owner and
+next-review note. It does not authenticate to GCP, inspect resources, make a
+public accessibility claim, certify accessibility, certify translations, deploy
+production, roll out a shared runtime, admit live/client data, or prove
+provider-side recovery or session revocation.
+
 ## Later Plan Review Policy
 
 A later approved production packet must review Terraform plan output against the
@@ -298,6 +319,8 @@ A later approved production packet should produce value-safe handoff evidence:
   `deploy/gcp/templates/client-production-data-governance.example.json`,
 - optional legal/business copy approval review structure from
   `deploy/gcp/templates/client-production-copy-approval.example.json`,
+- optional manual accessibility and language review structure from
+  `deploy/gcp/templates/client-production-manual-review.example.json`,
 - source commit and immutable image digest,
 - migration revision,
 - state backend lineage identifier,
@@ -311,6 +334,8 @@ A later approved production packet should produce value-safe handoff evidence:
   recipient governance receipts,
 - copy inventory, legal review, business review, translation review and
   controlled-copy owner receipts,
+- keyboard navigation, screen-reader, reflow, contrast, fluent-Spanish and
+  bilingual-parity review receipts,
 - staff identity readiness result,
 - smoke/readiness results,
 - rollback or forward-recovery note,

@@ -20,6 +20,7 @@
     "runtime_lifecycle_review",
     "data_governance_review",
     "copy_approval_review",
+    "manual_accessibility_language_review",
     "operations_owners",
     "manual_acceptance_boundary"
   ],
@@ -63,13 +64,15 @@
     "status": "<ready-or-blocked>",
     "evidence": "<value-safe-copy-approval-validator-record>"
   },
+  "manual_accessibility_language_review": {
+    "status": "<ready-or-blocked>",
+    "evidence": "<value-safe-manual-review-validator-record>"
+  },
   "operations_owners": {
     "status": "<ready-or-blocked>",
     "evidence": "<value-safe-owner-readiness-record>"
   },
   "manual_acceptance_boundary": {
-    "accessibility_review": "<not-run-or-separate-record>",
-    "fluent_spanish_review": "<not-run-or-separate-record>",
     "staff_workflow_acceptance": "<not-run-or-separate-record>"
   },
   "activation_boundary": {

@@ -33,6 +33,7 @@ READY_SECTIONS = (
     "operations_readiness",
     "runtime_lifecycle_review",
     "data_governance_review",
+    "copy_approval_review",
     "operations_owners",
 )
 MANUAL_ACCEPTANCE_KEYS = (

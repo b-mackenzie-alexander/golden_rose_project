@@ -1,0 +1,67 @@
+{
+  "purpose": "Placeholder-only staff feedback closeout receipt evidence template. Do not commit real values.",
+  "evidence_type": "staff-feedback-closeout-receipt-not-cleanup",
+  "validator_command": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_staff_feedback_closeout_receipt.py <operator-held-staff-feedback-closeout-receipt.json>",
+  "authority_boundary": {
+    "cloud_execution": "operator-held-separate-approval-required",
+    "runtime_access_change": "operator-held-separate-approval-required",
+    "production_deployment": "separate-approval-required",
+    "live_data_admission": "separate-approval-required",
+    "credential_rotation": "separate-approval-required",
+    "support_channel_activation": "separate-approval-required",
+    "current_environment_data_migration": "separate-approval-required",
+    "client_owned_environment_transition": "separate-approval-required",
+    "github_account_creation": "separate-approval-required",
+    "business_repository_transfer": "separate-approval-required",
+    "data_export_execution": "separate-approval-required",
+    "data_import_execution": "separate-approval-required",
+    "destructive_cleanup": "separate-approval-required"
+  },
+  "source": {
+    "source_commit": "<40-hex-source-commit>",
+    "migration_revision": "<alembic-revision>"
+  },
+  "preconditions": {
+    "activation_receipt_status": "<ready-or-blocked>",
+    "staff_feedback_triage_status": "<ready-or-blocked>",
+    "staff_access_scope_status": "<ready-or-blocked>",
+    "data_entry_scope_status": "<ready-or-blocked>",
+    "closeout_owner_status": "<ready-or-blocked>",
+    "rollback_status": "<ready-or-blocked>",
+    "migration_disposition_status": "<ready-or-blocked>"
+  },
+  "closeout_receipt": {
+    "receipt_scope": "<current-environment-feedback-closeout-only>",
+    "source_artifact_effect": "<records-operator-held-closeout-only>",
+    "feedback_window_status": "<closed-for-bounded-current-environment-feedback>",
+    "staff_access_posture": "<closed-or-expiring-under-operator-record>",
+    "data_entry_status": "<stopped-or-bounded-by-closeout-scope>",
+    "feedback_disposition": "<triaged-or-carried-forward>",
+    "retained_record_disposition": "<not-migrated-by-this-record>"
+  },
+  "retained_boundaries": {
+    "production_deployment": "not-executed-without-separate-approval",
+    "live_data_admission": "not-admitted-without-separate-approval",
+    "support_channel_activation": "not-activated-without-separate-approval",
+    "current_environment_data_migration": "not-executed-without-separate-approval",
+    "client_owned_environment_transition": "not-executed-without-separate-approval",
+    "data_export_execution": "not-executed-without-separate-approval",
+    "data_import_execution": "not-executed-without-separate-approval",
+    "github_account_creation": "not-executed-without-separate-approval",
+    "business_repository_transfer": "not-executed-without-separate-approval",
+    "destructive_cleanup": "not-executed-without-separate-approval",
+    "shared_runtime_rollout": "not-executed-without-separate-approval",
+    "product_completion_claim": "not-claimed"
+  },
+  "evidence": {
+    "activation_receipt": "<value-safe-activation-receipt-record>",
+    "triage_receipt": "<value-safe-triage-record>",
+    "staff_access_closeout_receipt": "<value-safe-staff-access-closeout-record>",
+    "data_entry_closeout_receipt": "<value-safe-data-entry-closeout-record>",
+    "retained_record_disposition_note": "<value-safe-retained-record-disposition>",
+    "rollback_or_forward_recovery_note": "<value-safe-rollback-forward-recovery-record>",
+    "no_store_auth_sensitive_receipt": "<value-safe-no-store-auth-record>",
+    "closeout_owner": "<private-owner-record>",
+    "next_review_note": "<value-safe-next-review-record>"
+  }
+}

@@ -84,6 +84,21 @@ live-data admission, support activation, export/import execution,
 current-environment migration, client-owned transition, account creation,
 repository transfer, shared-runtime rollout or a product-completion claim.
 
+When the bounded feedback window is closed or access removal/expiration posture
+is recorded, use
+`deploy/gcp/templates/staff-feedback-closeout-receipt.example.json` to record a
+value-safe closeout receipt and retained boundaries. Validate that operator-held
+receipt locally:
+
+```bash
+UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_staff_feedback_closeout_receipt.py <operator-held-staff-feedback-closeout-receipt.json>
+```
+
+The closeout receipt is not destructive cleanup, data deletion, export/import
+execution, current-environment migration, production deployment, live-data
+admission, account creation, repository transfer, shared-runtime rollout or a
+product-completion claim.
+
 For deeper planning on eventual data disposition, client-owned management,
 business account decisions and repository stewardship, use
 `deploy/gcp/client-transition-planning-runbook.md` and validate the
@@ -101,8 +116,9 @@ UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_st
 If the feedback window is being assembled as an operator packet, use
 `deploy/gcp/templates/staff-feedback-package-index.example.json` to record the
 value-safe review of the staff-feedback readiness materials, activation-approval
-materials, activation-receipt materials, feedback triage materials,
-transition-planning materials and human-feedback templates. Validate that
+materials, activation-receipt materials, closeout-receipt materials, feedback
+triage materials, transition-planning materials and human-feedback templates.
+Validate that
 operator-held package index locally:
 
 ```bash

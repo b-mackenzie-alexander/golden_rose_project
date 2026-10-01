@@ -89,6 +89,16 @@
       "evidence": "<value-safe-staff-feedback-activation-receipt-validator-record>"
     },
     {
+      "path": "deploy/gcp/templates/staff-feedback-closeout-receipt.example.json",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-staff-feedback-closeout-receipt-template-record>"
+    },
+    {
+      "path": "scripts/validate_staff_feedback_closeout_receipt.py",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-staff-feedback-closeout-receipt-validator-record>"
+    },
+    {
       "path": "deploy/gcp/templates/staff-feedback-triage.example.json",
       "status": "<reviewed-or-blocked>",
       "evidence": "<value-safe-staff-feedback-triage-template-record>"
@@ -115,6 +125,7 @@
     "staff_feedback_triage": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_staff_feedback_triage.py <operator-held-staff-feedback-triage.json>",
     "staff_feedback_activation_approval": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_staff_feedback_activation_approval.py <operator-held-staff-feedback-activation-approval.json>",
     "staff_feedback_activation_receipt": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_staff_feedback_activation_receipt.py <operator-held-staff-feedback-activation-receipt.json>",
+    "staff_feedback_closeout_receipt": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_staff_feedback_closeout_receipt.py <operator-held-staff-feedback-closeout-receipt.json>",
     "staff_feedback_package_index": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_staff_feedback_package_index.py <operator-held-staff-feedback-package-index.json>"
   },
   "activation_boundary": {

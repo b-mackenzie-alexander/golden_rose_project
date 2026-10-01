@@ -116,6 +116,14 @@ def test_operations_projection_route_returns_no_store_projection(
             "first_shift_starts_at": None,
             "last_shift_ends_at": None,
         },
+        "queue_summary": {
+            "open_item_count": 0,
+            "draft_count": 0,
+            "pending_review_count": 0,
+            "high_priority_count": 0,
+            "oldest_item_updated_at": None,
+            "newest_item_updated_at": None,
+        },
     }
 
     def fake_projection(**kwargs: Any) -> dict[str, Any]:
@@ -137,6 +145,7 @@ def test_operations_projection_route_returns_no_store_projection(
     assert response.json()["area_summary"][0]["area_label"] == "Brooklyn"
     assert response.json()["report_summary"]["pending_review_count"] == 1
     assert response.json()["calendar_summary"]["projected_shift_count"] == 0
+    assert response.json()["queue_summary"]["open_item_count"] == 0
 
 
 def test_operations_projection_route_bounds_page_size() -> None:
@@ -199,6 +208,8 @@ def test_operations_projection_returns_request_and_shift_items():
         [
             FakeResult([request_row]),
             FakeResult([shift_row]),
+            FakeResult([]),
+            FakeResult([]),
             FakeResult([]),
             FakeResult([]),
             FakeResult([]),
@@ -272,8 +283,16 @@ def test_operations_projection_returns_request_and_shift_items():
             "first_shift_starts_at": None,
             "last_shift_ends_at": None,
         },
+        "queue_summary": {
+            "open_item_count": 0,
+            "draft_count": 0,
+            "pending_review_count": 0,
+            "high_priority_count": 0,
+            "oldest_item_updated_at": None,
+            "newest_item_updated_at": None,
+        },
     }
-    assert len(session.executed) == 5
+    assert len(session.executed) == 7
     assert session.rollbacks == 0
 
 
@@ -324,6 +343,30 @@ def test_operations_projection_aggregates_broad_area_and_reporting_totals():
                     },
                 ]
             ),
+            FakeResult(
+                [
+                    {
+                        "request_status": "pending_review",
+                        "updated_at": datetime(2026, 9, 29, 15, 0, tzinfo=UTC),
+                    },
+                    {
+                        "request_status": "draft",
+                        "updated_at": datetime(2026, 9, 30, 15, 0, tzinfo=UTC),
+                    },
+                ]
+            ),
+            FakeResult(
+                [
+                    {
+                        "shift_status": "pending_review",
+                        "updated_at": datetime(2026, 9, 30, 16, 0, tzinfo=UTC),
+                    },
+                    {
+                        "shift_status": "draft",
+                        "updated_at": datetime(2026, 10, 1, 16, 0, tzinfo=UTC),
+                    },
+                ]
+            ),
         ]
     )
 
@@ -359,6 +402,14 @@ def test_operations_projection_aggregates_broad_area_and_reporting_totals():
         "coverage_day_count": 2,
         "first_shift_starts_at": NOW,
         "last_shift_ends_at": datetime(2026, 10, 1, 21, 0, tzinfo=UTC),
+    }
+    assert result["queue_summary"] == {
+        "open_item_count": 4,
+        "draft_count": 2,
+        "pending_review_count": 2,
+        "high_priority_count": 1,
+        "oldest_item_updated_at": datetime(2026, 9, 29, 15, 0, tzinfo=UTC),
+        "newest_item_updated_at": datetime(2026, 10, 1, 16, 0, tzinfo=UTC),
     }
 
 

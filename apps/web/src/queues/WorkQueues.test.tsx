@@ -70,6 +70,14 @@ const projectionExtras = {
     firstShiftStartsAt: '2026-09-29T14:00:00Z',
     lastShiftEndsAt: '2026-09-29T18:00:00Z',
   },
+  queueSummary: {
+    openItemCount: 2,
+    draftCount: 1,
+    pendingReviewCount: 1,
+    highPriorityCount: 1,
+    oldestItemUpdatedAt: '2026-09-29T13:30:00Z',
+    newestItemUpdatedAt: '2026-09-29T13:45:00Z',
+  },
 };
 
 describe('WorkQueues', () => {
@@ -134,6 +142,8 @@ describe('WorkQueues', () => {
     renderQueues();
 
     await screen.findByText('Shift pending review');
+    expect(screen.getByText(/Request and shift queue: 2 open item/)).toBeInTheDocument();
+    expect(screen.getByText(/This does not assign workers or confirm coverage/)).toBeInTheDocument();
     expect(screen.getAllByText(/Projected Employer/).length).toBeGreaterThan(0);
     expect(screen.getByText('Prepare staffing request')).toBeInTheDocument();
     expect(screen.getByText('Required intake fields are still missing')).toBeInTheDocument();
@@ -209,6 +219,14 @@ describe('WorkQueues', () => {
           firstShiftStartsAt: null,
           lastShiftEndsAt: null,
         },
+        queueSummary: {
+          openItemCount: 0,
+          draftCount: 0,
+          pendingReviewCount: 0,
+          highPriorityCount: 0,
+          oldestItemUpdatedAt: null,
+          newestItemUpdatedAt: null,
+        },
       },
     });
 
@@ -217,6 +235,7 @@ describe('WorkQueues', () => {
     await waitFor(() => {
       expect(screen.getByText('No queue items match this view.')).toBeInTheDocument();
     });
+    expect(screen.getByText(/Request and shift queue: 0 open item/)).toBeInTheDocument();
     expect(screen.queryByText('Urgent intake review')).not.toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
@@ -340,6 +359,14 @@ describe('WorkQueues', () => {
           coverageDayCount: 0,
           firstShiftStartsAt: null,
           lastShiftEndsAt: null,
+        },
+        queueSummary: {
+          openItemCount: 0,
+          draftCount: 0,
+          pendingReviewCount: 0,
+          highPriorityCount: 0,
+          oldestItemUpdatedAt: null,
+          newestItemUpdatedAt: null,
         },
       },
     });

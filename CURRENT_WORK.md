@@ -1,5 +1,17 @@
 # Current Work — Golden Rose Operations Platform
 
+## 2026-09-30 — Operations queue aging active
+
+- **Staffing:** One independent developer; focused backend/frontend tests, static checks and later PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #139, `feat: add operations calendar coverage`, merged into protected `develop` at `40b03ca3c408145ddf2897dc1069e55f3fdcf82f`. Local `develop` was fetched/pruned and fast-forwarded to that exact `origin/develop` tip; stale local `feat/operations-calendar-coverage` was deleted after exact tree comparison against `origin/develop`; no extra linked worktree remained. Fresh source work is active on `feat/operations-queue-aging`. This slice continues Tranche 3 by extending the no-store operations projection with queue-aging summary metrics for request/shift records and surfacing an operational queue-aging note on Work Queues.
+- **Gate budget:** Source/frontend/backend-client/local-validation work only. No cloud inspection or mutation, Terraform plan/apply, production deployment, live/client data, live identity-provider activation, provider-side reset/revocation mechanics, credential rotation, default permission activation, persistent synthetic write qualification, cloud migration or shared-runtime rollout occurs in this branch.
+- **Next executable action:** Complete publication hygiene for this queue-aging slice, including whitespace and redacted secret scans plus outgoing-range checks before PR publication. Later Tranche 3 work still needs manual accessibility, fluent-Spanish and staff-workflow acceptance; those are human acceptance gates and are not claimed by this source branch.
+- **Do not regress:** Human staff decision boundaries; no automated matching/ranking/eligibility/referral/placement; no active demand, coverage, referral, assignment or placement implication from request/shift queue records; personal browser-local calendar notes remain separate from request-derived operational coverage; private fictional-synthetic boundaries until live-data gates open; immutable intake history and exact retries; restricted-field permissions; bilingual/accessibility parity; separate public/staff identity planes; auth-sensitive no-store handling; deployable package guardrails for the client's later GCP environment.
+
+**Validated locally:** Focused backend operations projection tests passed 6 tests with the existing Starlette/httpx warning. Focused frontend operations projection client, work-queue, dashboard and staff calendar tests passed 65 tests with existing jsdom canvas notices. `npm --prefix apps/web run typecheck`, `npm --prefix apps/web run lint`, and `npm --prefix apps/web run build` passed; the build retains the existing Vite large-chunk warning. Full `npm --prefix apps/web run verify` passed lock validation, lock tests, lint, typecheck, 479 frontend tests with coverage gates, and production build. Focused Ruff format/check passed for touched backend files and tests. Full `UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run mypy src tests` passed across 249 source files.
+
+**Planning artifact:** [Production-readiness and staff identity plan](docs/planning/2026-09-27-production-readiness-plan.md).
+
 ## 2026-09-30 — Operations calendar coverage active
 
 - **Staffing:** One independent developer; focused backend/frontend tests, static checks and later PR gates provide quality evidence, not independent-human authorization.

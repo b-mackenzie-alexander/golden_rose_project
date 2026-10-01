@@ -144,6 +144,48 @@ def _build_calendar_summary(calendar_rows: Sequence[Mapping[str, Any]]) -> dict[
     return summary
 
 
+def _build_queue_summary(
+    *,
+    request_queue_rows: Sequence[Mapping[str, Any]],
+    shift_queue_rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    summary: dict[str, Any] = {
+        "open_item_count": 0,
+        "draft_count": 0,
+        "pending_review_count": 0,
+        "high_priority_count": 0,
+        "oldest_item_updated_at": None,
+        "newest_item_updated_at": None,
+    }
+    oldest_item: datetime | None = None
+    newest_item: datetime | None = None
+
+    def count_row(status: object, updated_at: object, *, high_priority: bool = False) -> None:
+        nonlocal oldest_item, newest_item
+        summary["open_item_count"] += 1
+        if status == "draft":
+            summary["draft_count"] += 1
+        if status == "pending_review":
+            summary["pending_review_count"] += 1
+        if high_priority:
+            summary["high_priority_count"] += 1
+        if isinstance(updated_at, datetime):
+            if oldest_item is None or updated_at < oldest_item:
+                oldest_item = updated_at
+            if newest_item is None or updated_at > newest_item:
+                newest_item = updated_at
+
+    for row in request_queue_rows:
+        count_row(row.get("request_status"), row.get("updated_at"))
+    for row in shift_queue_rows:
+        status = row.get("shift_status")
+        count_row(status, row.get("updated_at"), high_priority=status == "pending_review")
+
+    summary["oldest_item_updated_at"] = oldest_item
+    summary["newest_item_updated_at"] = newest_item
+    return summary
+
+
 def query_operations_projection(
     *,
     session: Session,
@@ -313,6 +355,46 @@ def query_operations_projection(
             .mappings()
             .all()
         )
+        request_queue_rows = (
+            session.execute(
+                select(
+                    staffing_requests.c.request_status,
+                    staffing_requests.c.updated_at,
+                )
+                .join(employers, employers.c.employer_id == staffing_requests.c.employer_id)
+                .where(
+                    employers.c.lifecycle_status == "draft",
+                    staffing_requests.c.request_status.in_(("draft", "pending_review")),
+                )
+                .limit(500)
+            )
+            .mappings()
+            .all()
+        )
+        shift_queue_rows = (
+            session.execute(
+                select(
+                    shift_needs.c.shift_status,
+                    shift_needs.c.updated_at,
+                )
+                .join(
+                    staffing_requests,
+                    (staffing_requests.c.employer_id == shift_needs.c.employer_id)
+                    & (
+                        staffing_requests.c.staffing_request_id == shift_needs.c.staffing_request_id
+                    ),
+                )
+                .join(employers, employers.c.employer_id == shift_needs.c.employer_id)
+                .where(
+                    employers.c.lifecycle_status == "draft",
+                    staffing_requests.c.request_status.in_(("draft", "pending_review")),
+                    shift_needs.c.shift_status.in_(("draft", "pending_review")),
+                )
+                .limit(500)
+            )
+            .mappings()
+            .all()
+        )
     except SQLAlchemyError as exc:
         session.rollback()
         raise IntakeError("persistence_unavailable", 503) from exc
@@ -322,6 +404,10 @@ def query_operations_projection(
     )
     calendar_summary = _build_calendar_summary(
         cast(Sequence[Mapping[str, Any]], shift_calendar_rows)
+    )
+    queue_summary = _build_queue_summary(
+        request_queue_rows=cast(Sequence[Mapping[str, Any]], request_queue_rows),
+        shift_queue_rows=cast(Sequence[Mapping[str, Any]], shift_queue_rows),
     )
     return {
         "request_items": [
@@ -341,4 +427,5 @@ def query_operations_projection(
         "area_summary": area_summary,
         "report_summary": report_summary,
         "calendar_summary": calendar_summary,
+        "queue_summary": queue_summary,
     }

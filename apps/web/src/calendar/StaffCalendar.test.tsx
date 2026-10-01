@@ -49,6 +49,14 @@ const projectionExtras = {
     firstShiftStartsAt: '2026-09-29T14:00:00Z',
     lastShiftEndsAt: '2026-09-29T18:00:00Z',
   },
+  queueSummary: {
+    openItemCount: 2,
+    draftCount: 1,
+    pendingReviewCount: 1,
+    highPriorityCount: 1,
+    oldestItemUpdatedAt: '2026-09-29T13:30:00Z',
+    newestItemUpdatedAt: '2026-09-29T13:45:00Z',
+  },
 };
 
 describe('StaffCalendar', () => {
@@ -199,6 +207,14 @@ describe('StaffCalendar', () => {
           coverageDayCount: 0,
           firstShiftStartsAt: null,
           lastShiftEndsAt: null,
+        },
+        queueSummary: {
+          openItemCount: 0,
+          draftCount: 0,
+          pendingReviewCount: 0,
+          highPriorityCount: 0,
+          oldestItemUpdatedAt: null,
+          newestItemUpdatedAt: null,
         },
       },
     });

@@ -68,9 +68,19 @@ class OperationsCalendarSummary(IntakeValue):
     last_shift_ends_at: datetime | None = None
 
 
+class OperationsQueueSummary(IntakeValue):
+    open_item_count: int = Field(ge=0, le=2147483647)
+    draft_count: int = Field(ge=0, le=2147483647)
+    pending_review_count: int = Field(ge=0, le=2147483647)
+    high_priority_count: int = Field(ge=0, le=2147483647)
+    oldest_item_updated_at: datetime | None = None
+    newest_item_updated_at: datetime | None = None
+
+
 class OperationsProjectionResponse(IntakeValue):
     request_items: list[OperationsStaffingRequestItem]
     shift_items: list[OperationsShiftNeedItem]
     area_summary: list[OperationsAreaSummaryItem]
     report_summary: OperationsReportSummary
     calendar_summary: OperationsCalendarSummary
+    queue_summary: OperationsQueueSummary

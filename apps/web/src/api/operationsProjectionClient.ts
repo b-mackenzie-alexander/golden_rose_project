@@ -69,12 +69,22 @@ export type OperationsCalendarSummary = {
   lastShiftEndsAt: string | null;
 };
 
+export type OperationsQueueSummary = {
+  openItemCount: number;
+  draftCount: number;
+  pendingReviewCount: number;
+  highPriorityCount: number;
+  oldestItemUpdatedAt: string | null;
+  newestItemUpdatedAt: string | null;
+};
+
 export type OperationsProjection = {
   requestItems: OperationsRequestItem[];
   shiftItems: OperationsShiftItem[];
   areaSummary: OperationsAreaSummaryItem[];
   reportSummary: OperationsReportSummary;
   calendarSummary: OperationsCalendarSummary;
+  queueSummary: OperationsQueueSummary;
 };
 
 const areaLabels: Record<OperationsAreaKey, OperationsAreaSummaryItem['areaLabel']> = {
@@ -249,6 +259,36 @@ function parseCalendarSummary(value: unknown): OperationsCalendarSummary | null 
   };
 }
 
+function parseQueueSummary(value: unknown): OperationsQueueSummary | null {
+  if (!object(value)) return null;
+  const oldestItemUpdatedAt = optionalTimestamp(value.oldest_item_updated_at);
+  const newestItemUpdatedAt = optionalTimestamp(value.newest_item_updated_at);
+  if (
+    !nonNegative(value.open_item_count) ||
+    !nonNegative(value.draft_count) ||
+    !nonNegative(value.pending_review_count) ||
+    !nonNegative(value.high_priority_count) ||
+    oldestItemUpdatedAt === false ||
+    newestItemUpdatedAt === false ||
+    value.draft_count + value.pending_review_count > value.open_item_count ||
+    value.high_priority_count > value.open_item_count ||
+    (oldestItemUpdatedAt === null) !== (newestItemUpdatedAt === null) ||
+    (
+      oldestItemUpdatedAt !== null &&
+      newestItemUpdatedAt !== null &&
+      Date.parse(oldestItemUpdatedAt) > Date.parse(newestItemUpdatedAt)
+    )
+  ) return null;
+  return {
+    openItemCount: value.open_item_count,
+    draftCount: value.draft_count,
+    pendingReviewCount: value.pending_review_count,
+    highPriorityCount: value.high_priority_count,
+    oldestItemUpdatedAt,
+    newestItemUpdatedAt,
+  };
+}
+
 function parseProjection(value: unknown): OperationsProjection | null {
   if (
     !object(value) ||
@@ -262,6 +302,7 @@ function parseProjection(value: unknown): OperationsProjection | null {
   const areaSummary = value.area_summary.map(parseAreaSummaryItem);
   const reportSummary = parseReportSummary(value.report_summary);
   const calendarSummary = parseCalendarSummary(value.calendar_summary);
+  const queueSummary = parseQueueSummary(value.queue_summary);
   const areaKeys = new Set(areaSummary.map((item) => item?.areaKey));
   if (
     requestItems.some((item) => item === null) ||
@@ -269,7 +310,8 @@ function parseProjection(value: unknown): OperationsProjection | null {
     areaSummary.some((item) => item === null) ||
     areaKeys.size !== 5 ||
     reportSummary === null ||
-    calendarSummary === null
+    calendarSummary === null ||
+    queueSummary === null
   ) return null;
   return {
     requestItems: requestItems as OperationsRequestItem[],
@@ -277,6 +319,7 @@ function parseProjection(value: unknown): OperationsProjection | null {
     areaSummary: areaSummary as OperationsAreaSummaryItem[],
     reportSummary,
     calendarSummary,
+    queueSummary,
   };
 }
 

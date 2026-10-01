@@ -35,6 +35,11 @@ activate provider-side staff identity, or create shared runtime access.
   placeholder-only template for later backup/restore rehearsal evidence. It is
   not a backup receipt, not a restore receipt, not proof of recovery execution,
   and not approval to run destructive recovery or use live/client data.
+- `deploy/gcp/templates/client-production-operations-readiness.example.json` is
+  a placeholder-only template for later monitoring, alerting, log-retention,
+  incident-routing and support-routing evidence. It is not an alerting
+  configuration, not an incident contact list, not proof that contact channels
+  have been activated, and not approval to mutate cloud monitoring resources.
 - Real project IDs, billing IDs, principals, service URLs, database URLs,
   identity-provider URLs, JWKS URLs, secret names, passwords, tokens, state
   buckets, support contacts, and owner emails must remain in approved private
@@ -103,10 +108,11 @@ UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_cl
 ```
 
 The readiness checklist validator requires the package artifacts, staff
-identity, Terraform plan review, artifact admission, handoff evidence and
-operations-owner sections to be marked ready with value-safe evidence. It also
-requires manual accessibility, fluent Spanish and staff workflow acceptance to
-remain `separate-review-required`, and requires production deployment, live-data
+identity, Terraform plan review, artifact admission, handoff evidence,
+backup/restore rehearsal, operations readiness and operations-owner sections to
+be marked ready with value-safe evidence. It also requires manual accessibility,
+fluent Spanish and staff workflow acceptance to remain
+`separate-review-required`, and requires production deployment, live-data
 admission and shared-runtime rollout to remain not executed without separate
 approval.
 
@@ -139,6 +145,21 @@ target, no live data in source, database-authority receipt, rollback or
 forward-recovery note, and backup/restore owner. It does not authenticate to
 GCP, inspect resources, execute backups, execute restores, run destructive
 recovery, deploy production, roll out a shared runtime, admit live/client data,
+or prove provider-side recovery or session revocation.
+
+When a later approved production packet records value-safe operations readiness
+evidence, keep the filled JSON outside source control and validate it locally:
+
+```bash
+UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_operations_readiness_evidence.py <operator-held-operations-readiness.json>
+```
+
+The operations readiness evidence validator checks the source commit, migration
+revision, ready monitoring, alerting, log-retention, incident-routing and
+support-routing statuses, value-safe receipts, and named monitoring, incident
+and support owners. It does not authenticate to GCP, inspect resources, create
+alert policies, create notification channels, activate incident contacts, page
+operators, deploy production, roll out a shared runtime, admit live/client data,
 or prove provider-side recovery or session revocation.
 
 ## Later Plan Review Policy
@@ -182,6 +203,9 @@ these are true:
 - A package policy omits delete/replace, public SQL, broad IAM, immutable
   digest, staff OIDC, demo-access, unqualified-secret, signed-artifact,
   database-authority, backup/restore or support-owner checks.
+- Operations readiness evidence includes real staff emails, private contact
+  URLs, alert channel payloads, command transcripts, or claims that incident
+  contacts were activated without a separate approval packet.
 - Staff recovery or session-revocation wording implies Golden Rose performs
   provider-side factor reset, provider-side session revocation, token
   revocation, or forced logout.
@@ -200,11 +224,15 @@ A later approved production packet should produce value-safe handoff evidence:
   `deploy/gcp/templates/client-production-package-index.example.json`,
 - optional backup/restore rehearsal structure from
   `deploy/gcp/templates/client-production-backup-restore.example.json`,
+- optional operations readiness structure from
+  `deploy/gcp/templates/client-production-operations-readiness.example.json`,
 - source commit and immutable image digest,
 - migration revision,
 - state backend lineage identifier,
 - database-authority receipt,
 - backup and restore rehearsal receipts,
+- monitoring, alerting, log-retention, incident-routing and support-routing
+  receipts,
 - staff identity readiness result,
 - smoke/readiness results,
 - rollback or forward-recovery note,

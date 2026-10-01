@@ -16,6 +16,7 @@
     "artifact_admission",
     "handoff_evidence",
     "backup_restore_rehearsal",
+    "operations_readiness",
     "operations_owners",
     "manual_acceptance_boundary"
   ],
@@ -42,6 +43,10 @@
   "backup_restore_rehearsal": {
     "status": "<ready-or-blocked>",
     "evidence": "<value-safe-backup-restore-validator-record>"
+  },
+  "operations_readiness": {
+    "status": "<ready-or-blocked>",
+    "evidence": "<value-safe-operations-readiness-validator-record>"
   },
   "operations_owners": {
     "status": "<ready-or-blocked>",

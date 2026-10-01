@@ -1,0 +1,33 @@
+{
+  "purpose": "Placeholder-only operations readiness evidence template. Do not commit real values.",
+  "evidence_type": "client-production-operations-readiness-not-activation",
+  "validator_command": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_operations_readiness_evidence.py <operator-held-operations-readiness.json>",
+  "authority_boundary": {
+    "cloud_execution": "separate-approval-required",
+    "production_deployment": "separate-approval-required",
+    "live_data_admission": "separate-approval-required",
+    "incident_contact_activation": "separate-approval-required"
+  },
+  "source": {
+    "source_commit": "<40-hex-source-commit>",
+    "migration_revision": "<alembic-revision>"
+  },
+  "operations": {
+    "monitoring_configuration_status": "<ready-or-blocked>",
+    "alerting_configuration_status": "<ready-or-blocked>",
+    "log_retention_status": "<ready-or-blocked>",
+    "incident_routing_status": "<ready-or-blocked>",
+    "support_routing_status": "<ready-or-blocked>"
+  },
+  "evidence": {
+    "monitoring_receipt": "<value-safe-monitoring-record>",
+    "alerting_receipt": "<value-safe-alerting-record>",
+    "log_retention_receipt": "<value-safe-log-retention-record>",
+    "incident_routing_receipt": "<value-safe-incident-routing-record>",
+    "support_routing_receipt": "<value-safe-support-routing-record>",
+    "monitoring_owner": "<private-owner-record>",
+    "incident_owner": "<private-owner-record>",
+    "support_owner": "<private-owner-record>",
+    "escalation_review_note": "<value-safe-escalation-review-record>"
+  }
+}

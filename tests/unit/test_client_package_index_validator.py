@@ -34,8 +34,6 @@ def _valid_package_index() -> dict[str, Any]:
         ],
         "validator_commands": dict(REQUIRED_VALIDATOR_COMMANDS),
         "manual_acceptance_boundary": {
-            "accessibility_review": "separate-review-required",
-            "fluent_spanish_review": "separate-review-required",
             "staff_workflow_acceptance": "separate-review-required",
         },
         "activation_boundary": {

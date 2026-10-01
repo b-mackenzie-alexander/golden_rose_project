@@ -1,0 +1,34 @@
+{
+  "purpose": "Placeholder-only manual accessibility and language review evidence template. Do not commit real values.",
+  "evidence_type": "client-production-manual-accessibility-language-review-not-activation",
+  "validator_command": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_manual_review_evidence.py <operator-held-manual-review.json>",
+  "authority_boundary": {
+    "cloud_execution": "separate-approval-required",
+    "production_deployment": "separate-approval-required",
+    "live_data_admission": "separate-approval-required",
+    "public_accessibility_claim": "separate-approval-required",
+    "translation_certification": "separate-approval-required"
+  },
+  "source": {
+    "source_commit": "<40-hex-source-commit>",
+    "migration_revision": "<alembic-revision>"
+  },
+  "manual_review": {
+    "keyboard_navigation_status": "<ready-or-blocked>",
+    "screen_reader_status": "<ready-or-blocked>",
+    "reflow_status": "<ready-or-blocked>",
+    "contrast_status": "<ready-or-blocked>",
+    "fluent_spanish_status": "<ready-or-blocked>",
+    "bilingual_parity_status": "<ready-or-blocked>"
+  },
+  "evidence": {
+    "keyboard_review_receipt": "<value-safe-keyboard-review-record>",
+    "screen_reader_review_receipt": "<value-safe-screen-reader-review-record>",
+    "reflow_review_receipt": "<value-safe-reflow-review-record>",
+    "contrast_review_receipt": "<value-safe-contrast-review-record>",
+    "fluent_spanish_review_receipt": "<value-safe-fluent-spanish-review-record>",
+    "bilingual_parity_receipt": "<value-safe-bilingual-parity-review-record>",
+    "manual_review_owner": "<private-owner-record>",
+    "next_review_note": "<value-safe-next-review-record>"
+  }
+}

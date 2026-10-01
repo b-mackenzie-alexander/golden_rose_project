@@ -33,6 +33,9 @@ DATA_GOVERNANCE_TEMPLATE_PATH = Path(
 COPY_APPROVAL_TEMPLATE_PATH = Path(
     "deploy/gcp/templates/client-production-copy-approval.example.json"
 )
+MANUAL_REVIEW_TEMPLATE_PATH = Path(
+    "deploy/gcp/templates/client-production-manual-review.example.json"
+)
 
 REQUIRED_RUNBOOK_PHRASES = (
     "not an approval to inspect or",
@@ -56,6 +59,7 @@ REQUIRED_RUNBOOK_PHRASES = (
     "client-production-runtime-lifecycle.example.json",
     "client-production-data-governance.example.json",
     "client-production-copy-approval.example.json",
+    "client-production-manual-review.example.json",
     "scripts/validate_client_production_plan.py",
     "scripts/validate_client_handoff_evidence.py",
     "scripts/validate_client_readiness_checklist.py",
@@ -65,6 +69,7 @@ REQUIRED_RUNBOOK_PHRASES = (
     "scripts/validate_client_runtime_lifecycle_evidence.py",
     "scripts/validate_client_data_governance_evidence.py",
     "scripts/validate_client_copy_approval_evidence.py",
+    "scripts/validate_client_manual_review_evidence.py",
     "delete/replace actions",
     "public SQL exposure",
     "broad IAM",
@@ -75,6 +80,7 @@ REQUIRED_RUNBOOK_PHRASES = (
     "validate_client_runtime_lifecycle_evidence.py <operator-held-runtime-lifecycle.json>",
     "validate_client_data_governance_evidence.py <operator-held-data-governance.json>",
     "validate_client_copy_approval_evidence.py <operator-held-copy-approval.json>",
+    "validate_client_manual_review_evidence.py <operator-held-manual-review.json>",
 )
 
 REQUIRED_ENV_VALUES = {
@@ -217,10 +223,10 @@ REQUIRED_READINESS_PLACEHOLDERS = (
     ("data_governance_review", "evidence"),
     ("copy_approval_review", "status"),
     ("copy_approval_review", "evidence"),
+    ("manual_accessibility_language_review", "status"),
+    ("manual_accessibility_language_review", "evidence"),
     ("operations_owners", "status"),
     ("operations_owners", "evidence"),
-    ("manual_acceptance_boundary", "accessibility_review"),
-    ("manual_acceptance_boundary", "fluent_spanish_review"),
     ("manual_acceptance_boundary", "staff_workflow_acceptance"),
 )
 
@@ -235,6 +241,7 @@ REQUIRED_READINESS_SECTIONS = (
     "runtime_lifecycle_review",
     "data_governance_review",
     "copy_approval_review",
+    "manual_accessibility_language_review",
     "operations_owners",
     "manual_acceptance_boundary",
 )
@@ -264,6 +271,7 @@ REQUIRED_PACKAGE_INDEX_SOURCE_ARTIFACTS = (
     "deploy/gcp/templates/client-production-runtime-lifecycle.example.json",
     "deploy/gcp/templates/client-production-data-governance.example.json",
     "deploy/gcp/templates/client-production-copy-approval.example.json",
+    "deploy/gcp/templates/client-production-manual-review.example.json",
     "scripts/validate_deployable_package.py",
     "scripts/validate_client_production_plan.py",
     "scripts/validate_client_handoff_evidence.py",
@@ -274,6 +282,7 @@ REQUIRED_PACKAGE_INDEX_SOURCE_ARTIFACTS = (
     "scripts/validate_client_runtime_lifecycle_evidence.py",
     "scripts/validate_client_data_governance_evidence.py",
     "scripts/validate_client_copy_approval_evidence.py",
+    "scripts/validate_client_manual_review_evidence.py",
 )
 
 REQUIRED_PACKAGE_INDEX_VALIDATOR_COMMANDS = {
@@ -321,11 +330,14 @@ REQUIRED_PACKAGE_INDEX_VALIDATOR_COMMANDS = {
         "scripts/validate_client_copy_approval_evidence.py "
         "<operator-held-copy-approval.json>"
     ),
+    "manual_review_evidence": (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_client_manual_review_evidence.py "
+        "<operator-held-manual-review.json>"
+    ),
 }
 
 REQUIRED_PACKAGE_INDEX_MANUAL_BOUNDARY = {
-    "accessibility_review": "<not-run-or-separate-record>",
-    "fluent_spanish_review": "<not-run-or-separate-record>",
     "staff_workflow_acceptance": "<not-run-or-separate-record>",
 }
 
@@ -934,6 +946,60 @@ def _validate_copy_approval_template(text: str) -> None:
             )
 
 
+def _validate_manual_review_template(text: str) -> None:
+    document = _load_json_object(text, MANUAL_REVIEW_TEMPLATE_PATH)
+    expected_type = "client-production-manual-accessibility-language-review-not-activation"
+    if document.get("evidence_type") != expected_type:
+        raise PackageValidationError(
+            f"{MANUAL_REVIEW_TEMPLATE_PATH} evidence_type must distinguish review"
+        )
+    expected_command = (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_client_manual_review_evidence.py "
+        "<operator-held-manual-review.json>"
+    )
+    if document.get("validator_command") != expected_command:
+        raise PackageValidationError(
+            f"{MANUAL_REVIEW_TEMPLATE_PATH} validator_command must be {expected_command}"
+        )
+    for key in (
+        "cloud_execution",
+        "production_deployment",
+        "live_data_admission",
+        "public_accessibility_claim",
+        "translation_certification",
+    ):
+        value = _get_pointer(document, MANUAL_REVIEW_TEMPLATE_PATH, "authority_boundary", key)
+        if value != "separate-approval-required":
+            raise PackageValidationError(
+                f"{MANUAL_REVIEW_TEMPLATE_PATH} authority_boundary.{key} "
+                "must preserve approval boundary"
+            )
+    for section, key in (
+        ("source", "source_commit"),
+        ("source", "migration_revision"),
+        ("manual_review", "keyboard_navigation_status"),
+        ("manual_review", "screen_reader_status"),
+        ("manual_review", "reflow_status"),
+        ("manual_review", "contrast_status"),
+        ("manual_review", "fluent_spanish_status"),
+        ("manual_review", "bilingual_parity_status"),
+        ("evidence", "keyboard_review_receipt"),
+        ("evidence", "screen_reader_review_receipt"),
+        ("evidence", "reflow_review_receipt"),
+        ("evidence", "contrast_review_receipt"),
+        ("evidence", "fluent_spanish_review_receipt"),
+        ("evidence", "bilingual_parity_receipt"),
+        ("evidence", "manual_review_owner"),
+        ("evidence", "next_review_note"),
+    ):
+        value = _get_pointer(document, MANUAL_REVIEW_TEMPLATE_PATH, section, key)
+        if not isinstance(value, str) or not _is_placeholder(value):
+            raise PackageValidationError(
+                f"{MANUAL_REVIEW_TEMPLATE_PATH} {section}.{key} must remain a placeholder"
+            )
+
+
 def _validate_runbook(text: str) -> None:
     for phrase in REQUIRED_RUNBOOK_PHRASES:
         if phrase not in text:
@@ -953,6 +1019,7 @@ def validate(root: Path = ROOT) -> list[str]:
     runtime_lifecycle_template = _read(root, RUNTIME_LIFECYCLE_TEMPLATE_PATH)
     data_governance_template = _read(root, DATA_GOVERNANCE_TEMPLATE_PATH)
     copy_approval_template = _read(root, COPY_APPROVAL_TEMPLATE_PATH)
+    manual_review_template = _read(root, MANUAL_REVIEW_TEMPLATE_PATH)
     for relative_path, text in (
         (RUNBOOK_PATH, runbook),
         (ENV_TEMPLATE_PATH, env_template),
@@ -966,6 +1033,7 @@ def validate(root: Path = ROOT) -> list[str]:
         (RUNTIME_LIFECYCLE_TEMPLATE_PATH, runtime_lifecycle_template),
         (DATA_GOVERNANCE_TEMPLATE_PATH, data_governance_template),
         (COPY_APPROVAL_TEMPLATE_PATH, copy_approval_template),
+        (MANUAL_REVIEW_TEMPLATE_PATH, manual_review_template),
     ):
         _validate_no_forbidden_values(relative_path, text)
     _validate_runbook(runbook)
@@ -980,6 +1048,7 @@ def validate(root: Path = ROOT) -> list[str]:
     _validate_runtime_lifecycle_template(runtime_lifecycle_template)
     _validate_data_governance_template(data_governance_template)
     _validate_copy_approval_template(copy_approval_template)
+    _validate_manual_review_template(manual_review_template)
     return [
         str(RUNBOOK_PATH),
         str(ENV_TEMPLATE_PATH),
@@ -993,6 +1062,7 @@ def validate(root: Path = ROOT) -> list[str]:
         str(RUNTIME_LIFECYCLE_TEMPLATE_PATH),
         str(DATA_GOVERNANCE_TEMPLATE_PATH),
         str(COPY_APPROVAL_TEMPLATE_PATH),
+        str(MANUAL_REVIEW_TEMPLATE_PATH),
     ]
 
 

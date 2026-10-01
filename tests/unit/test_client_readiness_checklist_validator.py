@@ -21,6 +21,7 @@ READY_SECTIONS = (
     "runtime_lifecycle_review",
     "data_governance_review",
     "copy_approval_review",
+    "manual_accessibility_language_review",
     "operations_owners",
 )
 
@@ -47,6 +48,7 @@ def _valid_checklist() -> dict[str, Any]:
             "runtime_lifecycle_review",
             "data_governance_review",
             "copy_approval_review",
+            "manual_accessibility_language_review",
             "operations_owners",
             "manual_acceptance_boundary",
         ],
@@ -90,13 +92,15 @@ def _valid_checklist() -> dict[str, Any]:
             "status": "ready",
             "evidence": "copy approval evidence validator passed",
         },
+        "manual_accessibility_language_review": {
+            "status": "ready",
+            "evidence": "manual accessibility language validator passed",
+        },
         "operations_owners": {
             "status": "ready",
             "evidence": "operations owner records identified privately",
         },
         "manual_acceptance_boundary": {
-            "accessibility_review": "separate-review-required",
-            "fluent_spanish_review": "separate-review-required",
             "staff_workflow_acceptance": "separate-review-required",
         },
         "activation_boundary": {
@@ -190,9 +194,9 @@ def test_client_readiness_checklist_rejects_manual_acceptance_overclaim(
     tmp_path: Path,
 ) -> None:
     document = _valid_checklist()
-    document["manual_acceptance_boundary"]["accessibility_review"] = "passed"
+    document["manual_acceptance_boundary"]["staff_workflow_acceptance"] = "passed"
 
-    with pytest.raises(ReadinessChecklistValidationError, match="accessibility_review"):
+    with pytest.raises(ReadinessChecklistValidationError, match="staff_workflow_acceptance"):
         validate_readiness_checklist(_write_checklist(tmp_path, document))
 
 

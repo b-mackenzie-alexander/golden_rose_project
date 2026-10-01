@@ -9,6 +9,7 @@ from scripts.validate_deployable_package import (
     ENV_TEMPLATE_PATH,
     HANDOFF_TEMPLATE_PATH,
     INPUTS_TEMPLATE_PATH,
+    MANUAL_REVIEW_TEMPLATE_PATH,
     OPERATIONS_READINESS_TEMPLATE_PATH,
     PACKAGE_INDEX_PATH,
     POLICY_TEMPLATE_PATH,
@@ -36,6 +37,7 @@ def _copy_package(tmp_path: Path) -> Path:
         RUNTIME_LIFECYCLE_TEMPLATE_PATH,
         DATA_GOVERNANCE_TEMPLATE_PATH,
         COPY_APPROVAL_TEMPLATE_PATH,
+        MANUAL_REVIEW_TEMPLATE_PATH,
     ):
         source = ROOT / relative_path
         destination = tmp_path / relative_path
@@ -60,6 +62,7 @@ def test_deployable_package_artifacts_are_placeholder_only_and_complete() -> Non
         str(RUNTIME_LIFECYCLE_TEMPLATE_PATH),
         str(DATA_GOVERNANCE_TEMPLATE_PATH),
         str(COPY_APPROVAL_TEMPLATE_PATH),
+        str(MANUAL_REVIEW_TEMPLATE_PATH),
     ]
 
 
@@ -323,4 +326,21 @@ def test_deployable_package_rejects_copy_approval_activation_claim(
     )
 
     with pytest.raises(PackageValidationError, match="legal_approval_execution"):
+        validate(root)
+
+
+def test_deployable_package_rejects_manual_review_activation_claim(
+    tmp_path: Path,
+) -> None:
+    root = _copy_package(tmp_path)
+    manual_path = root / MANUAL_REVIEW_TEMPLATE_PATH
+    manual_path.write_text(
+        manual_path.read_text(encoding="utf-8").replace(
+            '"public_accessibility_claim": "separate-approval-required"',
+            '"public_accessibility_claim": "published"',
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PackageValidationError, match="public_accessibility_claim"):
         validate(root)

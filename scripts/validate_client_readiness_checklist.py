@@ -34,13 +34,10 @@ READY_SECTIONS = (
     "runtime_lifecycle_review",
     "data_governance_review",
     "copy_approval_review",
+    "manual_accessibility_language_review",
     "operations_owners",
 )
-MANUAL_ACCEPTANCE_KEYS = (
-    "accessibility_review",
-    "fluent_spanish_review",
-    "staff_workflow_acceptance",
-)
+MANUAL_ACCEPTANCE_KEYS = ("staff_workflow_acceptance",)
 REQUIRED_ACTIVATION_BOUNDARY = {
     "production_deployment": "not-executed-without-separate-approval",
     "live_data_admission": "not-admitted-without-separate-approval",

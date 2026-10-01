@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { queryIntakes } from '../api/intakeClient';
 import type { IntakeKind, IntakeSummary } from '../api/intakeContracts';
-import { getOperationsProjection, type OperationsProjection, type OperationsProjectionFailureKind, type OperationsRequestItem, type OperationsShiftItem } from '../api/operationsProjectionClient';
+import { getOperationsProjection, type OperationsProjection, type OperationsProjectionFailureKind, type OperationsQueueSummary, type OperationsRequestItem, type OperationsShiftItem } from '../api/operationsProjectionClient';
 import { IconSymbol } from '../dashboard/artwork';
 import type { IconName } from '../dashboard/artwork';
 import { useLanguage } from '../i18n/LanguageProvider';
@@ -162,6 +162,26 @@ function projectionNotice(status: ProjectionStatus, language: 'en' | 'es') {
   return language === 'es'
     ? `No se pudieron leer las solicitudes y turnos porque ${reason}. La cola conserva registros guardados y muestra ejemplos solo cuando no hay una lectura autoritativa.`
     : `Requests and shifts could not be read because ${reason}. The queue keeps saved intake rows visible and uses examples only where an authoritative read is unavailable.`;
+}
+
+function formatQueueTimestamp(value: string | null, language: 'en' | 'es') {
+  if (value === null) return language === 'es' ? 'sin actualizaciones registradas' : 'no recorded updates';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return language === 'es' ? 'actualizacion registrada' : 'recorded update';
+  return date.toLocaleString(language === 'es' ? 'es-US' : 'en-US', {
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    month: 'short',
+  });
+}
+
+function queueSummaryNotice(summary: OperationsQueueSummary, language: 'en' | 'es') {
+  const oldest = formatQueueTimestamp(summary.oldestItemUpdatedAt, language);
+  if (language === 'es') {
+    return `Cola de solicitudes y turnos: ${String(summary.openItemCount)} elemento(s) abiertos, ${String(summary.pendingReviewCount)} en revision y ${String(summary.highPriorityCount)} de alta prioridad; actualizacion mas antigua ${oldest}. Esto no asigna trabajadores ni confirma cobertura.`;
+  }
+  return `Request and shift queue: ${String(summary.openItemCount)} open item(s), ${String(summary.pendingReviewCount)} in review and ${String(summary.highPriorityCount)} high priority; oldest update ${oldest}. This does not assign workers or confirm coverage.`;
 }
 
 function intakeHref(kind: IntakeKind, item: IntakeSummary) {
@@ -395,6 +415,12 @@ export function WorkQueues() {
   const items = useMemo(() => dynamicItems(copy, queueData, language), [copy, language, queueData]);
   const summaryItems = useMemo(() => dynamicSummary(copy, items), [copy, items]);
   const operationsNotice = useMemo(() => projectionNotice(queueData?.operationsStatus ?? 'loading', language), [language, queueData?.operationsStatus]);
+  const queueNotice = useMemo(
+    () => (queueData?.operationsStatus === 'ready' && queueData.operations !== null
+      ? queueSummaryNotice(queueData.operations.queueSummary, language)
+      : null),
+    [language, queueData],
+  );
   const visibleItems = useMemo(
     () => items.filter((item) => filter === 'all' || (filter === 'urgent' ? item.priority === 'high' : item.category === filter)),
     [filter, items],
@@ -449,6 +475,8 @@ export function WorkQueues() {
 
       {operationsNotice ? (
         <p className="projection-status-notice" role="status">{operationsNotice}</p>
+      ) : queueNotice ? (
+        <p className="queue-aging-note">{queueNotice}</p>
       ) : null}
 
       <section className="queue-panel" aria-labelledby="queue-list-heading">

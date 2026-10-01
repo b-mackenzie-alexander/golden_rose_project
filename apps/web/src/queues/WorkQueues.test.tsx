@@ -146,6 +146,26 @@ describe('WorkQueues', () => {
     await waitFor(() => {
       expect(screen.getByText('Urgent intake review')).toBeInTheDocument();
     });
+    expect(screen.getByRole('status')).toHaveTextContent('projection service is unavailable');
+  });
+
+  it('keeps a successful empty projection visibly empty instead of showing fallback queue rows', async () => {
+    vi.mocked(intakeApi.queryIntakes).mockResolvedValue({
+      ok: true,
+      value: { items: [], next_cursor: null },
+    });
+    vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue({
+      ok: true,
+      value: { requestItems: [], shiftItems: [] },
+    });
+
+    renderQueues();
+
+    await waitFor(() => {
+      expect(screen.getByText('No queue items match this view.')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Urgent intake review')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('uses employer fallback links and draft labels when operations have no source intake', async () => {

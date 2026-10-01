@@ -5,16 +5,25 @@ import { IconSymbol, MissionStatementMark, SkylineArtwork, ZoneMapArtwork } from
 import type { IconName } from './artwork';
 import { queryIntakes } from '../api/intakeClient';
 import type { IntakeKind, IntakeSummary } from '../api/intakeContracts';
-import { getOperationsProjection, type OperationsProjection, type OperationsRequestItem, type OperationsShiftItem } from '../api/operationsProjectionClient';
+import { getOperationsProjection, type OperationsProjection, type OperationsProjectionFailureKind, type OperationsRequestItem, type OperationsShiftItem } from '../api/operationsProjectionClient';
 import { useLanguage } from '../i18n/LanguageProvider';
 
 type DashboardStatus = 'complete' | 'draft' | 'in_review' | 'incomplete' | 'pending';
-type DashboardIntakes = { employers: IntakeSummary[]; operations: OperationsProjection | null; workers: IntakeSummary[] };
+type ProjectionStatus = 'loading' | 'ready' | OperationsProjectionFailureKind;
+type DashboardIntakes = {
+  employers: IntakeSummary[];
+  loaded: boolean;
+  operations: OperationsProjection | null;
+  operationsStatus: ProjectionStatus;
+  workers: IntakeSummary[];
+};
 
 type DashboardCopy = {
   activityHeading: string;
   activityLink: string;
   activityRows: Array<{ icon: IconName; meta: string; title: string }>;
+  emptyQueue: string;
+  emptySchedule: string;
   greeting: string;
   kpis: Array<{ accent: 'danger' | 'info' | 'success' | 'warning'; href: string; icon: IconName; label: string; meta: string; value: string }>;
   primaryQueueHeading: string;
@@ -44,6 +53,8 @@ const englishDashboard: DashboardCopy = {
     { icon: 'document', meta: '3 hours ago - Mariela Torres', title: 'Preview worker draft created' },
     { icon: 'building', meta: '5 hours ago - Sofia Diaz', title: 'Clean Homes LLC added' },
   ],
+  emptyQueue: 'No request, shift, or intake work is waiting in the projection.',
+  emptySchedule: 'No projected shifts are scheduled for this view.',
   greeting: 'Good morning, Mariela',
   kpis: [
     { accent: 'danger', href: '/staff/intakes/workers?queue=review', icon: 'document', label: 'Worker intakes', meta: 'need review', value: '12' },
@@ -106,6 +117,8 @@ const spanishDashboard: DashboardCopy = {
     { icon: 'document', meta: 'hace 3 horas - Mariela Torres', title: 'Nuevo borrador de trabajador creado' },
     { icon: 'building', meta: 'hace 5 horas - Sofia Diaz', title: 'Se agrego Clean Homes LLC' },
   ],
+  emptyQueue: 'No hay solicitudes, turnos ni registros pendientes en la proyeccion.',
+  emptySchedule: 'No hay turnos proyectados para esta vista.',
   greeting: 'Buenos días, Mariela',
   kpis: [
     { accent: 'danger', href: '/staff/intakes/workers?queue=review', icon: 'document', label: 'Registros pendientes', meta: 'requieren revision', value: '12' },
@@ -232,6 +245,35 @@ function relativeDate(value: string, language: 'en' | 'es') {
   return language === 'es' ? `hace ${String(elapsedDays)} dias` : `${String(elapsedDays)} days ago`;
 }
 
+function isProjectionFailure(status: ProjectionStatus) {
+  return status !== 'loading' && status !== 'ready';
+}
+
+function projectionNotice(status: ProjectionStatus, language: 'en' | 'es') {
+  if (!isProjectionFailure(status)) return null;
+  const reason = {
+    forbidden: {
+      en: 'this account is not authorized to read the projection',
+      es: 'esta cuenta no tiene autorizacion para leer la proyeccion',
+    },
+    validation: {
+      en: 'the projection response could not be validated',
+      es: 'no se pudo validar la respuesta de la proyeccion',
+    },
+    unavailable: {
+      en: 'the projection service is unavailable',
+      es: 'el servicio de proyeccion no esta disponible',
+    },
+    unexpected: {
+      en: 'the projection response was unexpected',
+      es: 'la respuesta de la proyeccion fue inesperada',
+    },
+  }[status][language];
+  return language === 'es'
+    ? `No se pudieron leer las solicitudes y turnos porque ${reason}. Se muestran registros guardados y datos de respaldo cuando no hay una lectura autoritativa.`
+    : `Requests and shifts could not be read because ${reason}. Saved intakes and fallback data are shown where an authoritative read is unavailable.`;
+}
+
 function recentRows(
   kind: IntakeKind,
   items: IntakeSummary[],
@@ -251,16 +293,15 @@ function recentRows(
 }
 
 function dynamicKpis(copy: DashboardCopy, data: DashboardIntakes, language: 'en' | 'es'): DashboardCopy['kpis'] {
-  if (
-    data.workers.length === 0 &&
-    data.employers.length === 0 &&
-    (!data.operations || (data.operations.requestItems.length === 0 && data.operations.shiftItems.length === 0))
-  ) return copy.kpis;
+  if (!data.loaded) return copy.kpis;
   const workerReviewCount = data.workers.filter((item) => item.review_status !== 'current').length;
   const employerReviewCount = data.employers.filter((item) => item.review_status !== 'current').length;
   const incompleteCount = [...data.workers, ...data.employers].filter((item) => item.complete === false).length;
-  const pendingShiftCount = data.operations?.shiftItems.filter((item) => item.shiftStatus === 'pending_review').length ?? 0;
-  const timedShiftCount = data.operations?.shiftItems.length ?? 0;
+  const operationsUnavailable = isProjectionFailure(data.operationsStatus);
+  const pendingShiftCount = operationsUnavailable
+    ? null
+    : data.operations?.shiftItems.filter((item) => item.shiftStatus === 'pending_review').length ?? 0;
+  const timedShiftCount = operationsUnavailable ? null : data.operations?.shiftItems.length ?? 0;
   const workerKpi = copy.kpis[0];
   const urgentKpi = copy.kpis[2];
   const calendarKpi = copy.kpis[3];
@@ -284,8 +325,10 @@ function dynamicKpis(copy: DashboardCopy, data: DashboardIntakes, language: 'en'
     {
       ...calendarKpi,
       label: language === 'es' ? 'Turnos registrados' : 'Recorded shifts',
-      meta: language === 'es' ? 'desde solicitudes' : 'from requests',
-      value: String(timedShiftCount),
+      meta: timedShiftCount === null
+        ? language === 'es' ? 'proyeccion no disponible' : 'projection unavailable'
+        : language === 'es' ? 'desde solicitudes' : 'from requests',
+      value: timedShiftCount === null ? 'N/A' : String(timedShiftCount),
     },
   ];
 }
@@ -351,11 +394,12 @@ function rowFromIntake(
 }
 
 function dynamicQueueRows(copy: DashboardCopy, data: DashboardIntakes, language: 'en' | 'es'): DashboardCopy['queueRows'] {
+  if (!data.loaded) return copy.queueRows;
   if (
     data.workers.length === 0 &&
     data.employers.length === 0 &&
     (!data.operations || (data.operations.requestItems.length === 0 && data.operations.shiftItems.length === 0))
-  ) return copy.queueRows;
+  ) return isProjectionFailure(data.operationsStatus) ? copy.queueRows : [];
   const rows = [...copy.queueRows];
   const operationRows = [
     ...(data.operations?.shiftItems.map((item, index) => {
@@ -392,7 +436,8 @@ function dynamicQueueRows(copy: DashboardCopy, data: DashboardIntakes, language:
 
 function dynamicScheduleRows(copy: DashboardCopy, data: DashboardIntakes, language: 'en' | 'es'): DashboardCopy['scheduleRows'] {
   const shifts = data.operations?.shiftItems ?? [];
-  if (!shifts.length) return copy.scheduleRows;
+  if (!data.loaded || isProjectionFailure(data.operationsStatus)) return copy.scheduleRows;
+  if (!shifts.length) return [];
   return shifts.slice(0, 5).map((item) => {
     const starts = new Date(item.startsAt);
     const ends = new Date(item.endsAt);
@@ -420,25 +465,33 @@ function IconMark({ name }: { name: IconName }) {
 export function Dashboard() {
   const { language } = useLanguage();
   const copy = language === 'es' ? spanishDashboard : englishDashboard;
-  const [intakes, setIntakes] = useState<DashboardIntakes>({ employers: [], operations: null, workers: [] });
+  const [intakes, setIntakes] = useState<DashboardIntakes>({
+    employers: [],
+    loaded: false,
+    operations: null,
+    operationsStatus: 'loading',
+    workers: [],
+  });
 
   useEffect(() => {
     let cancelled = false;
     Promise.all([
-      queryIntakes('worker', { page_size: 50 }),
-      queryIntakes('employer', { page_size: 50 }),
-      getOperationsProjection(),
+      queryIntakes('worker', { page_size: 50 }).catch(() => ({ ok: false as const, failure: 'failed' as const })),
+      queryIntakes('employer', { page_size: 50 }).catch(() => ({ ok: false as const, failure: 'failed' as const })),
+      getOperationsProjection().catch(() => ({ ok: false as const, failure: { kind: 'unavailable' as const } })),
     ])
       .then(([workerResult, employerResult, operationsResult]) => {
         if (cancelled) return;
         setIntakes({
           workers: workerResult.ok ? workerResult.value.items : [],
           employers: employerResult.ok ? employerResult.value.items : [],
+          loaded: true,
           operations: operationsResult.ok ? operationsResult.value : null,
+          operationsStatus: operationsResult.ok ? 'ready' : operationsResult.failure.kind,
         });
       })
       .catch(() => {
-        if (!cancelled) setIntakes({ employers: [], operations: null, workers: [] });
+        if (!cancelled) setIntakes({ employers: [], loaded: true, operations: null, operationsStatus: 'unavailable', workers: [] });
       });
     return () => {
       cancelled = true;
@@ -448,6 +501,7 @@ export function Dashboard() {
   const kpis = useMemo(() => dynamicKpis(copy, intakes, language), [copy, intakes, language]);
   const queueRows = useMemo(() => dynamicQueueRows(copy, intakes, language), [copy, intakes, language]);
   const scheduleRows = useMemo(() => dynamicScheduleRows(copy, intakes, language), [copy, intakes, language]);
+  const operationsNotice = useMemo(() => projectionNotice(intakes.operationsStatus, language), [intakes.operationsStatus, language]);
   const workerRows = useMemo(
     () => recentRows('worker', intakes.workers, language, copy.recentRows),
     [copy.recentRows, intakes.workers, language],
@@ -498,6 +552,10 @@ export function Dashboard() {
         ))}
       </div>
 
+      {operationsNotice ? (
+        <p className="projection-status-notice" role="status">{operationsNotice}</p>
+      ) : null}
+
       <div className="dashboard-main-grid">
         <section className="dashboard-card dashboard-card--queue" aria-labelledby="priority-heading">
           <div className="dashboard-section-header">
@@ -524,6 +582,7 @@ export function Dashboard() {
                 <span>{row.days}</span>
               </Link>
             ))}
+            {queueRows.length === 0 ? <p className="dashboard-empty-state">{copy.emptyQueue}</p> : null}
           </div>
         </section>
 
@@ -544,6 +603,7 @@ export function Dashboard() {
               </li>
             ))}
           </ol>
+          {scheduleRows.length === 0 ? <p className="dashboard-empty-state">{copy.emptySchedule}</p> : null}
         </section>
       </div>
 

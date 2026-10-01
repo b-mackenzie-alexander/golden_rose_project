@@ -1,6 +1,6 @@
 import { type SyntheticEvent, useEffect, useMemo, useState } from 'react';
 
-import { getOperationsProjection, type OperationsShiftItem } from '../api/operationsProjectionClient';
+import { getOperationsProjection, type OperationsProjectionFailureKind, type OperationsShiftItem } from '../api/operationsProjectionClient';
 import { IconSymbol } from '../dashboard/artwork';
 import type { IconName } from '../dashboard/artwork';
 import { useLanguage } from '../i18n/LanguageProvider';
@@ -21,6 +21,8 @@ type CalendarEvent = {
   time: string;
   title: string;
 };
+
+type ProjectionStatus = 'loading' | 'ready' | OperationsProjectionFailureKind;
 
 type CalendarDay = {
   date: string;
@@ -317,12 +319,42 @@ function canEditEvent(event: CalendarEvent) {
   return event.id.startsWith('manual-') && event.scope === 'personal';
 }
 
+function isProjectionFailure(status: ProjectionStatus) {
+  return status !== 'loading' && status !== 'ready';
+}
+
+function projectionNotice(status: ProjectionStatus, language: 'en' | 'es') {
+  if (!isProjectionFailure(status)) return null;
+  const reason = {
+    forbidden: {
+      en: 'this account is not authorized to read projected shifts',
+      es: 'esta cuenta no tiene autorizacion para leer turnos proyectados',
+    },
+    validation: {
+      en: 'the shift projection response could not be validated',
+      es: 'no se pudo validar la respuesta de turnos proyectados',
+    },
+    unavailable: {
+      en: 'the shift projection service is unavailable',
+      es: 'el servicio de turnos proyectados no esta disponible',
+    },
+    unexpected: {
+      en: 'the shift projection response was unexpected',
+      es: 'la respuesta de turnos proyectados fue inesperada',
+    },
+  }[status][language];
+  return language === 'es'
+    ? `El calendario no pudo leer turnos de solicitudes porque ${reason}. Los eventos personales siguen separados; se muestran eventos de respaldo cuando la proyeccion no esta disponible.`
+    : `The calendar could not read request-derived shifts because ${reason}. Personal events remain separate; fallback events are shown while the projection is unavailable.`;
+}
+
 export function StaffCalendar() {
   const { language } = useLanguage();
   const copy = language === 'es' ? spanishCalendar : englishCalendar;
   const [selectedDayId, setSelectedDayId] = useState('mon');
   const [manualEvents, setManualEvents] = useState<StoredCalendarEvent[]>(() => readStoredEvents());
   const [shiftEvents, setShiftEvents] = useState<OperationsShiftItem[]>([]);
+  const [projectionStatus, setProjectionStatus] = useState<ProjectionStatus>('loading');
   const [form, setForm] = useState<CalendarFormState>(defaultForm);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
@@ -332,9 +364,17 @@ export function StaffCalendar() {
   }
   useEffect(() => {
     let cancelled = false;
-    void getOperationsProjection().then((result) => {
-      if (!cancelled) setShiftEvents(result.ok ? result.value.shiftItems : []);
-    });
+    void getOperationsProjection()
+      .then((result) => {
+        if (cancelled) return;
+        setShiftEvents(result.ok ? result.value.shiftItems : []);
+        setProjectionStatus(result.ok ? 'ready' : result.failure.kind);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setShiftEvents([]);
+        setProjectionStatus('unavailable');
+      });
     return () => {
       cancelled = true;
     };
@@ -346,11 +386,12 @@ export function StaffCalendar() {
         ? shiftEvents
             .map((event) => toShiftEvent(event, language))
             .filter((event): event is CalendarEvent => event !== null)
-        : copy.events),
+        : projectionStatus === 'ready' ? [] : copy.events),
       ...manualEvents.map((event) => toCalendarEvent(event, language)),
     ].sort((left, right) => left.sortMinutes - right.sortMinutes || left.title.localeCompare(right.title)),
-    [copy.events, language, manualEvents, shiftEvents],
+    [copy.events, language, manualEvents, projectionStatus, shiftEvents],
   );
+  const operationsNotice = useMemo(() => projectionNotice(projectionStatus, language), [language, projectionStatus]);
   const selectedEvents = useMemo(
     () => events.filter((event) => event.dayId === selectedDay.id),
     [events, selectedDay.id],
@@ -462,6 +503,10 @@ export function StaffCalendar() {
           </div>
         ))}
       </div>
+
+      {operationsNotice ? (
+        <p className="projection-status-notice" role="status">{operationsNotice}</p>
+      ) : null}
 
       <div className="calendar-layout">
         <section className="calendar-panel calendar-week-panel" aria-labelledby="calendar-week-heading">

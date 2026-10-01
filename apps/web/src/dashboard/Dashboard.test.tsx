@@ -247,7 +247,32 @@ describe('Dashboard', () => {
     await waitFor(() => {
       expect(screen.getAllByText('Ana Quispe').length).toBeGreaterThan(0);
     });
+    expect(screen.getByRole('status')).toHaveTextContent('projection service is unavailable');
     expect(screen.getByText('Review new drafts')).toBeInTheDocument();
+  });
+
+  it('renders empty operational projection states without fallback queue or schedule rows', async () => {
+    vi.mocked(intakeApi.queryIntakes).mockResolvedValue({
+      ok: true,
+      value: { items: [], next_cursor: null },
+    });
+    vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue({
+      ok: true,
+      value: { requestItems: [], shiftItems: [] },
+    });
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    expect(await screen.findByText('No request, shift, or intake work is waiting in the projection.')).toBeInTheDocument();
+    expect(screen.getByText('No projected shifts are scheduled for this view.')).toBeInTheDocument();
+    expect(screen.queryByText('Urgent intake review')).not.toBeInTheDocument();
+    expect(screen.queryByText('Team check-in')).not.toBeInTheDocument();
   });
 
   it('routes from the global dashboard search to reserved workflow areas', async () => {

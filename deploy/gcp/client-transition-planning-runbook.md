@@ -48,6 +48,12 @@ Validate the filled operator-held JSON locally:
 UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_transition_planning.py <operator-held-client-transition-planning.json>
 ```
 
+When transition planning is reviewed as part of a bounded staff-feedback packet,
+include this runbook, template and validator in
+`deploy/gcp/templates/staff-feedback-package-index.example.json` and validate
+the operator-held package index with
+`scripts/validate_staff_feedback_package_index.py`.
+
 The validator checks that planning statuses are marked ready with value-safe
 evidence and that execution boundaries remain explicit. It does not authenticate
 to GCP, inspect runtime state, export data, import data, mutate databases, clean

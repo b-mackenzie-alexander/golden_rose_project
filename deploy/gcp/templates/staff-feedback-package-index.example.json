@@ -1,0 +1,101 @@
+{
+  "purpose": "Placeholder-only staff feedback package index. Do not commit real values.",
+  "index_type": "staff-feedback-package-index-not-activation",
+  "validator_command": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_staff_feedback_package_index.py <operator-held-staff-feedback-package-index.json>",
+  "authority_boundary": {
+    "cloud_execution": "separate-approval-required",
+    "runtime_access_change": "separate-approval-required",
+    "production_deployment": "separate-approval-required",
+    "live_data_admission": "separate-approval-required",
+    "credential_rotation": "separate-approval-required",
+    "support_channel_activation": "separate-approval-required",
+    "current_environment_data_migration": "separate-approval-required",
+    "client_owned_environment_transition": "separate-approval-required",
+    "github_account_creation": "separate-approval-required",
+    "business_repository_transfer": "separate-approval-required",
+    "data_export_execution": "separate-approval-required",
+    "data_import_execution": "separate-approval-required",
+    "destructive_cleanup": "separate-approval-required"
+  },
+  "source_artifacts": [
+    {
+      "path": "docs/planning/2026-09-27-production-readiness-plan.md",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-production-readiness-plan-record>"
+    },
+    {
+      "path": "deploy/gcp/staff-feedback-readiness-runbook.md",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-staff-feedback-runbook-record>"
+    },
+    {
+      "path": "deploy/gcp/templates/staff-feedback-readiness.example.json",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-staff-feedback-template-record>"
+    },
+    {
+      "path": "scripts/validate_staff_feedback_readiness.py",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-staff-feedback-validator-record>"
+    },
+    {
+      "path": "deploy/gcp/client-transition-planning-runbook.md",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-transition-planning-runbook-record>"
+    },
+    {
+      "path": "deploy/gcp/templates/client-transition-planning.example.json",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-transition-planning-template-record>"
+    },
+    {
+      "path": "scripts/validate_client_transition_planning.py",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-transition-planning-validator-record>"
+    },
+    {
+      "path": "deploy/gcp/human-feedback-template.md",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-human-feedback-template-record>"
+    },
+    {
+      "path": "deploy/gcp/human-qualification-checklist.md",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-human-qualification-checklist-record>"
+    },
+    {
+      "path": "deploy/gcp/qualification-status-contract.md",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-qualification-status-contract-record>"
+    },
+    {
+      "path": "deploy/gcp/templates/staff-feedback-package-index.example.json",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-staff-feedback-package-index-template-record>"
+    },
+    {
+      "path": "scripts/validate_staff_feedback_package_index.py",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-staff-feedback-package-index-validator-record>"
+    }
+  ],
+  "validator_commands": {
+    "staff_feedback_readiness": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_staff_feedback_readiness.py <operator-held-staff-feedback-readiness.json>",
+    "client_transition_planning": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_transition_planning.py <operator-held-client-transition-planning.json>",
+    "staff_feedback_package_index": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_staff_feedback_package_index.py <operator-held-staff-feedback-package-index.json>"
+  },
+  "activation_boundary": {
+    "staff_feedback_window": "not-activated-without-separate-approval",
+    "runtime_access_change": "not-executed-without-separate-approval",
+    "production_deployment": "not-executed-without-separate-approval",
+    "live_data_admission": "not-admitted-without-separate-approval",
+    "support_channel_activation": "not-activated-without-separate-approval",
+    "current_environment_data_migration": "not-executed-without-separate-approval",
+    "client_owned_environment_transition": "not-executed-without-separate-approval",
+    "data_export_execution": "not-executed-without-separate-approval",
+    "data_import_execution": "not-executed-without-separate-approval",
+    "github_account_creation": "not-executed-without-separate-approval",
+    "business_repository_transfer": "not-executed-without-separate-approval",
+    "shared_runtime_rollout": "not-executed-without-separate-approval"
+  }
+}

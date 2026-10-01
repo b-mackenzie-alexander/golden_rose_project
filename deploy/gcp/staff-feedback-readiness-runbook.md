@@ -57,6 +57,16 @@ Validate the filled operator-held JSON locally:
 UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_staff_feedback_readiness.py <operator-held-staff-feedback-readiness.json>
 ```
 
+If the feedback window is being assembled as an operator packet, use
+`deploy/gcp/templates/staff-feedback-package-index.example.json` to record the
+value-safe review of the staff-feedback readiness materials, transition-planning
+materials and human-feedback templates. Validate that operator-held package
+index locally:
+
+```bash
+UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_staff_feedback_package_index.py <operator-held-staff-feedback-package-index.json>
+```
+
 The validator checks that readiness statuses are marked ready with value-safe
 evidence and that approval boundaries remain explicit. It does not authenticate
 to GCP, inspect runtime state, grant staff access, rotate credentials, activate

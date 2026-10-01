@@ -33,12 +33,14 @@ REQUIRED_SOURCE_ARTIFACTS = (
     "deploy/gcp/templates/client-production-readiness-checklist.example.json",
     "deploy/gcp/templates/client-production-package-index.example.json",
     "deploy/gcp/templates/client-production-backup-restore.example.json",
+    "deploy/gcp/templates/client-production-operations-readiness.example.json",
     "scripts/validate_deployable_package.py",
     "scripts/validate_client_production_plan.py",
     "scripts/validate_client_handoff_evidence.py",
     "scripts/validate_client_readiness_checklist.py",
     "scripts/validate_client_package_index.py",
     "scripts/validate_client_backup_restore_evidence.py",
+    "scripts/validate_client_operations_readiness_evidence.py",
 )
 REQUIRED_VALIDATOR_COMMANDS = {
     "deployable_package": (
@@ -61,6 +63,11 @@ REQUIRED_VALIDATOR_COMMANDS = {
     "backup_restore_evidence": (
         "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
         "scripts/validate_client_backup_restore_evidence.py <operator-held-backup-restore.json>"
+    ),
+    "operations_readiness_evidence": (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_client_operations_readiness_evidence.py "
+        "<operator-held-operations-readiness.json>"
     ),
 }
 MANUAL_ACCEPTANCE_KEYS = (

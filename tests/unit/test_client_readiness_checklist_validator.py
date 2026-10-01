@@ -17,6 +17,7 @@ READY_SECTIONS = (
     "artifact_admission",
     "handoff_evidence",
     "backup_restore_rehearsal",
+    "operations_readiness",
     "operations_owners",
 )
 
@@ -39,6 +40,7 @@ def _valid_checklist() -> dict[str, Any]:
             "artifact_admission",
             "handoff_evidence",
             "backup_restore_rehearsal",
+            "operations_readiness",
             "operations_owners",
             "manual_acceptance_boundary",
         ],
@@ -65,6 +67,10 @@ def _valid_checklist() -> dict[str, Any]:
         "backup_restore_rehearsal": {
             "status": "ready",
             "evidence": "backup restore evidence validator passed",
+        },
+        "operations_readiness": {
+            "status": "ready",
+            "evidence": "operations readiness evidence validator passed",
         },
         "operations_owners": {
             "status": "ready",

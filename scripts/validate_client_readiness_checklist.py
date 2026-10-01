@@ -30,6 +30,7 @@ READY_SECTIONS = (
     "artifact_admission",
     "handoff_evidence",
     "backup_restore_rehearsal",
+    "operations_readiness",
     "operations_owners",
 )
 MANUAL_ACCEPTANCE_KEYS = (

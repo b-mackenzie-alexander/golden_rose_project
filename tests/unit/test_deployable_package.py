@@ -7,6 +7,7 @@ from scripts.validate_deployable_package import (
     ENV_TEMPLATE_PATH,
     HANDOFF_TEMPLATE_PATH,
     INPUTS_TEMPLATE_PATH,
+    OPERATIONS_READINESS_TEMPLATE_PATH,
     PACKAGE_INDEX_PATH,
     POLICY_TEMPLATE_PATH,
     READINESS_CHECKLIST_PATH,
@@ -28,6 +29,7 @@ def _copy_package(tmp_path: Path) -> Path:
         READINESS_CHECKLIST_PATH,
         PACKAGE_INDEX_PATH,
         BACKUP_RESTORE_TEMPLATE_PATH,
+        OPERATIONS_READINESS_TEMPLATE_PATH,
     ):
         source = ROOT / relative_path
         destination = tmp_path / relative_path
@@ -48,6 +50,7 @@ def test_deployable_package_artifacts_are_placeholder_only_and_complete() -> Non
         str(READINESS_CHECKLIST_PATH),
         str(PACKAGE_INDEX_PATH),
         str(BACKUP_RESTORE_TEMPLATE_PATH),
+        str(OPERATIONS_READINESS_TEMPLATE_PATH),
     ]
 
 
@@ -243,4 +246,21 @@ def test_deployable_package_rejects_backup_restore_activation_claim(
     )
 
     with pytest.raises(PackageValidationError, match="destructive_recovery"):
+        validate(root)
+
+
+def test_deployable_package_rejects_operations_readiness_activation_claim(
+    tmp_path: Path,
+) -> None:
+    root = _copy_package(tmp_path)
+    operations_path = root / OPERATIONS_READINESS_TEMPLATE_PATH
+    operations_path.write_text(
+        operations_path.read_text(encoding="utf-8").replace(
+            '"incident_contact_activation": "separate-approval-required"',
+            '"incident_contact_activation": "activated"',
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PackageValidationError, match="incident_contact_activation"):
         validate(root)

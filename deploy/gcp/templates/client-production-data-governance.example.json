@@ -1,0 +1,35 @@
+{
+  "purpose": "Placeholder-only data governance evidence template. Do not commit real values.",
+  "evidence_type": "client-production-data-governance-review-not-live-data-admission",
+  "validator_command": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_data_governance_evidence.py <operator-held-data-governance.json>",
+  "authority_boundary": {
+    "cloud_execution": "separate-approval-required",
+    "production_deployment": "separate-approval-required",
+    "live_data_admission": "separate-approval-required",
+    "data_export_execution": "separate-approval-required",
+    "disclosure_execution": "separate-approval-required",
+    "destructive_deletion": "separate-approval-required"
+  },
+  "source": {
+    "source_commit": "<40-hex-source-commit>",
+    "migration_revision": "<alembic-revision>"
+  },
+  "data_governance": {
+    "classification_status": "<ready-or-blocked>",
+    "retention_policy_status": "<ready-or-blocked>",
+    "deletion_policy_status": "<ready-or-blocked>",
+    "export_policy_status": "<ready-or-blocked>",
+    "disclosure_policy_status": "<ready-or-blocked>",
+    "restricted_history_recipient_status": "<ready-or-blocked>"
+  },
+  "evidence": {
+    "classification_matrix_receipt": "<value-safe-classification-matrix-record>",
+    "retention_schedule_receipt": "<value-safe-retention-schedule-record>",
+    "deletion_workflow_receipt": "<value-safe-deletion-workflow-record>",
+    "export_workflow_receipt": "<value-safe-export-workflow-record>",
+    "disclosure_rule_receipt": "<value-safe-disclosure-rule-record>",
+    "restricted_history_recipient_receipt": "<value-safe-restricted-history-recipient-record>",
+    "governance_owner": "<private-owner-record>",
+    "next_review_note": "<value-safe-next-review-record>"
+  }
+}

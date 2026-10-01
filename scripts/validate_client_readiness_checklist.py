@@ -32,6 +32,7 @@ READY_SECTIONS = (
     "backup_restore_rehearsal",
     "operations_readiness",
     "runtime_lifecycle_review",
+    "data_governance_review",
     "operations_owners",
 )
 MANUAL_ACCEPTANCE_KEYS = (

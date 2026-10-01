@@ -18,6 +18,7 @@
     "backup_restore_rehearsal",
     "operations_readiness",
     "runtime_lifecycle_review",
+    "data_governance_review",
     "operations_owners",
     "manual_acceptance_boundary"
   ],
@@ -52,6 +53,10 @@
   "runtime_lifecycle_review": {
     "status": "<ready-or-blocked>",
     "evidence": "<value-safe-runtime-lifecycle-validator-record>"
+  },
+  "data_governance_review": {
+    "status": "<ready-or-blocked>",
+    "evidence": "<value-safe-data-governance-validator-record>"
   },
   "operations_owners": {
     "status": "<ready-or-blocked>",

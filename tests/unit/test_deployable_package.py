@@ -16,6 +16,7 @@ from scripts.validate_deployable_package import (
     READINESS_CHECKLIST_PATH,
     RUNBOOK_PATH,
     RUNTIME_LIFECYCLE_TEMPLATE_PATH,
+    TRAINING_ACCEPTANCE_TEMPLATE_PATH,
     PackageValidationError,
     validate,
 )
@@ -38,6 +39,7 @@ def _copy_package(tmp_path: Path) -> Path:
         DATA_GOVERNANCE_TEMPLATE_PATH,
         COPY_APPROVAL_TEMPLATE_PATH,
         MANUAL_REVIEW_TEMPLATE_PATH,
+        TRAINING_ACCEPTANCE_TEMPLATE_PATH,
     ):
         source = ROOT / relative_path
         destination = tmp_path / relative_path
@@ -63,6 +65,7 @@ def test_deployable_package_artifacts_are_placeholder_only_and_complete() -> Non
         str(DATA_GOVERNANCE_TEMPLATE_PATH),
         str(COPY_APPROVAL_TEMPLATE_PATH),
         str(MANUAL_REVIEW_TEMPLATE_PATH),
+        str(TRAINING_ACCEPTANCE_TEMPLATE_PATH),
     ]
 
 
@@ -343,4 +346,21 @@ def test_deployable_package_rejects_manual_review_activation_claim(
     )
 
     with pytest.raises(PackageValidationError, match="public_accessibility_claim"):
+        validate(root)
+
+
+def test_deployable_package_rejects_training_acceptance_activation_claim(
+    tmp_path: Path,
+) -> None:
+    root = _copy_package(tmp_path)
+    training_path = root / TRAINING_ACCEPTANCE_TEMPLATE_PATH
+    training_path.write_text(
+        training_path.read_text(encoding="utf-8").replace(
+            '"current_environment_data_migration": "separate-approval-required"',
+            '"current_environment_data_migration": "completed"',
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PackageValidationError, match="current_environment_data_migration"):
         validate(root)

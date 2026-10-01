@@ -1,0 +1,40 @@
+{
+  "purpose": "Placeholder-only staff training, support escalation and workflow acceptance evidence template. Do not commit real values.",
+  "evidence_type": "client-production-training-acceptance-review-not-activation",
+  "validator_command": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_training_acceptance_evidence.py <operator-held-training-acceptance.json>",
+  "authority_boundary": {
+    "cloud_execution": "separate-approval-required",
+    "production_deployment": "separate-approval-required",
+    "live_data_admission": "separate-approval-required",
+    "provider_side_identity_activation": "separate-approval-required",
+    "support_channel_activation": "separate-approval-required",
+    "current_environment_data_migration": "separate-approval-required",
+    "business_repository_transfer": "separate-approval-required"
+  },
+  "source": {
+    "source_commit": "<40-hex-source-commit>",
+    "migration_revision": "<alembic-revision>"
+  },
+  "training_acceptance": {
+    "staff_training_status": "<ready-or-blocked>",
+    "support_escalation_status": "<ready-or-blocked>",
+    "staff_workflow_acceptance_status": "<ready-or-blocked>",
+    "management_model_review_status": "<ready-or-blocked>",
+    "working_environment_feedback_status": "<ready-or-blocked>",
+    "data_migration_planning_status": "<ready-or-blocked>",
+    "repository_stewardship_status": "<ready-or-blocked>",
+    "known_limitations_status": "<ready-or-blocked>"
+  },
+  "evidence": {
+    "staff_training_receipt": "<value-safe-staff-training-record>",
+    "support_escalation_receipt": "<value-safe-support-escalation-record>",
+    "staff_workflow_acceptance_receipt": "<value-safe-staff-workflow-acceptance-record>",
+    "management_model_review_note": "<value-safe-management-model-review-record>",
+    "working_environment_feedback_note": "<value-safe-working-environment-feedback-record>",
+    "data_migration_planning_note": "<value-safe-data-migration-planning-record>",
+    "repository_stewardship_note": "<value-safe-repository-stewardship-record>",
+    "known_limitations_acknowledgement": "<value-safe-known-limitations-record>",
+    "acceptance_owner": "<private-owner-record>",
+    "next_review_note": "<value-safe-next-review-record>"
+  }
+}

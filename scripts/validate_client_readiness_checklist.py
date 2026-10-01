@@ -35,9 +35,10 @@ READY_SECTIONS = (
     "data_governance_review",
     "copy_approval_review",
     "manual_accessibility_language_review",
+    "training_acceptance_review",
     "operations_owners",
 )
-MANUAL_ACCEPTANCE_KEYS = ("staff_workflow_acceptance",)
+REQUIRED_MANUAL_ACCEPTANCE_BOUNDARY: dict[str, str] = {}
 REQUIRED_ACTIVATION_BOUNDARY = {
     "production_deployment": "not-executed-without-separate-approval",
     "live_data_admission": "not-admitted-without-separate-approval",
@@ -151,12 +152,11 @@ def validate_readiness_checklist(path: Path) -> list[str]:
         checked.append(section_name)
 
     manual = _section(document, "manual_acceptance_boundary")
-    for key in MANUAL_ACCEPTANCE_KEYS:
-        value = manual.get(key)
-        if value != "separate-review-required":
-            raise ReadinessChecklistValidationError(
-                f"manual_acceptance_boundary.{key} must be separate-review-required"
-            )
+    if manual != REQUIRED_MANUAL_ACCEPTANCE_BOUNDARY:
+        raise ReadinessChecklistValidationError(
+            "manual_acceptance_boundary must be empty after validator-backed "
+            "training acceptance evidence is present"
+        )
     checked.append("manual_acceptance_boundary")
 
     activation = _section(document, "activation_boundary")

@@ -21,6 +21,7 @@
     "data_governance_review",
     "copy_approval_review",
     "manual_accessibility_language_review",
+    "training_acceptance_review",
     "operations_owners",
     "manual_acceptance_boundary"
   ],
@@ -68,13 +69,15 @@
     "status": "<ready-or-blocked>",
     "evidence": "<value-safe-manual-review-validator-record>"
   },
+  "training_acceptance_review": {
+    "status": "<ready-or-blocked>",
+    "evidence": "<value-safe-training-acceptance-validator-record>"
+  },
   "operations_owners": {
     "status": "<ready-or-blocked>",
     "evidence": "<value-safe-owner-readiness-record>"
   },
-  "manual_acceptance_boundary": {
-    "staff_workflow_acceptance": "<not-run-or-separate-record>"
-  },
+  "manual_acceptance_boundary": {},
   "activation_boundary": {
     "production_deployment": "not-executed-without-separate-approval",
     "live_data_admission": "not-admitted-without-separate-approval",

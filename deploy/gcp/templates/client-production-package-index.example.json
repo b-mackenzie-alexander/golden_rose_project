@@ -81,6 +81,11 @@
       "evidence": "<value-safe-manual-review-template-record>"
     },
     {
+      "path": "deploy/gcp/templates/client-production-training-acceptance.example.json",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-training-acceptance-template-record>"
+    },
+    {
       "path": "scripts/validate_deployable_package.py",
       "status": "<reviewed-or-blocked>",
       "evidence": "<value-safe-package-validator-record>"
@@ -134,6 +139,11 @@
       "path": "scripts/validate_client_manual_review_evidence.py",
       "status": "<reviewed-or-blocked>",
       "evidence": "<value-safe-manual-review-validator-record>"
+    },
+    {
+      "path": "scripts/validate_client_training_acceptance_evidence.py",
+      "status": "<reviewed-or-blocked>",
+      "evidence": "<value-safe-training-acceptance-validator-record>"
     }
   ],
   "validator_commands": {
@@ -147,11 +157,10 @@
     "runtime_lifecycle_evidence": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_runtime_lifecycle_evidence.py <operator-held-runtime-lifecycle.json>",
     "data_governance_evidence": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_data_governance_evidence.py <operator-held-data-governance.json>",
     "copy_approval_evidence": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_copy_approval_evidence.py <operator-held-copy-approval.json>",
-    "manual_review_evidence": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_manual_review_evidence.py <operator-held-manual-review.json>"
+    "manual_review_evidence": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_manual_review_evidence.py <operator-held-manual-review.json>",
+    "training_acceptance_evidence": "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_client_training_acceptance_evidence.py <operator-held-training-acceptance.json>"
   },
-  "manual_acceptance_boundary": {
-    "staff_workflow_acceptance": "<not-run-or-separate-record>"
-  },
+  "manual_acceptance_boundary": {},
   "activation_boundary": {
     "production_deployment": "not-executed-without-separate-approval",
     "live_data_admission": "not-admitted-without-separate-approval",

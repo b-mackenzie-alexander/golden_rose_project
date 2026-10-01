@@ -71,6 +71,14 @@ const projectionExtras = {
     activeAreaCount: 1,
     unmappedRequestCount: 0,
   },
+  calendarSummary: {
+    projectedShiftCount: 1,
+    workerSlots: 2,
+    pendingReviewShiftCount: 1,
+    coverageDayCount: 1,
+    firstShiftStartsAt: '2026-09-29T14:00:00Z',
+    lastShiftEndsAt: '2026-09-29T18:00:00Z',
+  },
 };
 
 describe('Dashboard', () => {
@@ -295,6 +303,14 @@ describe('Dashboard', () => {
           pendingReviewCount: 0,
           activeAreaCount: 0,
           unmappedRequestCount: 0,
+        },
+        calendarSummary: {
+          projectedShiftCount: 0,
+          workerSlots: 0,
+          pendingReviewShiftCount: 0,
+          coverageDayCount: 0,
+          firstShiftStartsAt: null,
+          lastShiftEndsAt: null,
         },
       },
     });

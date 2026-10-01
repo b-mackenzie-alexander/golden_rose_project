@@ -1,5 +1,17 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-09-30 — Operations calendar coverage active
+
+- **Staffing:** One independent developer; focused backend/frontend tests, static checks and later PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #138, `feat: add operations area aggregates`, merged into protected `develop` at `5269da78d6a63dc9a2ff6f22fbb2b9923d08fe29`. Local `develop` was fetched/pruned and fast-forwarded to that exact `origin/develop` tip; stale local `feat/operations-area-aggregates` was deleted after exact tree comparison against `origin/develop`; no extra linked worktree remained. Fresh work is active on `feat/operations-calendar-coverage`. This slice continues Tranche 3 by adding calendar coverage semantics to the authoritative operations projection: projected timed shifts, worker-slot totals, pending-review shift load, coverage-day count and first/last projected shift timestamps are exposed through the existing no-store projection and surfaced on the staff calendar without mixing personal events into operational coverage.
+- **Gate budget:** Source/frontend/backend-client/local-validation work only. No cloud inspection or mutation, Terraform plan/apply, production deployment, live/client data, live identity-provider activation, provider-side reset/revocation mechanics, credential rotation, default permission activation, persistent synthetic write qualification, cloud migration or shared-runtime rollout occurs in this branch.
+- **Next executable action:** Finish publishing this calendar-coverage slice, then treat manual accessibility, fluent-Spanish and staff-workflow acceptance as separate human acceptance gates before any separately approved cloud migration.
+- **Do not regress:** Human staff decision boundaries; no automated matching/ranking/eligibility/referral/placement; no active demand, coverage, referral or placement implication from request/shift records; personal browser-local calendar notes remain separate from request-derived operational coverage; private fictional-synthetic boundaries until live-data gates open; immutable intake history and exact retries; restricted-field permissions; bilingual/accessibility parity; separate public/staff identity planes; auth-sensitive no-store handling; deployable package guardrails for the client's later GCP environment.
+
+**Validated locally:** Focused operations-projection backend tests passed 6 tests with the existing Starlette/httpx warning. Focused frontend projection client, staff calendar, dashboard and work-queue tests passed 60 tests with existing jsdom canvas notices. Frontend typecheck, lint and production build passed; the build retains the existing Vite large-chunk warning. Full frontend verify passed lock validation, lock tests, lint, typecheck, 474 frontend tests with coverage gates, and production build. Focused Ruff format/check passed for touched backend files and tests. Full backend mypy passed across 249 source files.
+
+**Planning artifact:** [Production-readiness and staff identity plan](docs/planning/2026-09-27-production-readiness-plan.md).
+
 ## 2026-09-30 — Operations area aggregates active
 
 - **Staffing:** One independent developer; focused backend/frontend tests, static checks and later PR gates provide quality evidence, not independent-human authorization.

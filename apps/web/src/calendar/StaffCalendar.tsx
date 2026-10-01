@@ -1,6 +1,6 @@
 import { type SyntheticEvent, useEffect, useMemo, useState } from 'react';
 
-import { getOperationsProjection, type OperationsProjectionFailureKind, type OperationsShiftItem } from '../api/operationsProjectionClient';
+import { getOperationsProjection, type OperationsCalendarSummary, type OperationsProjectionFailureKind, type OperationsShiftItem } from '../api/operationsProjectionClient';
 import { IconSymbol } from '../dashboard/artwork';
 import type { IconName } from '../dashboard/artwork';
 import { useLanguage } from '../i18n/LanguageProvider';
@@ -48,6 +48,9 @@ type CalendarCopy = {
   events: CalendarEvent[];
   openSlots: string;
   personalCalendar: string;
+  projectedShifts: string;
+  projectedWorkerSlots: string;
+  projectionSeparate: string;
   removeEvent: string;
   removeRequiresPermission: string;
   saveEvent: string;
@@ -92,6 +95,9 @@ const englishCalendar: CalendarCopy = {
   ],
   openSlots: 'Open slots',
   personalCalendar: 'My calendar',
+  projectedShifts: 'Projected shifts',
+  projectedWorkerSlots: 'Projected worker slots',
+  projectionSeparate: 'Request-derived shifts only; personal events stay separate.',
   removeEvent: 'Remove event',
   removeRequiresPermission: 'Company calendar permission required',
   saveEvent: 'Save event',
@@ -148,6 +154,9 @@ const spanishCalendar: CalendarCopy = {
   ],
   openSlots: 'Espacios abiertos',
   personalCalendar: 'Mi calendario',
+  projectedShifts: 'Turnos proyectados',
+  projectedWorkerSlots: 'Cupos proyectados',
+  projectionSeparate: 'Solo turnos derivados de solicitudes; los eventos personales siguen separados.',
   removeEvent: 'Eliminar evento',
   removeRequiresPermission: 'Requiere permiso del calendario de la compania',
   saveEvent: 'Guardar evento',
@@ -354,6 +363,7 @@ export function StaffCalendar() {
   const [selectedDayId, setSelectedDayId] = useState('mon');
   const [manualEvents, setManualEvents] = useState<StoredCalendarEvent[]>(() => readStoredEvents());
   const [shiftEvents, setShiftEvents] = useState<OperationsShiftItem[]>([]);
+  const [calendarSummary, setCalendarSummary] = useState<OperationsCalendarSummary | null>(null);
   const [projectionStatus, setProjectionStatus] = useState<ProjectionStatus>('loading');
   const [form, setForm] = useState<CalendarFormState>(defaultForm);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -368,11 +378,13 @@ export function StaffCalendar() {
       .then((result) => {
         if (cancelled) return;
         setShiftEvents(result.ok ? result.value.shiftItems : []);
+        setCalendarSummary(result.ok ? result.value.calendarSummary : null);
         setProjectionStatus(result.ok ? 'ready' : result.failure.kind);
       })
       .catch(() => {
         if (cancelled) return;
         setShiftEvents([]);
+        setCalendarSummary(null);
         setProjectionStatus('unavailable');
       });
     return () => {
@@ -401,13 +413,20 @@ export function StaffCalendar() {
     events.filter((event) => event.dayId === day.id),
   ])), [copy.weekDays, events]);
   const summaryItems = useMemo(() => {
+    if (projectionStatus === 'ready' && calendarSummary !== null) {
+      return [
+        { icon: 'calendar' as const, label: copy.projectedShifts, value: String(calendarSummary.projectedShiftCount) },
+        { icon: 'worker' as const, label: copy.projectedWorkerSlots, value: String(calendarSummary.workerSlots) },
+        { icon: 'document' as const, label: language === 'es' ? 'Pendientes de revision' : 'Pending review', value: String(calendarSummary.pendingReviewShiftCount) },
+      ];
+    }
     const interviews = events.filter((event) => event.kind === 'interview').length;
     const followUps = events.filter((event) => event.kind === 'employer').length;
     return copy.summaryItems.map((item, index) => ({
       ...item,
       value: index === 0 ? String(events.length) : index === 1 ? String(interviews) : index === 2 ? String(followUps) : item.value,
     }));
-  }, [copy.summaryItems, events]);
+  }, [calendarSummary, copy.projectedShifts, copy.projectedWorkerSlots, copy.summaryItems, events, language, projectionStatus]);
   function saveManualEvent(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     const title = form.title.trim();
@@ -506,6 +525,8 @@ export function StaffCalendar() {
 
       {operationsNotice ? (
         <p className="projection-status-notice" role="status">{operationsNotice}</p>
+      ) : projectionStatus === 'ready' ? (
+        <p className="calendar-coverage-note">{copy.projectionSeparate}</p>
       ) : null}
 
       <div className="calendar-layout">

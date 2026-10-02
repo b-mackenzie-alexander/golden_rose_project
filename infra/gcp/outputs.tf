@@ -5,7 +5,7 @@ output "environment" {
 
 output "data_boundary" {
   description = "Value-safe data-boundary marker."
-  value       = "fictional-synthetic-only"
+  value       = var.runtime_profile == "controlled_live_data_staff_pilot" ? "controlled-live-data-staff-pilot" : "fictional-synthetic-only"
 }
 
 output "database_contract" {
@@ -31,6 +31,6 @@ output "observability_contract" {
 }
 
 output "human_visible_develop_contract" {
-  description = "Value-safe temporary access and cost-bound markers for fictional-synthetic develop."
+  description = "Value-safe runtime access and cost-bound markers for the selected develop profile."
   value       = module.develop.human_visible_develop_contract
 }

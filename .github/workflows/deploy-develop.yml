@@ -11,6 +11,13 @@ on:
         - migration
         - database-verification
         - service
+      runtime_profile:
+        description: Reviewed runtime profile already applied by Terraform before this transition readback
+        required: true
+        type: choice
+        options:
+        - synthetic_develop_demo
+        - controlled_live_data_staff_pilot
 
 permissions:
   contents: read
@@ -152,6 +159,7 @@ jobs:
         if: inputs.deployment_stage == 'migration'
         env:
           GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          DEPLOYMENT_RUNTIME_PROFILE: ${{ inputs.runtime_profile }}
         run: |
           set -euo pipefail
           mkdir -p build/transition-authority
@@ -219,9 +227,10 @@ jobs:
           public_label = environment["GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL"].get("value", "")
           if not {"non-production", "synthetic"}.issubset(set(str(public_label).lower().split())):
               raise SystemExit("migration job public label lost synthetic-only posture")
+          expected_data_boundary = "controlled-live-data-staff-pilot" if os.environ["DEPLOYMENT_RUNTIME_PROFILE"] == "controlled_live_data_staff_pilot" else "fictional-synthetic-only"
           required_labels = {
               "environment": "develop",
-              "data_boundary": "fictional-synthetic-only",
+              "data_boundary": expected_data_boundary,
               "managed_by": "terraform",
               "service": "staff-tracer",
               "cost_center": "develop",
@@ -250,6 +259,7 @@ jobs:
         if: inputs.deployment_stage == 'database-verification'
         env:
           GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          DEPLOYMENT_RUNTIME_PROFILE: ${{ inputs.runtime_profile }}
         run: |
           set -euo pipefail
           mkdir -p build/transition-authority
@@ -271,9 +281,10 @@ jobs:
               raise SystemExit("database authority job command drifted")
           if containers[0].get("args") not in (None, []):
               raise SystemExit("database authority job arguments drifted")
+          expected_data_boundary = "controlled-live-data-staff-pilot" if os.environ["DEPLOYMENT_RUNTIME_PROFILE"] == "controlled_live_data_staff_pilot" else "fictional-synthetic-only"
           expected_labels = {
               "environment": "develop",
-              "data_boundary": "fictional-synthetic-only",
+              "data_boundary": expected_data_boundary,
               "managed_by": "terraform",
               "service": "staff-tracer",
               "cost_center": "develop",
@@ -333,9 +344,12 @@ jobs:
 
       - name: Verify service readiness transition
         if: inputs.deployment_stage == 'service'
+        env:
+          DEPLOYMENT_RUNTIME_PROFILE: ${{ inputs.runtime_profile }}
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
         run: |
           set -euo pipefail
-          SERVICE_JSON=$(python scripts/read_cloud_run_v2.py --project "${{ vars.GCP_PROJECT_ID }}" --region us-east4 --kind services --name staff-tracer)
+          SERVICE_JSON=$(python scripts/read_cloud_run_v2.py --project "$GCP_PROJECT_ID" --region us-east4 --kind services --name staff-tracer)
           export SERVICE_JSON
           python - <<'PY'
           import json, os
@@ -355,6 +369,70 @@ jobs:
           image = containers[0].get("image")
           if image != os.environ["MANAGED_IMAGE"]:
               raise SystemExit("ready service image must match the direct Cosign-verified image")
+          environment = {}
+          for item in containers[0].get("env", []):
+              if not isinstance(item, dict) or not isinstance(item.get("name"), str):
+                  raise SystemExit("ready service environment is malformed")
+              if item["name"] in environment:
+                  raise SystemExit("ready service environment contains duplicate names")
+              if "value" in item:
+                  environment[item["name"]] = {"value": item.get("value")}
+              else:
+                  secret_ref = item.get("valueSource", {}).get("secretKeyRef", {})
+                  environment[item["name"]] = {
+                      "secret": secret_ref.get("secret"),
+                      "version": secret_ref.get("version"),
+                  }
+          if os.environ["DEPLOYMENT_RUNTIME_PROFILE"] == "controlled_live_data_staff_pilot":
+              expected_environment = {
+                  "GOLDEN_ROSE_ENVIRONMENT": {"value": "production"},
+                  "GOLDEN_ROSE_AUTH_MODE": {"value": "staff_oidc"},
+                  "GOLDEN_ROSE_DEPLOYMENT_TARGET": {"value": "controlled-live-data-staff-pilot"},
+                  "GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL": {"value": "Controlled live-data staff pilot"},
+                  "GOLDEN_ROSE_DEPLOYED_IMAGE_DIGEST": {"value": os.environ["IMAGE_DIGEST"]},
+                  "GOLDEN_ROSE_DEMO_ACCESS_ENABLED": {"value": "false"},
+                  "GOLDEN_ROSE_PRESENTATION_DEMO_SEED_ENABLED": {"value": "false"},
+                  "GOLDEN_ROSE_DATABASE_URL": {"secret": "runtime-database-url", "version": "latest"},
+                  "GOLDEN_ROSE_STAFF_OIDC_ISSUER": {"secret": "staff-oidc-issuer", "version": "latest"},
+                  "GOLDEN_ROSE_STAFF_OIDC_AUDIENCE": {"secret": "staff-oidc-audience", "version": "latest"},
+                  "GOLDEN_ROSE_STAFF_OIDC_JWKS_URL": {"secret": "staff-oidc-jwks-url", "version": "latest"},
+              }
+              if any(name in environment for name in ("GOLDEN_ROSE_DEMO_ACCESS_PASSWORD", "GOLDEN_ROSE_DEMO_ACCESS_EXPIRES_AT", "GOLDEN_ROSE_SYNTHETIC_STAFF_ID")):
+                  raise SystemExit("ready service staff-pilot runtime still exposes demo or synthetic env")
+          else:
+              expected_environment = {
+                  "GOLDEN_ROSE_ENVIRONMENT": {"value": "develop"},
+                  "GOLDEN_ROSE_AUTH_MODE": {"value": "synthetic"},
+                  "GOLDEN_ROSE_DEPLOYMENT_TARGET": {"value": "gcp-develop-private-synthetic"},
+                  "GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL": environment.get("GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL"),
+                  "GOLDEN_ROSE_DEPLOYED_IMAGE_DIGEST": {"value": os.environ["IMAGE_DIGEST"]},
+                  "GOLDEN_ROSE_DEMO_ACCESS_ENABLED": {"value": "true"},
+                  "GOLDEN_ROSE_DEMO_ACCESS_EXPIRES_AT": environment.get("GOLDEN_ROSE_DEMO_ACCESS_EXPIRES_AT"),
+                  "GOLDEN_ROSE_PRESENTATION_DEMO_SEED_ENABLED": {"value": "true"},
+                  "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD": {"secret": "demo-access-password", "version": "latest"},
+                  "GOLDEN_ROSE_DATABASE_URL": {"secret": "runtime-database-url", "version": "latest"},
+                  "GOLDEN_ROSE_SYNTHETIC_STAFF_ID": {"secret": "synthetic-staff-id", "version": "latest"},
+              }
+              public_label = str(environment.get("GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL", {}).get("value", "")).lower()
+              if "non-production" not in public_label or "synthetic" not in public_label:
+                  raise SystemExit("ready service synthetic label posture drifted")
+              if environment.get("GOLDEN_ROSE_DEMO_ACCESS_EXPIRES_AT", {}).get("value") in (None, ""):
+                  raise SystemExit("ready service synthetic demo expiry is missing")
+          if environment != expected_environment:
+              raise SystemExit("ready service environment inventory or value drifted")
+          expected_data_boundary = "controlled-live-data-staff-pilot" if os.environ["DEPLOYMENT_RUNTIME_PROFILE"] == "controlled_live_data_staff_pilot" else "fictional-synthetic-only"
+          expected_labels = {
+              "environment": "develop",
+              "data_boundary": expected_data_boundary,
+              "managed_by": "terraform",
+              "service": "staff-tracer",
+              "cost_center": "develop",
+              "owner": "technical-owner",
+              "teardown": "intentional-runbook-only",
+              "goog-terraform-provisioned": "true",
+          }
+          if service.get("labels") != expected_labels:
+              raise SystemExit("ready service label posture drifted")
           path = Path("build/deploy-result.json")
           payload = json.loads(path.read_text(encoding="utf-8"))
           payload.update({"result": "success", "current_stage": "service_readiness", "image_digest": os.environ["IMAGE_DIGEST"]})
@@ -365,6 +443,7 @@ jobs:
         if: always()
         env:
           DEPLOYMENT_STAGE: ${{ inputs.deployment_stage }}
+          DEPLOYMENT_RUNTIME_PROFILE: ${{ inputs.runtime_profile }}
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -372,7 +451,7 @@ jobs:
           from pathlib import Path
           path = Path("build/deploy-result.json")
           payload = json.loads(path.read_text(encoding="utf-8"))
-          payload.update({"current_stage": os.environ["DEPLOYMENT_STAGE"], "image_digest": os.environ.get("IMAGE_DIGEST"), "qualification_executed": False})
+          payload.update({"current_stage": os.environ["DEPLOYMENT_STAGE"], "runtime_profile": os.environ["DEPLOYMENT_RUNTIME_PROFILE"], "image_digest": os.environ.get("IMAGE_DIGEST"), "qualification_executed": False})
           path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
           PY
 

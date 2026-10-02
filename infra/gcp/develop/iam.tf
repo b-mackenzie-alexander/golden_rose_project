@@ -129,6 +129,8 @@ resource "google_secret_manager_secret_iam_member" "database_verifier_runtime_se
 }
 
 resource "google_secret_manager_secret_iam_member" "runtime_synthetic_staff_secret_access" {
+  count = var.deployment_stage == "service" && var.runtime_profile == "synthetic_develop_demo" ? 1 : 0
+
   project   = var.project_id
   secret_id = "synthetic-staff-id"
   role      = "roles/secretmanager.secretAccessor"
@@ -136,12 +138,47 @@ resource "google_secret_manager_secret_iam_member" "runtime_synthetic_staff_secr
 }
 
 resource "google_secret_manager_secret_iam_member" "runtime_demo_access_secret_access" {
+  count = var.deployment_stage == "service" && var.runtime_profile == "synthetic_develop_demo" ? 1 : 0
+
   project   = var.project_id
   secret_id = "demo-access-password"
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.runtime.email}"
 
   depends_on = [google_secret_manager_secret.metadata_only["demo-access-password"]]
+}
+
+resource "google_secret_manager_secret_iam_member" "runtime_staff_oidc_issuer_secret_access" {
+  count = var.deployment_stage == "service" && var.runtime_profile == "controlled_live_data_staff_pilot" ? 1 : 0
+
+  project   = var.project_id
+  secret_id = "staff-oidc-issuer"
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.runtime.email}"
+
+  depends_on = [google_secret_manager_secret.metadata_only["staff-oidc-issuer"]]
+}
+
+resource "google_secret_manager_secret_iam_member" "runtime_staff_oidc_audience_secret_access" {
+  count = var.deployment_stage == "service" && var.runtime_profile == "controlled_live_data_staff_pilot" ? 1 : 0
+
+  project   = var.project_id
+  secret_id = "staff-oidc-audience"
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.runtime.email}"
+
+  depends_on = [google_secret_manager_secret.metadata_only["staff-oidc-audience"]]
+}
+
+resource "google_secret_manager_secret_iam_member" "runtime_staff_oidc_jwks_url_secret_access" {
+  count = var.deployment_stage == "service" && var.runtime_profile == "controlled_live_data_staff_pilot" ? 1 : 0
+
+  project   = var.project_id
+  secret_id = "staff-oidc-jwks-url"
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.runtime.email}"
+
+  depends_on = [google_secret_manager_secret.metadata_only["staff-oidc-jwks-url"]]
 }
 
 resource "google_secret_manager_secret_iam_member" "migration_synthetic_staff_secret_access" {

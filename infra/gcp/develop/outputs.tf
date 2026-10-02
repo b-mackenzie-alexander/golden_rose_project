@@ -49,12 +49,12 @@ output "observability_contract" {
 }
 
 output "human_visible_develop_contract" {
-  description = "Value-safe temporary access and cost-bound markers for fictional-synthetic develop."
+  description = "Value-safe runtime access and cost-bound markers for the selected develop profile."
   value = var.deployment_stage == "service" ? {
-    access_mode    = "expiring-http-basic"
+    access_mode    = var.runtime_profile == "controlled_live_data_staff_pilot" ? "named-staff-oidc" : "expiring-http-basic"
     public_invoker = true
     min_instances  = 0
     max_instances  = 1
-    data_boundary  = "fictional-synthetic-only"
+    data_boundary  = var.runtime_profile == "controlled_live_data_staff_pilot" ? "controlled-live-data-staff-pilot" : "fictional-synthetic-only"
   } : null
 }

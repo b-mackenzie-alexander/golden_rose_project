@@ -129,9 +129,18 @@ def test_token_failure_and_redirect_never_expose_or_forward_credentials(monkeypa
 
 
 @pytest.mark.parametrize(
+    ("runtime_profile", "data_boundary"),
+    [
+        ("synthetic_develop_demo", "fictional-synthetic-only"),
+        ("controlled_live_data_staff_pilot", "controlled-live-data-staff-pilot"),
+    ],
+)
+@pytest.mark.parametrize(
     "defect", [None, "condition", "generation", "revision", "image", "containers"]
 )
-def test_actual_service_workflow_accepts_current_v2_revision_only(tmp_path, defect):
+def test_actual_service_workflow_accepts_current_v2_revision_only(
+    tmp_path, runtime_profile, data_boundary, defect
+):
     import os
     import sys
 
@@ -146,13 +155,98 @@ def test_actual_service_workflow_accepts_current_v2_revision_only(tmp_path, defe
     )
     body = step["run"].split("python - <<'PY'\n", 1)[1].rsplit("\nPY", 1)[0]
     image = "example/image@sha256:" + "1" * 64
+    image_digest = "sha256:" + "1" * 64
+    environment = [
+        {"name": "GOLDEN_ROSE_DEPLOYED_IMAGE_DIGEST", "value": image_digest},
+        {
+            "name": "GOLDEN_ROSE_DATABASE_URL",
+            "valueSource": {
+                "secretKeyRef": {"secret": "runtime-database-url", "version": "latest"}
+            },
+        },
+    ]
+    if runtime_profile == "controlled_live_data_staff_pilot":
+        environment.extend(
+            [
+                {"name": "GOLDEN_ROSE_ENVIRONMENT", "value": "production"},
+                {"name": "GOLDEN_ROSE_AUTH_MODE", "value": "staff_oidc"},
+                {
+                    "name": "GOLDEN_ROSE_DEPLOYMENT_TARGET",
+                    "value": "controlled-live-data-staff-pilot",
+                },
+                {
+                    "name": "GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL",
+                    "value": "Controlled live-data staff pilot",
+                },
+                {"name": "GOLDEN_ROSE_DEMO_ACCESS_ENABLED", "value": "false"},
+                {"name": "GOLDEN_ROSE_PRESENTATION_DEMO_SEED_ENABLED", "value": "false"},
+                {
+                    "name": "GOLDEN_ROSE_STAFF_OIDC_ISSUER",
+                    "valueSource": {
+                        "secretKeyRef": {"secret": "staff-oidc-issuer", "version": "latest"}
+                    },
+                },
+                {
+                    "name": "GOLDEN_ROSE_STAFF_OIDC_AUDIENCE",
+                    "valueSource": {
+                        "secretKeyRef": {"secret": "staff-oidc-audience", "version": "latest"}
+                    },
+                },
+                {
+                    "name": "GOLDEN_ROSE_STAFF_OIDC_JWKS_URL",
+                    "valueSource": {
+                        "secretKeyRef": {"secret": "staff-oidc-jwks-url", "version": "latest"}
+                    },
+                },
+            ]
+        )
+    else:
+        environment.extend(
+            [
+                {"name": "GOLDEN_ROSE_ENVIRONMENT", "value": "develop"},
+                {"name": "GOLDEN_ROSE_AUTH_MODE", "value": "synthetic"},
+                {
+                    "name": "GOLDEN_ROSE_DEPLOYMENT_TARGET",
+                    "value": "gcp-develop-private-synthetic",
+                },
+                {
+                    "name": "GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL",
+                    "value": "Private non-production synthetic develop",
+                },
+                {"name": "GOLDEN_ROSE_DEMO_ACCESS_ENABLED", "value": "true"},
+                {"name": "GOLDEN_ROSE_DEMO_ACCESS_EXPIRES_AT", "value": "2026-10-31T00:00:00Z"},
+                {"name": "GOLDEN_ROSE_PRESENTATION_DEMO_SEED_ENABLED", "value": "true"},
+                {
+                    "name": "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD",
+                    "valueSource": {
+                        "secretKeyRef": {"secret": "demo-access-password", "version": "latest"}
+                    },
+                },
+                {
+                    "name": "GOLDEN_ROSE_SYNTHETIC_STAFF_ID",
+                    "valueSource": {
+                        "secretKeyRef": {"secret": "synthetic-staff-id", "version": "latest"}
+                    },
+                },
+            ]
+        )
     service: dict[str, Any] = {
         "terminalCondition": {"state": "CONDITION_SUCCEEDED"},
         "generation": "2",
         "observedGeneration": "2",
         "latestReadyRevision": "rev2",
         "latestCreatedRevision": "rev2",
-        "template": {"containers": [{"image": image}]},
+        "labels": {
+            "environment": "develop",
+            "data_boundary": data_boundary,
+            "managed_by": "terraform",
+            "service": "staff-tracer",
+            "cost_center": "develop",
+            "owner": "technical-owner",
+            "teardown": "intentional-runbook-only",
+            "goog-terraform-provisioned": "true",
+        },
+        "template": {"containers": [{"image": image, "env": environment}]},
     }
     if defect == "condition":
         service["terminalCondition"]["state"] = "CONDITION_FAILED"
@@ -174,7 +268,8 @@ def test_actual_service_workflow_accepts_current_v2_revision_only(tmp_path, defe
         | {
             "SERVICE_JSON": json.dumps(service),
             "MANAGED_IMAGE": image,
-            "IMAGE_DIGEST": "sha256:" + "1" * 64,
+            "IMAGE_DIGEST": image_digest,
+            "DEPLOYMENT_RUNTIME_PROFILE": runtime_profile,
         },
         text=True,
         capture_output=True,

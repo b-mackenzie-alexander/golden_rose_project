@@ -1,19 +1,24 @@
 # Staff Feedback Readiness Runbook
 
 This runbook defines the source-controlled, value-safe evidence shape for a
-later bounded staff-feedback use window in the current working environment. It
-does not approve cloud inspection, cloud mutation, production deployment,
-live/client data admission, support-channel activation, credential rotation,
-current-environment data migration, client-owned environment transfer, or
-business repository transfer.
+bounded staff-feedback use window that does not admit real worker or employer
+records. It does not approve cloud inspection, cloud mutation, production
+deployment, live/client data admission, support-channel activation, credential
+rotation, current-environment data migration, client-owned environment transfer,
+or business repository transfer.
+
+If staff will enter real worker or employer data, use
+`deploy/gcp/live-data-pilot-readiness-runbook.md` instead. That controlled
+live-data staff pilot packet supersedes this feedback-only packet for the next
+working environment.
 
 ## Boundary
 
 - A staff-feedback use window is a learning and acceptance mechanism, not a
   declaration that Golden Rose is complete.
 - Staff daily use must have an explicit data-entry scope before it starts. If
-  live/client data is proposed, that is a separate approval and evidence packet,
-  not a side effect of this source artifact.
+  live/client data is proposed, use the controlled live-data staff pilot packet,
+  not this feedback-only artifact.
 - The current working environment may later need migration into a client-owned
   environment. This runbook records planning evidence only; it does not execute
   exports, imports, database copies or destructive cleanup.
@@ -131,6 +136,13 @@ to GCP, inspect runtime state, grant staff access, rotate credentials, activate
 support channels, migrate records, create GitHub accounts, transfer
 repositories, deploy production, roll out a shared runtime, admit live/client
 data, or prove provider-side recovery or session revocation.
+
+For the controlled live-data staff pilot, validate the operator-held readiness
+record with:
+
+```bash
+UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python scripts/validate_live_data_pilot_readiness.py <operator-held-live-data-pilot-readiness.json>
+```
 
 ## Stop Conditions
 

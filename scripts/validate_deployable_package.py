@@ -39,6 +39,7 @@ MANUAL_REVIEW_TEMPLATE_PATH = Path(
 TRAINING_ACCEPTANCE_TEMPLATE_PATH = Path(
     "deploy/gcp/templates/client-production-training-acceptance.example.json"
 )
+LIVE_DATA_PILOT_TEMPLATE_PATH = Path("deploy/gcp/templates/live-data-pilot-readiness.example.json")
 
 REQUIRED_RUNBOOK_PHRASES = (
     "not an approval to inspect or",
@@ -64,6 +65,7 @@ REQUIRED_RUNBOOK_PHRASES = (
     "client-production-copy-approval.example.json",
     "client-production-manual-review.example.json",
     "client-production-training-acceptance.example.json",
+    "live-data-pilot-readiness.example.json",
     "scripts/validate_client_production_plan.py",
     "scripts/validate_client_handoff_evidence.py",
     "scripts/validate_client_readiness_checklist.py",
@@ -75,6 +77,7 @@ REQUIRED_RUNBOOK_PHRASES = (
     "scripts/validate_client_copy_approval_evidence.py",
     "scripts/validate_client_manual_review_evidence.py",
     "scripts/validate_client_training_acceptance_evidence.py",
+    "scripts/validate_live_data_pilot_readiness.py",
     "delete/replace actions",
     "public SQL exposure",
     "broad IAM",
@@ -87,6 +90,7 @@ REQUIRED_RUNBOOK_PHRASES = (
     "validate_client_copy_approval_evidence.py <operator-held-copy-approval.json>",
     "validate_client_manual_review_evidence.py <operator-held-manual-review.json>",
     "validate_client_training_acceptance_evidence.py <operator-held-training-acceptance.json>",
+    "validate_live_data_pilot_readiness.py <operator-held-live-data-pilot-readiness.json>",
 )
 
 REQUIRED_ENV_VALUES = {
@@ -281,6 +285,7 @@ REQUIRED_PACKAGE_INDEX_SOURCE_ARTIFACTS = (
     "deploy/gcp/templates/client-production-copy-approval.example.json",
     "deploy/gcp/templates/client-production-manual-review.example.json",
     "deploy/gcp/templates/client-production-training-acceptance.example.json",
+    "deploy/gcp/templates/live-data-pilot-readiness.example.json",
     "scripts/validate_deployable_package.py",
     "scripts/validate_client_production_plan.py",
     "scripts/validate_client_handoff_evidence.py",
@@ -293,6 +298,7 @@ REQUIRED_PACKAGE_INDEX_SOURCE_ARTIFACTS = (
     "scripts/validate_client_copy_approval_evidence.py",
     "scripts/validate_client_manual_review_evidence.py",
     "scripts/validate_client_training_acceptance_evidence.py",
+    "scripts/validate_live_data_pilot_readiness.py",
 )
 
 REQUIRED_PACKAGE_INDEX_VALIDATOR_COMMANDS = {
@@ -350,7 +356,63 @@ REQUIRED_PACKAGE_INDEX_VALIDATOR_COMMANDS = {
         "scripts/validate_client_training_acceptance_evidence.py "
         "<operator-held-training-acceptance.json>"
     ),
+    "live_data_pilot_readiness": (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_live_data_pilot_readiness.py "
+        "<operator-held-live-data-pilot-readiness.json>"
+    ),
 }
+
+REQUIRED_LIVE_DATA_PILOT_STRING_VALUES = {
+    ("authority_boundary", "cloud_execution"): "separate-approval-required",
+    ("authority_boundary", "production_deployment"): "not-production-activation",
+    ("authority_boundary", "live_data_admission"): "controlled-staff-pilot-approved",
+    ("deployment_preconditions", "runtime_environment"): ("production-mode-controlled-staff-pilot"),
+    ("deployment_preconditions", "auth_mode"): "staff_oidc",
+    ("deployment_preconditions", "environment_marker"): "controlled-live-data-staff-pilot",
+    ("deployment_preconditions", "presentation_seed"): "disabled",
+    ("deployment_preconditions", "shared_demo_access"): "disabled",
+    ("deployment_preconditions", "static_operational_examples"): "disabled",
+    ("deployment_preconditions", "named_staff_accounts"): "required",
+    ("deployment_preconditions", "live_data_scope"): "worker-and-employer-intake-records-only",
+    ("retained_boundaries", "public_worker_or_employer_portal"): "not-activated",
+    ("retained_boundaries", "automated_matching_ranking_referral_placement"): "not-implemented",
+    ("retained_boundaries", "production_completion_claim"): "not-claimed",
+    ("retained_boundaries", "client_owned_environment_transition"): (
+        "not-executed-without-separate-approval"
+    ),
+    ("retained_boundaries", "current_environment_data_migration"): (
+        "not-executed-without-separate-approval"
+    ),
+}
+
+REQUIRED_LIVE_DATA_PILOT_PLACEHOLDERS = (
+    ("source", "source_commit"),
+    ("source", "migration_revision"),
+    ("pilot_readiness", "operating_boundary_status"),
+    ("pilot_readiness", "live_data_scope_status"),
+    ("pilot_readiness", "staff_identity_status"),
+    ("pilot_readiness", "staff_account_status"),
+    ("pilot_readiness", "backup_restore_status"),
+    ("pilot_readiness", "migration_disposition_status"),
+    ("pilot_readiness", "data_governance_status"),
+    ("pilot_readiness", "support_escalation_status"),
+    ("pilot_readiness", "staff_training_status"),
+    ("pilot_readiness", "manual_acceptance_status"),
+    ("pilot_readiness", "rollback_closeout_status"),
+    ("evidence", "operating_boundary_note"),
+    ("evidence", "live_data_scope_note"),
+    ("evidence", "staff_identity_receipt"),
+    ("evidence", "staff_account_receipt"),
+    ("evidence", "backup_restore_receipt"),
+    ("evidence", "migration_disposition_note"),
+    ("evidence", "data_governance_note"),
+    ("evidence", "support_escalation_note"),
+    ("evidence", "staff_training_note"),
+    ("evidence", "manual_acceptance_note"),
+    ("evidence", "rollback_closeout_note"),
+    ("evidence", "readiness_owner"),
+)
 
 REQUIRED_PACKAGE_INDEX_MANUAL_BOUNDARY: dict[str, str] = {}
 
@@ -1073,6 +1135,35 @@ def _validate_training_acceptance_template(text: str) -> None:
             )
 
 
+def _validate_live_data_pilot_template(text: str) -> None:
+    document = _load_json_object(text, LIVE_DATA_PILOT_TEMPLATE_PATH)
+    if document.get("evidence_type") != "controlled-live-data-staff-pilot-readiness":
+        raise PackageValidationError(
+            f"{LIVE_DATA_PILOT_TEMPLATE_PATH} evidence_type must distinguish live-data pilot"
+        )
+    expected_command = (
+        "UV_CACHE_DIR=/private/tmp/golden-rose-uv-cache uv run python "
+        "scripts/validate_live_data_pilot_readiness.py "
+        "<operator-held-live-data-pilot-readiness.json>"
+    )
+    if document.get("validator_command") != expected_command:
+        raise PackageValidationError(
+            f"{LIVE_DATA_PILOT_TEMPLATE_PATH} validator_command must be {expected_command}"
+        )
+    for (section, key), expected_text in REQUIRED_LIVE_DATA_PILOT_STRING_VALUES.items():
+        value = _get_pointer(document, LIVE_DATA_PILOT_TEMPLATE_PATH, section, key)
+        if value != expected_text:
+            raise PackageValidationError(
+                f"{LIVE_DATA_PILOT_TEMPLATE_PATH} {section}.{key} must be {expected_text}"
+            )
+    for section, key in REQUIRED_LIVE_DATA_PILOT_PLACEHOLDERS:
+        value = _get_pointer(document, LIVE_DATA_PILOT_TEMPLATE_PATH, section, key)
+        if not isinstance(value, str) or not _is_placeholder(value):
+            raise PackageValidationError(
+                f"{LIVE_DATA_PILOT_TEMPLATE_PATH} {section}.{key} must remain a placeholder"
+            )
+
+
 def _validate_runbook(text: str) -> None:
     for phrase in REQUIRED_RUNBOOK_PHRASES:
         if phrase not in text:
@@ -1094,6 +1185,7 @@ def validate(root: Path = ROOT) -> list[str]:
     copy_approval_template = _read(root, COPY_APPROVAL_TEMPLATE_PATH)
     manual_review_template = _read(root, MANUAL_REVIEW_TEMPLATE_PATH)
     training_acceptance_template = _read(root, TRAINING_ACCEPTANCE_TEMPLATE_PATH)
+    live_data_pilot_template = _read(root, LIVE_DATA_PILOT_TEMPLATE_PATH)
     for relative_path, text in (
         (RUNBOOK_PATH, runbook),
         (ENV_TEMPLATE_PATH, env_template),
@@ -1109,6 +1201,7 @@ def validate(root: Path = ROOT) -> list[str]:
         (COPY_APPROVAL_TEMPLATE_PATH, copy_approval_template),
         (MANUAL_REVIEW_TEMPLATE_PATH, manual_review_template),
         (TRAINING_ACCEPTANCE_TEMPLATE_PATH, training_acceptance_template),
+        (LIVE_DATA_PILOT_TEMPLATE_PATH, live_data_pilot_template),
     ):
         _validate_no_forbidden_values(relative_path, text)
     _validate_runbook(runbook)
@@ -1125,6 +1218,7 @@ def validate(root: Path = ROOT) -> list[str]:
     _validate_copy_approval_template(copy_approval_template)
     _validate_manual_review_template(manual_review_template)
     _validate_training_acceptance_template(training_acceptance_template)
+    _validate_live_data_pilot_template(live_data_pilot_template)
     return [
         str(RUNBOOK_PATH),
         str(ENV_TEMPLATE_PATH),
@@ -1140,6 +1234,7 @@ def validate(root: Path = ROOT) -> list[str]:
         str(COPY_APPROVAL_TEMPLATE_PATH),
         str(MANUAL_REVIEW_TEMPLATE_PATH),
         str(TRAINING_ACCEPTANCE_TEMPLATE_PATH),
+        str(LIVE_DATA_PILOT_TEMPLATE_PATH),
     ]
 
 

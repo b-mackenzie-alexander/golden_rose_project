@@ -1,5 +1,13 @@
 # Security — Golden Rose Operations Platform
 
+## 2026-10-01 — Controlled live-data staff pilot security posture
+
+PR #156 is merged at protected `develop@985a8d1ac8630310ea58c0bca809665612c5ddbc`. The current source posture is a controlled live-data staff pilot package, not a fictional-demo or feedback-only package. Real worker and employer records may be entered only after a separate operator-held cloud packet validates named staff access, staff OIDC/MFA posture, disabled presentation seed/shared gate/static examples, live-data scope, backup/restore posture, data-governance basics, support/training/manual acceptance, rollback/closeout ownership and migration-disposition planning.
+
+The pilot security boundary remains staff-only and application-mediated. Staff account lifecycle, role/permission/delegation administration, recovery evidence and session-revocation evidence are attributable application records; they are not claims that provider-side factor reset, forced logout or token/session revocation has executed unless a separately approved identity-provider integration and receipt prove that action. Platform Administrator remains a technical-support role, not a business-superuser role with standing operational-data access.
+
+This branch is documentation/source remediation only. It does not authenticate to cloud systems, inspect state, run probes, generate Terraform plans, apply infrastructure, create secrets, activate identity providers, rotate credentials, execute export/import, migrate current-environment records, deploy production, admit live/client data or authorize shared-runtime rollout. Historical fictional/synthetic and private-demo entries below remain evidence for their past scopes only.
+
 ## 2026-09-29 — Client package index source guard
 
 The active `feat/client-package-index-validator` source slice extends Tranche 2 portability with `deploy/gcp/templates/client-production-package-index.example.json` and `scripts/validate_client_package_index.py`. The template is placeholder-only and indexes the package runbooks, production placeholder templates and offline validator scripts that a later operator must review outside source control with value-safe evidence.

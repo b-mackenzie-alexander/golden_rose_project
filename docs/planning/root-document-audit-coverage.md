@@ -1,4 +1,43 @@
-# Root-document audit coverage — 2026-09-14
+# Root-document audit coverage
+
+## 2026-10-01 — Current-state remediation pass
+
+### Scope and method
+
+Bounded documentation/source-remediation pass in `/Users/genie/Desktop/golden_rose_project` on `docs/live-data-pilot-docs-remediation` after PR #156 merged into protected `develop@985a8d1ac8630310ea58c0bca809665612c5ddbc`. This pass reviewed current root Markdown, the active production-readiness plan and selected living Obsidian notes for stale active directives, unchecked next steps and old wording that would steer future work back toward fictional/synthetic or feedback-only assumptions.
+
+Historical entries were preserved instead of rewritten. The remediation adds current-status locks and superseding notes so future work starts from the controlled live-data staff pilot model: real worker/employer records may be entered only after a separate operator-held cloud packet validates exact source/image/schema identity, staff OIDC/named accounts, disabled demo/static-example posture, live-data scope, backup/restore, data governance, support/training/manual acceptance, rollback/closeout and migration-disposition boundaries.
+
+### Edited source documents
+
+| File | Remediation |
+|---|---|
+| `AGENTS.md` | Added a current PR #156 delivery lock and marked older PR A-D / private fictional/synthetic entries historical unless they contain still-active guardrails. |
+| `CURRENT_WORK.md` | Replaced the stale active PR #155 branch framing with the current PR #156 merge, documentation truth-pass branch and next cloud-packet action. |
+| `ROADMAP.md` | Replaced the stale active PR #155 branch framing with the current PR #156 merge and controlled live-data staff pilot next step. |
+| `NOTES.md` | Appended the PR #156 merge and documentation remediation entry. |
+| `README.md` | Added current repository status and separated local/test fictional fixtures from the later controlled staff pilot with real records. |
+| `SECURITY.md` | Added current pilot security posture, preserving evidence-only recovery/session-revocation wording and source-only branch boundaries. |
+| `ARCHITECTURE.md` | Added current architecture status after PR #156 and demoted older private fictional/synthetic develop architecture to historical context. |
+| `docs/planning/2026-09-27-production-readiness-plan.md` | Added a superseding status noting that the tranches have been substantially executed in source through PR #156. |
+| `docs/planning/root-document-audit-coverage.md` | Recorded this remediation scope. |
+
+### Edited living Obsidian notes
+
+| Note | Remediation |
+|---|---|
+| `Golden Rose Employment Agency - Engagement Index` | Replaced the stale v28/Wave 1 active status with the PR #156 controlled live-data staff pilot boundary and current cloud-packet next step. |
+| `Golden Rose Employment Agency - Phase 1 Implementation Progress` | Added PR #156 current repository status and replaced the old v28/Wave 1 current-work block. |
+| `Golden Rose Employment Agency - Governance Source of Truth` | Removed synthetic-only wording from the current internal-workflow rule and added the controlled live-data staff pilot gate. |
+| `Golden Rose Employment Agency - Notebook Consolidation Map` | Updated current cluster summaries for the engagement index, architecture, deployment strategy and implementation progress notes. |
+| `Golden Rose Employment Agency - Living Technical Architecture and Infrastructure` | Updated status/evidence posture from local/synthetic tracers to the current staff-only operations platform and PR #156 readiness boundary. |
+| `Golden Rose Employment Agency - Living Rolling Deployment and DevSecOps Strategy` | Updated the environment/data model so local/staging default to fixtures while real records require the separately approved controlled staff pilot packet. |
+
+### Limits
+
+This pass does not claim exhaustive semantic review of every historical Markdown file, private evidence packet, ADR, handoff or generated artifact. It does not inspect or mutate cloud resources, run service smoke checks, activate live identity providers, migrate current-environment records, create business accounts, transfer repositories, execute export/import or admit live data. Obsidian private evidence packets may still contain historical private access material and should not be copied into source-controlled docs or chat.
+
+## 2026-09-14 — Root-document audit coverage
 
 ## Scope and method
 

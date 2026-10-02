@@ -1,5 +1,13 @@
 # Production-readiness and staff identity plan — 2026-09-27
 
+## 2026-10-01 superseding status
+
+This plan has been substantially executed in source through PR #156, `feat: add live-data staff pilot readiness`, merged into protected `develop` at `985a8d1ac8630310ea58c0bca809665612c5ddbc`. Do not restart Tranche 1 from this document. Staff authentication/account lifecycle/admin surfaces, deployable-package portability validators, operations-readiness evidence contracts, staff-feedback and transition-planning evidence, and the controlled live-data staff pilot readiness packet now exist in source.
+
+The current next step is not another fictional/synthetic feedback deployment. It is a documentation truth pass followed, after review/merge, by a separately approved operator-held cloud packet for a controlled staff working environment where real worker and employer records may be entered only within the validated live-data scope. That packet must identify exact source/image/schema state and validate staff OIDC/named-account readiness, disabled presentation seed/shared gate/static examples, backup/restore posture, data-governance basics, support/training/manual acceptance, rollback/closeout ownership and migration-disposition planning.
+
+Still-open items after PR #156 are operational activation items, not missing source-plan tranches: cloud packet assembly and execution, current dashboard review by staff, any remediation from real daily use, live identity-provider configuration, current-environment record migration/disposition decisions, business account/repository stewardship decisions, and any later client-owned transition/export/import. No cloud deployment, live/client data action, provider-side identity mutation, credential rotation or production-completion claim is authorized by this addendum.
+
 ## Delivery position
 
 - **Staffing:** One independent developer; automated checks, fresh agent review and protected PR gates provide quality evidence, not independent-human authorization.

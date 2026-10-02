@@ -1,5 +1,15 @@
 # Architecture — Golden Rose Operations Platform
 
+## 2026-10-01 — Current architecture status after PR #156
+
+Protected `develop@985a8d1ac8630310ea58c0bca809665612c5ddbc` contains the current source architecture for a controlled live-data staff pilot. The application is a staff-only operations platform with durable worker/employer intake, review, finalization, corrections/current-facts review, staff personal accounts and account administration, request/shift lifecycle foundations, operations projections, deployable-package validators and a live-data pilot readiness packet.
+
+The next working environment is no longer modeled as a fictional-demo or feedback-only target. In production-mode staff pilot runtime the environment marker reports `controlled-live-data-staff-pilot`; static/demo operational examples and presentation seed posture are disallowed. Real worker and employer records remain gated by a separate operator-held cloud packet that validates source/image/schema identity, named staff access, staff OIDC/MFA posture, backup/restore, data governance, support/training/manual acceptance, rollback/closeout and migration-disposition evidence.
+
+Architecturally, PostgreSQL domain rows and append-only audit/history records remain authoritative. Dashboard counts, queues, calendar views, map/area summaries and staff operations surfaces are derived projections/queries over governed records and permissions; they must not become independent editable truth stores or automatic matching/ranking/eligibility/referral/placement mechanisms. Public worker/employer self-service remains out of scope for this pilot.
+
+This status does not claim current cloud deployment, service mutation, migration execution, live identity-provider activation, credential rotation, export/import, client-owned transition or production completion. Older private fictional/synthetic Cloud Run and Wave 1 sections below are historical unless they describe still-active architecture guardrails.
+
 ## 2026-09-16 — Current private develop architecture status
 
 Protected `develop@dd6697871986fa5677e722b2805a21a8a7776b64` is deployed to the existing private fictional-synthetic Cloud Run/Cloud SQL `develop` service for stakeholder review. The architecture remains one private staff service behind the temporary expiring Basic gate, with private Cloud SQL, one-instance service bounds, immutable image promotion, and fictional/synthetic data controls. The latest rollout changed only image references for the service, migration job and database-authority job; it did not run migrations, execute database verification, alter Terraform topology, change ingress/authentication, rotate credentials, or promote production authority.

@@ -1,11 +1,34 @@
 # Golden Rose Operations Platform
 
-This repository contains bounded synthetic/local tracers for the Golden Rose
-staff employer-demand workflow. The first staff Employer browser workspace,
-its closeout, bounded draft-Employer revision, and backend EmployerContact
-authority foundation are merged into `develop`.
-This is not a public portal, production deployment, or
-automated hiring, matching, ranking, eligibility, or referral system.
+This repository contains the Golden Rose staff operations platform source. It
+supports staff-facing worker/employer intake, staff account administration,
+dashboard operations, deployable-package guardrails and controlled live-data
+staff pilot readiness.
+
+This is not a public portal, automatic hiring/matching/ranking/eligibility/
+referral system, or self-service worker/employer application. Human staff
+decision boundaries, named staff accountability, bilingual/accessibility parity,
+auth-sensitive no-store handling and separate public/staff identity planes remain
+core product constraints.
+
+## 2026-10-01 — Current status after PR #156
+
+PR #156, `feat: add live-data staff pilot readiness`, is merged into protected
+`develop` at `985a8d1ac8630310ea58c0bca809665612c5ddbc`. The source now
+contains the controlled live-data staff pilot readiness runbook/template/
+validator, package-index wiring and production-mode environment marker for a
+staff-only working environment where real worker and employer records may be
+entered only after a separate operator-held cloud packet validates staff OIDC,
+named accounts, disabled demo/presentation/static-example posture, live-data
+scope, backup/restore, data governance, support/training/manual acceptance,
+rollback/closeout and migration-disposition boundaries.
+
+No current cloud deployment, service mutation, migration execution, production
+completion, live identity-provider activation, credential rotation, data
+export/import or client-owned transition is implied by this repository status.
+Older fictional/synthetic and private-demo references below are historical
+evidence or local/test guidance unless a current section explicitly says
+otherwise.
 
 ## 2026-09-14 — Staff intake planning boundary
 
@@ -144,8 +167,11 @@ uv run python scripts/validate_sbom.py build/backend-sbom.cdx.json --spec 1.6 --
 ```
 
 The application must not be started against production settings with synthetic
-authentication. The approved cloud implementation/testing lane must use the
-dedicated GCP deployment/testing project with wholly fictional synthetic data;
-project IDs, billing IDs, domains, user emails, credentials, and secret payloads
-must stay out of tracked source and ordinary docs. Public access, real identity
-integration, live-data use, and production remain separately gated.
+authentication. Local and automated tests use disposable or fictional fixtures.
+The next controlled staff pilot may contain real worker and employer records
+only after a separate operator-held cloud packet validates the live-data scope,
+named staff access, staff OIDC, disabled demo/static-example posture, backup/
+restore, data governance, support/training/manual acceptance, rollback/closeout
+and migration-disposition boundaries. Project IDs, billing IDs, domains, user
+emails, credentials, service URLs and secret payloads must stay out of tracked
+source and ordinary docs.

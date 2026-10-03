@@ -269,6 +269,7 @@ def test_actual_service_workflow_accepts_current_v2_revision_only(
             "SERVICE_JSON": json.dumps(service),
             "MANAGED_IMAGE": image,
             "IMAGE_DIGEST": image_digest,
+            "ADMITTED_IMAGE_DIGEST": "sha256:" + "2" * 64,
             "DEPLOYMENT_RUNTIME_PROFILE": runtime_profile,
         },
         text=True,

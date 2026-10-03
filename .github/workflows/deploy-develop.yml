@@ -65,6 +65,9 @@ jobs:
         with:
           cosign-release: "v3.0.6"
 
+      - name: Set up Docker Buildx
+        # v3.11.1
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
 
       - name: Initialize failed deploy result
         run: |
@@ -100,20 +103,23 @@ jobs:
           IMAGE_TAG="$MANAGED_REPOSITORY:${GITHUB_SHA}"
           mkdir -p build/oci-authority
           cosign verify --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$IMAGE_TAG" > build/oci-authority/tag-signature.json
-          IMAGE_DIGEST="$(python - <<'PY'
+          ADMITTED_IMAGE_DIGEST="$(python - <<'PY'
           import json
           from pathlib import Path
           records = json.loads(Path("build/oci-authority/tag-signature.json").read_text(encoding="utf-8"))
           print(records[0]["critical"]["image"]["docker-manifest-digest"])
           PY
           )"
+          ADMITTED_MANAGED_IMAGE="${MANAGED_REPOSITORY}@${ADMITTED_IMAGE_DIGEST}"
+          docker buildx imagetools inspect --raw "$IMAGE_TAG" > build/oci-authority/image-index.json
+          IMAGE_DIGEST="$(uv run python scripts/resolve_deployment_image_digest.py --root-digest "$ADMITTED_IMAGE_DIGEST" --platform linux/amd64 < build/oci-authority/image-index.json)"
           MANAGED_IMAGE="${MANAGED_REPOSITORY}@${IMAGE_DIGEST}"
-          cosign verify --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/oci-authority/signature.json
-          cosign verify-attestation --type slsaprovenance1 --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/oci-authority/provenance.json
-          cosign verify-attestation --type https://spdx.dev/Document --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/oci-authority/image-sbom.json
-          cosign verify-attestation --type https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1 --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/oci-authority/application-sbom.json
-          uv run python scripts/verify_deploy_image_authority.py --image "$MANAGED_IMAGE" --signature build/oci-authority/signature.json --provenance build/oci-authority/provenance.json --image-sbom build/oci-authority/image-sbom.json --application-sbom build/oci-authority/application-sbom.json --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --source-commit "$GITHUB_SHA"
-          printf 'MANAGED_IMAGE=%s\nIMAGE_DIGEST=%s\n' "$MANAGED_IMAGE" "$IMAGE_DIGEST" >> "$GITHUB_ENV"
+          cosign verify --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$ADMITTED_MANAGED_IMAGE" > build/oci-authority/signature.json
+          cosign verify-attestation --type slsaprovenance1 --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$ADMITTED_MANAGED_IMAGE" > build/oci-authority/provenance.json
+          cosign verify-attestation --type https://spdx.dev/Document --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$ADMITTED_MANAGED_IMAGE" > build/oci-authority/image-sbom.json
+          cosign verify-attestation --type https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1 --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$ADMITTED_MANAGED_IMAGE" > build/oci-authority/application-sbom.json
+          uv run python scripts/verify_deploy_image_authority.py --image "$ADMITTED_MANAGED_IMAGE" --signature build/oci-authority/signature.json --provenance build/oci-authority/provenance.json --image-sbom build/oci-authority/image-sbom.json --application-sbom build/oci-authority/application-sbom.json --certificate-identity "$BUILD_CERTIFICATE_IDENTITY" --source-commit "$GITHUB_SHA"
+          printf 'MANAGED_IMAGE=%s\nIMAGE_DIGEST=%s\nADMITTED_MANAGED_IMAGE=%s\nADMITTED_IMAGE_DIGEST=%s\n' "$MANAGED_IMAGE" "$IMAGE_DIGEST" "$ADMITTED_MANAGED_IMAGE" "$ADMITTED_IMAGE_DIGEST" >> "$GITHUB_ENV"
 
       - name: Clear artifact verifier credential context
         env:
@@ -250,7 +256,7 @@ jobs:
 
           path = Path("build/deploy-result.json")
           payload = json.loads(path.read_text(encoding="utf-8"))
-          payload.update({"result": "success", "current_stage": "migration_execution", "image_digest": os.environ["IMAGE_DIGEST"]})
+          payload.update({"result": "success", "current_stage": "migration_execution", "image_digest": os.environ["IMAGE_DIGEST"], "admitted_image_digest": os.environ["ADMITTED_IMAGE_DIGEST"]})
           path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
           PY
 
@@ -337,7 +343,7 @@ jobs:
 
           path = Path("build/deploy-result.json")
           payload = json.loads(path.read_text(encoding="utf-8"))
-          payload.update({"result": "success", "current_stage": "database_verification", "image_digest": os.environ["IMAGE_DIGEST"]})
+          payload.update({"result": "success", "current_stage": "database_verification", "image_digest": os.environ["IMAGE_DIGEST"], "admitted_image_digest": os.environ["ADMITTED_IMAGE_DIGEST"]})
           path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
           PY
 
@@ -435,7 +441,7 @@ jobs:
               raise SystemExit("ready service label posture drifted")
           path = Path("build/deploy-result.json")
           payload = json.loads(path.read_text(encoding="utf-8"))
-          payload.update({"result": "success", "current_stage": "service_readiness", "image_digest": os.environ["IMAGE_DIGEST"]})
+          payload.update({"result": "success", "current_stage": "service_readiness", "image_digest": os.environ["IMAGE_DIGEST"], "admitted_image_digest": os.environ["ADMITTED_IMAGE_DIGEST"]})
           path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
           PY
 
@@ -451,7 +457,7 @@ jobs:
           from pathlib import Path
           path = Path("build/deploy-result.json")
           payload = json.loads(path.read_text(encoding="utf-8"))
-          payload.update({"current_stage": os.environ["DEPLOYMENT_STAGE"], "runtime_profile": os.environ["DEPLOYMENT_RUNTIME_PROFILE"], "image_digest": os.environ.get("IMAGE_DIGEST"), "qualification_executed": False})
+          payload.update({"current_stage": os.environ["DEPLOYMENT_STAGE"], "runtime_profile": os.environ["DEPLOYMENT_RUNTIME_PROFILE"], "image_digest": os.environ.get("IMAGE_DIGEST"), "admitted_image_digest": os.environ.get("ADMITTED_IMAGE_DIGEST"), "qualification_executed": False})
           path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
           PY
 

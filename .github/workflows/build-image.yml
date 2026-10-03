@@ -236,7 +236,10 @@ jobs:
           PY
           )"
           MANAGED_IMAGE="${MANAGED_REPOSITORY}@${IMAGE_DIGEST}"
-          export IMAGE_DIGEST MANAGED_IMAGE
+          docker buildx imagetools inspect --raw "${MANAGED_REPOSITORY}:${SOURCE_COMMIT}" > build/published-image-index.json
+          DEPLOYMENT_IMAGE_DIGEST="$(uv run python scripts/resolve_deployment_image_digest.py --root-digest "$IMAGE_DIGEST" --platform linux/amd64 < build/published-image-index.json)"
+          DEPLOYMENT_MANAGED_IMAGE="${MANAGED_REPOSITORY}@${DEPLOYMENT_IMAGE_DIGEST}"
+          export IMAGE_DIGEST MANAGED_IMAGE DEPLOYMENT_IMAGE_DIGEST DEPLOYMENT_MANAGED_IMAGE
           "${{ steps.syft.outputs.cmd }}" "$MANAGED_IMAGE" --output spdx-json=build/image-sbom.spdx.json
           python - <<'PY'
           import base64
@@ -270,8 +273,26 @@ jobs:
           cosign verify-attestation --type https://spdx.dev/Document --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/image-sbom.cdx.json
           cosign verify-attestation --type https://golden-rose.nousresearch.com/attestations/application-sbom-checksums/v1 --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" --output json "$MANAGED_IMAGE" > build/publish-application-sbom-verification.json
           uv run python scripts/verify_deploy_image_authority.py --image "$MANAGED_IMAGE" --signature build/publish-signature-verification.json --provenance build/publish-provenance-verification.json --image-sbom build/image-sbom.cdx.json --application-sbom build/publish-application-sbom-verification.json --certificate-identity "https://github.com/b-mackenzie-alexander/golden_rose_project/.github/workflows/build-image.yml@refs/heads/develop" --source-commit "$SOURCE_COMMIT" --backend-sbom build/backend-sbom.cdx.json --frontend-sbom build/frontend-sbom.cdx.json >/dev/null
-          # never deploy by tag; retain only the verifier-approved immutable reference
+          # never deploy by tag; retain immutable evidence for both the admitted index and runtime manifest
           printf '%s\n' "$MANAGED_IMAGE" > build/published-image.txt
+          printf '%s\n' "$DEPLOYMENT_MANAGED_IMAGE" > build/published-deployment-image.txt
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          payload = {
+              "admitted_image": os.environ["MANAGED_IMAGE"],
+              "admitted_image_digest": os.environ["IMAGE_DIGEST"],
+              "deployment_image": os.environ["DEPLOYMENT_MANAGED_IMAGE"],
+              "deployment_image_digest": os.environ["DEPLOYMENT_IMAGE_DIGEST"],
+              "platform": "linux/amd64",
+          }
+          Path("build/published-image-reference.json").write_text(
+              json.dumps(payload, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
 
       - name: Upload backend SBOM evidence
         if: always()
@@ -349,6 +370,10 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: published-image
-          path: build/published-image.txt
+          path: |
+            build/published-image.txt
+            build/published-deployment-image.txt
+            build/published-image-reference.json
+            build/published-image-index.json
           if-no-files-found: error
           retention-days: 14

@@ -845,7 +845,12 @@ ALLOWED_WORKFLOW_STEP_WITH = {
         "name:Upload published image reference",
     ): {
         "name": "published-image",
-        "path": "build/published-image.txt",
+        "path": (
+            "build/published-image.txt\n"
+            "build/published-deployment-image.txt\n"
+            "build/published-image-reference.json\n"
+            "build/published-image-index.json\n"
+        ),
         "if-no-files-found": "error",
         "retention-days": 14,
     },
@@ -1057,6 +1062,11 @@ ALLOWED_WORKFLOW_STEP_USES = {
     (
         "build-image.yml",
         "publish-image",
+        "name:Set up Docker Buildx",
+    ): "docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435",
+    (
+        "deploy-develop.yml",
+        "deploy",
         "name:Set up Docker Buildx",
     ): "docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435",
     (
@@ -1634,7 +1644,7 @@ test -f .gitignore
 
 EXACT_WORKFLOW_RUN_SHA256 = {
     ("build-image.yml", "publish-image", "name:Sign and verify published image attestation set"): (
-        "ea84c34dbca86e386e9e48a98b68ed26b21f2b621844ed07e0687465e6548124"
+        "d90842b694225f3eb713b8f1293b8c1585e6763d8dae9a20b946d77efacf063d"
     ),
     ("deploy-develop.yml", "deploy", "name:Initialize failed deploy result"): (
         "931d39097ca97bc9a49f5227f4287d19f0709adfff40ca6f540f673703622b40"
@@ -1926,6 +1936,7 @@ DEPLOY_WORKFLOW_STEPS = [
     "name:Set up uv",
     "name:Enforce protected develop source",
     "name:Install Cosign",
+    "name:Set up Docker Buildx",
     "name:Initialize failed deploy result",
     "name:Authenticate artifact verifier to Google Cloud",
     "name:Verify direct OCI image authority",
@@ -2063,7 +2074,7 @@ EXACT_WORKFLOW_RUN_SHA256.update(
             "deploy-develop.yml",
             "deploy",
             "name:Verify direct OCI image authority",
-        ): "d6d32c11fc0b698b96f60be1b966eef10ea2ffa9798f72b7d5f28482e5317c0c",
+        ): "1ef23267a866979003b41683cfa5ebe9964fca18f0f53aec9318f08f5b3d9d0e",
         (
             "deploy-develop.yml",
             "deploy",
@@ -2083,12 +2094,12 @@ EXACT_WORKFLOW_RUN_SHA256.update(
             "deploy-develop.yml",
             "deploy",
             "name:Execute migration transition",
-        ): "78e3c8a20b583f78532af38da73a20224c92566e85cc02ec5ad7c84b6f0fba63",
+        ): "5484b1c4d44e96435745f6e63da551ccec2062ca884f23bb202c956740253e2e",
         (
             "deploy-develop.yml",
             "deploy",
             "name:Execute database authority verification",
-        ): "e3ec448080ec691664e8e4be121b45bddf1e0384616302a35ee80fb5701b608f",
+        ): "f85e54c34860d70c7537e92824ab4d35c9c11d4ad0a1b81e3d0c86aef64c36e9",
         (
             "deploy-develop.yml",
             "deploy",
@@ -2103,12 +2114,12 @@ EXACT_WORKFLOW_RUN_SHA256.update(
             "deploy-develop.yml",
             "deploy",
             "name:Verify service readiness transition",
-        ): "78160a02b20245d6c952fa5f08b13b7c389594a7eb944f0bd45c7bda0ecf0a70",
+        ): "283468f231a40e2c6af36b5c5f920e0af7acee95df2af94daae45c78f2fae7e4",
         (
             "deploy-develop.yml",
             "deploy",
             "name:Record deploy result",
-        ): "f58f1554e03e703d1cbfc5f9e060b4e9c8f57c60b88408bc424106982fb83c8e",
+        ): "21555789b3814ac4e0fcdee7b5e7e3fb07da545aa0056d9e1d4f6b423309b48c",
     }
 )
 

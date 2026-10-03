@@ -29,7 +29,24 @@ def test_deployment_admits_only_immutable_verification(
         with Path("calls.jsonl").open("a") as output:
             output.write(json.dumps([tool, *args]) + "\\n")
         if tool == "docker":
-            sys.stdin.read()
+            if args[:3] == ["buildx", "imagetools", "inspect"]:
+                print(json.dumps({
+                    "mediaType": "application/vnd.oci.image.index.v1+json",
+                    "manifests": [
+                        {
+                            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+                            "digest": "sha256:" + "d" * 64,
+                            "platform": {"os": "linux", "architecture": "amd64"},
+                        },
+                        {
+                            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+                            "digest": "sha256:" + "e" * 64,
+                            "platform": {"os": "unknown", "architecture": "unknown"},
+                        },
+                    ],
+                }))
+            else:
+                sys.stdin.read()
         elif tool == "cosign":
             if args[0] == "verify":
                 if "@sha256:" in args[-1] and os.environ["FAIL_IMMUTABLE"] == "1":
@@ -41,10 +58,13 @@ def test_deployment_admits_only_immutable_verification(
             else:
                 print("{}")
         elif tool == "uv":
-            image = args[args.index("--image") + 1]
-            signature = json.loads(Path(args[args.index("--signature") + 1]).read_text())
-            assert signature[0]["critical"]["identity"]["docker-reference"] == image
-            Path("admitted").touch()
+            if "scripts/resolve_deployment_image_digest.py" in args:
+                print("sha256:" + "d" * 64)
+            else:
+                image = args[args.index("--image") + 1]
+                signature = json.loads(Path(args[args.index("--signature") + 1]).read_text())
+                assert signature[0]["critical"]["identity"]["docker-reference"] == image
+                Path("admitted").touch()
     """)
     for name in ("docker", "cosign", "uv"):
         path = binaries / name
@@ -52,7 +72,8 @@ def test_deployment_admits_only_immutable_verification(
         path.chmod(0o755)
     (binaries / "python").symlink_to(sys.executable)
     repository = "registry.example.test/synthetic/image"
-    digest = "sha256:" + "a" * 64
+    admitted_digest = "sha256:" + "a" * 64
+    deployment_digest = "sha256:" + "d" * 64
     source = "b" * 40
     env = {
         **os.environ,
@@ -68,7 +89,10 @@ def test_deployment_admits_only_immutable_verification(
     result = subprocess.run(["bash", "-c", body], cwd=tmp_path, env=env, capture_output=True)
     calls = [json.loads(line) for line in (tmp_path / "calls.jsonl").read_text().splitlines()]
     verifies = [call for call in calls if call[:2] == ["cosign", "verify"]]
-    assert [call[-1] for call in verifies] == [f"{repository}:{source}", f"{repository}@{digest}"]
+    assert [call[-1] for call in verifies] == [
+        f"{repository}:{source}",
+        f"{repository}@{admitted_digest}",
+    ]
     for call in verifies:
         assert call[call.index("--certificate-identity") + 1] == env["BUILD_CERTIFICATE_IDENTITY"]
         assert (
@@ -77,13 +101,18 @@ def test_deployment_admits_only_immutable_verification(
         )
     if fail_immutable:
         assert result.returncode == 7
+        assert not any(call[:2] == ["cosign", "verify-attestation"] for call in calls)
         assert not any(
-            call[0] == "uv" or call[:2] == ["cosign", "verify-attestation"] for call in calls
+            call[0] == "uv" and "scripts/verify_deploy_image_authority.py" in call for call in calls
         )
         assert not (tmp_path / "admitted").exists()
         assert not (tmp_path / "github-env").exists()
     else:
         assert result.returncode == 0, result.stderr
         assert (tmp_path / "admitted").exists()
-        assert f"MANAGED_IMAGE={repository}@{digest}" in (tmp_path / "github-env").read_text()
+        github_env = (tmp_path / "github-env").read_text()
+        assert f"ADMITTED_MANAGED_IMAGE={repository}@{admitted_digest}" in github_env
+        assert f"ADMITTED_IMAGE_DIGEST={admitted_digest}" in github_env
+        assert f"MANAGED_IMAGE={repository}@{deployment_digest}" in github_env
+        assert f"IMAGE_DIGEST={deployment_digest}" in github_env
         assert len([call for call in calls if call[:2] == ["cosign", "verify-attestation"]]) == 3

@@ -9,6 +9,7 @@ import type {
   StaffIdentityReadinessAction,
   StaffSession,
 } from '../api/staffAccountClient';
+import { GoogleStaffSignIn } from '../auth/GoogleStaffSignIn';
 import { IconSymbol } from '../dashboard/artwork';
 import { useLanguage } from '../i18n/LanguageProvider';
 
@@ -210,6 +211,9 @@ export function StaffAccountProfile() {
 
       {loading ? <p role="status">{language === 'en' ? 'Checking staff session...' : 'Verificando sesion del personal...'}</p> : null}
       {failure ? <p className="staff-account-error" role="alert">{failureText(failure, language)}</p> : null}
+      {failure === 'sign_in_required' || failure === 'authentication_failed' ? (
+        <GoogleStaffSignIn onSignedIn={() => { void reload(); }} />
+      ) : null}
 
       {session ? (
         <>

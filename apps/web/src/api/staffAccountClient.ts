@@ -1,3 +1,5 @@
+import { staffApiFetch } from '../auth/staffAuthSession';
+
 export type StaffAccountRole = 'owner' | 'delegated_manager' | 'operations_staff' | 'platform_administrator';
 export type StaffAccountStatus = 'active' | 'suspended' | 'deprovisioned';
 export type StaffAccountEvent =
@@ -457,7 +459,7 @@ async function request<T>(
 ): Promise<StaffAccountResult<T>> {
   let response: Response;
   try {
-    response = await fetch(`/api/staff/v1${path}`, {
+    response = await staffApiFetch(`/api/staff/v1${path}`, {
       cache: 'no-store',
       credentials: 'same-origin',
       mode: 'same-origin',

@@ -2052,6 +2052,7 @@ def test_openapi_exposes_only_intended_staff_route() -> None:
             "/api/staff/v1/intakes/{intake_id}/addresses/{section}",
             "/api/staff/v1/intakes/{intake_id}/addresses/{section}/revisions",
             "/api/staff/v1/session",
+            "/api/staff/v1/staff-auth-config",
             "/api/staff/v1/staff-identity-readiness",
             "/api/staff/v1/operations/projection",
             "/api/staff/v1/staff-accounts",
@@ -2077,6 +2078,7 @@ def test_openapi_exposes_only_intended_staff_route() -> None:
         assert set(paths["/health"]) == {"get"}
         assert set(paths["/readiness"]) == {"get"}
         assert set(paths["/api/staff/v1/session"]) == {"get"}
+        assert set(paths["/api/staff/v1/staff-auth-config"]) == {"get"}
         assert set(paths["/api/staff/v1/staff-identity-readiness"]) == {"get"}
         assert set(paths["/api/staff/v1/operations/projection"]) == {"get"}
         assert set(paths["/api/staff/v1/staff-accounts"]) == {"get", "post"}
@@ -2177,6 +2179,7 @@ def test_openapi_exposes_only_create_search_detail_and_revision_routes() -> None
             "/api/staff/v1/intakes/{intake_id}/addresses/{section}",
             "/api/staff/v1/intakes/{intake_id}/addresses/{section}/revisions",
             "/api/staff/v1/session",
+            "/api/staff/v1/staff-auth-config",
             "/api/staff/v1/staff-identity-readiness",
             "/api/staff/v1/operations/projection",
             "/api/staff/v1/staff-accounts",
@@ -2202,6 +2205,7 @@ def test_openapi_exposes_only_create_search_detail_and_revision_routes() -> None
         assert set(paths["/health"]) == {"get"}
         assert set(paths["/readiness"]) == {"get"}
         assert set(paths["/api/staff/v1/session"]) == {"get"}
+        assert set(paths["/api/staff/v1/staff-auth-config"]) == {"get"}
         assert set(paths["/api/staff/v1/staff-identity-readiness"]) == {"get"}
         assert set(paths["/api/staff/v1/operations/projection"]) == {"get"}
         assert set(paths["/api/staff/v1/staff-accounts"]) == {"get", "post"}
@@ -2286,6 +2290,7 @@ def test_staff_employer_revision_openapi_exposes_only_approved_contract() -> Non
             "/api/staff/v1/intakes/{intake_id}/addresses/{section}",
             "/api/staff/v1/intakes/{intake_id}/addresses/{section}/revisions",
             "/api/staff/v1/session",
+            "/api/staff/v1/staff-auth-config",
             "/api/staff/v1/staff-identity-readiness",
             "/api/staff/v1/operations/projection",
             "/api/staff/v1/staff-accounts",
@@ -2311,6 +2316,7 @@ def test_staff_employer_revision_openapi_exposes_only_approved_contract() -> Non
         assert set(paths["/health"]) == {"get"}
         assert set(paths["/readiness"]) == {"get"}
         assert set(paths["/api/staff/v1/session"]) == {"get"}
+        assert set(paths["/api/staff/v1/staff-auth-config"]) == {"get"}
         assert set(paths["/api/staff/v1/staff-identity-readiness"]) == {"get"}
         assert set(paths["/api/staff/v1/operations/projection"]) == {"get"}
         assert set(paths["/api/staff/v1/staff-accounts"]) == {"get", "post"}

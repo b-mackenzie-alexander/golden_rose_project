@@ -1,3 +1,4 @@
+import { staffApiFetch } from '../auth/staffAuthSession';
 import { canonicalId, canonicalVersion } from './intakeCanonicalContracts';
 import type { CanonicalReference } from './intakeCanonicalContracts';
 import type { IntakeKind, Page, Result } from './intakeContracts';
@@ -21,7 +22,7 @@ export async function discover(kind: IntakeKind, query: string, cursor?: string,
     : kind === 'worker' ? [idKey, 'full_name', 'version']
       : [idKey, 'employer_type', 'display_name', 'lifecycle_status', 'version', 'received_at'];
   try {
-    const response = await fetch(`/api/staff/v1${path}`, {
+    const response = await staffApiFetch(`/api/staff/v1${path}`, {
       method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({ page_size: 25, ...(cursor ? { cursor } : {}),
         ...(!parent ? { [kind === 'worker' ? 'name_query' : 'display_name_query']: query.trim() } : {}) }),

@@ -15,6 +15,12 @@ vi.mock('../api/staffAccountClient', () => ({
   getStaffSession: vi.fn(),
 }));
 
+vi.mock('../auth/GoogleStaffSignIn', () => ({
+  GoogleStaffSignIn: ({ onSignedIn }: { onSignedIn?: () => void }) => (
+    <button type="button" onClick={onSignedIn}>Mock Google sign-in</button>
+  ),
+}));
+
 afterEach(() => {
   vi.clearAllMocks();
 });
@@ -168,6 +174,7 @@ it('surfaces recoverable staff sign-in and unavailable-account states', async ()
   renderProfile();
 
   expect(await screen.findByRole('alert')).toHaveTextContent('Sign in with the configured staff identity provider to continue.');
+  expect(screen.getByRole('button', { name: 'Mock Google sign-in' })).toBeInTheDocument();
 
   await user.click(screen.getByRole('button', { name: 'Reload status' }));
 

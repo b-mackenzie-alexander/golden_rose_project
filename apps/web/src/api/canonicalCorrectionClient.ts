@@ -1,3 +1,4 @@
+import { staffApiFetch } from '../auth/staffAuthSession';
 import type { DraftObject, Result } from './intakeContracts';
 import type { FinalizationOutputs } from './intakeCanonicalContracts';
 import { canonicalId, canonicalVersion } from './intakeCanonicalContracts';
@@ -22,7 +23,7 @@ export async function correctCanonical(path: string, key: string, body: DraftObj
     ? path.includes('/contact/') ? 'worker_contact' : path.includes('/residence/') ? 'worker_residence' : path.includes('/preferences/') ? 'worker_preferences' : 'worker'
     : path.includes('/contacts/') ? 'employer_contact_details' : path.includes('/addresses/') ? 'employer_address' : path.includes('/worksites/') ? 'worksite' : 'staffing_request';
   try {
-    const response = await fetch(`/api/staff/v1${path}`, { ...fetchOptions, method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'Idempotency-Key': key }, body: JSON.stringify(body) });
+    const response = await staffApiFetch(`/api/staff/v1${path}`, { ...fetchOptions, method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'Idempotency-Key': key }, body: JSON.stringify(body) });
     if (response.status !== 200) { await response.body?.cancel(); return { ok: false, failure: response.status >= 500 ? 'unknown' : [401, 403, 404].includes(response.status) ? 'forbidden' : response.status === 409 ? 'conflict' : 'failed' }; }
     if (!/^application\/json(?:\s*;.*)?$/i.test(response.headers.get('Content-Type') ?? '')) return { ok: false, failure: 'unknown' };
     const value: unknown = await response.json();
@@ -42,7 +43,7 @@ export function validReview(value: unknown, outputs: FinalizationOutputs): value
 }
 export async function currentReview(intakeId: string, outputs: FinalizationOutputs): Promise<Result<CurrentReview>> {
   try {
-    const response = await fetch(`/api/staff/v1/intake-finalizations/${intakeId}/current-review`, { ...fetchOptions, headers: { Accept: 'application/json' } });
+    const response = await staffApiFetch(`/api/staff/v1/intake-finalizations/${intakeId}/current-review`, { ...fetchOptions, headers: { Accept: 'application/json' } });
     if (response.status !== 200) { await response.body?.cancel(); return { ok: false, failure: [401, 403, 404].includes(response.status) ? 'forbidden' : 'failed' }; }
     if (!/^application\/json(?:\s*;.*)?$/i.test(response.headers.get('Content-Type') ?? '')) return { ok: false, failure: 'failed' };
     const value: unknown = await response.json();
@@ -51,7 +52,7 @@ export async function currentReview(intakeId: string, outputs: FinalizationOutpu
 }
 export async function reviewCanonical(intakeId: string, outputs: FinalizationOutputs, key: string, body: DraftObject): Promise<Result<CurrentReview>> {
   try {
-    const response = await fetch(`/api/staff/v1/intake-finalizations/${intakeId}/current-reviews`, { ...fetchOptions, method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'Idempotency-Key': key }, body: JSON.stringify(body) });
+    const response = await staffApiFetch(`/api/staff/v1/intake-finalizations/${intakeId}/current-reviews`, { ...fetchOptions, method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'Idempotency-Key': key }, body: JSON.stringify(body) });
     if (![200, 201].includes(response.status)) { await response.body?.cancel(); return { ok: false, failure: response.status >= 500 ? 'unknown' : [401, 403, 404].includes(response.status) ? 'forbidden' : response.status === 409 ? 'conflict' : 'failed' }; }
     if (!/^application\/json(?:\s*;.*)?$/i.test(response.headers.get('Content-Type') ?? '')) return { ok: false, failure: 'unknown' };
     const value: unknown = await response.json();

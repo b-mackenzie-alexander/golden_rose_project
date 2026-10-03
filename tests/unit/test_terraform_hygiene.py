@@ -1241,9 +1241,6 @@ def test_gcp_develop_secrets_manage_metadata_only_without_payloads_or_broad_iam(
         "migration-database-url",
         "synthetic-staff-id",
         "demo-access-password",
-        "staff-oidc-issuer",
-        "staff-oidc-audience",
-        "staff-oidc-jwks-url",
         "deployment-posture",
     ]
 
@@ -1258,6 +1255,14 @@ def test_gcp_develop_secrets_manage_metadata_only_without_payloads_or_broad_iam(
     assert "local.standard_labels" in secrets
     for secret_id in expected_secret_ids:
         assert secret_id in secrets
+    for secret_id in ("staff-oidc-issuer", "staff-oidc-audience", "staff-oidc-jwks-url"):
+        assert f'secret_id = "{secret_id}"' in secrets
+    assert 'data "google_secret_manager_secret" "staff_oidc_issuer"' in secrets
+    assert 'data "google_secret_manager_secret" "staff_oidc_audience"' in secrets
+    assert 'data "google_secret_manager_secret" "staff_oidc_jwks_url"' in secrets
+    assert '"staff-oidc-issuer",' not in secrets
+    assert '"staff-oidc-audience",' not in secrets
+    assert '"staff-oidc-jwks-url",' not in secrets
     assert "roles/secretmanager.admin" not in secrets
     assert "roles/secretmanager.secretAccessor" not in secrets
     assert "allUsers" not in secrets
@@ -9308,9 +9313,12 @@ def test_service_stage_has_exact_profiled_public_access_and_one_instance_contrac
     )
     assert "service_agent_authentication" not in observability
     assert '"demo-access-password"' in secrets
-    assert '"staff-oidc-issuer"' in secrets
-    assert '"staff-oidc-audience"' in secrets
-    assert '"staff-oidc-jwks-url"' in secrets
+    assert 'data "google_secret_manager_secret" "staff_oidc_issuer"' in secrets
+    assert 'data "google_secret_manager_secret" "staff_oidc_audience"' in secrets
+    assert 'data "google_secret_manager_secret" "staff_oidc_jwks_url"' in secrets
+    assert '"staff-oidc-issuer",' not in secrets
+    assert '"staff-oidc-audience",' not in secrets
+    assert '"staff-oidc-jwks-url",' not in secrets
     assert (
         'resource "google_secret_manager_secret_iam_member" "runtime_demo_access_secret_access"'
         in iam
@@ -9366,6 +9374,12 @@ def test_outputs_expose_only_value_safe_temporary_access_markers() -> None:
             'GOLDEN_ROSE_STAFF_OIDC_JWKS_URL = "staff-oidc-jwks-url"',
             'GOLDEN_ROSE_STAFF_OIDC_JWKS_URL = "demo-access-password"',
             "cloud run contract",
+        ),
+        (
+            Path("infra/gcp/develop/secrets.tf"),
+            'secret_id = "staff-oidc-issuer"',
+            '"staff-oidc-issuer",',
+            "externally prepared staff oidc secret",
         ),
     ],
 )

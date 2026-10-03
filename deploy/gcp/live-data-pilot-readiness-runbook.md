@@ -69,6 +69,10 @@ and should include, outside source control:
 - migration revision, currently expected by application readiness
 - database-authority and migration execution evidence
 - staff OIDC issuer/audience/JWKS values in approved secret custody
+- pre-service evidence that `staff-oidc-issuer`, `staff-oidc-audience` and
+  `staff-oidc-jwks-url` Secret Manager containers already exist with enabled
+  `latest` versions prepared outside Terraform; the service-stage plan must not
+  be the action that creates or populates those staff identity-provider secrets
 - initial named staff-account list and activation owner
 - backup/restore posture and forward-recovery note
 - smoke/readiness results after deployment

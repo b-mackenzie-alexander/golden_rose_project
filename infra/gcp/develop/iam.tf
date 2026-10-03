@@ -156,7 +156,7 @@ resource "google_secret_manager_secret_iam_member" "runtime_staff_oidc_issuer_se
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.runtime.email}"
 
-  depends_on = [google_secret_manager_secret.metadata_only["staff-oidc-issuer"]]
+  depends_on = [data.google_secret_manager_secret.staff_oidc_issuer]
 }
 
 resource "google_secret_manager_secret_iam_member" "runtime_staff_oidc_audience_secret_access" {
@@ -167,7 +167,7 @@ resource "google_secret_manager_secret_iam_member" "runtime_staff_oidc_audience_
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.runtime.email}"
 
-  depends_on = [google_secret_manager_secret.metadata_only["staff-oidc-audience"]]
+  depends_on = [data.google_secret_manager_secret.staff_oidc_audience]
 }
 
 resource "google_secret_manager_secret_iam_member" "runtime_staff_oidc_jwks_url_secret_access" {
@@ -178,7 +178,7 @@ resource "google_secret_manager_secret_iam_member" "runtime_staff_oidc_jwks_url_
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.runtime.email}"
 
-  depends_on = [google_secret_manager_secret.metadata_only["staff-oidc-jwks-url"]]
+  depends_on = [data.google_secret_manager_secret.staff_oidc_jwks_url]
 }
 
 resource "google_secret_manager_secret_iam_member" "migration_synthetic_staff_secret_access" {

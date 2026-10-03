@@ -46,12 +46,17 @@ GOLDEN_ROSE_PRESENTATION_DEMO_SEED_ENABLED=false
    specific.
 3. Confirm MFA claim semantics with the provider owner before admitting live
    staff sessions.
-4. Create the initial Golden Rose staff accounts while they remain suspended.
-5. Activate only accounts whose provider subject and MFA evidence have been
+4. Prepare Staff OIDC configuration secrets before the service-stage Terraform
+   plan: `staff-oidc-issuer`, `staff-oidc-audience` and
+   `staff-oidc-jwks-url` must already exist in Secret Manager with enabled
+   `latest` versions. Terraform may look up those containers and grant runtime
+   access, but it must not create the containers or write provider values.
+5. Create the initial Golden Rose staff accounts while they remain suspended.
+6. Activate only accounts whose provider subject and MFA evidence have been
    verified by an authorized human operator.
-6. Record the provider-side recovery and session-revocation procedure in the
+7. Record the provider-side recovery and session-revocation procedure in the
    operational handoff materials before production use.
-7. Verify `/api/staff/v1/staff-identity-readiness` returns
+8. Verify `/api/staff/v1/staff-identity-readiness` returns
    `production_staff_auth_ready: true`, `synthetic_staff_runtime_allowed: false`
    and `recovery_and_session_revocation_evidence_only: true` under the
    production OIDC configuration.
@@ -71,6 +76,8 @@ Stop before live use if any of these are true:
 - Synthetic auth is configured in production.
 - Demo access or presentation seeding is enabled in production.
 - OIDC issuer, audience or JWKS settings are missing or unapproved.
+- Staff OIDC Secret Manager containers or their enabled `latest` versions are
+  missing before the service-stage Terraform plan.
 - The MFA claim mapping has not been confirmed.
 - No authorized human operator has verified the initial staff account subjects.
 - Recovery/session-revocation provider procedures have not been recorded.

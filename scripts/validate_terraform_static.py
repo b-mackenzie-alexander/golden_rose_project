@@ -4234,6 +4234,58 @@ def _collect_api_contract_violations(root: Path) -> list[str]:
     return violations
 
 
+def _collect_secret_custody_contract_violations(root: Path) -> list[str]:
+    violations: list[str] = []
+    secrets_path = root / "infra" / "gcp" / "develop" / "secrets.tf"
+    iam_path = root / "infra" / "gcp" / "develop" / "iam.tf"
+    if not secrets_path.exists() or not iam_path.exists():
+        return violations
+
+    secrets = secrets_path.read_text(encoding="utf-8")
+    iam = iam_path.read_text(encoding="utf-8")
+    externally_prepared_staff_oidc_secret_ids = [
+        "staff-oidc-issuer",
+        "staff-oidc-audience",
+        "staff-oidc-jwks-url",
+    ]
+
+    for secret_id in externally_prepared_staff_oidc_secret_ids:
+        terraform_created_fragment = f'"{secret_id}",'
+        if terraform_created_fragment in secrets:
+            violations.append(
+                f"{secrets_path.relative_to(root)} must not create externally prepared Staff OIDC secret {secret_id!r}"
+            )
+        if f'secret_id = "{secret_id}"' not in secrets:
+            violations.append(
+                f"{secrets_path.relative_to(root)} missing Staff OIDC secret lookup for {secret_id!r}"
+            )
+
+    required_data_sources = [
+        'data "google_secret_manager_secret" "staff_oidc_issuer"',
+        'data "google_secret_manager_secret" "staff_oidc_audience"',
+        'data "google_secret_manager_secret" "staff_oidc_jwks_url"',
+        'staff_oidc_secret_lookup_enabled = var.deployment_stage == "service" && var.runtime_profile == "controlled_live_data_staff_pilot"',
+    ]
+    for fragment in required_data_sources:
+        if fragment not in secrets:
+            violations.append(
+                f"{secrets_path.relative_to(root)} missing Staff OIDC secret custody fragment {fragment!r}"
+            )
+
+    required_iam_dependencies = [
+        "depends_on = [data.google_secret_manager_secret.staff_oidc_issuer]",
+        "depends_on = [data.google_secret_manager_secret.staff_oidc_audience]",
+        "depends_on = [data.google_secret_manager_secret.staff_oidc_jwks_url]",
+    ]
+    for fragment in required_iam_dependencies:
+        if fragment not in iam:
+            violations.append(
+                f"{iam_path.relative_to(root)} missing Staff OIDC secret custody dependency {fragment!r}"
+            )
+
+    return violations
+
+
 def _collect_evidence_template_violations(root: Path) -> list[str]:
     violations: list[str] = []
     template_path = root / "deploy" / "gcp" / "evidence-template.md"
@@ -4733,6 +4785,7 @@ def main() -> int:
     violations.extend(_collect_migration_job_violations(root, terraform_config_paths))
     violations.extend(_collect_budget_observability_violations(root, terraform_config_paths))
     violations.extend(_collect_api_contract_violations(root))
+    violations.extend(_collect_secret_custody_contract_violations(root))
     violations.extend(_collect_cloud_run_contract_violations(root))
     violations.extend(_collect_evidence_template_violations(root))
     violations.extend(_collect_stage_contract_violations(root, terraform_config_paths, manifest))

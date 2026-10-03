@@ -1,3 +1,4 @@
+import { staffApiFetch } from '../auth/staffAuthSession';
 import type {
   WorkInterest,
   HistoryItem,
@@ -171,7 +172,7 @@ async function request<T>(
   commandKind?: 'link' | 'finalize',
 ): Promise<Result<T>> {
   try {
-    const response = await fetch(`/api/staff/v1${path}`, {
+    const response = await staffApiFetch(`/api/staff/v1${path}`, {
       method: body ? 'POST' : 'GET',
       headers: {
         Accept: 'application/json',

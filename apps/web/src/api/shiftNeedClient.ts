@@ -1,3 +1,5 @@
+import { staffApiFetch } from '../auth/staffAuthSession';
+
 export type ShiftNeedFailureKind =
   | 'validation'
   | 'forbidden'
@@ -181,7 +183,7 @@ function parseRequestCommand(value: unknown): StaffingRequestCommandResult | nul
 async function request<T>(path: string, init: RequestInit, validate: (value: unknown) => T | null, command = false): Promise<ShiftNeedResult<T>> {
   let response: Response;
   try {
-    response = await fetch(`/api/staff/v1${path}`, {
+    response = await staffApiFetch(`/api/staff/v1${path}`, {
       cache: 'no-store',
       credentials: 'same-origin',
       mode: 'same-origin',

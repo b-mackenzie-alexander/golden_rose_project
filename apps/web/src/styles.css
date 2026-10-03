@@ -110,6 +110,38 @@ html {
   padding: 0 var(--space-8);
 }
 
+.staff-google-signin {
+  align-items: center;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: space-between;
+  padding: var(--space-3);
+}
+
+.staff-google-signin--compact {
+  grid-column: 1 / -1;
+  padding: var(--space-2) var(--space-3);
+}
+
+.staff-google-signin p {
+  color: var(--color-muted);
+  font-size: 0.88rem;
+  font-weight: 850;
+  margin: 0;
+}
+
+.staff-google-signin p[role='alert'] {
+  color: #991b1b;
+}
+
+.staff-google-signin__button {
+  min-height: 2.5rem;
+}
+
 .app-brand {
   color: inherit;
   font-family: "Cormorant Garamond", Georgia, serif;
@@ -2798,7 +2830,7 @@ select {
     gap: var(--space-3);
     grid-template-columns: minmax(14rem, 1fr) auto;
     min-height: 72px;
-    padding-block: 0;
+    padding-block: var(--space-2);
   }
 
   .header-utility {
@@ -2868,6 +2900,11 @@ select {
     align-items: stretch;
     grid-template-columns: minmax(0, 1fr);
     padding: var(--space-4);
+  }
+
+  .staff-google-signin {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .app-brand {

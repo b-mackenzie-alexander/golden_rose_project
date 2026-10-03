@@ -1,3 +1,4 @@
+import { staffApiFetch } from '../auth/staffAuthSession';
 import type {
   ApiResult,
   CreateEmployerInput,
@@ -180,7 +181,7 @@ function parseSearchResult(value: unknown): EmployerSearchResult | null {
 export async function searchEmployers(input: SearchEmployersInput): Promise<ApiResult<EmployerSearchResult> | null> {
   let response: Response;
   try {
-    response = await fetch('/api/staff/v1/employers/search', {
+    response = await staffApiFetch('/api/staff/v1/employers/search', {
       method: 'POST',
       headers: JSON_HEADERS,
       body: JSON.stringify({
@@ -313,7 +314,7 @@ export async function getEmployer(
 
   let response: Response;
   try {
-    response = await fetch(`/api/staff/v1/employers/${employerId}`, {
+    response = await staffApiFetch(`/api/staff/v1/employers/${employerId}`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
@@ -361,7 +362,7 @@ export async function getEmployer(
 export async function createEmployer(_input: CreateEmployerInput): Promise<ApiResult<EmployerDetail>> {
   let response: Response;
   try {
-    response = await fetch('/api/staff/v1/employers', {
+    response = await staffApiFetch('/api/staff/v1/employers', {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -411,7 +412,7 @@ export async function createEmployer(_input: CreateEmployerInput): Promise<ApiRe
 export async function reviseEmployer(input: ReviseEmployerInput): Promise<ApiResult<ReviseEmployerResult>> {
   let response: Response;
   try {
-    response = await fetch(`/api/staff/v1/employers/${input.employerId}/revisions`, {
+    response = await staffApiFetch(`/api/staff/v1/employers/${input.employerId}/revisions`, {
       method: 'POST',
       headers: {
         Accept: 'application/json',

@@ -1,3 +1,4 @@
+import { staffApiFetch } from '../auth/staffAuthSession';
 import { canonicalId, canonicalVersion, finalizationOutputs } from './intakeCanonicalContracts';
 import type { FinalizationOutputs, OutputReference } from './intakeCanonicalContracts';
 import type { DraftObject, Result } from './intakeContracts';
@@ -103,7 +104,7 @@ export async function getCanonicalOutput(outputs: FinalizationOutputs, key: stri
     }
   }
   try {
-    const response = await fetch(`/api/staff/v1${path}`, { method: 'GET', headers: { Accept: 'application/json' },
+    const response = await staffApiFetch(`/api/staff/v1${path}`, { method: 'GET', headers: { Accept: 'application/json' },
       cache: 'no-store', credentials: 'same-origin', mode: 'same-origin', redirect: 'error', referrerPolicy: 'no-referrer' });
     if (response.status !== 200) {
       await response.body?.cancel();

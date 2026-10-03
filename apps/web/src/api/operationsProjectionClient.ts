@@ -1,3 +1,5 @@
+import { staffApiFetch } from '../auth/staffAuthSession';
+
 export type OperationsProjectionFailureKind =
   | 'forbidden'
   | 'validation'
@@ -333,7 +335,7 @@ function failure(status: number): OperationsProjectionResult<never> {
 export async function getOperationsProjection(): Promise<OperationsProjectionResult<OperationsProjection>> {
   let response: Response;
   try {
-    response = await fetch('/api/staff/v1/operations/projection', {
+    response = await staffApiFetch('/api/staff/v1/operations/projection', {
       method: 'GET',
       headers: { Accept: 'application/json' },
       cache: 'no-store',

@@ -200,6 +200,9 @@ APPROVED_ENV_NAMES = {
     "GOLDEN_ROSE_MIGRATION_DATABASE_URL",
     "GOLDEN_ROSE_RUNTIME_DATABASE_URL",
     "GOLDEN_ROSE_SYNTHETIC_STAFF_ID",
+    "GOLDEN_ROSE_STAFF_OIDC_ISSUER",
+    "GOLDEN_ROSE_STAFF_OIDC_AUDIENCE",
+    "GOLDEN_ROSE_STAFF_OIDC_JWKS_URL",
     "GOLDEN_ROSE_MIGRATION_ASSUMED_ROLE",
 }
 
@@ -210,6 +213,9 @@ SECRET_ENV_NAMES = {
     "GOLDEN_ROSE_MIGRATION_DATABASE_URL",
     "GOLDEN_ROSE_RUNTIME_DATABASE_URL",
     "GOLDEN_ROSE_SYNTHETIC_STAFF_ID",
+    "GOLDEN_ROSE_STAFF_OIDC_ISSUER",
+    "GOLDEN_ROSE_STAFF_OIDC_AUDIENCE",
+    "GOLDEN_ROSE_STAFF_OIDC_JWKS_URL",
 }
 
 # Env names exclusive to migration (not allowed in service containers).
@@ -229,6 +235,9 @@ APPROVED_SECRET_REFS: dict[str, set[str]] = {
     "GOLDEN_ROSE_SYNTHETIC_STAFF_ID": {
         "synthetic-staff-id",
     },
+    "GOLDEN_ROSE_STAFF_OIDC_ISSUER": {"staff-oidc-issuer"},
+    "GOLDEN_ROSE_STAFF_OIDC_AUDIENCE": {"staff-oidc-audience"},
+    "GOLDEN_ROSE_STAFF_OIDC_JWKS_URL": {"staff-oidc-jwks-url"},
 }
 
 # Mapping of resource type to which secret is allowed for GOLDEN_ROSE_DATABASE_URL.
@@ -1990,11 +1999,21 @@ ALLOWED_WORKFLOW_STEP_ENV[
     ("deploy-develop.yml", "deploy", "name:Clear artifact verifier credential context")
 ] = {"DOCKER_CONFIG": "${{ runner.temp }}/artifact-verifier-docker"}
 ALLOWED_WORKFLOW_STEP_ENV[("deploy-develop.yml", "deploy", "name:Execute migration transition")] = {
-    "GCP_PROJECT_ID": "${{ vars.GCP_PROJECT_ID }}"
+    "GCP_PROJECT_ID": "${{ vars.GCP_PROJECT_ID }}",
+    "DEPLOYMENT_RUNTIME_PROFILE": "${{ inputs.runtime_profile }}",
 }
 ALLOWED_WORKFLOW_STEP_ENV[
     ("deploy-develop.yml", "deploy", "name:Execute database authority verification")
-] = {"GCP_PROJECT_ID": "${{ vars.GCP_PROJECT_ID }}"}
+] = {
+    "GCP_PROJECT_ID": "${{ vars.GCP_PROJECT_ID }}",
+    "DEPLOYMENT_RUNTIME_PROFILE": "${{ inputs.runtime_profile }}",
+}
+ALLOWED_WORKFLOW_STEP_ENV[
+    ("deploy-develop.yml", "deploy", "name:Verify service readiness transition")
+] = {
+    "DEPLOYMENT_RUNTIME_PROFILE": "${{ inputs.runtime_profile }}",
+    "GCP_PROJECT_ID": "${{ vars.GCP_PROJECT_ID }}",
+}
 ALLOWED_WORKFLOW_STEP_ENV[
     ("deploy-develop.yml", "deploy", "name:Validate signed stage receipt after image digest")
 ] = {
@@ -2016,6 +2035,7 @@ ALLOWED_WORKFLOW_STEP_ENV[
 }
 ALLOWED_WORKFLOW_STEP_ENV[("deploy-develop.yml", "deploy", "name:Record deploy result")] = {
     "DEPLOYMENT_STAGE": "${{ inputs.deployment_stage }}",
+    "DEPLOYMENT_RUNTIME_PROFILE": "${{ inputs.runtime_profile }}",
 }
 
 # Deploy is the only workflow that can obtain the deployer identity. Every
@@ -2063,12 +2083,12 @@ EXACT_WORKFLOW_RUN_SHA256.update(
             "deploy-develop.yml",
             "deploy",
             "name:Execute migration transition",
-        ): "a32c980384a59fe0df3397f591c19407dced040f01c2144b9581a6ed692dc46f",
+        ): "78e3c8a20b583f78532af38da73a20224c92566e85cc02ec5ad7c84b6f0fba63",
         (
             "deploy-develop.yml",
             "deploy",
             "name:Execute database authority verification",
-        ): "06d2a91b79c5f1bdbedb10306855291d18bf9e10fc6f1e6ef05a7183cb11a911",
+        ): "e3ec448080ec691664e8e4be121b45bddf1e0384616302a35ee80fb5701b608f",
         (
             "deploy-develop.yml",
             "deploy",
@@ -2083,12 +2103,12 @@ EXACT_WORKFLOW_RUN_SHA256.update(
             "deploy-develop.yml",
             "deploy",
             "name:Verify service readiness transition",
-        ): "8902d091a6cf84bce5202acd273ac3eaee49b0e051ce0b96b41020ad53e611ec",
+        ): "78160a02b20245d6c952fa5f08b13b7c389594a7eb944f0bd45c7bda0ecf0a70",
         (
             "deploy-develop.yml",
             "deploy",
             "name:Record deploy result",
-        ): "491e2d8b8fb26c206faeeec288d25f5340bc9528fc0dc1147ce4129aab3b82c9",
+        ): "f58f1554e03e703d1cbfc5f9e060b4e9c8f57c60b88408bc424106982fb83c8e",
     }
 )
 
@@ -2941,6 +2961,8 @@ def _approved_count_max(count_expr: str) -> int | None:
         return int(normalized)
     approved_patterns = [
         r'var\.deployment_stage == "service" \? 1 : 0',
+        r'var\.deployment_stage == "service" && var\.runtime_profile == "synthetic_develop_demo" \? 1 : 0',
+        r'var\.deployment_stage == "service" && var\.runtime_profile == "controlled_live_data_staff_pilot" \? 1 : 0',
         r'var\.deployment_stage == "migration" \|\| var\.deployment_stage == "service" \? 1 : 0',
         r'var\.deployment_stage != "foundation" \? 1 : 0',
         r'var\.bootstrap_operator_status == "bootstrap-active" \? 1 : 0',
@@ -3020,8 +3042,8 @@ def _collect_declared_terraform_resource_expansions(
             resource_type = match.group(1)
             body = match.group("body")
             occurrences.append((path, resource_type))
-            count_match = re.search(r"^\s*count\s*=\s*(.+?)$", body, re.MULTILINE)
-            for_each_match = re.search(r"^\s*for_each\s*=\s*(.+?)$", body, re.MULTILINE)
+            count_match = re.search(r"^  count\s*=\s*(.+?)$", body, re.MULTILINE)
+            for_each_match = re.search(r"^  for_each\s*=\s*(.+?)$", body, re.MULTILINE)
             if count_match and for_each_match:
                 unresolved.append(
                     (path, resource_type, "count+for_each", "count and for_each both set")
@@ -3816,6 +3838,9 @@ def _collect_develop_iam_violations(root: Path, terraform_config_paths: list[Pat
             'resource "google_secret_manager_secret_iam_member" "migration_database_secret_access"',
             'resource "google_secret_manager_secret_iam_member" "runtime_synthetic_staff_secret_access"',
             'resource "google_secret_manager_secret_iam_member" "migration_synthetic_staff_secret_access"',
+            'resource "google_secret_manager_secret_iam_member" "runtime_staff_oidc_issuer_secret_access"',
+            'resource "google_secret_manager_secret_iam_member" "runtime_staff_oidc_audience_secret_access"',
+            'resource "google_secret_manager_secret_iam_member" "runtime_staff_oidc_jwks_url_secret_access"',
             'resource "google_artifact_registry_repository_iam_member" "image_publisher_writer"',
             'resource "google_artifact_registry_repository_iam_member" "artifact_verifier_reader"',
             'resource "google_cloud_run_v2_service_iam_member" "public_invoker"',
@@ -4244,16 +4269,26 @@ def _collect_cloud_run_contract_violations(root: Path) -> list[str]:
     required_fragments = [
         'resource "google_cloud_run_v2_service" "staff_tracer"',
         'ingress             = "INGRESS_TRAFFIC_ALL"',
-        'value = "gcp-develop-private-synthetic"',
+        'var.runtime_profile == "controlled_live_data_staff_pilot" ? "production" : "develop"',
+        'var.runtime_profile == "controlled_live_data_staff_pilot" ? "staff_oidc" : "synthetic"',
+        'var.runtime_profile == "controlled_live_data_staff_pilot" ? "controlled-live-data-staff-pilot" : "gcp-develop-private-synthetic"',
+        'var.runtime_profile == "controlled_live_data_staff_pilot" ? "Controlled live-data staff pilot" : var.golden_rose_public_environment_label',
         "min_instance_count = 0",
         "max_instance_count = 1",
         "max_instance_request_concurrency = 10",
         'timeout                          = "60s"',
-        'name  = "GOLDEN_ROSE_DEMO_ACCESS_ENABLED"',
-        'name  = "GOLDEN_ROSE_DEMO_ACCESS_EXPIRES_AT"',
-        "value = var.demo_access_expires_at",
-        'name = "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD"',
-        'secret  = "demo-access-password"',
+        'GOLDEN_ROSE_DEMO_ACCESS_ENABLED            = "true"',
+        "GOLDEN_ROSE_DEMO_ACCESS_EXPIRES_AT         = var.demo_access_expires_at",
+        'GOLDEN_ROSE_PRESENTATION_DEMO_SEED_ENABLED = "true"',
+        'name   = "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD"',
+        'secret = "demo-access-password"',
+        'name   = "GOLDEN_ROSE_SYNTHETIC_STAFF_ID"',
+        'secret = "synthetic-staff-id"',
+        'GOLDEN_ROSE_DEMO_ACCESS_ENABLED            = "false"',
+        'GOLDEN_ROSE_PRESENTATION_DEMO_SEED_ENABLED = "false"',
+        'GOLDEN_ROSE_STAFF_OIDC_ISSUER   = "staff-oidc-issuer"',
+        'GOLDEN_ROSE_STAFF_OIDC_AUDIENCE = "staff-oidc-audience"',
+        'GOLDEN_ROSE_STAFF_OIDC_JWKS_URL = "staff-oidc-jwks-url"',
     ]
     for fragment in required_fragments:
         if fragment not in cloud_run:
@@ -4263,10 +4298,17 @@ def _collect_cloud_run_contract_violations(root: Path) -> list[str]:
 
     if not _contains_normalized_fragment(
         cloud_run,
-        'name = "GOLDEN_ROSE_DEMO_ACCESS_ENABLED" value = "true"',
+        'for_each = var.runtime_profile == "synthetic_develop_demo" ? { GOLDEN_ROSE_DEMO_ACCESS_ENABLED = "true"',
     ):
         violations.append(
             f"{cloud_run_path.relative_to(root)} demo access enablement drifted from the exact cloud run contract"
+        )
+    if not _contains_normalized_fragment(
+        cloud_run,
+        'for_each = var.runtime_profile == "controlled_live_data_staff_pilot" ? { GOLDEN_ROSE_STAFF_OIDC_ISSUER = "staff-oidc-issuer"',
+    ):
+        violations.append(
+            f"{cloud_run_path.relative_to(root)} staff-pilot oidc env drifted from the exact cloud run contract"
         )
 
     forbidden_fragments = [

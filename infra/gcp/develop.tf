@@ -6,6 +6,7 @@ module "develop" {
   region                   = var.region
   container_image_digest   = var.container_image_digest
   deployment_stage         = var.deployment_stage
+  runtime_profile          = var.runtime_profile
   direct_vpc_subnet_cidr   = var.direct_vpc_subnet_cidr
 
   demo_access_expires_at                   = var.demo_access_expires_at

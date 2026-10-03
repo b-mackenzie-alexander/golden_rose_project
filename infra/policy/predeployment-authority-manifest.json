@@ -82,10 +82,10 @@
         }
       },
       "google_secret_manager_secret": {
-        "max_count": 5
+        "max_count": 8
       },
       "google_secret_manager_secret_iam_member": {
-        "max_count": 7
+        "max_count": 10
       },
       "google_service_account": {
         "max_count": 7

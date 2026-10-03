@@ -4,6 +4,9 @@ locals {
     "migration-database-url",
     "synthetic-staff-id",
     "demo-access-password",
+    "staff-oidc-issuer",
+    "staff-oidc-audience",
+    "staff-oidc-jwks-url",
     "deployment-posture",
   ])
 }

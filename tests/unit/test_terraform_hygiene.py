@@ -1125,6 +1125,8 @@ def test_gcp_terraform_outputs_are_value_safe_and_do_not_expose_identifiers() ->
     assert 'output "data_boundary"' in outputs
     assert '"develop"' in outputs
     assert '"fictional-synthetic-only"' in outputs
+    assert '"controlled-live-data-staff-pilot"' in outputs
+    assert "var.runtime_profile" in outputs
     assert "project" not in outputs.lower()
     assert "billing" not in outputs.lower()
     assert "secret" not in outputs.lower()
@@ -1154,6 +1156,8 @@ def test_gcp_terraform_locals_define_standard_non_sensitive_labels() -> None:
 
     assert '"develop"' in locals_text
     assert '"fictional-synthetic-only"' in locals_text
+    assert '"controlled-live-data-staff-pilot"' in locals_text
+    assert "var.runtime_profile" in locals_text
     assert '"terraform"' in locals_text
     assert "@" not in locals_text
     assert "client" not in locals_text.lower()
@@ -1237,6 +1241,9 @@ def test_gcp_develop_secrets_manage_metadata_only_without_payloads_or_broad_iam(
         "migration-database-url",
         "synthetic-staff-id",
         "demo-access-password",
+        "staff-oidc-issuer",
+        "staff-oidc-audience",
+        "staff-oidc-jwks-url",
         "deployment-posture",
     ]
 
@@ -1415,8 +1422,8 @@ def test_foundation_stage_omits_deferred_network_cloud_sql_and_demo_expiry_input
         },
         "demo_access_expires_at": {
             "next": 'variable "billing_account_id"',
-            "root_guard": 'var.deployment_stage == "service" ? var.demo_access_expires_at != null && can(regex(',
-            "develop_guard": 'var.deployment_stage == "service" ? var.demo_access_expires_at != null && can(regex(',
+            "root_guard": 'var.deployment_stage == "service" && var.runtime_profile == "synthetic_develop_demo" ? var.demo_access_expires_at != null && can(regex(',
+            "develop_guard": 'var.deployment_stage == "service" && var.runtime_profile == "synthetic_develop_demo" ? var.demo_access_expires_at != null && can(regex(',
             "migration_service_guard": ": var.demo_access_expires_at == null",
         },
         "cloud_sql_backup_enabled": {
@@ -1794,6 +1801,10 @@ def test_service_uses_accepted_iam_private_ingress_not_unreachable_internal_only
     assert "PRIVATE_RANGES_ONLY" in cloud_run
     assert "image" in cloud_run
     assert "local.managed_container_image" in cloud_run
+    assert "controlled_live_data_staff_pilot" in cloud_run
+    assert "GOLDEN_ROSE_STAFF_OIDC_ISSUER" in cloud_run
+    assert "GOLDEN_ROSE_STAFF_OIDC_AUDIENCE" in cloud_run
+    assert "GOLDEN_ROSE_STAFF_OIDC_JWKS_URL" in cloud_run
     assert ":latest" not in cloud_run.lower()
     assert "google_cloud_run_service_iam" not in cloud_run
     assert "google_cloud_run_v2_service_iam" not in cloud_run
@@ -1840,7 +1851,7 @@ def test_gcp_develop_identities_are_distinct_without_keys_or_broad_project_iam()
     assert "local-exec" not in identities.lower()
 
 
-def test_gcp_develop_cloud_run_uses_runtime_service_account_without_invoker_grant() -> None:
+def test_gcp_develop_cloud_run_uses_runtime_service_account_without_inline_invoker_grant() -> None:
     cloud_run = (ROOT / "infra/gcp/develop/cloud_run.tf").read_text(encoding="utf-8")
 
     assert "service_account" in cloud_run
@@ -1861,6 +1872,7 @@ def test_gcp_develop_iam_models_least_privilege_runtime_migration_deployer_and_i
 
     required_variable_names = [
         "control_plane_project_id",
+        "runtime_profile",
         "demo_access_expires_at",
     ]
     for variable_name in required_variable_names:
@@ -1881,6 +1893,9 @@ def test_gcp_develop_iam_models_least_privilege_runtime_migration_deployer_and_i
         'resource "google_secret_manager_secret_iam_member" "runtime_synthetic_staff_secret_access"',
         'resource "google_secret_manager_secret_iam_member" "migration_synthetic_staff_secret_access"',
         'resource "google_secret_manager_secret_iam_member" "runtime_demo_access_secret_access"',
+        'resource "google_secret_manager_secret_iam_member" "runtime_staff_oidc_issuer_secret_access"',
+        'resource "google_secret_manager_secret_iam_member" "runtime_staff_oidc_audience_secret_access"',
+        'resource "google_secret_manager_secret_iam_member" "runtime_staff_oidc_jwks_url_secret_access"',
         'resource "google_artifact_registry_repository_iam_member" "image_publisher_writer"',
         'resource "google_artifact_registry_repository_iam_member" "artifact_verifier_reader"',
         'resource "google_cloud_run_v2_service_iam_member" "public_invoker"',
@@ -2035,12 +2050,15 @@ def test_temporary_public_invoker_replaces_named_tester_authority() -> None:
     assert "allAuthenticatedUsers" not in iam
 
 
-def test_demo_expiry_is_the_only_service_access_tfvars_input() -> None:
+def test_runtime_profile_and_demo_expiry_are_the_only_service_access_tfvars_inputs() -> None:
     root_variables = (ROOT / "infra/gcp/variables.tf").read_text(encoding="utf-8")
     module_variables = (ROOT / "infra/gcp/develop/variables.tf").read_text(encoding="utf-8")
     iam = (ROOT / "infra/gcp/develop/iam.tf").read_text(encoding="utf-8")
 
     for variables in [root_variables, module_variables]:
+        assert 'variable "runtime_profile"' in variables
+        assert "controlled_live_data_staff_pilot" in variables
+        assert "synthetic_develop_demo" in variables
         assert 'variable "demo_access_expires_at"' in variables
         assert 'variable "tester_authority_receipt_path"' not in variables
         assert 'variable "tester_authority_bundle_path"' not in variables
@@ -2142,7 +2160,7 @@ def test_gcp_develop_database_authority_job_is_private_bounded_and_executable() 
     )
     resource_types = manifest["terraform"]["resource_types"]
     assert resource_types["google_project_iam_member"]["max_count"] == 10
-    assert resource_types["google_secret_manager_secret_iam_member"]["max_count"] == 7
+    assert resource_types["google_secret_manager_secret_iam_member"]["max_count"] == 10
 
 
 def test_cloud_sql_database_role_inputs_are_exact_application_contracts() -> None:
@@ -9247,7 +9265,7 @@ def test_static_validation_rejects_quota_role_or_binding_expansion(
     assert "provisioner quota" in result.stdout.lower()
 
 
-def test_service_stage_has_exact_temporary_public_access_and_one_instance_contract() -> None:
+def test_service_stage_has_exact_profiled_public_access_and_one_instance_contract() -> None:
     cloud_run = (ROOT / "infra" / "gcp" / "develop" / "cloud_run.tf").read_text(encoding="utf-8")
     iam = (ROOT / "infra" / "gcp" / "develop" / "iam.tf").read_text(encoding="utf-8")
     secrets = (ROOT / "infra" / "gcp" / "develop" / "secrets.tf").read_text(encoding="utf-8")
@@ -9263,12 +9281,19 @@ def test_service_stage_has_exact_temporary_public_access_and_one_instance_contra
         'timeout                          = "60s"',
         'cpu    = "1"',
         'memory = "512Mi"',
-        'name  = "GOLDEN_ROSE_DEMO_ACCESS_ENABLED"',
-        'value = "true"',
-        'name  = "GOLDEN_ROSE_DEMO_ACCESS_EXPIRES_AT"',
-        "value = var.demo_access_expires_at",
-        'name = "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD"',
-        'secret  = "demo-access-password"',
+        'var.runtime_profile == "controlled_live_data_staff_pilot" ? "production" : "develop"',
+        'var.runtime_profile == "controlled_live_data_staff_pilot" ? "staff_oidc" : "synthetic"',
+        'var.runtime_profile == "controlled_live_data_staff_pilot" ? "controlled-live-data-staff-pilot" : "gcp-develop-private-synthetic"',
+        'GOLDEN_ROSE_DEMO_ACCESS_ENABLED            = "true"',
+        "GOLDEN_ROSE_DEMO_ACCESS_EXPIRES_AT         = var.demo_access_expires_at",
+        'name   = "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD"',
+        'secret = "demo-access-password"',
+        'name   = "GOLDEN_ROSE_SYNTHETIC_STAFF_ID"',
+        'secret = "synthetic-staff-id"',
+        'GOLDEN_ROSE_DEMO_ACCESS_ENABLED            = "false"',
+        'GOLDEN_ROSE_STAFF_OIDC_ISSUER   = "staff-oidc-issuer"',
+        'GOLDEN_ROSE_STAFF_OIDC_AUDIENCE = "staff-oidc-audience"',
+        'GOLDEN_ROSE_STAFF_OIDC_JWKS_URL = "staff-oidc-jwks-url"',
     ]:
         assert fragment in cloud_run
 
@@ -9283,8 +9308,15 @@ def test_service_stage_has_exact_temporary_public_access_and_one_instance_contra
     )
     assert "service_agent_authentication" not in observability
     assert '"demo-access-password"' in secrets
+    assert '"staff-oidc-issuer"' in secrets
+    assert '"staff-oidc-audience"' in secrets
+    assert '"staff-oidc-jwks-url"' in secrets
     assert (
         'resource "google_secret_manager_secret_iam_member" "runtime_demo_access_secret_access"'
+        in iam
+    )
+    assert (
+        'resource "google_secret_manager_secret_iam_member" "runtime_staff_oidc_issuer_secret_access"'
         in iam
     )
     assert "migration_demo_access_secret_access" not in iam
@@ -9296,11 +9328,11 @@ def test_outputs_expose_only_value_safe_temporary_access_markers() -> None:
 
     assert 'output "human_visible_develop_contract"' in module_outputs
     for fragment in [
-        'access_mode = "expiring-http-basic"',
+        'access_mode = var.runtime_profile == "controlled_live_data_staff_pilot" ? "named-staff-oidc" : "expiring-http-basic"',
         "public_invoker = true",
         "min_instances = 0",
         "max_instances = 1",
-        'data_boundary = "fictional-synthetic-only"',
+        'data_boundary = var.runtime_profile == "controlled_live_data_staff_pilot" ? "controlled-live-data-staff-pilot" : "fictional-synthetic-only"',
     ]:
         assert _contains_normalized_fragment(module_outputs, fragment)
     assert "demo_access_expires_at" not in module_outputs
@@ -9325,14 +9357,14 @@ def test_outputs_expose_only_value_safe_temporary_access_markers() -> None:
         ),
         (
             Path("infra/gcp/develop/cloud_run.tf"),
-            'name  = "GOLDEN_ROSE_DEMO_ACCESS_ENABLED"\n        value = "true"',
-            'name  = "GOLDEN_ROSE_DEMO_ACCESS_ENABLED"\n        value = "false"',
+            'GOLDEN_ROSE_DEMO_ACCESS_ENABLED            = "true"',
+            'GOLDEN_ROSE_DEMO_ACCESS_ENABLED            = "maybe"',
             "cloud run contract",
         ),
         (
             Path("infra/gcp/develop/cloud_run.tf"),
-            'name = "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD"\n        value_source {',
-            'name  = "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD"\n        value = "forbidden-literal"\n        value_source {',
+            'GOLDEN_ROSE_STAFF_OIDC_JWKS_URL = "staff-oidc-jwks-url"',
+            'GOLDEN_ROSE_STAFF_OIDC_JWKS_URL = "demo-access-password"',
             "cloud run contract",
         ),
     ],

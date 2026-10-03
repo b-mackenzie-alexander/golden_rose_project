@@ -44,6 +44,17 @@ variable "deployment_stage" {
   }
 }
 
+variable "runtime_profile" {
+  description = "Reviewed runtime profile for the develop package: historical synthetic demo or controlled named-staff live-data pilot."
+  type        = string
+  nullable    = false
+
+  validation {
+    condition     = contains(["synthetic_develop_demo", "controlled_live_data_staff_pilot"], var.runtime_profile)
+    error_message = "The runtime profile must be synthetic_develop_demo or controlled_live_data_staff_pilot."
+  }
+}
+
 variable "direct_vpc_subnet_cidr" {
   description = "RFC1918 /26-or-broader subnet CIDR reserved out of band for Direct VPC egress and private service access validation."
   type        = string
@@ -61,14 +72,14 @@ variable "direct_vpc_subnet_cidr" {
 
 
 variable "demo_access_expires_at" {
-  description = "Sensitive strict UTC RFC 3339 expiry for the temporary service-stage shared access gate; omitted outside service stage."
+  description = "Sensitive strict UTC RFC 3339 expiry for the temporary service-stage shared demo access gate; required only for the synthetic demo runtime profile."
   type        = string
   nullable    = true
   default     = null
 
   validation {
-    condition     = var.deployment_stage == "service" ? var.demo_access_expires_at != null && can(regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$", var.demo_access_expires_at)) : var.demo_access_expires_at == null
-    error_message = "Service stage requires one strict UTC RFC 3339 demo-access expiry; other stages require null."
+    condition     = var.deployment_stage == "service" && var.runtime_profile == "synthetic_develop_demo" ? var.demo_access_expires_at != null && can(regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$", var.demo_access_expires_at)) : var.demo_access_expires_at == null
+    error_message = "The synthetic demo service profile requires one strict UTC RFC 3339 demo-access expiry; every other stage/profile requires null."
   }
 
   sensitive = true
@@ -236,7 +247,7 @@ variable "cloud_sql_recovery_policy_review_status" {
 }
 
 variable "golden_rose_public_environment_label" {
-  description = "Operator-held reviewed non-secret public environment label containing 'non-production' and 'synthetic'."
+  description = "Operator-held reviewed non-secret public environment label for the develop migration/demo runtime containing 'non-production' and 'synthetic'."
   type        = string
   nullable    = false
 

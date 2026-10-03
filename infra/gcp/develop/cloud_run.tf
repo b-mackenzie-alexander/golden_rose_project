@@ -39,52 +39,27 @@ resource "google_cloud_run_v2_service" "staff_tracer" {
 
       env {
         name  = "GOLDEN_ROSE_ENVIRONMENT"
-        value = "develop"
+        value = var.runtime_profile == "controlled_live_data_staff_pilot" ? "production" : "develop"
       }
 
       env {
         name  = "GOLDEN_ROSE_AUTH_MODE"
-        value = "synthetic"
+        value = var.runtime_profile == "controlled_live_data_staff_pilot" ? "staff_oidc" : "synthetic"
       }
 
       env {
         name  = "GOLDEN_ROSE_DEPLOYMENT_TARGET"
-        value = "gcp-develop-private-synthetic"
+        value = var.runtime_profile == "controlled_live_data_staff_pilot" ? "controlled-live-data-staff-pilot" : "gcp-develop-private-synthetic"
       }
 
       env {
         name  = "GOLDEN_ROSE_PUBLIC_ENVIRONMENT_LABEL"
-        value = var.golden_rose_public_environment_label
+        value = var.runtime_profile == "controlled_live_data_staff_pilot" ? "Controlled live-data staff pilot" : var.golden_rose_public_environment_label
       }
 
       env {
         name  = "GOLDEN_ROSE_DEPLOYED_IMAGE_DIGEST"
         value = var.container_image_digest
-      }
-
-      env {
-        name  = "GOLDEN_ROSE_DEMO_ACCESS_ENABLED"
-        value = "true"
-      }
-
-      env {
-        name  = "GOLDEN_ROSE_DEMO_ACCESS_EXPIRES_AT"
-        value = var.demo_access_expires_at
-      }
-
-      env {
-        name  = "GOLDEN_ROSE_PRESENTATION_DEMO_SEED_ENABLED"
-        value = "true"
-      }
-
-      env {
-        name = "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD"
-        value_source {
-          secret_key_ref {
-            secret  = "demo-access-password"
-            version = "latest"
-          }
-        }
       }
 
       env {
@@ -97,12 +72,68 @@ resource "google_cloud_run_v2_service" "staff_tracer" {
         }
       }
 
-      env {
-        name = "GOLDEN_ROSE_SYNTHETIC_STAFF_ID"
-        value_source {
-          secret_key_ref {
-            secret  = "synthetic-staff-id"
-            version = "latest"
+      dynamic "env" {
+        for_each = var.runtime_profile == "synthetic_develop_demo" ? {
+          GOLDEN_ROSE_DEMO_ACCESS_ENABLED            = "true"
+          GOLDEN_ROSE_DEMO_ACCESS_EXPIRES_AT         = var.demo_access_expires_at
+          GOLDEN_ROSE_PRESENTATION_DEMO_SEED_ENABLED = "true"
+        } : {}
+
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.runtime_profile == "synthetic_develop_demo" ? {
+          demo_access_password = {
+            name   = "GOLDEN_ROSE_DEMO_ACCESS_PASSWORD"
+            secret = "demo-access-password"
+          }
+          synthetic_staff_id = {
+            name   = "GOLDEN_ROSE_SYNTHETIC_STAFF_ID"
+            secret = "synthetic-staff-id"
+          }
+        } : {}
+
+        content {
+          name = env.value.name
+          value_source {
+            secret_key_ref {
+              secret  = env.value.secret
+              version = "latest"
+            }
+          }
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.runtime_profile == "controlled_live_data_staff_pilot" ? {
+          GOLDEN_ROSE_DEMO_ACCESS_ENABLED            = "false"
+          GOLDEN_ROSE_PRESENTATION_DEMO_SEED_ENABLED = "false"
+        } : {}
+
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.runtime_profile == "controlled_live_data_staff_pilot" ? {
+          GOLDEN_ROSE_STAFF_OIDC_ISSUER   = "staff-oidc-issuer"
+          GOLDEN_ROSE_STAFF_OIDC_AUDIENCE = "staff-oidc-audience"
+          GOLDEN_ROSE_STAFF_OIDC_JWKS_URL = "staff-oidc-jwks-url"
+        } : {}
+
+        content {
+          name = env.key
+          value_source {
+            secret_key_ref {
+              secret  = env.value
+              version = "latest"
+            }
           }
         }
       }
@@ -116,5 +147,8 @@ resource "google_cloud_run_v2_service" "staff_tracer" {
     google_monitoring_alert_policy.service_error_events,
     google_logging_project_bucket_config.default,
     google_secret_manager_secret_iam_member.runtime_demo_access_secret_access,
+    google_secret_manager_secret_iam_member.runtime_staff_oidc_issuer_secret_access,
+    google_secret_manager_secret_iam_member.runtime_staff_oidc_audience_secret_access,
+    google_secret_manager_secret_iam_member.runtime_staff_oidc_jwks_url_secret_access,
   ]
 }

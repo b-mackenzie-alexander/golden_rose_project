@@ -31,6 +31,18 @@ def _settings() -> Settings:
     )
 
 
+def _settings_with_issuer(issuer: str) -> Settings:
+    return Settings(
+        environment="test",
+        auth_mode="staff_oidc",
+        database_url="postgresql+psycopg://test:test@127.0.0.1:55432/golden_rose",
+        synthetic_staff_id=None,
+        staff_oidc_issuer=issuer,
+        staff_oidc_audience="golden-rose-staff",
+        staff_oidc_jwks_url="https://accounts.example.test/.well-known/jwks.json",
+    )
+
+
 def _b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
 
@@ -89,6 +101,41 @@ def test_jwks_verifier_returns_staff_identity_claims() -> None:
     assert claims.provider_subject == "oidc:staff:123"
     assert claims.mfa_verified is True
     assert claims.session_id == "session-123"
+
+
+@pytest.mark.parametrize("token_issuer", ["accounts.google.com", "https://accounts.google.com"])
+def test_jwks_verifier_accepts_google_issuer_aliases(token_issuer: str) -> None:
+    key = SigningKey()
+    verifier = StaffOidcJwksTokenVerifier(fetch_jwks=lambda _url: {"keys": [key.jwk()]})
+
+    claims = verifier.verify(
+        token=key.token({"iss": token_issuer}),
+        settings=_settings_with_issuer("https://accounts.google.com"),
+    )
+
+    assert claims.provider_subject == "oidc:staff:123"
+
+
+def test_jwks_verifier_keeps_non_google_issuer_matching_exact() -> None:
+    key = SigningKey()
+    verifier = StaffOidcJwksTokenVerifier(fetch_jwks=lambda _url: {"keys": [key.jwk()]})
+
+    with pytest.raises(StaffAuthenticationFailedError):
+        verifier.verify(
+            token=key.token({"iss": "https://identity.example.test"}),
+            settings=_settings_with_issuer("https://accounts.example.test"),
+        )
+
+
+def test_jwks_verifier_rejects_google_token_when_non_google_provider_configured() -> None:
+    key = SigningKey()
+    verifier = StaffOidcJwksTokenVerifier(fetch_jwks=lambda _url: {"keys": [key.jwk()]})
+
+    with pytest.raises(StaffAuthenticationFailedError):
+        verifier.verify(
+            token=key.token({"iss": "accounts.google.com"}),
+            settings=_settings_with_issuer("https://accounts.example.test"),
+        )
 
 
 def test_jwks_verifier_accepts_explicit_mfa_verified_claim() -> None:

@@ -393,10 +393,10 @@ export function AppShell() {
               type="button"
               onClick={() => { void navigate('/staff/account'); }}
             >
-              <span className="user-avatar" aria-hidden="true">MT</span>
+              <span className="user-avatar" aria-hidden="true">GR</span>
               <span>
-                <strong>Mariela Torres</strong>
-                <small>{language === 'en' ? 'Operations team' : 'Equipo de Operaciones'}</small>
+                <strong>{language === 'en' ? 'Staff account' : 'Cuenta del personal'}</strong>
+                <small>{language === 'en' ? 'Verify session' : 'Verificar sesion'}</small>
               </span>
             </button>
           </div>

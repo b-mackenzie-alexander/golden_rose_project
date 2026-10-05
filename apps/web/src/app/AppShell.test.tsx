@@ -42,6 +42,22 @@ describe('AppShell', () => {
     expect(screen.getByRole('link', { name: 'Employers' })).toHaveAttribute('aria-current', 'page');
   });
 
+  it('does not hardcode a named staff identity before session verification', () => {
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppShell />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    const accountButton = screen.getByRole('button', { name: 'Open my staff account' });
+    expect(accountButton).toHaveTextContent('Staff account');
+    expect(accountButton).toHaveTextContent('Verify session');
+    expect(accountButton).not.toHaveTextContent('Mariela Torres');
+    expect(accountButton).not.toHaveTextContent('Operations team');
+  });
+
   it('persists light and dark mode from the utility toggle', async () => {
     const user = userEvent.setup();
     render(

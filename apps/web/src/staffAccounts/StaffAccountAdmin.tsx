@@ -15,6 +15,7 @@ import {
   suspendStaffAccount,
 } from '../api/staffAccountClient';
 import type { StaffAccount, StaffAccountFailureKind, StaffAccountLifecycleEvent, StaffAccountRole, StaffDelegation } from '../api/staffAccountClient';
+import { GoogleStaffSignIn } from '../auth/GoogleStaffSignIn';
 import { IconSymbol } from '../dashboard/artwork';
 import { useLanguage } from '../i18n/LanguageProvider';
 
@@ -199,8 +200,10 @@ export function StaffAccountAdmin() {
   const { language } = useLanguage();
   const [accounts, setAccounts] = useState<StaffAccount[]>([]);
   const [loading, setLoading] = useState(true);
+  const [accountsLoaded, setAccountsLoaded] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const [accessFailure, setAccessFailure] = useState<StaffAccountFailureKind | null>(null);
   const [createForm, setCreateForm] = useState<CreateForm>(emptyCreate);
   const [createErrors, setCreateErrors] = useState<Partial<Record<keyof CreateForm, string>>>({});
   const [actionForm, setActionForm] = useState<ActionForm | null>(null);
@@ -230,10 +233,15 @@ export function StaffAccountAdmin() {
   async function reloadAccounts() {
     setLoading(true);
     setError('');
+    setAccessFailure(null);
     const result = await listStaffAccounts();
     if (result.ok) {
       setAccounts(result.value);
+      setAccountsLoaded(true);
     } else {
+      setAccountsLoaded(false);
+      setAccounts([]);
+      setAccessFailure(result.failure.kind);
       setError(failureText(result.failure.kind, language));
     }
     setLoading(false);
@@ -245,8 +253,13 @@ export function StaffAccountAdmin() {
       if (cancelled) return;
       if (result.ok) {
         setAccounts(result.value);
+        setAccountsLoaded(true);
         setError('');
+        setAccessFailure(null);
       } else {
+        setAccounts([]);
+        setAccountsLoaded(false);
+        setAccessFailure(result.failure.kind);
         setError(failureText(result.failure.kind, language));
       }
       setLoading(false);
@@ -255,6 +268,9 @@ export function StaffAccountAdmin() {
       cancelled = true;
     };
   }, [language]);
+
+  const signInRequired = accessFailure === 'sign_in_required' || accessFailure === 'authentication_failed';
+  const adminControlsReady = accountsLoaded;
 
   function validateCreate() {
     const next: Partial<Record<keyof CreateForm, string>> = {};
@@ -432,7 +448,11 @@ export function StaffAccountAdmin() {
 
       {notice ? <p className="staff-account-notice" role="status">{notice}</p> : null}
       {error ? <p className="staff-account-error" role="alert">{error}</p> : null}
+      {signInRequired ? (
+        <GoogleStaffSignIn onSignedIn={() => { void reloadAccounts(); }} />
+      ) : null}
 
+      {adminControlsReady ? (
       <div className="staff-account-layout">
         <section className="staff-account-panel" aria-labelledby="account-list-heading">
           <div className="staff-account-panel-header">
@@ -556,6 +576,7 @@ export function StaffAccountAdmin() {
           </form>
         </section>
       </div>
+      ) : null}
 
       {actionForm ? (
         <section className="staff-account-panel staff-action-panel" aria-labelledby="account-action-heading">

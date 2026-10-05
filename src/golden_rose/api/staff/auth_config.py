@@ -4,11 +4,10 @@ from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, ConfigDict
 
 from golden_rose.api.dependencies import get_settings
+from golden_rose.auth.staff_oidc import GOOGLE_OIDC_ISSUERS
 from golden_rose.config import Settings
 
 router = APIRouter(prefix="/api/staff/v1", tags=["staff-auth"])
-
-GOOGLE_OIDC_ISSUERS = {"https://accounts.google.com", "accounts.google.com"}
 
 
 class StaffAuthConfigResponse(BaseModel):

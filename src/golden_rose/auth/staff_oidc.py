@@ -17,6 +17,7 @@ from golden_rose.config import Settings
 
 JwksFetcher = Callable[[str], Mapping[str, Any]]
 MFA_AUTHENTICATION_METHODS = frozenset({"mfa"})
+GOOGLE_OIDC_ISSUERS = frozenset({"https://accounts.google.com", "accounts.google.com"})
 
 
 class StaffAuthenticationError(RuntimeError):
@@ -84,7 +85,10 @@ class StaffOidcJwksTokenVerifier:
         ) as exc:
             raise StaffAuthenticationFailedError("staff identity token is invalid") from exc
 
-        if payload.get("iss") != settings.staff_oidc_issuer:
+        if not _issuer_matches_configured_provider(
+            payload.get("iss"),
+            settings.staff_oidc_issuer,
+        ):
             raise StaffAuthenticationFailedError("staff identity token issuer is invalid")
         subject = payload.get("sub")
         if not isinstance(subject, str) or not subject.strip():
@@ -102,6 +106,17 @@ def _require_staff_oidc_settings(settings: Settings) -> None:
         raise StaffIdentityProviderUnavailableError("staff oidc settings are incomplete")
     if not settings.staff_oidc_jwks_url:
         raise StaffIdentityProviderUnavailableError("staff oidc jwks url is not configured")
+
+
+def _issuer_matches_configured_provider(
+    token_issuer: object,
+    configured_issuer: str | None,
+) -> bool:
+    if not isinstance(token_issuer, str) or configured_issuer is None:
+        return False
+    if configured_issuer in GOOGLE_OIDC_ISSUERS:
+        return token_issuer in GOOGLE_OIDC_ISSUERS
+    return token_issuer == configured_issuer
 
 
 def _fetch_jwks(url: str) -> Mapping[str, Any]:

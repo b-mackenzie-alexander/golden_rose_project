@@ -9296,9 +9296,15 @@ def test_service_stage_has_exact_profiled_public_access_and_one_instance_contrac
         'name   = "GOLDEN_ROSE_SYNTHETIC_STAFF_ID"',
         'secret = "synthetic-staff-id"',
         'GOLDEN_ROSE_DEMO_ACCESS_ENABLED            = "false"',
-        'GOLDEN_ROSE_STAFF_OIDC_ISSUER   = "staff-oidc-issuer"',
-        'GOLDEN_ROSE_STAFF_OIDC_AUDIENCE = "staff-oidc-audience"',
-        'GOLDEN_ROSE_STAFF_OIDC_JWKS_URL = "staff-oidc-jwks-url"',
+        "GOLDEN_ROSE_STAFF_OIDC_ISSUER = {",
+        'secret  = "staff-oidc-issuer"',
+        "version = var.staff_oidc_issuer_secret_version",
+        "GOLDEN_ROSE_STAFF_OIDC_AUDIENCE = {",
+        'secret  = "staff-oidc-audience"',
+        "version = var.staff_oidc_audience_secret_version",
+        "GOLDEN_ROSE_STAFF_OIDC_JWKS_URL = {",
+        'secret  = "staff-oidc-jwks-url"',
+        "version = var.staff_oidc_jwks_url_secret_version",
     ]:
         assert fragment in cloud_run
 
@@ -9319,6 +9325,15 @@ def test_service_stage_has_exact_profiled_public_access_and_one_instance_contrac
     assert '"staff-oidc-issuer",' not in secrets
     assert '"staff-oidc-audience",' not in secrets
     assert '"staff-oidc-jwks-url",' not in secrets
+    variables_root = (ROOT / "infra" / "gcp" / "variables.tf").read_text(encoding="utf-8")
+    variables_child = (ROOT / "infra" / "gcp" / "develop" / "variables.tf").read_text(
+        encoding="utf-8"
+    )
+    for variables in (variables_root, variables_child):
+        assert 'variable "staff_oidc_issuer_secret_version"' in variables
+        assert 'variable "staff_oidc_audience_secret_version"' in variables
+        assert 'variable "staff_oidc_jwks_url_secret_version"' in variables
+        assert 'can(regex("^[1-9][0-9]*$"' in variables
     assert (
         'resource "google_secret_manager_secret_iam_member" "runtime_demo_access_secret_access"'
         in iam
@@ -9371,8 +9386,8 @@ def test_outputs_expose_only_value_safe_temporary_access_markers() -> None:
         ),
         (
             Path("infra/gcp/develop/cloud_run.tf"),
-            'GOLDEN_ROSE_STAFF_OIDC_JWKS_URL = "staff-oidc-jwks-url"',
-            'GOLDEN_ROSE_STAFF_OIDC_JWKS_URL = "demo-access-password"',
+            'secret  = "staff-oidc-jwks-url"',
+            'secret  = "demo-access-password"',
             "cloud run contract",
         ),
         (

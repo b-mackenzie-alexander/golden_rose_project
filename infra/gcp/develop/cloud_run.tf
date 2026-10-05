@@ -122,17 +122,26 @@ resource "google_cloud_run_v2_service" "staff_tracer" {
 
       dynamic "env" {
         for_each = var.runtime_profile == "controlled_live_data_staff_pilot" ? {
-          GOLDEN_ROSE_STAFF_OIDC_ISSUER   = "staff-oidc-issuer"
-          GOLDEN_ROSE_STAFF_OIDC_AUDIENCE = "staff-oidc-audience"
-          GOLDEN_ROSE_STAFF_OIDC_JWKS_URL = "staff-oidc-jwks-url"
+          GOLDEN_ROSE_STAFF_OIDC_ISSUER = {
+            secret  = "staff-oidc-issuer"
+            version = var.staff_oidc_issuer_secret_version
+          }
+          GOLDEN_ROSE_STAFF_OIDC_AUDIENCE = {
+            secret  = "staff-oidc-audience"
+            version = var.staff_oidc_audience_secret_version
+          }
+          GOLDEN_ROSE_STAFF_OIDC_JWKS_URL = {
+            secret  = "staff-oidc-jwks-url"
+            version = var.staff_oidc_jwks_url_secret_version
+          }
         } : {}
 
         content {
           name = env.key
           value_source {
             secret_key_ref {
-              secret  = env.value
-              version = "latest"
+              secret  = env.value.secret
+              version = env.value.version
             }
           }
         }

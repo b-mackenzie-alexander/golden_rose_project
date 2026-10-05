@@ -399,10 +399,22 @@ jobs:
                   "GOLDEN_ROSE_DEMO_ACCESS_ENABLED": {"value": "false"},
                   "GOLDEN_ROSE_PRESENTATION_DEMO_SEED_ENABLED": {"value": "false"},
                   "GOLDEN_ROSE_DATABASE_URL": {"secret": "runtime-database-url", "version": "latest"},
-                  "GOLDEN_ROSE_STAFF_OIDC_ISSUER": {"secret": "staff-oidc-issuer", "version": "latest"},
-                  "GOLDEN_ROSE_STAFF_OIDC_AUDIENCE": {"secret": "staff-oidc-audience", "version": "latest"},
-                  "GOLDEN_ROSE_STAFF_OIDC_JWKS_URL": {"secret": "staff-oidc-jwks-url", "version": "latest"},
               }
+              expected_staff_oidc_secret_names = {
+                  "GOLDEN_ROSE_STAFF_OIDC_ISSUER": "staff-oidc-issuer",
+                  "GOLDEN_ROSE_STAFF_OIDC_AUDIENCE": "staff-oidc-audience",
+                  "GOLDEN_ROSE_STAFF_OIDC_JWKS_URL": "staff-oidc-jwks-url",
+              }
+              for name, secret_name in expected_staff_oidc_secret_names.items():
+                  secret_ref = environment.get(name)
+                  if secret_ref is None:
+                      raise SystemExit(f"ready service missing {name}")
+                  if secret_ref.get("secret") != secret_name:
+                      raise SystemExit(f"ready service {name} secret drifted")
+                  version = secret_ref.get("version")
+                  if not isinstance(version, str) or not version.isdigit() or version == "0":
+                      raise SystemExit(f"ready service {name} must pin an enabled numeric secret version")
+                  expected_environment[name] = {"secret": secret_name, "version": version}
               if any(name in environment for name in ("GOLDEN_ROSE_DEMO_ACCESS_PASSWORD", "GOLDEN_ROSE_DEMO_ACCESS_EXPIRES_AT", "GOLDEN_ROSE_SYNTHETIC_STAFF_ID")):
                   raise SystemExit("ready service staff-pilot runtime still exposes demo or synthetic env")
           else:

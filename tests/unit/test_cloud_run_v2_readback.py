@@ -136,7 +136,8 @@ def test_token_failure_and_redirect_never_expose_or_forward_credentials(monkeypa
     ],
 )
 @pytest.mark.parametrize(
-    "defect", [None, "condition", "generation", "revision", "image", "containers"]
+    "defect",
+    [None, "condition", "generation", "revision", "image", "containers", "staff_oidc_latest"],
 )
 def test_actual_service_workflow_accepts_current_v2_revision_only(
     tmp_path, runtime_profile, data_boundary, defect
@@ -156,7 +157,7 @@ def test_actual_service_workflow_accepts_current_v2_revision_only(
     body = step["run"].split("python - <<'PY'\n", 1)[1].rsplit("\nPY", 1)[0]
     image = "example/image@sha256:" + "1" * 64
     image_digest = "sha256:" + "1" * 64
-    environment = [
+    environment: list[dict[str, Any]] = [
         {"name": "GOLDEN_ROSE_DEPLOYED_IMAGE_DIGEST", "value": image_digest},
         {
             "name": "GOLDEN_ROSE_DATABASE_URL",
@@ -183,19 +184,19 @@ def test_actual_service_workflow_accepts_current_v2_revision_only(
                 {
                     "name": "GOLDEN_ROSE_STAFF_OIDC_ISSUER",
                     "valueSource": {
-                        "secretKeyRef": {"secret": "staff-oidc-issuer", "version": "latest"}
+                        "secretKeyRef": {"secret": "staff-oidc-issuer", "version": "2"}
                     },
                 },
                 {
                     "name": "GOLDEN_ROSE_STAFF_OIDC_AUDIENCE",
                     "valueSource": {
-                        "secretKeyRef": {"secret": "staff-oidc-audience", "version": "latest"}
+                        "secretKeyRef": {"secret": "staff-oidc-audience", "version": "2"}
                     },
                 },
                 {
                     "name": "GOLDEN_ROSE_STAFF_OIDC_JWKS_URL",
                     "valueSource": {
-                        "secretKeyRef": {"secret": "staff-oidc-jwks-url", "version": "latest"}
+                        "secretKeyRef": {"secret": "staff-oidc-jwks-url", "version": "2"}
                     },
                 },
             ]
@@ -258,6 +259,14 @@ def test_actual_service_workflow_accepts_current_v2_revision_only(
         service["template"]["containers"][0]["image"] = "different"
     if defect == "containers":
         service["template"]["containers"].append({"image": image})
+    if defect == "staff_oidc_latest":
+        if runtime_profile != "controlled_live_data_staff_pilot":
+            pytest.skip(
+                "staff oidc secret version applies only to the controlled staff-pilot profile"
+            )
+        for item in environment:
+            if item["name"].startswith("GOLDEN_ROSE_STAFF_OIDC_"):
+                item["valueSource"]["secretKeyRef"]["version"] = "latest"
     (tmp_path / "build").mkdir()
     (tmp_path / "build/deploy-result.json").write_text("{}")
     result = subprocess.run(

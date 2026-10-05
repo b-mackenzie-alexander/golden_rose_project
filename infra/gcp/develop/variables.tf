@@ -85,6 +85,42 @@ variable "demo_access_expires_at" {
   sensitive = true
 }
 
+variable "staff_oidc_issuer_secret_version" {
+  description = "Operator-held enabled Secret Manager version number for staff-oidc-issuer supplied by the root module; required only for the controlled staff-pilot service profile."
+  type        = string
+  nullable    = true
+  default     = null
+
+  validation {
+    condition     = var.deployment_stage == "service" && var.runtime_profile == "controlled_live_data_staff_pilot" ? var.staff_oidc_issuer_secret_version != null && can(regex("^[1-9][0-9]*$", var.staff_oidc_issuer_secret_version)) : var.staff_oidc_issuer_secret_version == null
+    error_message = "The controlled staff-pilot service profile requires an explicit numeric staff OIDC issuer secret version; every other stage/profile requires null."
+  }
+}
+
+variable "staff_oidc_audience_secret_version" {
+  description = "Operator-held enabled Secret Manager version number for staff-oidc-audience supplied by the root module; required only for the controlled staff-pilot service profile."
+  type        = string
+  nullable    = true
+  default     = null
+
+  validation {
+    condition     = var.deployment_stage == "service" && var.runtime_profile == "controlled_live_data_staff_pilot" ? var.staff_oidc_audience_secret_version != null && can(regex("^[1-9][0-9]*$", var.staff_oidc_audience_secret_version)) : var.staff_oidc_audience_secret_version == null
+    error_message = "The controlled staff-pilot service profile requires an explicit numeric staff OIDC audience secret version; every other stage/profile requires null."
+  }
+}
+
+variable "staff_oidc_jwks_url_secret_version" {
+  description = "Operator-held enabled Secret Manager version number for staff-oidc-jwks-url supplied by the root module; required only for the controlled staff-pilot service profile."
+  type        = string
+  nullable    = true
+  default     = null
+
+  validation {
+    condition     = var.deployment_stage == "service" && var.runtime_profile == "controlled_live_data_staff_pilot" ? var.staff_oidc_jwks_url_secret_version != null && can(regex("^[1-9][0-9]*$", var.staff_oidc_jwks_url_secret_version)) : var.staff_oidc_jwks_url_secret_version == null
+    error_message = "The controlled staff-pilot service profile requires an explicit numeric staff OIDC JWKS URL secret version; every other stage/profile requires null."
+  }
+}
+
 
 variable "billing_account_id" {
   description = "Operator-supplied billing account identifier for reviewed develop budget routing."

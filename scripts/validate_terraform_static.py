@@ -2114,7 +2114,7 @@ EXACT_WORKFLOW_RUN_SHA256.update(
             "deploy-develop.yml",
             "deploy",
             "name:Verify service readiness transition",
-        ): "283468f231a40e2c6af36b5c5f920e0af7acee95df2af94daae45c78f2fae7e4",
+        ): "d518bec825bf8d9c4b2cbf231de0ae20d6095030ebfd7920d92f411003c78646",
         (
             "deploy-develop.yml",
             "deploy",
@@ -4349,9 +4349,15 @@ def _collect_cloud_run_contract_violations(root: Path) -> list[str]:
         'secret = "synthetic-staff-id"',
         'GOLDEN_ROSE_DEMO_ACCESS_ENABLED            = "false"',
         'GOLDEN_ROSE_PRESENTATION_DEMO_SEED_ENABLED = "false"',
-        'GOLDEN_ROSE_STAFF_OIDC_ISSUER   = "staff-oidc-issuer"',
-        'GOLDEN_ROSE_STAFF_OIDC_AUDIENCE = "staff-oidc-audience"',
-        'GOLDEN_ROSE_STAFF_OIDC_JWKS_URL = "staff-oidc-jwks-url"',
+        "GOLDEN_ROSE_STAFF_OIDC_ISSUER = {",
+        'secret  = "staff-oidc-issuer"',
+        "version = var.staff_oidc_issuer_secret_version",
+        "GOLDEN_ROSE_STAFF_OIDC_AUDIENCE = {",
+        'secret  = "staff-oidc-audience"',
+        "version = var.staff_oidc_audience_secret_version",
+        "GOLDEN_ROSE_STAFF_OIDC_JWKS_URL = {",
+        'secret  = "staff-oidc-jwks-url"',
+        "version = var.staff_oidc_jwks_url_secret_version",
     ]
     for fragment in required_fragments:
         if fragment not in cloud_run:
@@ -4368,7 +4374,7 @@ def _collect_cloud_run_contract_violations(root: Path) -> list[str]:
         )
     if not _contains_normalized_fragment(
         cloud_run,
-        'for_each = var.runtime_profile == "controlled_live_data_staff_pilot" ? { GOLDEN_ROSE_STAFF_OIDC_ISSUER = "staff-oidc-issuer"',
+        'for_each = var.runtime_profile == "controlled_live_data_staff_pilot" ? { GOLDEN_ROSE_STAFF_OIDC_ISSUER = { secret = "staff-oidc-issuer" version = var.staff_oidc_issuer_secret_version',
     ):
         violations.append(
             f"{cloud_run_path.relative_to(root)} staff-pilot oidc env drifted from the exact cloud run contract"

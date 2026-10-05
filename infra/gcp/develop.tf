@@ -10,6 +10,9 @@ module "develop" {
   direct_vpc_subnet_cidr   = var.direct_vpc_subnet_cidr
 
   demo_access_expires_at                   = var.demo_access_expires_at
+  staff_oidc_issuer_secret_version         = var.staff_oidc_issuer_secret_version
+  staff_oidc_audience_secret_version       = var.staff_oidc_audience_secret_version
+  staff_oidc_jwks_url_secret_version       = var.staff_oidc_jwks_url_secret_version
   billing_account_id                       = var.billing_account_id
   alert_notification_email_address         = var.alert_notification_email_address
   observability_viewer_principal           = var.observability_viewer_principal

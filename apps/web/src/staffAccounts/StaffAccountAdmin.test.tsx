@@ -39,6 +39,12 @@ vi.mock('../api/staffAccountClient', () => ({
   suspendStaffAccount: vi.fn(),
 }));
 
+vi.mock('../auth/GoogleStaffSignIn', () => ({
+  GoogleStaffSignIn: ({ onSignedIn }: { onSignedIn?: () => void }) => (
+    <button type="button" onClick={onSignedIn}>Mock Google sign-in</button>
+  ),
+}));
+
 const suspended: StaffAccount = {
   staffId: '22222222-2222-4222-8222-222222222222',
   providerSubject: 'oidc:staff:123',
@@ -141,6 +147,26 @@ it('creates a suspended onboarding account and shows field-local validation', as
   expect(createCall?.reasonText).toBe('Initial onboarding approved');
   expect(await screen.findByText('Staff account created in suspended onboarding state.')).toBeInTheDocument();
   expect(screen.getByText('Sofia Diaz')).toBeInTheDocument();
+});
+
+it('requires staff sign-in before showing account administration controls', async () => {
+  const user = userEvent.setup();
+  vi.mocked(listStaffAccounts)
+    .mockResolvedValueOnce({ ok: false, failure: { kind: 'sign_in_required' } })
+    .mockResolvedValueOnce({ ok: true, value: [suspended] });
+
+  render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
+
+  expect(await screen.findByText('Sign in with a staff session before managing accounts.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Mock Google sign-in' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Create staff account' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('table', { name: 'Staff account lifecycle table' })).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'Mock Google sign-in' }));
+
+  expect(await screen.findByText('Mariela Torres')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Create staff account' })).toBeInTheDocument();
+  expect(screen.getByRole('table', { name: 'Staff account lifecycle table' })).toBeInTheDocument();
 });
 
 it('filters staff accounts by lifecycle, MFA readiness, and search text', async () => {

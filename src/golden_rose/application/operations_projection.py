@@ -16,6 +16,7 @@ from golden_rose.persistence.models import (
     intake_finalizations,
     shift_needs,
     staffing_requests,
+    worker_residences,
     worksites,
 )
 
@@ -37,6 +38,220 @@ LOCALITY_TO_AREA: dict[str, str] = {
     "queens": "queens",
     "staten island": "staten_island",
     "richmond": "staten_island",
+}
+
+ZONE_BUCKETS: tuple[tuple[str, str, str], ...] = (
+    ("south_bronx", "South Bronx", "bronx"),
+    ("upper_manhattan_harlem", "Upper Manhattan / Harlem", "manhattan"),
+    ("midtown_lower_manhattan", "Midtown / Lower Manhattan", "manhattan"),
+    ("northwest_queens", "Northwest Queens", "queens"),
+    ("central_queens", "Central Queens", "queens"),
+    ("northeast_queens", "Northeast Queens", "queens"),
+    ("north_brooklyn", "North Brooklyn", "brooklyn"),
+    ("central_brooklyn", "Central Brooklyn", "brooklyn"),
+    ("south_brooklyn", "South Brooklyn", "brooklyn"),
+    ("north_shore_staten_island", "North Shore Staten Island", "staten_island"),
+)
+
+AREA_ANCHOR_ZONE: dict[str, str] = {
+    "bronx": "south_bronx",
+    "brooklyn": "central_brooklyn",
+    "manhattan": "midtown_lower_manhattan",
+    "queens": "central_queens",
+    "staten_island": "north_shore_staten_island",
+}
+
+POSTAL_ZONE_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "south_bronx",
+        ("10451", "10452", "10453", "10454", "10455", "10456", "10457", "10458", "10459", "10460"),
+    ),
+    (
+        "upper_manhattan_harlem",
+        (
+            "10026",
+            "10027",
+            "10030",
+            "10031",
+            "10032",
+            "10033",
+            "10034",
+            "10035",
+            "10037",
+            "10039",
+            "10040",
+        ),
+    ),
+    (
+        "midtown_lower_manhattan",
+        (
+            "10001",
+            "10002",
+            "10003",
+            "10004",
+            "10005",
+            "10006",
+            "10007",
+            "10009",
+            "10010",
+            "10011",
+            "10012",
+            "10013",
+            "10014",
+            "10016",
+            "10017",
+            "10018",
+            "10019",
+            "10021",
+            "10022",
+            "10023",
+            "10024",
+            "10025",
+            "10028",
+            "10029",
+            "10036",
+            "10038",
+            "10044",
+            "10065",
+            "10069",
+            "10075",
+            "10128",
+            "10280",
+            "10282",
+        ),
+    ),
+    (
+        "northwest_queens",
+        (
+            "11101",
+            "11102",
+            "11103",
+            "11104",
+            "11105",
+            "11106",
+            "11369",
+            "11370",
+            "11372",
+            "11373",
+            "11377",
+            "11378",
+        ),
+    ),
+    (
+        "central_queens",
+        (
+            "11354",
+            "11355",
+            "11356",
+            "11357",
+            "11358",
+            "11364",
+            "11365",
+            "11366",
+            "11367",
+            "11368",
+            "11374",
+            "11375",
+            "11379",
+            "11385",
+            "11415",
+            "11416",
+            "11417",
+            "11418",
+            "11419",
+            "11420",
+            "11421",
+            "11432",
+            "11433",
+            "11434",
+            "11435",
+            "11436",
+        ),
+    ),
+    (
+        "northeast_queens",
+        ("11004", "11005", "11360", "11361", "11362", "11363", "11364"),
+    ),
+    ("north_brooklyn", ("11201", "11205", "11206", "11211", "11221", "11222", "11237", "11249")),
+    (
+        "central_brooklyn",
+        (
+            "11203",
+            "11207",
+            "11208",
+            "11210",
+            "11212",
+            "11213",
+            "11216",
+            "11225",
+            "11226",
+            "11233",
+            "11236",
+            "11238",
+        ),
+    ),
+    (
+        "south_brooklyn",
+        (
+            "11204",
+            "11209",
+            "11214",
+            "11218",
+            "11219",
+            "11220",
+            "11223",
+            "11224",
+            "11228",
+            "11229",
+            "11230",
+            "11232",
+            "11234",
+            "11235",
+        ),
+    ),
+    ("north_shore_staten_island", ("10301", "10302", "10303", "10304", "10310")),
+)
+
+POSTAL_CODE_TO_ZONE: dict[str, str] = {
+    code: zone for zone, postal_codes in POSTAL_ZONE_GROUPS for code in postal_codes
+}
+
+LOCALITY_TO_ZONE: dict[str, str] = {
+    "astoria": "northwest_queens",
+    "bay ridge": "south_brooklyn",
+    "bayside": "northeast_queens",
+    "bedford stuyvesant": "central_brooklyn",
+    "bronx": "south_bronx",
+    "brooklyn": "central_brooklyn",
+    "bushwick": "north_brooklyn",
+    "central harlem": "upper_manhattan_harlem",
+    "coney island": "south_brooklyn",
+    "corona": "central_queens",
+    "crown heights": "central_brooklyn",
+    "east flatbush": "central_brooklyn",
+    "elmhurst": "central_queens",
+    "far rockaway": "central_queens",
+    "flatbush": "central_brooklyn",
+    "flushing": "northeast_queens",
+    "forest hills": "central_queens",
+    "greenpoint": "north_brooklyn",
+    "harlem": "upper_manhattan_harlem",
+    "jackson heights": "northwest_queens",
+    "jamaica": "central_queens",
+    "kings": "central_brooklyn",
+    "long island city": "northwest_queens",
+    "manhattan": "midtown_lower_manhattan",
+    "new york": "midtown_lower_manhattan",
+    "new york city": "midtown_lower_manhattan",
+    "queens": "central_queens",
+    "rego park": "central_queens",
+    "richmond": "north_shore_staten_island",
+    "ridgewood": "central_queens",
+    "staten island": "north_shore_staten_island",
+    "sunset park": "south_brooklyn",
+    "washington heights": "upper_manhattan_harlem",
+    "williamsburg": "north_brooklyn",
+    "woodside": "northwest_queens",
 }
 
 
@@ -61,6 +276,94 @@ def _area_key(locality: object) -> str | None:
     if not normalized:
         return None
     return LOCALITY_TO_AREA.get(normalized)
+
+
+def _normalized_text(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = " ".join(value.strip().lower().replace("-", " ").split())
+    return normalized or None
+
+
+def _postal_prefix(postal_code: object) -> str | None:
+    if not isinstance(postal_code, str):
+        return None
+    digits = "".join(character for character in postal_code.strip() if character.isdigit())
+    return digits[:5] if len(digits) >= 5 else None
+
+
+def _zone_key(*, locality: object, postal_code: object) -> str | None:
+    postal_prefix = _postal_prefix(postal_code)
+    if postal_prefix is not None and postal_prefix in POSTAL_CODE_TO_ZONE:
+        return POSTAL_CODE_TO_ZONE[postal_prefix]
+    normalized_locality = _normalized_text(locality)
+    if normalized_locality is None:
+        return None
+    zone = LOCALITY_TO_ZONE.get(normalized_locality)
+    if zone is not None:
+        return zone
+    area = LOCALITY_TO_AREA.get(normalized_locality)
+    return AREA_ANCHOR_ZONE.get(area) if area is not None else None
+
+
+def _empty_zone_summary() -> dict[str, dict[str, int | str]]:
+    return {
+        key: {
+            "zone_key": key,
+            "zone_label": label,
+            "area_key": area_key,
+            "worker_residence_count": 0,
+            "worksite_count": 0,
+            "request_count": 0,
+            "shift_count": 0,
+            "worker_slots": 0,
+            "pending_review_count": 0,
+        }
+        for key, label, area_key in ZONE_BUCKETS
+    }
+
+
+def _build_zone_summary(
+    *,
+    request_area_rows: Sequence[Mapping[str, Any]],
+    shift_area_rows: Sequence[Mapping[str, Any]],
+    worker_zone_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, int | str]]:
+    zones = _empty_zone_summary()
+    worksites_by_zone: dict[str, set[object]] = {key: set() for key, _label, _area in ZONE_BUCKETS}
+
+    for row in worker_zone_rows:
+        key = _zone_key(locality=row.get("locality"), postal_code=row.get("postal_code"))
+        if key is None:
+            continue
+        zones[key]["worker_residence_count"] = int(zones[key]["worker_residence_count"]) + 1
+
+    for row in request_area_rows:
+        key = _zone_key(locality=row.get("locality"), postal_code=row.get("postal_code"))
+        if key is None:
+            continue
+        zone = zones[key]
+        zone["request_count"] = int(zone["request_count"]) + 1
+        worksite_id = row.get("worksite_id")
+        if worksite_id is not None:
+            worksites_by_zone[key].add(worksite_id)
+        if row.get("request_status") == "pending_review":
+            zone["pending_review_count"] = int(zone["pending_review_count"]) + 1
+
+    for row in shift_area_rows:
+        key = _zone_key(locality=row.get("locality"), postal_code=row.get("postal_code"))
+        if key is None:
+            continue
+        zone = zones[key]
+        zone["shift_count"] = int(zone["shift_count"]) + 1
+        zone["worker_slots"] = int(zone["worker_slots"]) + int(row.get("worker_count") or 0)
+        if row.get("shift_status") == "pending_review":
+            zone["pending_review_count"] = int(zone["pending_review_count"]) + 1
+
+    for key, worksites_for_zone in worksites_by_zone.items():
+        zones[key]["worksite_count"] = len(worksites_for_zone)
+
+    return [zones[key] for key, _label, _area in ZONE_BUCKETS]
 
 
 def _build_area_and_report_summary(
@@ -281,7 +584,9 @@ def query_operations_projection(
         request_area_rows = (
             session.execute(
                 select(
+                    worksites.c.worksite_id,
                     worksites.c.locality,
+                    worksites.c.postal_code,
                     staffing_requests.c.request_status,
                 )
                 .join(
@@ -303,6 +608,7 @@ def query_operations_projection(
             session.execute(
                 select(
                     worksites.c.locality,
+                    worksites.c.postal_code,
                     shift_needs.c.shift_status,
                     shift_needs.c.worker_count,
                 )
@@ -328,6 +634,18 @@ def query_operations_projection(
             )
             .mappings()
             .all()
+        )
+        worker_zone_rows = (
+            session.execute(
+                select(
+                    worker_residences.c.locality,
+                    worker_residences.c.postal_code,
+                ).limit(500)
+            )
+            .mappings()
+            .all()
+            if "worker_residence:read" in principal.permissions
+            else []
         )
         shift_calendar_rows = (
             session.execute(
@@ -402,6 +720,11 @@ def query_operations_projection(
         request_area_rows=cast(Sequence[Mapping[str, Any]], request_area_rows),
         shift_area_rows=cast(Sequence[Mapping[str, Any]], shift_area_rows),
     )
+    zone_summary = _build_zone_summary(
+        request_area_rows=cast(Sequence[Mapping[str, Any]], request_area_rows),
+        shift_area_rows=cast(Sequence[Mapping[str, Any]], shift_area_rows),
+        worker_zone_rows=cast(Sequence[Mapping[str, Any]], worker_zone_rows),
+    )
     calendar_summary = _build_calendar_summary(
         cast(Sequence[Mapping[str, Any]], shift_calendar_rows)
     )
@@ -425,6 +748,7 @@ def query_operations_projection(
             for row in shift_rows
         ],
         "area_summary": area_summary,
+        "zone_summary": zone_summary,
         "report_summary": report_summary,
         "calendar_summary": calendar_summary,
         "queue_summary": queue_summary,

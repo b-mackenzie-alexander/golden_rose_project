@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import type { OperationsAreaSummaryItem } from '../api/operationsProjectionClient';
+import type { OperationsAreaSummaryItem, OperationsZoneSummaryItem } from '../api/operationsProjectionClient';
 import { buildPilotZones, type Language } from './NYCZoneMapData';
 
 type NYCZoneMapProps = {
@@ -8,6 +8,7 @@ type NYCZoneMapProps = {
   compact?: boolean;
   decorative?: boolean;
   language: Language;
+  zoneSummary?: OperationsZoneSummaryItem[];
 };
 
 const osmTiles = [
@@ -22,8 +23,18 @@ const osmTiles = [
   { gridColumn: 3, gridRow: 3, x: 302, y: 386 },
 ];
 
-export function NYCZoneMap({ areaSummary, compact = false, decorative = false, language }: NYCZoneMapProps) {
-  const zones = useMemo(() => buildPilotZones(areaSummary), [areaSummary]);
+function countLabel(value: number, singular: string, pluralText: string) {
+  return `${String(value)} ${value === 1 ? singular : pluralText}`;
+}
+
+function zoneDetail(summary: OperationsZoneSummaryItem, language: Language) {
+  return language === 'es'
+    ? `${countLabel(summary.requestCount, 'solicitud', 'solicitudes')} / ${countLabel(summary.workerSlots, 'cupo', 'cupos')}`
+    : `${countLabel(summary.requestCount, 'request', 'requests')} / ${countLabel(summary.workerSlots, 'slot', 'slots')}`;
+}
+
+export function NYCZoneMap({ areaSummary, compact = false, decorative = false, language, zoneSummary = [] }: NYCZoneMapProps) {
+  const zones = useMemo(() => buildPilotZones(areaSummary, zoneSummary), [areaSummary, zoneSummary]);
 
   return (
     <div className={compact ? 'nyc-zone-map nyc-zone-map--compact' : 'nyc-zone-map'}>
@@ -53,10 +64,10 @@ export function NYCZoneMap({ areaSummary, compact = false, decorative = false, l
           role={decorative ? undefined : 'list'}
         >
           {zones.map((zone) => {
-            const hasDemand = zone.aggregateAnchor && (zone.aggregate.requestCount > 0 || zone.aggregate.workerSlots > 0);
+            const hasDemand = zone.summary.requestCount > 0 || zone.summary.workerSlots > 0 || zone.summary.workerResidenceCount > 0 || zone.summary.worksiteCount > 0;
             const ariaLabel = language === 'es'
-              ? `${zone.label.es}. 0 residencias de trabajadores, 0 lugares de trabajo asignados. ${String(zone.aggregate.workerSlots)} cupos de trabajadores del agregado de ${zone.aggregate.areaLabel} esperan asignacion de zona.`
-              : `${zone.label.en}. 0 worker residences, 0 worksites assigned. ${String(zone.aggregate.workerSlots)} worker slots from the ${zone.aggregate.areaLabel} aggregate await zone assignment.`;
+              ? `${zone.label.es}. ${String(zone.summary.workerResidenceCount)} residencias de trabajadores, ${String(zone.summary.worksiteCount)} lugares de trabajo, ${String(zone.summary.requestCount)} solicitudes, ${String(zone.summary.workerSlots)} cupos.`
+              : `${zone.label.en}. ${String(zone.summary.workerResidenceCount)} worker residences, ${String(zone.summary.worksiteCount)} worksites, ${String(zone.summary.requestCount)} requests, ${String(zone.summary.workerSlots)} slots.`;
             return (
               <div
                 aria-label={decorative ? undefined : ariaLabel}
@@ -75,14 +86,12 @@ export function NYCZoneMap({ areaSummary, compact = false, decorative = false, l
               >
                 <span className="nyc-zone-map__zone-label">
                   <strong>{zone.label[language]}</strong>
-                  <span>{language === 'es' ? '0 trabajadores / 0 lugares' : '0 workers / 0 worksites'}</span>
-                  {zone.aggregateAnchor ? (
-                    <small>
-                      {language === 'es'
-                        ? `${String(zone.aggregate.workerSlots)} cupos por asignar`
-                        : `${String(zone.aggregate.workerSlots)} slots pending`}
-                    </small>
-                  ) : null}
+                  <span>
+                    {language === 'es'
+                      ? `${String(zone.summary.workerResidenceCount)} trabajadores / ${String(zone.summary.worksiteCount)} lugares`
+                      : `${String(zone.summary.workerResidenceCount)} workers / ${String(zone.summary.worksiteCount)} worksites`}
+                  </span>
+                  <small>{zoneDetail(zone.summary, language)}</small>
                 </span>
               </div>
             );

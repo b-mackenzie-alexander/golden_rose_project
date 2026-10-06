@@ -108,6 +108,7 @@ function StaffMapPreview() {
   const { language } = useLanguage();
   const { fallbackPolicy, projection, status } = useOperationsProjection();
   const areaSummary = areaSummaryFromProjection(projection, status, fallbackPolicy);
+  const zoneSummary = projection && status === 'ready' ? projection.zoneSummary ?? [] : [];
   const notice = projectionNotice(status, language, fallbackPolicy);
   const totalWorkerSlots = projection && status === 'ready'
     ? projection.reportSummary.workerSlots
@@ -133,15 +134,19 @@ function StaffMapPreview() {
       {notice ? <p className="projection-status-notice" role="status">{notice}</p> : null}
       <div className="module-preview-grid">
         <section className="module-preview-panel module-preview-map" aria-label={language === 'en' ? 'NYC activity by area' : 'Actividad por zona de NYC'}>
-          <NYCZoneMap areaSummary={areaSummary} language={language} />
+          <NYCZoneMap areaSummary={areaSummary} language={language} zoneSummary={zoneSummary} />
         </section>
         <section className="module-preview-panel" aria-labelledby="service-zone-heading">
           <h3 id="service-zone-heading">{language === 'en' ? 'Pilot zone snapshot' : 'Resumen de zonas piloto'}</h3>
           <p className="module-preview-total"><strong>{totalWorkerSlots}</strong> {totalLabel}</p>
           <p className="module-preview-helper">
-            {language === 'en'
-              ? 'Current demand is still stored by borough. Neighborhood/service-zone assignment is the next backend slice.'
-              : 'La demanda actual todavia esta guardada por condado. La asignacion por vecindario o zona de servicio es el siguiente corte del servidor.'}
+            {zoneSummary.length > 0
+              ? language === 'en'
+                ? 'Zone counts use coarse locality and postal-code assignment. Exact addresses stay hidden.'
+                : 'Los conteos por zona usan localidad y codigo postal de forma general. Las direcciones exactas permanecen ocultas.'
+              : language === 'en'
+                ? 'Current demand is still stored by borough while the zone projection loads.'
+                : 'La demanda actual todavia se muestra por condado mientras carga la proyeccion por zona.'}
           </p>
           <ol className="module-metric-list">
             {areaSummary.map((area) => (

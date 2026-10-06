@@ -238,7 +238,7 @@ describe('Dashboard', () => {
     expect(view.container.querySelector('.nyc-zone-map')).toBeInTheDocument();
     expect(view.container.querySelectorAll('.nyc-zone-map__zone')).toHaveLength(10);
     expect(view.container.querySelector('.nyc-zone-map')?.textContent).toContain('Central Brooklyn');
-    expect(view.container.querySelector('.nyc-zone-map')?.textContent).toContain('2 slots pending');
+    expect(view.container.querySelector('.nyc-zone-map')?.textContent).toContain('0 requests / 2 slots');
     expect(await runAxe(view.container)).toEqual([]);
   });
 
@@ -569,9 +569,9 @@ describe('Dashboard', () => {
     expect(screen.queryByRole('button', { name: 'Zone overlay' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Heat intensity' })).not.toBeInTheDocument();
     expect(await screen.findByText('projected slots awaiting zone assignment')).toBeInTheDocument();
-    expect(screen.getByText('1 request / 2 slots')).toBeInTheDocument();
+    expect(screen.getAllByText('1 request / 2 slots').length).toBeGreaterThan(0);
     expect(view.container.querySelector('.nyc-zone-map')?.textContent).toContain('Central Brooklyn');
-    expect(view.container.querySelector('.nyc-zone-map')?.textContent).toContain('2 slots pending');
+    expect(view.container.querySelector('.nyc-zone-map')?.textContent).toContain('1 request / 2 slots');
     expect(await runAxe(view.container)).toEqual([]);
 
     view.unmount();
@@ -607,7 +607,7 @@ describe('Dashboard', () => {
     const total = screen.getByText('projected slots awaiting zone assignment').closest('p');
     expect(total).toHaveTextContent('0 projected slots awaiting zone assignment');
     expect(view.container.querySelector('.nyc-zone-map')?.textContent).toContain('Central Brooklyn');
-    expect(view.container.querySelector('.nyc-zone-map')?.textContent).toContain('0 slots pending');
+    expect(view.container.querySelector('.nyc-zone-map')?.textContent).toContain('0 requests / 0 slots');
 
     view.unmount();
     render(

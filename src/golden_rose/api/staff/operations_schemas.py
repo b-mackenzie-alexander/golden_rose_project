@@ -50,6 +50,45 @@ class OperationsAreaSummaryItem(IntakeValue):
     pending_review_count: int = Field(ge=0, le=2147483647)
 
 
+OperationsZoneKey = Literal[
+    "south_bronx",
+    "upper_manhattan_harlem",
+    "midtown_lower_manhattan",
+    "northwest_queens",
+    "central_queens",
+    "northeast_queens",
+    "north_brooklyn",
+    "central_brooklyn",
+    "south_brooklyn",
+    "north_shore_staten_island",
+]
+
+OperationsZoneLabel = Literal[
+    "South Bronx",
+    "Upper Manhattan / Harlem",
+    "Midtown / Lower Manhattan",
+    "Northwest Queens",
+    "Central Queens",
+    "Northeast Queens",
+    "North Brooklyn",
+    "Central Brooklyn",
+    "South Brooklyn",
+    "North Shore Staten Island",
+]
+
+
+class OperationsZoneSummaryItem(IntakeValue):
+    zone_key: OperationsZoneKey
+    zone_label: OperationsZoneLabel
+    area_key: Literal["bronx", "brooklyn", "manhattan", "queens", "staten_island"]
+    worker_residence_count: int = Field(ge=0, le=2147483647)
+    worksite_count: int = Field(ge=0, le=2147483647)
+    request_count: int = Field(ge=0, le=2147483647)
+    shift_count: int = Field(ge=0, le=2147483647)
+    worker_slots: int = Field(ge=0, le=2147483647)
+    pending_review_count: int = Field(ge=0, le=2147483647)
+
+
 class OperationsReportSummary(IntakeValue):
     request_count: int = Field(ge=0, le=2147483647)
     shift_count: int = Field(ge=0, le=2147483647)
@@ -81,6 +120,7 @@ class OperationsProjectionResponse(IntakeValue):
     request_items: list[OperationsStaffingRequestItem]
     shift_items: list[OperationsShiftNeedItem]
     area_summary: list[OperationsAreaSummaryItem]
+    zone_summary: list[OperationsZoneSummaryItem]
     report_summary: OperationsReportSummary
     calendar_summary: OperationsCalendarSummary
     queue_summary: OperationsQueueSummary

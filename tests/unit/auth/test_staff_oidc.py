@@ -3,7 +3,7 @@ import json
 import time
 import urllib.error
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 import pytest
@@ -14,7 +14,9 @@ from golden_rose.auth.staff_oidc import (
     StaffAuthenticationFailedError,
     StaffIdentityProviderUnavailableError,
     StaffOidcJwksTokenVerifier,
+    _base64url_uint,
     _fetch_jwks,
+    _jwks_to_certs,
 )
 from golden_rose.config import Settings
 
@@ -92,6 +94,21 @@ class SigningKey:
         return signing_input.decode("ascii") + "." + _b64url(signature)
 
 
+class FakeJwksResponse:
+    def __init__(self, *, status: int, body: bytes = b'{"keys": []}') -> None:
+        self.status = status
+        self.body = body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback) -> Literal[False]:
+        return False
+
+    def read(self, _limit: int) -> bytes:
+        return self.body
+
+
 def test_jwks_verifier_returns_staff_identity_claims() -> None:
     key = SigningKey()
     verifier = StaffOidcJwksTokenVerifier(fetch_jwks=lambda _url: {"keys": [key.jwk()]})
@@ -101,6 +118,27 @@ def test_jwks_verifier_returns_staff_identity_claims() -> None:
     assert claims.provider_subject == "oidc:staff:123"
     assert claims.mfa_verified is True
     assert claims.session_id == "session-123"
+
+
+def test_jwks_verifier_rejects_malformed_token_header() -> None:
+    verifier = StaffOidcJwksTokenVerifier(fetch_jwks=lambda _url: {"keys": []})
+
+    with pytest.raises(StaffAuthenticationFailedError, match="token is invalid"):
+        verifier.verify(token="not-a-jwt", settings=_settings())
+
+
+def test_jwks_verifier_rejects_non_rs256_token_header() -> None:
+    token = ".".join(
+        (
+            _b64url(json.dumps({"alg": "HS256", "typ": "JWT"}).encode("utf-8")),
+            _b64url(json.dumps({"sub": "oidc:staff:123"}).encode("utf-8")),
+            _b64url(b"signature"),
+        )
+    )
+    verifier = StaffOidcJwksTokenVerifier(fetch_jwks=lambda _url: {"keys": []})
+
+    with pytest.raises(StaffAuthenticationFailedError, match="algorithm is unsupported"):
+        verifier.verify(token=token, settings=_settings())
 
 
 @pytest.mark.parametrize("token_issuer", ["accounts.google.com", "https://accounts.google.com"])
@@ -214,6 +252,17 @@ def test_jwks_verifier_fails_closed_when_provider_fetch_fails() -> None:
         verifier.verify(token=key.token(), settings=_settings())
 
 
+@pytest.mark.parametrize("missing_field", ["staff_oidc_issuer", "staff_oidc_jwks_url"])
+def test_jwks_verifier_requires_complete_provider_settings(missing_field: str) -> None:
+    key = SigningKey()
+    settings = _settings()
+    object.__setattr__(settings, missing_field, None)
+    verifier = StaffOidcJwksTokenVerifier(fetch_jwks=lambda _url: {"keys": [key.jwk()]})
+
+    with pytest.raises(StaffIdentityProviderUnavailableError):
+        verifier.verify(token=key.token(), settings=settings)
+
+
 def test_jwks_verifier_maps_network_fetch_failure_to_provider_unavailable() -> None:
     key = SigningKey()
 
@@ -246,6 +295,47 @@ def test_jwks_fetch_rejects_unsafe_url_before_network(
 
     with pytest.raises(StaffIdentityProviderUnavailableError, match="jwks url is invalid"):
         _fetch_jwks(url)
+
+
+def test_jwks_fetch_rejects_unsuccessful_provider_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "golden_rose.auth.staff_oidc.urllib.request.urlopen",
+        lambda *_args, **_kwargs: FakeJwksResponse(status=503),
+    )
+
+    with pytest.raises(StaffIdentityProviderUnavailableError, match="jwks unavailable"):
+        _fetch_jwks("https://accounts.example.test/.well-known/jwks.json")
+
+
+def test_jwks_fetch_rejects_non_object_provider_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "golden_rose.auth.staff_oidc.urllib.request.urlopen",
+        lambda *_args, **_kwargs: FakeJwksResponse(status=200, body=b"[]"),
+    )
+
+    with pytest.raises(StaffAuthenticationFailedError, match="jwks is invalid"):
+        _fetch_jwks("https://accounts.example.test/.well-known/jwks.json")
+
+
+def test_jwks_conversion_ignores_non_object_keys_and_rejects_missing_key_material() -> None:
+    with pytest.raises(StaffAuthenticationFailedError, match="no usable keys"):
+        _jwks_to_certs(
+            {
+                "keys": [
+                    "not-a-key",
+                    {"kty": "RSA", "kid": "staff-key-1", "alg": "RS256", "e": "AQAB"},
+                ]
+            }
+        )
+
+
+def test_base64url_uint_rejects_empty_value() -> None:
+    with pytest.raises(StaffAuthenticationFailedError, match="jwks is invalid"):
+        _base64url_uint("")
 
 
 def test_jwks_verifier_requires_staff_oidc_mode() -> None:

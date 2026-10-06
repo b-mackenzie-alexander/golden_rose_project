@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from typing import Any
+from unittest.mock import Mock
 from uuid import UUID
 
 import pytest
@@ -9,6 +10,8 @@ import golden_rose.application.staff_account_lifecycle as lifecycle_module
 from golden_rose.application.errors import SafePersistenceError
 from golden_rose.application.staff_account_lifecycle import (
     StaffAccountLifecycleError,
+    StaffAccountNotFoundError,
+    StaffAccountVersionConflictError,
     activate_staff_account,
     correct_staff_account_onboarding,
     create_staff_account,
@@ -232,6 +235,84 @@ def test_correct_staff_account_onboarding_rejects_active_accounts(
         )
 
     assert session.rollbacks == 1
+
+
+@pytest.mark.parametrize(
+    ("reader", "expected_error"),
+    [
+        (
+            lambda **_: _record(status="suspended", version=2),
+            StaffAccountVersionConflictError,
+        ),
+        (
+            lambda **_: (_ for _ in ()).throw(NoResultFound()),
+            StaffAccountNotFoundError,
+        ),
+    ],
+)
+def test_correct_staff_account_onboarding_rolls_back_recoverable_read_errors(
+    monkeypatch: pytest.MonkeyPatch,
+    reader,
+    expected_error: type[Exception],
+) -> None:
+    session = FakeSession()
+    monkeypatch.setattr(lifecycle_module, "get_staff_account_by_id_for_update", reader)
+
+    with pytest.raises(expected_error):
+        correct_staff_account_onboarding(
+            session=session,  # type: ignore[arg-type]
+            principal=_principal("staff_account:create"),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            expected_version=1,
+            provider_subject="oidc:staff:123",
+            display_name="Mariela Torres",
+            role_name="operations_staff",
+            permission_names=frozenset({"staff_account:read"}),
+            mfa_enrolled=True,
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="Recoverable correction failure",
+        )
+
+    assert session.rollbacks == 1
+    assert session.commits == 0
+
+
+def test_correct_staff_account_onboarding_wraps_persistence_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_id_for_update",
+        lambda **_: _record(status="suspended", version=1),
+    )
+    monkeypatch.setattr(
+        lifecycle_module,
+        "update_staff_account_onboarding",
+        Mock(side_effect=SQLAlchemyError("database details")),
+    )
+
+    with pytest.raises(SafePersistenceError, match="persistence operation failed"):
+        correct_staff_account_onboarding(
+            session=session,  # type: ignore[arg-type]
+            principal=_principal("staff_account:create"),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            expected_version=1,
+            provider_subject="oidc:staff:123",
+            display_name="Mariela Torres",
+            role_name="operations_staff",
+            permission_names=frozenset({"staff_account:read"}),
+            mfa_enrolled=True,
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="Persistence correction failure",
+        )
+
+    assert session.rollbacks == 1
+    assert session.commits == 0
 
 
 def test_create_staff_account_denies_platform_admin_operational_data() -> None:

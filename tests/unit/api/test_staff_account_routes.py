@@ -492,6 +492,34 @@ def test_staff_account_correction_route_preserves_forbidden_boundary(
     assert "private" not in response.text
 
 
+def test_staff_account_correction_route_returns_recoverable_lifecycle_error(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = http
+    correct = Mock(side_effect=StaffAccountVersionConflictError("stale correction"))
+    monkeypatch.setattr(staff_accounts, "correct_staff_account_onboarding", correct)
+
+    response = client.post(
+        f"/api/staff/v1/staff-accounts/{STAFF_ID}/correct-onboarding",
+        headers=command_headers(),
+        json={
+            "expected_version": 1,
+            "provider_subject": "oidc:staff:corrected",
+            "display_name": "Mariela Rivera",
+            "role_name": "operations_staff",
+            "permission_names": ["staff_account:read"],
+            "mfa_enrolled": True,
+            "reason_text": "Correct onboarding record",
+        },
+    )
+
+    assert response.status_code == 412
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["detail"] == "staff account version conflict"
+    assert "stale" not in response.text
+
+
 def test_activate_staff_account_routes_mfa_confirmation(
     http: tuple[TestClient, FixedIdentifiers],
     monkeypatch: pytest.MonkeyPatch,

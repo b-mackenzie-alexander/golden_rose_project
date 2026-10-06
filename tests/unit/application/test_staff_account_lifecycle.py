@@ -729,8 +729,44 @@ def test_transition_staff_account_unexpected_failure_rolls_back(
     assert session.commits == 0
 
 
-def test_resolve_staff_principal_from_claims_requires_mfa() -> None:
-    with pytest.raises(PermissionError, match="mfa"):
+def test_resolve_staff_principal_from_claims_accepts_missing_token_mfa_when_account_enrolled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_provider_subject",
+        lambda **_kwargs: _record(status="active", version=2, mfa_enrolled=True),
+    )
+    monkeypatch.setattr(
+        lifecycle_module,
+        "list_active_staff_permissions",
+        lambda **_kwargs: frozenset({"intake:read"}),
+    )
+
+    principal = resolve_staff_principal_from_claims(
+        session=FakeSession(),  # type: ignore[arg-type]
+        claims=StaffIdentityClaims(provider_subject="oidc:staff:123", mfa_verified=False),
+    )
+
+    assert principal.actor_id == STAFF_ID
+    assert principal.permissions == frozenset({"intake:read"})
+
+
+def test_resolve_staff_principal_from_claims_requires_account_mfa_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_provider_subject",
+        lambda **_kwargs: _record(status="active", version=2, mfa_enrolled=False),
+    )
+    monkeypatch.setattr(
+        lifecycle_module,
+        "list_active_staff_permissions",
+        lambda **_kwargs: frozenset({"intake:read"}),
+    )
+
+    with pytest.raises(ValueError, match="eligible"):
         resolve_staff_principal_from_claims(
             session=FakeSession(),  # type: ignore[arg-type]
             claims=StaffIdentityClaims(provider_subject="oidc:staff:123", mfa_verified=False),

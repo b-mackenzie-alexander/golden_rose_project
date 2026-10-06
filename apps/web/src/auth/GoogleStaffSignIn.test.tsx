@@ -59,6 +59,7 @@ describe('GoogleStaffSignIn', () => {
     expect(googleId.initialize).toHaveBeenCalledWith(expect.objectContaining({
       client_id: 'google-client-id.apps.googleusercontent.com',
       auto_select: false,
+      essential_claims: 'auth_time, amr',
     }));
 
     await waitFor(() => {

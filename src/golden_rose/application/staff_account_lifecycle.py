@@ -288,8 +288,6 @@ def resolve_staff_principal_from_claims(
     session: Session,
     claims: StaffIdentityClaims,
 ) -> StaffPrincipal:
-    if not claims.mfa_verified:
-        raise PermissionError("staff session requires mfa")
     try:
         account = get_staff_account_by_provider_subject(
             session=session,

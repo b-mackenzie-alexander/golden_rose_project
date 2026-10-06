@@ -350,7 +350,7 @@ describe('App', () => {
     );
 
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('heading', { name: 'Good morning, Mariela' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Good (morning|afternoon|evening)/ })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: "Today's priorities" })).toBeInTheDocument();
     rootRoute.unmount();
 
@@ -366,6 +366,19 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Find an employer' })).toBeInTheDocument();
     expect(screen.getByRole('form', { name: 'Employer search' })).toBeInTheDocument();
     employersRoute.unmount();
+
+    const mapRoute = render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/staff/map']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    expect(screen.getByRole('link', { name: 'Map' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('heading', { name: 'Activity map' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to dashboard' })).toHaveAttribute('href', '/');
+    mapRoute.unmount();
 
     render(
       <LanguageProvider>

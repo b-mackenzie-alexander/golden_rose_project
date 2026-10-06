@@ -24,7 +24,7 @@ def _valid_manual_review_evidence() -> dict[str, Any]:
         },
         "source": {
             "source_commit": "e" * 40,
-            "migration_revision": "0014_request_shift_review",
+            "migration_revision": "0015_staff_account_corrections",
         },
         "manual_review": {
             "keyboard_navigation_status": "ready",

@@ -26,6 +26,10 @@ describe('AppShell', () => {
     expect(screen.getByRole('heading', { name: 'Nuestro Corazón Dorado' })).toHaveClass('app-brand');
     expect(screen.getByRole('navigation', { name: 'Primary' })).toHaveClass('primary-navigation');
     expect(screen.getByRole('link', { name: 'Employers' })).toHaveClass('nav-link');
+    const accountGroup = document.querySelector('.nav-account-group');
+    expect(accountGroup).toContainElement(screen.getByRole('link', { name: 'My account' }));
+    expect(accountGroup).toContainElement(screen.getByRole('link', { name: 'Staff accounts' }));
+    expect(accountGroup).not.toContainElement(screen.getByRole('link', { name: 'Map' }));
     expect(screen.getByRole('main')).toHaveClass('app-main');
   });
 

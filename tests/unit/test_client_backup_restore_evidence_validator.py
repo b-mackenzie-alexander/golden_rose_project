@@ -23,7 +23,7 @@ def _valid_backup_restore_evidence() -> dict[str, Any]:
         },
         "source": {
             "source_commit": "a" * 40,
-            "migration_revision": "0014_request_shift_review",
+            "migration_revision": "0015_staff_account_corrections",
         },
         "rehearsal": {
             "backup_rehearsal_status": "passed",

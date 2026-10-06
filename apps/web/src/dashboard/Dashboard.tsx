@@ -7,7 +7,9 @@ import { queryIntakes } from '../api/intakeClient';
 import type { IntakeKind, IntakeSummary } from '../api/intakeContracts';
 import { getOperationsProjection, type OperationsProjection, type OperationsProjectionFailureKind, type OperationsRequestItem, type OperationsShiftItem } from '../api/operationsProjectionClient';
 import { getStaticOperationalFallbackPolicy, staticOperationalFallbackNotice, staticOperationalFallbacksAllowed, type StaticOperationalFallbackPolicy } from '../api/runtimeEnvironmentClient';
+import { getStaffSession } from '../api/staffAccountClient';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { dashboardGreeting } from './dashboardGreeting';
 
 type DashboardStatus = 'complete' | 'draft' | 'in_review' | 'incomplete' | 'pending';
 type ProjectionStatus = 'loading' | 'ready' | OperationsProjectionFailureKind;
@@ -27,7 +29,6 @@ type DashboardCopy = {
   emptyActivity: string;
   emptyQueue: string;
   emptySchedule: string;
-  greeting: string;
   kpis: Array<{ accent: 'danger' | 'info' | 'success' | 'warning'; href: string; icon: IconName; label: string; meta: string; value: string }>;
   primaryQueueHeading: string;
   primaryQueueLink: string;
@@ -59,7 +60,6 @@ const englishDashboard: DashboardCopy = {
   emptyActivity: 'No recent activity read is available.',
   emptyQueue: 'No request, shift, or intake work is waiting in the projection.',
   emptySchedule: 'No projected shifts are scheduled for this view.',
-  greeting: 'Good morning, Mariela',
   kpis: [
     { accent: 'danger', href: '/staff/intakes/workers?queue=review', icon: 'document', label: 'Worker intakes', meta: 'need review', value: '12' },
     { accent: 'success', href: '/employers', icon: 'workers', label: 'Employer follow-ups', meta: 'scheduled today', value: '8' },
@@ -124,7 +124,6 @@ const spanishDashboard: DashboardCopy = {
   emptyActivity: 'No hay lectura de actividad reciente disponible.',
   emptyQueue: 'No hay solicitudes, turnos ni registros pendientes en la proyeccion.',
   emptySchedule: 'No hay turnos proyectados para esta vista.',
-  greeting: 'Buenos días, Mariela',
   kpis: [
     { accent: 'danger', href: '/staff/intakes/workers?queue=review', icon: 'document', label: 'Registros pendientes', meta: 'requieren revision', value: '12' },
     { accent: 'success', href: '/employers', icon: 'workers', label: 'Seguimientos hoy', meta: 'contactos programados', value: '8' },
@@ -517,6 +516,7 @@ function IconMark({ name }: { name: IconName }) {
 export function Dashboard() {
   const { language } = useLanguage();
   const copy = language === 'es' ? spanishDashboard : englishDashboard;
+  const [staffDisplayName, setStaffDisplayName] = useState<string | null>(null);
   const [intakes, setIntakes] = useState<DashboardIntakes>({
     employers: [],
     loaded: false,
@@ -553,6 +553,21 @@ export function Dashboard() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    void getStaffSession()
+      .then((result) => {
+        if (cancelled) return;
+        setStaffDisplayName(result.ok ? result.value.account?.displayName ?? null : null);
+      })
+      .catch(() => {
+        if (!cancelled) setStaffDisplayName(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const kpis = useMemo(() => dynamicKpis(copy, intakes, language), [copy, intakes, language]);
   const queueRows = useMemo(() => dynamicQueueRows(copy, intakes, language), [copy, intakes, language]);
   const scheduleRows = useMemo(() => dynamicScheduleRows(copy, intakes, language), [copy, intakes, language]);
@@ -579,12 +594,13 @@ export function Dashboard() {
     [allowStaticFallbacks, intakes.employers, language],
   );
   const activityRows = allowStaticFallbacks ? copy.activityRows : [];
+  const greeting = dashboardGreeting(staffDisplayName, language);
 
   return (
     <section aria-labelledby="dashboard-heading" className="dashboard-page">
       <div className="dashboard-hero">
         <div className="dashboard-hero__copy">
-          <h2 id="dashboard-heading">{copy.greeting}<span aria-hidden="true" className="dashboard-hero__wave">👋</span></h2>
+          <h2 id="dashboard-heading">{greeting}<span aria-hidden="true" className="dashboard-hero__wave">👋</span></h2>
           <p>{copy.subtitle}</p>
         </div>
         <div className="dashboard-skyline">

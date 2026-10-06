@@ -32,7 +32,7 @@ def _valid_activation_approval() -> dict[str, Any]:
         },
         "source": {
             "source_commit": "e" * 40,
-            "migration_revision": "0014_request_shift_review",
+            "migration_revision": "0015_staff_account_corrections",
         },
         "prerequisites": {
             "staff_feedback_readiness_status": "ready",

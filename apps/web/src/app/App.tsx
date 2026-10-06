@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { createBrowserRouter, RouterProvider, Route, Routes } from 'react-router';
+import { createBrowserRouter, Link, RouterProvider, Route, Routes } from 'react-router';
 import { NavigationGuard } from './NavigationGuard';
 import { routerWindow } from '../browser/routerWindow';
 
@@ -146,6 +146,11 @@ function StaffMapPreview() {
             ? 'Broad-area activity for staff planning. Exact household and worksite locations remain restricted.'
             : 'Actividad por zona amplia para planificacion del personal. Las direcciones exactas siguen restringidas.'}
         </p>
+        <div className="module-preview-actions">
+          <Link className="staff-secondary-button focus-ring" to="/">
+            {language === 'en' ? 'Back to dashboard' : 'Volver al panel'}
+          </Link>
+        </div>
       </div>
       {notice ? <p className="projection-status-notice" role="status">{notice}</p> : null}
       <div className="module-preview-grid">

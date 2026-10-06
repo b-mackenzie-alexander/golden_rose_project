@@ -10,6 +10,7 @@ from golden_rose.application.errors import SafePersistenceError
 from golden_rose.application.staff_account_lifecycle import (
     StaffAccountLifecycleError,
     activate_staff_account,
+    correct_staff_account_onboarding,
     create_staff_account,
     deprovision_staff_account,
     record_staff_account_recovery_evidence,
@@ -126,6 +127,111 @@ def test_create_staff_account_records_grants_and_lifecycle_event(monkeypatch: py
     assert observed["event"]["reason_text"] == "Initial staff onboarding"
     assert session.commits == 1
     assert session.rollbacks == 0
+
+
+def test_correct_staff_account_onboarding_replaces_details_grants_and_records_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+    observed: dict[str, Any] = {}
+
+    class CorrectionIdentifiers:
+        def __init__(self) -> None:
+            self.values = [
+                UUID("66666666-6666-4666-8666-666666666666"),
+                UUID("77777777-7777-4777-8777-777777777777"),
+                EVENT_ID,
+            ]
+
+        def new_uuid4(self) -> UUID:
+            return self.values.pop(0)
+
+    def get_existing(**kwargs):
+        observed["get"] = kwargs
+        return _record()
+
+    def update_account(**kwargs):
+        observed["account"] = kwargs
+        return _record(version=2, mfa_enrolled=True)
+
+    def revoke_grants(**kwargs) -> None:
+        observed["revoked_grants"] = kwargs
+
+    def insert_grants(**kwargs) -> None:
+        observed["grants"] = kwargs
+
+    def insert_event(**kwargs) -> None:
+        observed["event"] = kwargs
+
+    monkeypatch.setattr(lifecycle_module, "get_staff_account_by_id_for_update", get_existing)
+    monkeypatch.setattr(lifecycle_module, "update_staff_account_onboarding", update_account)
+    monkeypatch.setattr(lifecycle_module, "revoke_active_staff_permission_grants", revoke_grants)
+    monkeypatch.setattr(lifecycle_module, "insert_staff_permission_grants", insert_grants)
+    monkeypatch.setattr(lifecycle_module, "insert_lifecycle_event", insert_event)
+
+    result = correct_staff_account_onboarding(
+        session=session,  # type: ignore[arg-type]
+        principal=_principal("staff_account:create", "intake:read"),
+        command_id=COMMAND_ID,
+        staff_id=STAFF_ID,
+        expected_version=1,
+        provider_subject=" oidc:staff:corrected ",
+        display_name=" Mariela   Rivera ",
+        role_name="operations_staff",
+        permission_names=frozenset({"intake:read", "staff_account:read"}),
+        mfa_enrolled=True,
+        clock=FixedClock(),
+        identifiers=CorrectionIdentifiers(),
+        reason_text=" Corrected onboarding record ",
+    )
+
+    assert result.event_type == "staff_account.corrected"
+    assert observed["get"]["staff_id"] == STAFF_ID
+    assert observed["account"]["provider_subject"] == "oidc:staff:corrected"
+    assert observed["account"]["display_name"] == "Mariela Rivera"
+    assert observed["account"]["expected_version"] == 1
+    assert observed["revoked_grants"]["reason_text"] == "Corrected onboarding record"
+    assert observed["grants"]["grants"] == (
+        (UUID("66666666-6666-4666-8666-666666666666"), "intake:read"),
+        (UUID("77777777-7777-4777-8777-777777777777"), "staff_account:read"),
+    )
+    assert observed["event"]["event_type"] == "staff_account.corrected"
+    assert observed["event"]["previous_status"] == "suspended"
+    assert observed["event"]["new_status"] == "suspended"
+    assert observed["event"]["previous_version"] == 1
+    assert observed["event"]["new_version"] == 2
+    assert session.commits == 1
+    assert session.rollbacks == 0
+
+
+def test_correct_staff_account_onboarding_rejects_active_accounts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_id_for_update",
+        lambda **_: _record(status="active", version=3, mfa_enrolled=True),
+    )
+
+    with pytest.raises(StaffAccountLifecycleError, match="only suspended"):
+        correct_staff_account_onboarding(
+            session=session,  # type: ignore[arg-type]
+            principal=_principal("staff_account:create"),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            expected_version=3,
+            provider_subject="oidc:staff:123",
+            display_name="Mariela Torres",
+            role_name="operations_staff",
+            permission_names=frozenset({"staff_account:read"}),
+            mfa_enrolled=True,
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="No active correction",
+        )
+
+    assert session.rollbacks == 1
 
 
 def test_create_staff_account_denies_platform_admin_operational_data() -> None:

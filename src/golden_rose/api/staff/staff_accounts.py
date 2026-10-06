@@ -15,6 +15,7 @@ from golden_rose.api.dependencies import (
 from golden_rose.api.errors import no_store_problem_response
 from golden_rose.api.staff.schemas import (
     ActivateStaffAccountRequest,
+    CorrectStaffAccountRequest,
     CreateStaffAccountRequest,
     StaffAccountLifecycleEventListResponse,
     StaffAccountLifecycleEventResponse,
@@ -44,6 +45,7 @@ from golden_rose.application.staff_account_lifecycle import (
     StaffAccountNotFoundError,
     StaffAccountVersionConflictError,
     activate_staff_account,
+    correct_staff_account_onboarding,
     create_staff_account,
     deprovision_staff_account,
     record_staff_account_recovery_evidence,
@@ -401,6 +403,62 @@ def post_staff_account_activation(
             clock=clock,
             identifiers=identifiers,
             reason_text=request.reason_text,
+        )
+    except PermissionError:
+        return no_store_problem_response(
+            status_code=403,
+            title="Forbidden",
+            detail="forbidden",
+            type_="https://golden-rose.local/problems/forbidden",
+        )
+    except (
+        StaffAccountLifecycleError,
+        StaffAccountNotFoundError,
+        StaffAccountVersionConflictError,
+        SafePersistenceError,
+    ) as exc:
+        return _problem_for_lifecycle_error(exc)
+    _lifecycle_response(result, response)
+    return _lifecycle_body(result)
+
+
+@router.post(
+    "/{staff_id}/correct-onboarding",
+    response_model=StaffAccountLifecycleResponse,
+    status_code=status.HTTP_200_OK,
+)
+def post_staff_account_onboarding_correction(
+    staff_id: UUID,
+    request: CorrectStaffAccountRequest,
+    response: Response,
+    idempotency_key: Annotated[UUID, Depends(get_idempotency_key)],
+    session: Annotated[Session, Depends(get_db_session)],
+    principal: Annotated[StaffPrincipal, Depends(get_staff_principal)],
+    clock: Annotated[Clock, Depends(get_clock)],
+    identifiers: Annotated[IdentifierFactory, Depends(get_identifier_factory)],
+) -> StaffAccountLifecycleResponse | Response:
+    try:
+        result = correct_staff_account_onboarding(
+            session=session,
+            principal=principal,
+            command_id=idempotency_key,
+            staff_id=staff_id,
+            expected_version=request.expected_version,
+            provider_subject=request.provider_subject,
+            display_name=request.display_name,
+            role_name=request.role_name,
+            permission_names=frozenset(request.permission_names),
+            mfa_enrolled=request.mfa_enrolled,
+            clock=clock,
+            identifiers=identifiers,
+            reason_text=request.reason_text,
+        )
+    except PermissionError:
+        return no_store_problem_response(
+            status_code=403,
+            title="Forbidden",
+            detail="forbidden",
+            type_="https://golden-rose.local/problems/forbidden",
         )
     except (
         StaffAccountLifecycleError,

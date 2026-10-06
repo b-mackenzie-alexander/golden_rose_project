@@ -1,10 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import {
   activateStaffAccount,
+  correctStaffAccount,
   createStaffAccount,
   grantStaffDelegation,
   listStaffAccounts,
@@ -27,6 +28,7 @@ vi.mock('../api/intakeClient', () => ({
 
 vi.mock('../api/staffAccountClient', () => ({
   activateStaffAccount: vi.fn(),
+  correctStaffAccount: vi.fn(),
   createStaffAccount: vi.fn(),
   deprovisionStaffAccount: vi.fn(),
   grantStaffDelegation: vi.fn(),
@@ -99,6 +101,7 @@ const lifecycleEvent: StaffAccountLifecycleEvent = {
 beforeEach(() => {
   vi.mocked(listStaffAccounts).mockResolvedValue({ ok: true, value: [suspended] });
   vi.mocked(createStaffAccount).mockReset();
+  vi.mocked(correctStaffAccount).mockReset();
   vi.mocked(activateStaffAccount).mockReset();
   vi.mocked(recordRecoveryEvidence).mockReset();
   vi.mocked(recordSessionRevocationEvidence).mockReset();
@@ -129,6 +132,8 @@ it('creates a suspended onboarding account and shows field-local validation', as
 
   render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
   await screen.findByText('Mariela Torres');
+  expect(screen.getByText('Identity provider subject recorded')).toBeInTheDocument();
+  expect(screen.queryByText('oidc:staff:123')).not.toBeInTheDocument();
 
   await user.click(screen.getByRole('button', { name: 'Create staff account' }));
   expect(screen.getByText('Display name is required.')).toBeInTheDocument();
@@ -167,6 +172,53 @@ it('requires staff sign-in before showing account administration controls', asyn
   expect(await screen.findByText('Mariela Torres')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Create staff account' })).toBeInTheDocument();
   expect(screen.getByRole('table', { name: 'Staff account lifecycle table' })).toBeInTheDocument();
+});
+
+it('corrects suspended onboarding details without deleting the account', async () => {
+  const user = userEvent.setup();
+  const corrected = {
+    ...suspended,
+    displayName: 'Mariela Rivera',
+    providerSubject: 'oidc:staff:corrected',
+    mfaEnrolled: true,
+    version: 2,
+  };
+  vi.mocked(correctStaffAccount).mockResolvedValue({
+    ok: true,
+    value: { account: corrected, eventType: 'staff_account.corrected', resultVersion: 2 },
+  });
+
+  render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
+  await screen.findByText('Mariela Torres');
+
+  await user.click(screen.getByRole('button', { name: 'Correct' }));
+  const correctionPanel = screen.getByRole('heading', { name: 'Correct onboarding: Mariela Torres' }).closest('section');
+  expect(correctionPanel).not.toBeNull();
+  const correction = within(correctionPanel as HTMLElement);
+  expect(correction.getByText(/Named permissions selected here replace/)).toBeInTheDocument();
+  await user.clear(correction.getByRole('textbox', { name: /Display name/ }));
+  await user.type(correction.getByRole('textbox', { name: /Display name/ }), 'Mariela Rivera');
+  await user.clear(correction.getByRole('textbox', { name: /Provider subject/ }));
+  await user.type(correction.getByRole('textbox', { name: /Provider subject/ }), 'oidc:staff:corrected');
+  await user.click(correction.getByLabelText('MFA already enrolled'));
+  await user.click(correction.getByLabelText('intake:read'));
+  await user.type(correction.getByLabelText('Reason'), 'Corrected provider subject before activation');
+  await user.click(correction.getByRole('button', { name: 'Save correction' }));
+
+  expect(correctStaffAccount).toHaveBeenCalledTimes(1);
+  const correctionInput = vi.mocked(correctStaffAccount).mock.calls[0]?.[0];
+  expect(correctionInput).toMatchObject({
+    staffId: suspended.staffId,
+    expectedVersion: 1,
+    displayName: 'Mariela Rivera',
+    providerSubject: 'oidc:staff:corrected',
+    mfaEnrolled: true,
+    reasonText: 'Corrected provider subject before activation',
+  });
+  expect(correctionInput?.permissionNames).toEqual(expect.arrayContaining(['staff_account:read', 'intake:read']));
+  expect(await screen.findByText('Staff account onboarding details corrected.')).toBeInTheDocument();
+  expect(screen.getByText('Mariela Rivera')).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: /Correct onboarding/ })).not.toBeInTheDocument();
 });
 
 it('filters staff accounts by lifecycle, MFA readiness, and search text', async () => {

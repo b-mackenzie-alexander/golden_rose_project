@@ -376,7 +376,7 @@ describe('App', () => {
     );
 
     expect(screen.getByRole('link', { name: 'Map' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('heading', { name: 'Activity map' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'NYC zone map' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to dashboard' })).toHaveAttribute('href', '/');
     mapRoute.unmount();
 

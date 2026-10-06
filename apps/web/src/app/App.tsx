@@ -17,28 +17,21 @@ import { StaffAccountAdmin } from '../staffAccounts/StaffAccountAdmin';
 import { StaffAccountProfile } from '../staffAccounts/StaffAccountProfile';
 import { LanguageProvider } from '../i18n/LanguageProvider';
 import { useLanguage } from '../i18n/LanguageProvider';
-import { IconSymbol, ZoneMapArtwork } from '../dashboard/artwork';
-import { getOperationsProjection, type OperationsProjection, type OperationsProjectionFailureKind } from '../api/operationsProjectionClient';
+import { IconSymbol } from '../dashboard/artwork';
+import { getOperationsProjection, type OperationsAreaSummaryItem, type OperationsProjection, type OperationsProjectionFailureKind } from '../api/operationsProjectionClient';
 import { getStaticOperationalFallbackPolicy, staticOperationalFallbackNotice, staticOperationalFallbacksAllowed, type StaticOperationalFallbackPolicy } from '../api/runtimeEnvironmentClient';
+import { NYCZoneMap } from '../map/NYCZoneMap';
+import { aggregateAreaSummary, aggregateSummaryText, emptyOperationsAreaSummary } from '../map/NYCZoneMapData';
 
 type ProjectionStatus = 'loading' | 'ready' | OperationsProjectionFailureKind;
 
-type ZoneArea = {
-  count: number;
-  intensity: 'high' | 'low' | 'medium' | 'mediumHigh';
-  label: string;
-  name: 'Bronx' | 'Brooklyn' | 'Manhattan' | 'Queens' | 'Staten Island';
-};
-
-const fallbackAreas: ZoneArea[] = [
-  { count: 18, intensity: 'high', label: 'Manhattan', name: 'Manhattan' },
-  { count: 14, intensity: 'mediumHigh', label: 'Brooklyn', name: 'Brooklyn' },
-  { count: 12, intensity: 'medium', label: 'Bronx', name: 'Bronx' },
-  { count: 9, intensity: 'medium', label: 'Queens', name: 'Queens' },
-  { count: 3, intensity: 'low', label: 'Staten Island', name: 'Staten Island' },
+const fallbackAreaSummary: OperationsAreaSummaryItem[] = [
+  { areaKey: 'bronx', areaLabel: 'Bronx', pendingReviewCount: 5, requestCount: 6, shiftCount: 6, workerSlots: 12 },
+  { areaKey: 'brooklyn', areaLabel: 'Brooklyn', pendingReviewCount: 6, requestCount: 7, shiftCount: 7, workerSlots: 14 },
+  { areaKey: 'manhattan', areaLabel: 'Manhattan', pendingReviewCount: 8, requestCount: 8, shiftCount: 8, workerSlots: 18 },
+  { areaKey: 'queens', areaLabel: 'Queens', pendingReviewCount: 4, requestCount: 5, shiftCount: 5, workerSlots: 9 },
+  { areaKey: 'staten_island', areaLabel: 'Staten Island', pendingReviewCount: 1, requestCount: 2, shiftCount: 2, workerSlots: 3 },
 ];
-
-const emptyAreas: ZoneArea[] = fallbackAreas.map((area) => ({ ...area, count: 0, intensity: 'low' as const }));
 
 function isProjectionFailure(status: ProjectionStatus) {
   return status !== 'loading' && status !== 'ready';
@@ -75,26 +68,11 @@ function projectionNotice(status: ProjectionStatus, language: 'en' | 'es', fallb
     : `Operational aggregates could not be read because ${reason}. ${suffix}`;
 }
 
-function intensityFor(value: number, maximum: number): ZoneArea['intensity'] {
-  if (maximum <= 0 || value <= 0) return 'low';
-  const ratio = value / maximum;
-  if (ratio >= 0.8) return 'high';
-  if (ratio >= 0.55) return 'mediumHigh';
-  if (ratio >= 0.25) return 'medium';
-  return 'low';
-}
-
-function areasFromProjection(projection: OperationsProjection | null, status: ProjectionStatus, fallbackPolicy: StaticOperationalFallbackPolicy): ZoneArea[] {
+function areaSummaryFromProjection(projection: OperationsProjection | null, status: ProjectionStatus, fallbackPolicy: StaticOperationalFallbackPolicy): OperationsAreaSummaryItem[] {
   if (projection === null || isProjectionFailure(status) || status === 'loading') {
-    return staticOperationalFallbacksAllowed(fallbackPolicy) ? fallbackAreas : emptyAreas;
+    return staticOperationalFallbacksAllowed(fallbackPolicy) ? fallbackAreaSummary : emptyOperationsAreaSummary;
   }
-  const maximum = Math.max(...projection.areaSummary.map((area) => area.workerSlots), 0);
-  return projection.areaSummary.map((area) => ({
-    count: area.workerSlots,
-    intensity: intensityFor(area.workerSlots, maximum),
-    label: area.areaLabel,
-    name: area.areaLabel,
-  }));
+  return aggregateAreaSummary(projection.areaSummary);
 }
 
 function useOperationsProjection() {
@@ -129,22 +107,22 @@ function useOperationsProjection() {
 function StaffMapPreview() {
   const { language } = useLanguage();
   const { fallbackPolicy, projection, status } = useOperationsProjection();
-  const areas = areasFromProjection(projection, status, fallbackPolicy);
+  const areaSummary = areaSummaryFromProjection(projection, status, fallbackPolicy);
   const notice = projectionNotice(status, language, fallbackPolicy);
   const totalWorkerSlots = projection && status === 'ready'
     ? projection.reportSummary.workerSlots
-    : areas.reduce((total, area) => total + area.count, 0);
-  const totalLabel = language === 'en' ? 'Projected worker slots' : 'Cupos de trabajadores proyectados';
+    : areaSummary.reduce((total, area) => total + area.workerSlots, 0);
+  const totalLabel = language === 'en' ? 'projected slots awaiting zone assignment' : 'cupos proyectados por asignar';
 
   return (
     <section className="module-preview-page" aria-labelledby="staff-map-heading">
       <div className="module-preview-hero">
         <p className="module-preview-eyebrow">{language === 'en' ? 'Service zones' : 'Zonas de servicio'}</p>
-        <h2 id="staff-map-heading">{language === 'en' ? 'Activity map' : 'Mapa de actividad'}</h2>
+        <h2 id="staff-map-heading">{language === 'en' ? 'NYC zone map' : 'Mapa de zonas de NYC'}</h2>
         <p>
           {language === 'en'
-            ? 'Broad-area activity for staff planning. Exact household and worksite locations remain restricted.'
-            : 'Actividad por zona amplia para planificacion del personal. Las direcciones exactas siguen restringidas.'}
+            ? 'A real NYC basemap with named pilot zones for staff planning. Exact household and worksite locations remain restricted.'
+            : 'Un mapa base real de NYC con zonas piloto nombradas para planificacion del personal. Las direcciones exactas siguen restringidas.'}
         </p>
         <div className="module-preview-actions">
           <Link className="staff-secondary-button focus-ring" to="/">
@@ -155,16 +133,21 @@ function StaffMapPreview() {
       {notice ? <p className="projection-status-notice" role="status">{notice}</p> : null}
       <div className="module-preview-grid">
         <section className="module-preview-panel module-preview-map" aria-label={language === 'en' ? 'NYC activity by area' : 'Actividad por zona de NYC'}>
-          <ZoneMapArtwork areas={areas} />
+          <NYCZoneMap areaSummary={areaSummary} language={language} />
         </section>
         <section className="module-preview-panel" aria-labelledby="service-zone-heading">
-          <h3 id="service-zone-heading">{language === 'en' ? 'Zone snapshot' : 'Resumen de zonas'}</h3>
+          <h3 id="service-zone-heading">{language === 'en' ? 'Pilot zone snapshot' : 'Resumen de zonas piloto'}</h3>
           <p className="module-preview-total"><strong>{totalWorkerSlots}</strong> {totalLabel}</p>
+          <p className="module-preview-helper">
+            {language === 'en'
+              ? 'Current demand is still stored by borough. Neighborhood/service-zone assignment is the next backend slice.'
+              : 'La demanda actual todavia esta guardada por condado. La asignacion por vecindario o zona de servicio es el siguiente corte del servidor.'}
+          </p>
           <ol className="module-metric-list">
-            {areas.map((area) => (
-              <li key={area.name}>
-                <span>{area.label}</span>
-                <strong>{area.count}</strong>
+            {areaSummary.map((area) => (
+              <li key={area.areaKey}>
+                <span>{area.areaLabel}</span>
+                <strong>{aggregateSummaryText(area, language)}</strong>
               </li>
             ))}
           </ol>
@@ -173,8 +156,8 @@ function StaffMapPreview() {
       <section className="module-preview-panel" aria-labelledby="privacy-boundary-heading">
         <h3 id="privacy-boundary-heading">{language === 'en' ? 'Privacy boundary' : 'Limite de privacidad'}</h3>
         <p>{language === 'en'
-          ? 'This view intentionally stays at borough/service-zone level. Individual worker residence and worksite address reveals remain permission-gated inside intake workflows.'
-          : 'Esta vista se mantiene a nivel de zona amplia. Los domicilios de trabajadores y direcciones de trabajo siguen protegidos por permisos dentro de los registros.'}</p>
+          ? 'This view intentionally uses aggregate zone counts only. It does not drop pins for individual workers, households, employers, or worksites, and address reveals remain permission-gated inside intake workflows.'
+          : 'Esta vista usa solo conteos agregados por zona. No coloca puntos de trabajadores, hogares, empleadores ni lugares de trabajo individuales, y las direcciones siguen protegidas por permisos dentro de los registros.'}</p>
       </section>
     </section>
   );

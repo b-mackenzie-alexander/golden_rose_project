@@ -61,7 +61,9 @@ describe('GoogleStaffSignIn', () => {
       auto_select: false,
     }));
 
-    expect(callback).not.toBeNull();
+    await waitFor(() => {
+      expect(callback).not.toBeNull();
+    });
     const credentialCallback = callback as unknown as (response: { credential?: string }) => void;
     await act(async () => {
       credentialCallback({ credential: 'header.payload.signature' });
@@ -144,7 +146,9 @@ describe('GoogleStaffSignIn', () => {
     renderSignIn();
 
     expect(await screen.findByText('Sign in with Google to continue.')).toBeInTheDocument();
-    expect(callback).not.toBeNull();
+    await waitFor(() => {
+      expect(callback).not.toBeNull();
+    });
     const credentialCallback = callback as unknown as (response: { credential?: string }) => void;
     await act(async () => {
       credentialCallback({});

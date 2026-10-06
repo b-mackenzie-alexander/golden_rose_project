@@ -53,6 +53,40 @@ export type OperationsAreaSummaryItem = {
   pendingReviewCount: number;
 };
 
+export type OperationsZoneKey =
+  | 'south_bronx'
+  | 'upper_manhattan_harlem'
+  | 'midtown_lower_manhattan'
+  | 'northwest_queens'
+  | 'central_queens'
+  | 'northeast_queens'
+  | 'north_brooklyn'
+  | 'central_brooklyn'
+  | 'south_brooklyn'
+  | 'north_shore_staten_island';
+
+export type OperationsZoneSummaryItem = {
+  zoneKey: OperationsZoneKey;
+  zoneLabel:
+    | 'South Bronx'
+    | 'Upper Manhattan / Harlem'
+    | 'Midtown / Lower Manhattan'
+    | 'Northwest Queens'
+    | 'Central Queens'
+    | 'Northeast Queens'
+    | 'North Brooklyn'
+    | 'Central Brooklyn'
+    | 'South Brooklyn'
+    | 'North Shore Staten Island';
+  areaKey: OperationsAreaKey;
+  workerResidenceCount: number;
+  worksiteCount: number;
+  requestCount: number;
+  shiftCount: number;
+  workerSlots: number;
+  pendingReviewCount: number;
+};
+
 export type OperationsReportSummary = {
   requestCount: number;
   shiftCount: number;
@@ -84,6 +118,7 @@ export type OperationsProjection = {
   requestItems: OperationsRequestItem[];
   shiftItems: OperationsShiftItem[];
   areaSummary: OperationsAreaSummaryItem[];
+  zoneSummary?: OperationsZoneSummaryItem[];
   reportSummary: OperationsReportSummary;
   calendarSummary: OperationsCalendarSummary;
   queueSummary: OperationsQueueSummary;
@@ -95,6 +130,19 @@ const areaLabels: Record<OperationsAreaKey, OperationsAreaSummaryItem['areaLabel
   manhattan: 'Manhattan',
   queens: 'Queens',
   staten_island: 'Staten Island',
+};
+
+const zoneLabels: Record<OperationsZoneKey, OperationsZoneSummaryItem['zoneLabel']> = {
+  south_bronx: 'South Bronx',
+  upper_manhattan_harlem: 'Upper Manhattan / Harlem',
+  midtown_lower_manhattan: 'Midtown / Lower Manhattan',
+  northwest_queens: 'Northwest Queens',
+  central_queens: 'Central Queens',
+  northeast_queens: 'Northeast Queens',
+  north_brooklyn: 'North Brooklyn',
+  central_brooklyn: 'Central Brooklyn',
+  south_brooklyn: 'South Brooklyn',
+  north_shore_staten_island: 'North Shore Staten Island',
 };
 
 function object(value: unknown): value is Record<string, unknown> {
@@ -208,6 +256,34 @@ function parseAreaSummaryItem(value: unknown): OperationsAreaSummaryItem | null 
   };
 }
 
+function parseZoneSummaryItem(value: unknown): OperationsZoneSummaryItem | null {
+  if (!object(value)) return null;
+  const key = value.zone_key;
+  if (!Object.keys(zoneLabels).includes(String(key))) return null;
+  const zoneKey = key as OperationsZoneKey;
+  if (value.zone_label !== zoneLabels[zoneKey]) return null;
+  if (!['bronx', 'brooklyn', 'manhattan', 'queens', 'staten_island'].includes(String(value.area_key))) return null;
+  if (
+    !nonNegative(value.worker_residence_count) ||
+    !nonNegative(value.worksite_count) ||
+    !nonNegative(value.request_count) ||
+    !nonNegative(value.shift_count) ||
+    !nonNegative(value.worker_slots) ||
+    !nonNegative(value.pending_review_count)
+  ) return null;
+  return {
+    zoneKey,
+    zoneLabel: zoneLabels[zoneKey],
+    areaKey: value.area_key as OperationsAreaKey,
+    workerResidenceCount: value.worker_residence_count,
+    worksiteCount: value.worksite_count,
+    requestCount: value.request_count,
+    shiftCount: value.shift_count,
+    workerSlots: value.worker_slots,
+    pendingReviewCount: value.pending_review_count,
+  };
+}
+
 function parseReportSummary(value: unknown): OperationsReportSummary | null {
   if (!object(value)) return null;
   if (
@@ -302,15 +378,21 @@ function parseProjection(value: unknown): OperationsProjection | null {
   const requestItems = value.request_items.map(parseRequestItem);
   const shiftItems = value.shift_items.map(parseShiftItem);
   const areaSummary = value.area_summary.map(parseAreaSummaryItem);
+  const rawZoneSummary = value.zone_summary === undefined ? [] : value.zone_summary;
+  if (!Array.isArray(rawZoneSummary) || (rawZoneSummary.length !== 0 && rawZoneSummary.length !== 10)) return null;
+  const zoneSummary = rawZoneSummary.map(parseZoneSummaryItem);
   const reportSummary = parseReportSummary(value.report_summary);
   const calendarSummary = parseCalendarSummary(value.calendar_summary);
   const queueSummary = parseQueueSummary(value.queue_summary);
   const areaKeys = new Set(areaSummary.map((item) => item?.areaKey));
+  const zoneKeys = new Set(zoneSummary.map((item) => item?.zoneKey));
   if (
     requestItems.some((item) => item === null) ||
     shiftItems.some((item) => item === null) ||
     areaSummary.some((item) => item === null) ||
+    zoneSummary.some((item) => item === null) ||
     areaKeys.size !== 5 ||
+    (zoneSummary.length > 0 && zoneKeys.size !== 10) ||
     reportSummary === null ||
     calendarSummary === null ||
     queueSummary === null
@@ -319,6 +401,7 @@ function parseProjection(value: unknown): OperationsProjection | null {
     requestItems: requestItems as OperationsRequestItem[],
     shiftItems: shiftItems as OperationsShiftItem[],
     areaSummary: areaSummary as OperationsAreaSummaryItem[],
+    zoneSummary: zoneSummary as OperationsZoneSummaryItem[],
     reportSummary,
     calendarSummary,
     queueSummary,

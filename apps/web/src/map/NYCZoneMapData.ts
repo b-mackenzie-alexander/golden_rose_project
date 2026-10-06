@@ -1,4 +1,9 @@
-import type { OperationsAreaKey, OperationsAreaSummaryItem } from '../api/operationsProjectionClient';
+import type {
+  OperationsAreaKey,
+  OperationsAreaSummaryItem,
+  OperationsZoneKey,
+  OperationsZoneSummaryItem,
+} from '../api/operationsProjectionClient';
 
 export type Language = 'en' | 'es';
 export type MapMode = 'zones' | 'heat';
@@ -12,11 +17,13 @@ export type PilotZoneDefinition = {
   left: number;
   top: number;
   width: number;
+  zoneKey: OperationsZoneKey;
 };
 
 export type PilotZone = PilotZoneDefinition & {
   aggregate: OperationsAreaSummaryItem;
   intensity: 'high' | 'low' | 'medium' | 'mediumHigh';
+  summary: OperationsZoneSummaryItem;
 };
 
 const areaOrder: OperationsAreaKey[] = ['bronx', 'brooklyn', 'manhattan', 'queens', 'staten_island'];
@@ -48,6 +55,7 @@ export const pilotZones: PilotZoneDefinition[] = [
     left: 54,
     top: 12,
     width: 17,
+    zoneKey: 'south_bronx',
   },
   {
     aggregateAnchor: true,
@@ -58,6 +66,7 @@ export const pilotZones: PilotZoneDefinition[] = [
     left: 43,
     top: 24,
     width: 12,
+    zoneKey: 'upper_manhattan_harlem',
   },
   {
     areaKey: 'manhattan',
@@ -67,6 +76,7 @@ export const pilotZones: PilotZoneDefinition[] = [
     left: 39,
     top: 48,
     width: 11,
+    zoneKey: 'midtown_lower_manhattan',
   },
   {
     aggregateAnchor: true,
@@ -77,6 +87,7 @@ export const pilotZones: PilotZoneDefinition[] = [
     left: 62,
     top: 31,
     width: 20,
+    zoneKey: 'northwest_queens',
   },
   {
     areaKey: 'queens',
@@ -86,6 +97,7 @@ export const pilotZones: PilotZoneDefinition[] = [
     left: 67,
     top: 50,
     width: 22,
+    zoneKey: 'central_queens',
   },
   {
     areaKey: 'queens',
@@ -95,6 +107,7 @@ export const pilotZones: PilotZoneDefinition[] = [
     left: 78,
     top: 23,
     width: 17,
+    zoneKey: 'northeast_queens',
   },
   {
     areaKey: 'brooklyn',
@@ -104,6 +117,7 @@ export const pilotZones: PilotZoneDefinition[] = [
     left: 50,
     top: 54,
     width: 17,
+    zoneKey: 'north_brooklyn',
   },
   {
     aggregateAnchor: true,
@@ -114,6 +128,7 @@ export const pilotZones: PilotZoneDefinition[] = [
     left: 49,
     top: 72,
     width: 20,
+    zoneKey: 'central_brooklyn',
   },
   {
     areaKey: 'brooklyn',
@@ -123,6 +138,7 @@ export const pilotZones: PilotZoneDefinition[] = [
     left: 39,
     top: 83,
     width: 20,
+    zoneKey: 'south_brooklyn',
   },
   {
     aggregateAnchor: true,
@@ -133,6 +149,7 @@ export const pilotZones: PilotZoneDefinition[] = [
     left: 14,
     top: 76,
     width: 19,
+    zoneKey: 'north_shore_staten_island',
   },
 ];
 
@@ -156,6 +173,37 @@ function fallbackArea(areaKey: OperationsAreaKey) {
   };
 }
 
+const zoneLabels: Record<OperationsZoneKey, OperationsZoneSummaryItem['zoneLabel']> = {
+  south_bronx: 'South Bronx',
+  upper_manhattan_harlem: 'Upper Manhattan / Harlem',
+  midtown_lower_manhattan: 'Midtown / Lower Manhattan',
+  northwest_queens: 'Northwest Queens',
+  central_queens: 'Central Queens',
+  northeast_queens: 'Northeast Queens',
+  north_brooklyn: 'North Brooklyn',
+  central_brooklyn: 'Central Brooklyn',
+  south_brooklyn: 'South Brooklyn',
+  north_shore_staten_island: 'North Shore Staten Island',
+};
+
+function fallbackZoneSummary(zone: PilotZoneDefinition, aggregate: OperationsAreaSummaryItem): OperationsZoneSummaryItem {
+  return {
+    areaKey: zone.areaKey,
+    pendingReviewCount: zone.aggregateAnchor ? aggregate.pendingReviewCount : 0,
+    requestCount: zone.aggregateAnchor ? aggregate.requestCount : 0,
+    shiftCount: zone.aggregateAnchor ? aggregate.shiftCount : 0,
+    workerResidenceCount: 0,
+    workerSlots: zone.aggregateAnchor ? aggregate.workerSlots : 0,
+    worksiteCount: 0,
+    zoneKey: zone.zoneKey,
+    zoneLabel: zoneLabels[zone.zoneKey],
+  };
+}
+
+function zoneSummaryByKey(zoneSummary: OperationsZoneSummaryItem[]) {
+  return new Map(zoneSummary.map((zone) => [zone.zoneKey, zone] as const));
+}
+
 function areaSummaryByKey(areaSummary: OperationsAreaSummaryItem[]) {
   const empty = new Map(emptyOperationsAreaSummary.map((area) => [area.areaKey, area]));
   return new Map([...empty, ...areaSummary.map((area) => [area.areaKey, area] as const)]);
@@ -166,16 +214,26 @@ export function aggregateAreaSummary(areaSummary: OperationsAreaSummaryItem[]) {
   return areaOrder.map((areaKey) => byKey.get(areaKey) ?? fallbackArea(areaKey));
 }
 
-export function buildPilotZones(areaSummary: OperationsAreaSummaryItem[]): PilotZone[] {
+export function buildPilotZones(
+  areaSummary: OperationsAreaSummaryItem[],
+  zoneSummary: OperationsZoneSummaryItem[] = [],
+): PilotZone[] {
   const normalizedSummary = aggregateAreaSummary(areaSummary);
   const byKey = new Map(normalizedSummary.map((area) => [area.areaKey, area]));
-  const maximum = Math.max(...normalizedSummary.map((area) => area.workerSlots), 0);
+  const zoneByKey = zoneSummaryByKey(zoneSummary);
+  const maximum = Math.max(
+    ...zoneSummary.map((zone) => zone.workerSlots),
+    ...normalizedSummary.map((area) => area.workerSlots),
+    0,
+  );
   return pilotZones.map((zone) => {
     const aggregate = byKey.get(zone.areaKey) ?? fallbackArea(zone.areaKey);
+    const summary = zoneByKey.get(zone.zoneKey) ?? fallbackZoneSummary(zone, aggregate);
     return {
       ...zone,
       aggregate,
-      intensity: zone.aggregateAnchor ? intensityFor(aggregate.workerSlots, maximum) : 'low',
+      intensity: intensityFor(summary.workerSlots, maximum),
+      summary,
     };
   });
 }

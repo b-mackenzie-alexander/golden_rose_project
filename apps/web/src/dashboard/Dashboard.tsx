@@ -593,6 +593,7 @@ export function Dashboard() {
   const scheduleRows = useMemo(() => dynamicScheduleRows(copy, intakes, language), [copy, intakes, language]);
   const zoneAreas = useMemo(() => dynamicZoneAreas(copy, intakes), [copy, intakes]);
   const zoneAreaSummary = useMemo(() => zoneAreasAsAreaSummary(zoneAreas), [zoneAreas]);
+  const zoneSummary = intakes.operationsStatus === 'ready' ? intakes.operations?.zoneSummary ?? [] : [];
   const zonesMetric = useMemo(() => dynamicZonesMetric(copy, intakes, language), [copy, intakes, language]);
   const operationsNotice = useMemo(() => projectionNotice(intakes.operationsStatus, language, intakes.staticFallbackPolicy), [intakes.operationsStatus, intakes.staticFallbackPolicy, language]);
   const allowStaticFallbacks = staticOperationalFallbacksAllowed(intakes.staticFallbackPolicy);
@@ -740,7 +741,7 @@ export function Dashboard() {
             <p><strong>{zonesMetric.value}</strong> {zonesMetric.meta}</p>
           </div>
           <div aria-hidden="true" className="dashboard-map">
-            <NYCZoneMap areaSummary={zoneAreaSummary} compact decorative language={language} />
+            <NYCZoneMap areaSummary={zoneAreaSummary} compact decorative language={language} zoneSummary={zoneSummary} />
           </div>
         </section>
 

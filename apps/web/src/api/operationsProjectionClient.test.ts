@@ -40,6 +40,18 @@ const validAreaSummary = [
   { area_key: 'queens', area_label: 'Queens', request_count: 0, shift_count: 0, worker_slots: 0, pending_review_count: 0 },
   { area_key: 'staten_island', area_label: 'Staten Island', request_count: 0, shift_count: 0, worker_slots: 0, pending_review_count: 0 },
 ];
+const validZoneSummary = [
+  { zone_key: 'south_bronx', zone_label: 'South Bronx', area_key: 'bronx', worker_residence_count: 0, worksite_count: 0, request_count: 0, shift_count: 0, worker_slots: 0, pending_review_count: 0 },
+  { zone_key: 'upper_manhattan_harlem', zone_label: 'Upper Manhattan / Harlem', area_key: 'manhattan', worker_residence_count: 0, worksite_count: 0, request_count: 0, shift_count: 0, worker_slots: 0, pending_review_count: 0 },
+  { zone_key: 'midtown_lower_manhattan', zone_label: 'Midtown / Lower Manhattan', area_key: 'manhattan', worker_residence_count: 0, worksite_count: 0, request_count: 0, shift_count: 0, worker_slots: 0, pending_review_count: 0 },
+  { zone_key: 'northwest_queens', zone_label: 'Northwest Queens', area_key: 'queens', worker_residence_count: 0, worksite_count: 0, request_count: 0, shift_count: 0, worker_slots: 0, pending_review_count: 0 },
+  { zone_key: 'central_queens', zone_label: 'Central Queens', area_key: 'queens', worker_residence_count: 0, worksite_count: 0, request_count: 0, shift_count: 0, worker_slots: 0, pending_review_count: 0 },
+  { zone_key: 'northeast_queens', zone_label: 'Northeast Queens', area_key: 'queens', worker_residence_count: 0, worksite_count: 0, request_count: 0, shift_count: 0, worker_slots: 0, pending_review_count: 0 },
+  { zone_key: 'north_brooklyn', zone_label: 'North Brooklyn', area_key: 'brooklyn', worker_residence_count: 0, worksite_count: 0, request_count: 0, shift_count: 0, worker_slots: 0, pending_review_count: 0 },
+  { zone_key: 'central_brooklyn', zone_label: 'Central Brooklyn', area_key: 'brooklyn', worker_residence_count: 2, worksite_count: 1, request_count: 1, shift_count: 1, worker_slots: 2, pending_review_count: 1 },
+  { zone_key: 'south_brooklyn', zone_label: 'South Brooklyn', area_key: 'brooklyn', worker_residence_count: 0, worksite_count: 0, request_count: 0, shift_count: 0, worker_slots: 0, pending_review_count: 0 },
+  { zone_key: 'north_shore_staten_island', zone_label: 'North Shore Staten Island', area_key: 'staten_island', worker_residence_count: 0, worksite_count: 0, request_count: 0, shift_count: 0, worker_slots: 0, pending_review_count: 0 },
+];
 const validReportSummary = {
   request_count: 1,
   shift_count: 1,
@@ -77,6 +89,7 @@ function projection(
     request_items: [request],
     shift_items: [shift],
     area_summary: validAreaSummary,
+    zone_summary: validZoneSummary,
     report_summary: validReportSummary,
     calendar_summary: validCalendarSummary,
     queue_summary: validQueueSummary,
@@ -110,6 +123,17 @@ describe('operationsProjectionClient', () => {
     expect(result.value.areaSummary[1]).toEqual({
       areaKey: 'brooklyn',
       areaLabel: 'Brooklyn',
+      requestCount: 1,
+      shiftCount: 1,
+      workerSlots: 2,
+      pendingReviewCount: 1,
+    });
+    expect(result.value.zoneSummary?.[7]).toEqual({
+      zoneKey: 'central_brooklyn',
+      zoneLabel: 'Central Brooklyn',
+      areaKey: 'brooklyn',
+      workerResidenceCount: 2,
+      worksiteCount: 1,
       requestCount: 1,
       shiftCount: 1,
       workerSlots: 2,
@@ -231,6 +255,10 @@ describe('operationsProjectionClient', () => {
     ['duplicate area summary', { request_items: [], shift_items: [], area_summary: [validAreaSummary[0], ...validAreaSummary.slice(0, 4)], report_summary: validReportSummary, calendar_summary: validCalendarSummary, queue_summary: validQueueSummary }],
     ['invalid area label', { request_items: [], shift_items: [], area_summary: [{ ...validAreaSummary[0], area_label: 'Queens' }, ...validAreaSummary.slice(1)], report_summary: validReportSummary, calendar_summary: validCalendarSummary, queue_summary: validQueueSummary }],
     ['invalid area count', { request_items: [], shift_items: [], area_summary: [{ ...validAreaSummary[0], worker_slots: -1 }, ...validAreaSummary.slice(1)], report_summary: validReportSummary, calendar_summary: validCalendarSummary, queue_summary: validQueueSummary }],
+    ['short zone summary', { ...projection(), zone_summary: validZoneSummary.slice(1) }],
+    ['duplicate zone summary', { ...projection(), zone_summary: [validZoneSummary[0], ...validZoneSummary.slice(0, 9)] }],
+    ['invalid zone label', { ...projection(), zone_summary: [{ ...validZoneSummary[0], zone_label: 'Central Queens' }, ...validZoneSummary.slice(1)] }],
+    ['invalid zone count', { ...projection(), zone_summary: [{ ...validZoneSummary[0], worker_residence_count: -1 }, ...validZoneSummary.slice(1)] }],
     ['invalid report active area count', { request_items: [], shift_items: [], area_summary: validAreaSummary, report_summary: { ...validReportSummary, active_area_count: 6 }, calendar_summary: validCalendarSummary, queue_summary: validQueueSummary }],
     ['invalid calendar day count', { request_items: [], shift_items: [], area_summary: validAreaSummary, report_summary: validReportSummary, calendar_summary: { ...validCalendarSummary, coverage_day_count: 367 }, queue_summary: validQueueSummary }],
     ['invalid calendar timestamp pairing', { request_items: [], shift_items: [], area_summary: validAreaSummary, report_summary: validReportSummary, calendar_summary: { ...validCalendarSummary, first_shift_starts_at: null }, queue_summary: validQueueSummary }],

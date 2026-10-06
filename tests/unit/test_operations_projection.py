@@ -21,6 +21,18 @@ INTAKE_ID = UUID("33333333-3333-4333-8333-333333333333")
 REQUEST_ID = UUID("44444444-4444-4444-8444-444444444444")
 SHIFT_ID = UUID("55555555-5555-4555-8555-555555555555")
 NOW = datetime(2026, 9, 30, 14, 0, tzinfo=UTC)
+ZONE_BUCKETS = [
+    ("south_bronx", "South Bronx", "bronx"),
+    ("upper_manhattan_harlem", "Upper Manhattan / Harlem", "manhattan"),
+    ("midtown_lower_manhattan", "Midtown / Lower Manhattan", "manhattan"),
+    ("northwest_queens", "Northwest Queens", "queens"),
+    ("central_queens", "Central Queens", "queens"),
+    ("northeast_queens", "Northeast Queens", "queens"),
+    ("north_brooklyn", "North Brooklyn", "brooklyn"),
+    ("central_brooklyn", "Central Brooklyn", "brooklyn"),
+    ("south_brooklyn", "South Brooklyn", "brooklyn"),
+    ("north_shore_staten_island", "North Shore Staten Island", "staten_island"),
+]
 
 
 class FakeResult:
@@ -58,7 +70,29 @@ def principal(*permissions: str) -> StaffPrincipal:
 
 
 def all_permissions() -> StaffPrincipal:
-    return principal("employer:read", "staffing_request:read", "shift_need:read")
+    return principal(
+        "employer:read",
+        "staffing_request:read",
+        "shift_need:read",
+        "worker_residence:read",
+    )
+
+
+def empty_zone_summary() -> list[dict[str, object]]:
+    return [
+        {
+            "zone_key": key,
+            "zone_label": label,
+            "area_key": area_key,
+            "worker_residence_count": 0,
+            "worksite_count": 0,
+            "request_count": 0,
+            "shift_count": 0,
+            "worker_slots": 0,
+            "pending_review_count": 0,
+        }
+        for key, label, area_key in ZONE_BUCKETS
+    ]
 
 
 def test_operations_projection_route_returns_no_store_projection(
@@ -100,6 +134,7 @@ def test_operations_projection_route_returns_no_store_projection(
                 "pending_review_count": 1,
             }
         ],
+        "zone_summary": empty_zone_summary(),
         "report_summary": {
             "request_count": 1,
             "shift_count": 0,
@@ -143,6 +178,7 @@ def test_operations_projection_route_returns_no_store_projection(
     assert response.json()["request_items"][0]["staffing_request_id"] == str(REQUEST_ID)
     assert response.json()["shift_items"] == []
     assert response.json()["area_summary"][0]["area_label"] == "Brooklyn"
+    assert response.json()["zone_summary"][0]["zone_label"] == "South Bronx"
     assert response.json()["report_summary"]["pending_review_count"] == 1
     assert response.json()["calendar_summary"]["projected_shift_count"] == 0
     assert response.json()["queue_summary"]["open_item_count"] == 0
@@ -213,6 +249,7 @@ def test_operations_projection_returns_request_and_shift_items():
             FakeResult([]),
             FakeResult([]),
             FakeResult([]),
+            FakeResult([]),
         ]
     )
 
@@ -267,6 +304,7 @@ def test_operations_projection_returns_request_and_shift_items():
                 "pending_review_count": 0,
             },
         ],
+        "zone_summary": empty_zone_summary(),
         "report_summary": {
             "request_count": 0,
             "shift_count": 0,
@@ -292,7 +330,7 @@ def test_operations_projection_returns_request_and_shift_items():
             "newest_item_updated_at": None,
         },
     }
-    assert len(session.executed) == 7
+    assert len(session.executed) == 8
     assert session.rollbacks == 0
 
 
@@ -303,16 +341,52 @@ def test_operations_projection_aggregates_broad_area_and_reporting_totals():
             FakeResult([]),
             FakeResult(
                 [
-                    {"locality": "Brooklyn", "request_status": "pending_review"},
-                    {"locality": "New York", "request_status": "draft"},
-                    {"locality": "Fictional City", "request_status": "pending_review"},
+                    {
+                        "worksite_id": "worksite-brooklyn",
+                        "locality": "Brooklyn",
+                        "postal_code": "11213",
+                        "request_status": "pending_review",
+                    },
+                    {
+                        "worksite_id": "worksite-manhattan",
+                        "locality": "New York",
+                        "postal_code": "10018",
+                        "request_status": "draft",
+                    },
+                    {
+                        "worksite_id": "worksite-outside",
+                        "locality": "Fictional City",
+                        "postal_code": "99999",
+                        "request_status": "pending_review",
+                    },
                 ]
             ),
             FakeResult(
                 [
-                    {"locality": "Brooklyn", "shift_status": "pending_review", "worker_count": 2},
-                    {"locality": "Queens", "shift_status": "draft", "worker_count": 3},
-                    {"locality": "Outside", "shift_status": "draft", "worker_count": 4},
+                    {
+                        "locality": "Brooklyn",
+                        "postal_code": "11213",
+                        "shift_status": "pending_review",
+                        "worker_count": 2,
+                    },
+                    {
+                        "locality": "Queens",
+                        "postal_code": "11375",
+                        "shift_status": "draft",
+                        "worker_count": 3,
+                    },
+                    {
+                        "locality": "Outside",
+                        "postal_code": "99999",
+                        "shift_status": "draft",
+                        "worker_count": 4,
+                    },
+                ]
+            ),
+            FakeResult(
+                [
+                    {"locality": "Crown Heights", "postal_code": "11213"},
+                    {"locality": "Astoria", "postal_code": "11103"},
                 ]
             ),
             FakeResult(
@@ -377,6 +451,8 @@ def test_operations_projection_aggregates_broad_area_and_reporting_totals():
 
     area_items = cast(list[dict[str, object]], result["area_summary"])
     areas = {item["area_key"]: item for item in area_items}
+    zone_items = cast(list[dict[str, object]], result["zone_summary"])
+    zones = {item["zone_key"]: item for item in zone_items}
     assert areas["brooklyn"] == {
         "area_key": "brooklyn",
         "area_label": "Brooklyn",
@@ -387,6 +463,20 @@ def test_operations_projection_aggregates_broad_area_and_reporting_totals():
     }
     assert areas["manhattan"]["request_count"] == 1
     assert areas["queens"]["worker_slots"] == 3
+    assert zones["central_brooklyn"] == {
+        "zone_key": "central_brooklyn",
+        "zone_label": "Central Brooklyn",
+        "area_key": "brooklyn",
+        "worker_residence_count": 1,
+        "worksite_count": 1,
+        "request_count": 1,
+        "shift_count": 1,
+        "worker_slots": 2,
+        "pending_review_count": 2,
+    }
+    assert zones["northwest_queens"]["worker_residence_count"] == 1
+    assert zones["central_queens"]["worker_slots"] == 3
+    assert zones["midtown_lower_manhattan"]["request_count"] == 1
     assert result["report_summary"] == {
         "request_count": 3,
         "shift_count": 3,

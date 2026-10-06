@@ -23,6 +23,7 @@ dependencies = [
 [project.scripts]
 golden-rose-run = "golden_rose.runtime:main"
 golden-rose-migrate = "golden_rose.migration_runtime:main"
+golden-rose-bootstrap-first-staff-account = "golden_rose.bootstrap_staff_account:main"
 
 [dependency-groups]
 dev = [

@@ -2164,8 +2164,8 @@ def test_gcp_develop_database_authority_job_is_private_bounded_and_executable() 
         (ROOT / "infra/policy/predeployment-authority-manifest.json").read_text(encoding="utf-8")
     )
     resource_types = manifest["terraform"]["resource_types"]
-    assert resource_types["google_project_iam_member"]["max_count"] == 10
-    assert resource_types["google_secret_manager_secret_iam_member"]["max_count"] == 10
+    assert resource_types["google_project_iam_member"]["max_count"] == 13
+    assert resource_types["google_secret_manager_secret_iam_member"]["max_count"] == 13
 
 
 def test_cloud_sql_database_role_inputs_are_exact_application_contracts() -> None:
@@ -8993,6 +8993,7 @@ def test_deploy_workflow_uses_one_packet_stages_and_direct_oci_authority() -> No
         "deployment_stage:",
         "eight-hour deployment packet",
         "- migration",
+        "- staff-bootstrap",
         "- service",
         "Verify direct OCI image authority",
         "cosign verify --certificate-identity",
@@ -9003,6 +9004,7 @@ def test_deploy_workflow_uses_one_packet_stages_and_direct_oci_authority() -> No
         "Execute migration transition",
         "--kind jobs --name run-migrations",
         "job image must match the direct Cosign-verified image",
+        "Execute first staff account bootstrap",
         "Verify service readiness transition",
     ]
     for fragment in required:
@@ -9042,6 +9044,41 @@ def test_deploy_workflow_uses_one_packet_stages_and_direct_oci_authority() -> No
     )
     assert "labels != required_labels" in migration_step
     assert 'payload.update({"result": "success"' in service_step
+
+
+def test_deploy_workflow_executes_bounded_first_staff_bootstrap_job() -> None:
+    workflow = (ROOT / ".github/workflows/deploy-develop.yml").read_text(encoding="utf-8")
+
+    required = [
+        "- staff-bootstrap",
+        "Execute first staff account bootstrap",
+        "if: inputs.deployment_stage == 'staff-bootstrap'",
+        "--kind jobs --name bootstrap-first-staff-account",
+        "staff bootstrap job image must match the direct Cosign-verified image",
+        "gcloud run jobs execute bootstrap-first-staff-account",
+        '"current_stage": "staff_account_bootstrap"',
+        "staff-bootstrap-provider-subject",
+        "staff-bootstrap-display-name",
+    ]
+    for fragment in required:
+        assert fragment in workflow
+
+    step = workflow.split("- name: Execute first staff account bootstrap", 1)[1].split(
+        "- name: Verify service readiness transition", 1
+    )[0]
+    assert step.index("python scripts/read_cloud_run_v2.py") < step.index("gcloud run jobs execute")
+    assert "--update-env-vars" not in step
+    assert "--args" not in step
+    assert "--command" not in step
+    assert 'containers[0].get("args") not in (None, [])' in step
+    assert 'item["name"] in environment' in step
+    assert "must pin an enabled numeric secret version" in step
+    assert "f\"projects/{os.environ['GCP_PROJECT_ID']}/global/networks/develop-vpc\"" in step
+    assert (
+        "f\"projects/{os.environ['GCP_PROJECT_ID']}/regions/us-east4/"
+        'subnetworks/develop-direct-vpc"' in step
+    )
+    assert 'job.get("labels") != expected_labels' in step
 
 
 def test_deploy_workflow_executes_bounded_database_authority_job() -> None:

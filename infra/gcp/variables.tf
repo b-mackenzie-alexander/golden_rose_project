@@ -121,6 +121,30 @@ variable "staff_oidc_jwks_url_secret_version" {
   }
 }
 
+variable "staff_bootstrap_provider_subject_secret_version" {
+  description = "Operator-held enabled Secret Manager version number for staff-bootstrap-provider-subject; required only for the controlled staff-pilot service profile so the managed bootstrap job never reads a mutable identity subject alias."
+  type        = string
+  nullable    = true
+  default     = null
+
+  validation {
+    condition     = var.deployment_stage == "service" && var.runtime_profile == "controlled_live_data_staff_pilot" ? var.staff_bootstrap_provider_subject_secret_version != null && can(regex("^[1-9][0-9]*$", var.staff_bootstrap_provider_subject_secret_version)) : var.staff_bootstrap_provider_subject_secret_version == null
+    error_message = "The controlled staff-pilot service profile requires an explicit numeric staff bootstrap provider-subject secret version; every other stage/profile requires null."
+  }
+}
+
+variable "staff_bootstrap_display_name_secret_version" {
+  description = "Operator-held enabled Secret Manager version number for staff-bootstrap-display-name; required only for the controlled staff-pilot service profile so the managed bootstrap job never reads a mutable display-name alias."
+  type        = string
+  nullable    = true
+  default     = null
+
+  validation {
+    condition     = var.deployment_stage == "service" && var.runtime_profile == "controlled_live_data_staff_pilot" ? var.staff_bootstrap_display_name_secret_version != null && can(regex("^[1-9][0-9]*$", var.staff_bootstrap_display_name_secret_version)) : var.staff_bootstrap_display_name_secret_version == null
+    error_message = "The controlled staff-pilot service profile requires an explicit numeric staff bootstrap display-name secret version; every other stage/profile requires null."
+  }
+}
+
 
 variable "billing_account_id" {
   description = "Operator-supplied billing account identifier for reviewed develop budget routing."

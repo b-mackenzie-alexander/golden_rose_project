@@ -24,3 +24,12 @@ resource "google_service_account" "database_verifier" {
 
   depends_on = [google_project_service.approved["iam.googleapis.com"]]
 }
+
+resource "google_service_account" "staff_bootstrap" {
+  project      = var.project_id
+  account_id   = "staff-tracer-staff-bootstrap"
+  display_name = "Develop first staff account bootstrap"
+  description  = "One-task bootstrap identity for the first named staff pilot account through private Cloud SQL."
+
+  depends_on = [google_project_service.approved["iam.googleapis.com"]]
+}

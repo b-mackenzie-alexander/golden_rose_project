@@ -55,6 +55,24 @@ resource "google_project_iam_member" "database_verifier_cloudsql_client" {
   member  = "serviceAccount:${google_service_account.database_verifier.email}"
 }
 
+resource "google_project_iam_member" "staff_bootstrap_cloudsql_client" {
+  project = var.project_id
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.staff_bootstrap.email}"
+}
+
+resource "google_project_iam_member" "staff_bootstrap_log_writer" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:${google_service_account.staff_bootstrap.email}"
+}
+
+resource "google_project_iam_member" "staff_bootstrap_metric_writer" {
+  project = var.project_id
+  role    = "roles/monitoring.metricWriter"
+  member  = "serviceAccount:${google_service_account.staff_bootstrap.email}"
+}
+
 resource "google_cloud_run_v2_job_iam_member" "deployer_jobs_executor" {
   count    = var.deployment_stage == "migration" || var.deployment_stage == "service" ? 1 : 0
   project  = var.project_id
@@ -87,6 +105,24 @@ resource "google_cloud_run_v2_job_iam_member" "deployer_database_authority_job_v
   project  = var.project_id
   location = var.region
   name     = google_cloud_run_v2_job.database_authority[0].name
+  role     = "roles/run.viewer"
+  member   = "serviceAccount:golden-rose-deployer@${var.control_plane_project_id}.iam.gserviceaccount.com"
+}
+
+resource "google_cloud_run_v2_job_iam_member" "deployer_staff_bootstrap_job_executor" {
+  count    = var.deployment_stage == "service" && var.runtime_profile == "controlled_live_data_staff_pilot" ? 1 : 0
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_job.staff_bootstrap[0].name
+  role     = "roles/run.jobsExecutor"
+  member   = "serviceAccount:golden-rose-deployer@${var.control_plane_project_id}.iam.gserviceaccount.com"
+}
+
+resource "google_cloud_run_v2_job_iam_member" "deployer_staff_bootstrap_job_viewer" {
+  count    = var.deployment_stage == "service" && var.runtime_profile == "controlled_live_data_staff_pilot" ? 1 : 0
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_job.staff_bootstrap[0].name
   role     = "roles/run.viewer"
   member   = "serviceAccount:golden-rose-deployer@${var.control_plane_project_id}.iam.gserviceaccount.com"
 }
@@ -126,6 +162,37 @@ resource "google_secret_manager_secret_iam_member" "database_verifier_runtime_se
   secret_id = "runtime-database-url"
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.database_verifier.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "staff_bootstrap_database_secret_access" {
+  count = var.deployment_stage == "service" && var.runtime_profile == "controlled_live_data_staff_pilot" ? 1 : 0
+
+  project   = var.project_id
+  secret_id = "migration-database-url"
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.staff_bootstrap.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "staff_bootstrap_provider_subject_secret_access" {
+  count = var.deployment_stage == "service" && var.runtime_profile == "controlled_live_data_staff_pilot" ? 1 : 0
+
+  project   = var.project_id
+  secret_id = "staff-bootstrap-provider-subject"
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.staff_bootstrap.email}"
+
+  depends_on = [google_secret_manager_secret.metadata_only["staff-bootstrap-provider-subject"]]
+}
+
+resource "google_secret_manager_secret_iam_member" "staff_bootstrap_display_name_secret_access" {
+  count = var.deployment_stage == "service" && var.runtime_profile == "controlled_live_data_staff_pilot" ? 1 : 0
+
+  project   = var.project_id
+  secret_id = "staff-bootstrap-display-name"
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.staff_bootstrap.email}"
+
+  depends_on = [google_secret_manager_secret.metadata_only["staff-bootstrap-display-name"]]
 }
 
 resource "google_secret_manager_secret_iam_member" "runtime_synthetic_staff_secret_access" {

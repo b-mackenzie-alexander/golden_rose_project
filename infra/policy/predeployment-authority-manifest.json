@@ -23,14 +23,14 @@
         "max_count": 2
       },
       "google_cloud_run_v2_job_iam_member": {
-        "max_count": 4
+        "max_count": 6
       },
       "google_cloud_run_v2_job": {
-        "max_count": 2,
+        "max_count": 3,
         "max_count_by_stage": {
           "foundation": 0,
           "migration": 2,
-          "service": 2
+          "service": 3
         },
         "stage_ownership": "migration"
       },
@@ -65,7 +65,7 @@
         "max_count": 1
       },
       "google_project_iam_member": {
-        "max_count": 10
+        "max_count": 13
       },
       "google_monitoring_alert_policy": {
         "max_count": 3
@@ -82,13 +82,13 @@
         }
       },
       "google_secret_manager_secret": {
-        "max_count": 8
-      },
-      "google_secret_manager_secret_iam_member": {
         "max_count": 10
       },
+      "google_secret_manager_secret_iam_member": {
+        "max_count": 13
+      },
       "google_service_account": {
-        "max_count": 7
+        "max_count": 8
       },
       "google_service_account_iam_member": {
         "max_count": 4
@@ -192,6 +192,7 @@
               "name:Set up gcloud",
               "name:Execute migration transition",
               "name:Execute database authority verification",
+              "name:Execute first staff account bootstrap",
               "name:Verify service readiness transition",
               "name:Record deploy result",
               "name:Upload deploy result evidence"

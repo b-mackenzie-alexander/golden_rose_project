@@ -5,6 +5,8 @@ locals {
     "synthetic-staff-id",
     "demo-access-password",
     "deployment-posture",
+    "staff-bootstrap-provider-subject",
+    "staff-bootstrap-display-name",
   ])
 
   staff_oidc_secret_lookup_enabled = var.deployment_stage == "service" && var.runtime_profile == "controlled_live_data_staff_pilot"

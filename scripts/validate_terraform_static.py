@@ -183,7 +183,12 @@ EXACT_SEMANTIC_FORBIDDEN_CONSTRUCTS = {
 
 # Task 1: Staged authority model — approved deployment stage values.
 APPROVED_STAGE_VALUES = ["foundation", "migration", "service"]
-WORKFLOW_DEPLOYMENT_STAGE_VALUES = ["migration", "database-verification", "service"]
+WORKFLOW_DEPLOYMENT_STAGE_VALUES = [
+    "migration",
+    "database-verification",
+    "staff-bootstrap",
+    "service",
+]
 
 # Task 3: Reviewed env names allowed in Cloud Run service/job containers.
 APPROVED_ENV_NAMES = {
@@ -204,6 +209,8 @@ APPROVED_ENV_NAMES = {
     "GOLDEN_ROSE_STAFF_OIDC_AUDIENCE",
     "GOLDEN_ROSE_STAFF_OIDC_JWKS_URL",
     "GOLDEN_ROSE_MIGRATION_ASSUMED_ROLE",
+    "GOLDEN_ROSE_BOOTSTRAP_PROVIDER_SUBJECT",
+    "GOLDEN_ROSE_BOOTSTRAP_DISPLAY_NAME",
 }
 
 # Env names that must use value_source/secret_ref (not literal value).
@@ -216,6 +223,8 @@ SECRET_ENV_NAMES = {
     "GOLDEN_ROSE_STAFF_OIDC_ISSUER",
     "GOLDEN_ROSE_STAFF_OIDC_AUDIENCE",
     "GOLDEN_ROSE_STAFF_OIDC_JWKS_URL",
+    "GOLDEN_ROSE_BOOTSTRAP_PROVIDER_SUBJECT",
+    "GOLDEN_ROSE_BOOTSTRAP_DISPLAY_NAME",
 }
 
 # Env names exclusive to migration (not allowed in service containers).
@@ -238,6 +247,8 @@ APPROVED_SECRET_REFS: dict[str, set[str]] = {
     "GOLDEN_ROSE_STAFF_OIDC_ISSUER": {"staff-oidc-issuer"},
     "GOLDEN_ROSE_STAFF_OIDC_AUDIENCE": {"staff-oidc-audience"},
     "GOLDEN_ROSE_STAFF_OIDC_JWKS_URL": {"staff-oidc-jwks-url"},
+    "GOLDEN_ROSE_BOOTSTRAP_PROVIDER_SUBJECT": {"staff-bootstrap-provider-subject"},
+    "GOLDEN_ROSE_BOOTSTRAP_DISPLAY_NAME": {"staff-bootstrap-display-name"},
 }
 
 # Mapping of resource type to which secret is allowed for GOLDEN_ROSE_DATABASE_URL.
@@ -1945,6 +1956,7 @@ DEPLOY_WORKFLOW_STEPS = [
     "name:Set up gcloud",
     "name:Execute migration transition",
     "name:Execute database authority verification",
+    "name:Execute first staff account bootstrap",
     "name:Verify service readiness transition",
     "name:Record deploy result",
     "name:Upload deploy result evidence",
@@ -1963,6 +1975,9 @@ ALLOWED_WORKFLOW_STEP_IF[("deploy-develop.yml", "deploy", "name:Execute migratio
 ALLOWED_WORKFLOW_STEP_IF[
     ("deploy-develop.yml", "deploy", "name:Execute database authority verification")
 ] = "inputs.deployment_stage == 'database-verification'"
+ALLOWED_WORKFLOW_STEP_IF[
+    ("deploy-develop.yml", "deploy", "name:Execute first staff account bootstrap")
+] = "inputs.deployment_stage == 'staff-bootstrap'"
 ALLOWED_WORKFLOW_STEP_IF[
     ("deploy-develop.yml", "deploy", "name:Write migration success receipt")
 ] = "inputs.deployment_stage == 'migration'"
@@ -2015,6 +2030,12 @@ ALLOWED_WORKFLOW_STEP_ENV[("deploy-develop.yml", "deploy", "name:Execute migrati
 }
 ALLOWED_WORKFLOW_STEP_ENV[
     ("deploy-develop.yml", "deploy", "name:Execute database authority verification")
+] = {
+    "GCP_PROJECT_ID": "${{ vars.GCP_PROJECT_ID }}",
+    "DEPLOYMENT_RUNTIME_PROFILE": "${{ inputs.runtime_profile }}",
+}
+ALLOWED_WORKFLOW_STEP_ENV[
+    ("deploy-develop.yml", "deploy", "name:Execute first staff account bootstrap")
 ] = {
     "GCP_PROJECT_ID": "${{ vars.GCP_PROJECT_ID }}",
     "DEPLOYMENT_RUNTIME_PROFILE": "${{ inputs.runtime_profile }}",
@@ -2100,6 +2121,11 @@ EXACT_WORKFLOW_RUN_SHA256.update(
             "deploy",
             "name:Execute database authority verification",
         ): "f85e54c34860d70c7537e92824ab4d35c9c11d4ad0a1b81e3d0c86aef64c36e9",
+        (
+            "deploy-develop.yml",
+            "deploy",
+            "name:Execute first staff account bootstrap",
+        ): "228c51ed174f15ccdab67e2a27c8b0be321542d3a9a9456847a9deff92a7f354",
         (
             "deploy-develop.yml",
             "deploy",
@@ -3842,11 +3868,19 @@ def _collect_develop_iam_violations(root: Path, terraform_config_paths: list[Pat
             'resource "google_project_iam_member" "migration_cloudsql_client"',
             'resource "google_project_iam_member" "migration_log_writer"',
             'resource "google_project_iam_member" "migration_metric_writer"',
+            'resource "google_project_iam_member" "staff_bootstrap_cloudsql_client"',
+            'resource "google_project_iam_member" "staff_bootstrap_log_writer"',
+            'resource "google_project_iam_member" "staff_bootstrap_metric_writer"',
             'resource "google_cloud_run_v2_job_iam_member" "deployer_jobs_executor"',
             'resource "google_cloud_run_v2_job_iam_member" "deployer_migration_job_viewer"',
+            'resource "google_cloud_run_v2_job_iam_member" "deployer_staff_bootstrap_job_executor"',
+            'resource "google_cloud_run_v2_job_iam_member" "deployer_staff_bootstrap_job_viewer"',
             'resource "google_cloud_run_v2_service_iam_member" "deployer_staff_service_viewer"',
             'resource "google_secret_manager_secret_iam_member" "runtime_database_secret_access"',
             'resource "google_secret_manager_secret_iam_member" "migration_database_secret_access"',
+            'resource "google_secret_manager_secret_iam_member" "staff_bootstrap_database_secret_access"',
+            'resource "google_secret_manager_secret_iam_member" "staff_bootstrap_provider_subject_secret_access"',
+            'resource "google_secret_manager_secret_iam_member" "staff_bootstrap_display_name_secret_access"',
             'resource "google_secret_manager_secret_iam_member" "runtime_synthetic_staff_secret_access"',
             'resource "google_secret_manager_secret_iam_member" "migration_synthetic_staff_secret_access"',
             'resource "google_secret_manager_secret_iam_member" "runtime_staff_oidc_issuer_secret_access"',
@@ -3867,6 +3901,7 @@ def _collect_develop_iam_violations(root: Path, terraform_config_paths: list[Pat
             'role     = "roles/run.invoker"',
             'member  = "serviceAccount:${google_service_account.runtime.email}"',
             'member  = "serviceAccount:${google_service_account.migration.email}"',
+            'member  = "serviceAccount:${google_service_account.staff_bootstrap.email}"',
             'member     = "serviceAccount:golden-rose-image-publisher@${var.control_plane_project_id}.iam.gserviceaccount.com"',
             'member     = "serviceAccount:golden-rose-artifact-verifier@${var.control_plane_project_id}.iam.gserviceaccount.com"',
             'member   = "serviceAccount:golden-rose-deployer@${var.control_plane_project_id}.iam.gserviceaccount.com"',
@@ -4053,6 +4088,32 @@ def _collect_migration_job_violations(root: Path, terraform_config_paths: list[P
                 'egress = "PRIVATE_RANGES_ONLY"',
                 'secret  = "migration-database-url"',
                 'secret  = "runtime-database-url"',
+            ],
+            "forbidden": [
+                "google_service_account.runtime.email",
+                "INGRESS_TRAFFIC_ALL",
+                ":latest",
+            ],
+        },
+        Path("infra/gcp/develop/staff_bootstrap_job.tf"): {
+            "label": "staff bootstrap",
+            "required": [
+                'resource "google_cloud_run_v2_job" "staff_bootstrap"',
+                'name     = "bootstrap-first-staff-account"',
+                "service_account = google_service_account.staff_bootstrap.email",
+                "image = local.managed_container_image",
+                'command = ["golden-rose-bootstrap-first-staff-account"]',
+                "max_retries = 0",
+                'timeout         = "600s"',
+                "task_count  = 1",
+                "parallelism = 1",
+                "subnetwork = google_compute_subnetwork.direct_vpc[0].id",
+                'egress = "PRIVATE_RANGES_ONLY"',
+                'secret  = "migration-database-url"',
+                'secret  = "staff-bootstrap-provider-subject"',
+                'secret  = "staff-bootstrap-display-name"',
+                "version = var.staff_bootstrap_provider_subject_secret_version",
+                "version = var.staff_bootstrap_display_name_secret_version",
             ],
             "forbidden": [
                 "google_service_account.runtime.email",
@@ -4424,6 +4485,9 @@ APPROVED_STAGE_COUNT_PATTERNS: dict[str, list[re.Pattern[str]]] = {
         ),
         re.compile(r'count\s*=\s*var\.deployment_stage\s*==\s*"migration"\s*\?\s*1\s*:\s*0'),
         re.compile(r'count\s*=\s*var\.deployment_stage\s*!=\s*"foundation"\s*\?\s*1\s*:\s*0'),
+        re.compile(
+            r'count\s*=\s*var\.deployment_stage\s*==\s*"service"\s*&&\s*var\.runtime_profile\s*==\s*"controlled_live_data_staff_pilot"\s*\?\s*1\s*:\s*0'
+        ),
     ],
 }
 

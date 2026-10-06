@@ -10,6 +10,7 @@ on:
         options:
         - migration
         - database-verification
+        - staff-bootstrap
         - service
       runtime_profile:
         description: Reviewed runtime profile already applied by Terraform before this transition readback
@@ -344,6 +345,113 @@ jobs:
           path = Path("build/deploy-result.json")
           payload = json.loads(path.read_text(encoding="utf-8"))
           payload.update({"result": "success", "current_stage": "database_verification", "image_digest": os.environ["IMAGE_DIGEST"], "admitted_image_digest": os.environ["ADMITTED_IMAGE_DIGEST"]})
+          path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+          PY
+
+
+      - name: Execute first staff account bootstrap
+        if: inputs.deployment_stage == 'staff-bootstrap'
+        env:
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          DEPLOYMENT_RUNTIME_PROFILE: ${{ inputs.runtime_profile }}
+        run: |
+          set -euo pipefail
+          test "$DEPLOYMENT_RUNTIME_PROFILE" = "controlled_live_data_staff_pilot"
+          mkdir -p build/transition-authority
+          JOB_JSON=$(python scripts/read_cloud_run_v2.py --project "$GCP_PROJECT_ID" --region us-east4 --kind jobs --name bootstrap-first-staff-account)
+          export JOB_JSON
+          python - <<'PY'
+          import json
+          import os
+
+          job = json.loads(os.environ["JOB_JSON"])
+          template = job.get("template", {})
+          task_template = template.get("template", {})
+          containers = task_template.get("containers")
+          if not isinstance(containers, list) or len(containers) != 1 or not isinstance(containers[0], dict):
+              raise SystemExit("staff bootstrap job must contain exactly one reviewed container")
+          if containers[0].get("image") != os.environ["MANAGED_IMAGE"]:
+              raise SystemExit("staff bootstrap job image must match the direct Cosign-verified image")
+          if containers[0].get("command") != ["golden-rose-bootstrap-first-staff-account"]:
+              raise SystemExit("staff bootstrap job command drifted")
+          if containers[0].get("args") not in (None, []):
+              raise SystemExit("staff bootstrap job arguments drifted")
+          expected_labels = {
+              "environment": "develop",
+              "data_boundary": "controlled-live-data-staff-pilot",
+              "managed_by": "terraform",
+              "service": "staff-tracer",
+              "cost_center": "develop",
+              "owner": "technical-owner",
+              "teardown": "intentional-runbook-only",
+              "goog-terraform-provisioned": "true",
+          }
+          if job.get("labels") != expected_labels:
+              raise SystemExit("staff bootstrap job labels drifted")
+          if task_template.get("serviceAccount") != f"staff-tracer-staff-bootstrap@{os.environ['GCP_PROJECT_ID']}.iam.gserviceaccount.com":
+              raise SystemExit("staff bootstrap job service account drifted")
+          if template.get("parallelism") != 1 or template.get("taskCount") != 1:
+              raise SystemExit("staff bootstrap job execution cardinality drifted")
+          if task_template.get("maxRetries") != 0 or task_template.get("timeout") != "600s":
+              raise SystemExit("staff bootstrap job retry or timeout posture drifted")
+          vpc_access = task_template.get("vpcAccess")
+          interfaces = vpc_access.get("networkInterfaces") if isinstance(vpc_access, dict) else None
+          if not isinstance(interfaces, list) or len(interfaces) != 1 or not isinstance(interfaces[0], dict):
+              raise SystemExit("staff bootstrap job VPC interface drifted")
+          if vpc_access.get("egress") != "PRIVATE_RANGES_ONLY":
+              raise SystemExit("staff bootstrap job VPC egress drifted")
+          if interfaces[0].get("network") != f"projects/{os.environ['GCP_PROJECT_ID']}/global/networks/develop-vpc":
+              raise SystemExit("staff bootstrap job VPC network drifted")
+          if interfaces[0].get("subnetwork") != f"projects/{os.environ['GCP_PROJECT_ID']}/regions/us-east4/subnetworks/develop-direct-vpc":
+              raise SystemExit("staff bootstrap job VPC subnetwork drifted")
+          environment = {}
+          for item in containers[0].get("env", []):
+              if not isinstance(item, dict) or not isinstance(item.get("name"), str):
+                  raise SystemExit("staff bootstrap job environment is malformed")
+              if item["name"] in environment:
+                  raise SystemExit("staff bootstrap job environment contains duplicate names")
+              if "value" in item:
+                  environment[item["name"]] = {"value": item.get("value")}
+              else:
+                  secret_ref = item.get("valueSource", {}).get("secretKeyRef", {})
+                  environment[item["name"]] = {
+                      "secret": secret_ref.get("secret"),
+                      "version": secret_ref.get("version"),
+                  }
+          expected_environment = {
+              "GOLDEN_ROSE_ENVIRONMENT": {"value": "production"},
+              "GOLDEN_ROSE_AUTH_MODE": {"value": "staff_oidc"},
+              "GOLDEN_ROSE_DEPLOYMENT_TARGET": {"value": "controlled-live-data-staff-pilot"},
+              "GOLDEN_ROSE_DEPLOYED_IMAGE_DIGEST": {"value": os.environ["IMAGE_DIGEST"]},
+              "GOLDEN_ROSE_MIGRATION_ASSUMED_ROLE": {"value": "golden_rose_schema_owner"},
+              "GOLDEN_ROSE_DATABASE_URL": {"secret": "migration-database-url", "version": "latest"},
+          }
+          pinned_identity_refs = {
+              "GOLDEN_ROSE_BOOTSTRAP_PROVIDER_SUBJECT": "staff-bootstrap-provider-subject",
+              "GOLDEN_ROSE_BOOTSTRAP_DISPLAY_NAME": "staff-bootstrap-display-name",
+          }
+          for name, secret_name in pinned_identity_refs.items():
+              secret_ref = environment.get(name)
+              if secret_ref is None:
+                  raise SystemExit(f"staff bootstrap job missing {name}")
+              if secret_ref.get("secret") != secret_name:
+                  raise SystemExit(f"staff bootstrap job {name} secret drifted")
+              version = secret_ref.get("version")
+              if not isinstance(version, str) or not version.isdigit() or version == "0":
+                  raise SystemExit(f"staff bootstrap job {name} must pin an enabled numeric secret version")
+              expected_environment[name] = {"secret": secret_name, "version": version}
+          if environment != expected_environment:
+              raise SystemExit("staff bootstrap job environment inventory or value drifted")
+          PY
+          gcloud run jobs execute bootstrap-first-staff-account --project "$GCP_PROJECT_ID" --region us-east4 --wait --format=json > build/transition-authority/staff-bootstrap-execution.json
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path("build/deploy-result.json")
+          payload = json.loads(path.read_text(encoding="utf-8"))
+          payload.update({"result": "success", "current_stage": "staff_account_bootstrap", "image_digest": os.environ["IMAGE_DIGEST"], "admitted_image_digest": os.environ["ADMITTED_IMAGE_DIGEST"]})
           path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
           PY
 

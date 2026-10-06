@@ -1314,6 +1314,178 @@ select {
   text-anchor: middle;
 }
 
+.nyc-zone-map {
+  display: grid;
+  gap: var(--space-3);
+  inline-size: 100%;
+  min-block-size: 100%;
+}
+
+.nyc-zone-map__frame {
+  aspect-ratio: 16 / 11;
+  background: #dbeaf0;
+  border: 1px solid var(--color-border);
+  border-radius: 0.55rem;
+  min-block-size: 20rem;
+  overflow: hidden;
+  position: relative;
+}
+
+.nyc-zone-map--compact .nyc-zone-map__frame {
+  border: 0;
+  border-radius: 0;
+  min-block-size: 100%;
+}
+
+.nyc-zone-map__base,
+.nyc-zone-map__mask,
+.nyc-zone-map__zones {
+  inset: 0;
+  position: absolute;
+}
+
+.nyc-zone-map__base {
+  border: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  height: 100%;
+  width: 100%;
+}
+
+.nyc-zone-map__base img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.nyc-zone-map__mask {
+  background:
+    linear-gradient(180deg, rgba(255, 253, 248, 0.12), rgba(255, 253, 248, 0.3)),
+    radial-gradient(circle at 66% 42%, rgba(255, 255, 255, 0.12), transparent 38%);
+  pointer-events: none;
+}
+
+.nyc-zone-map__zones {
+  pointer-events: none;
+}
+
+.nyc-zone-map__zone {
+  align-content: start;
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 0.45rem;
+  box-shadow: none;
+  color: #12213f;
+  display: grid;
+  gap: 0.1rem;
+  min-height: 3.1rem;
+  min-width: 5.75rem;
+  padding: 0.38rem 0.45rem;
+  pointer-events: auto;
+  position: absolute;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.nyc-zone-map__zone:hover,
+.nyc-zone-map__zone:focus-visible {
+  background: rgba(255, 253, 248, 0.16);
+  border-color: rgba(31, 121, 58, 0.54);
+  box-shadow: inset 0 0 0 1px rgba(255, 253, 248, 0.48);
+  z-index: 2;
+}
+
+.nyc-zone-map__zone-label {
+  background: rgba(255, 253, 248, 0.93);
+  border: 1px solid rgba(229, 217, 205, 0.86);
+  border-radius: 0.4rem;
+  box-shadow: 0 8px 18px rgba(28, 43, 55, 0.14);
+  display: grid;
+  gap: 0.1rem;
+  max-width: min(13rem, 42vw);
+  opacity: 0;
+  padding: 0.34rem 0.42rem;
+  pointer-events: none;
+  position: absolute;
+  transform: translateY(-0.35rem);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+  visibility: hidden;
+}
+
+.nyc-zone-map__zone:hover .nyc-zone-map__zone-label,
+.nyc-zone-map__zone:focus-visible .nyc-zone-map__zone-label {
+  opacity: 1;
+  transform: translateY(0);
+  visibility: visible;
+}
+
+.nyc-zone-map__zone-label strong,
+.nyc-zone-map__zone-label span,
+.nyc-zone-map__zone-label small {
+  overflow-wrap: anywhere;
+}
+
+.nyc-zone-map__zone-label strong {
+  font-size: clamp(0.62rem, 0.76rem, 0.86rem);
+  line-height: 1.05;
+}
+
+.nyc-zone-map__zone-label span {
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.nyc-zone-map__zone-label small {
+  color: #1f5d32;
+  font-size: 0.64rem;
+  font-weight: 900;
+}
+
+.nyc-zone-map--compact .nyc-zone-map__zone {
+  border-width: 1px;
+  box-shadow: none;
+  min-height: 2.2rem;
+  min-width: 4.5rem;
+  padding: 0.25rem 0.3rem;
+  pointer-events: none;
+}
+
+.nyc-zone-map--compact .nyc-zone-map__zone-label strong {
+  font-size: 0.58rem;
+}
+
+.nyc-zone-map--compact .nyc-zone-map__zone-label span,
+.nyc-zone-map--compact .nyc-zone-map__zone-label small {
+  font-size: 0.52rem;
+}
+
+.nyc-zone-map__attribution {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 0.3rem;
+  bottom: 0.5rem;
+  color: #1f2937;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 0.32rem 0.42rem;
+  position: absolute;
+  right: 0.5rem;
+  text-decoration: none;
+}
+
+.nyc-zone-map__note,
+.module-preview-helper {
+  color: var(--color-muted-text);
+  font-size: 0.92rem;
+  font-weight: 700;
+  margin: 0;
+}
+
 :root[data-theme='dark'] .skyline-artwork {
   filter: saturate(0.78) brightness(1.08) contrast(0.86);
   mix-blend-mode: screen;

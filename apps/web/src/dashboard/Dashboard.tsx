@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 
-import { IconSymbol, MissionStatementMark, SkylineArtwork, ZoneMapArtwork } from './artwork';
+import { IconSymbol, MissionStatementMark, SkylineArtwork } from './artwork';
 import type { IconName } from './artwork';
 import { queryIntakes } from '../api/intakeClient';
 import type { IntakeKind, IntakeSummary } from '../api/intakeContracts';
-import { getOperationsProjection, type OperationsProjection, type OperationsProjectionFailureKind, type OperationsRequestItem, type OperationsShiftItem } from '../api/operationsProjectionClient';
+import { getOperationsProjection, type OperationsAreaKey, type OperationsAreaSummaryItem, type OperationsProjection, type OperationsProjectionFailureKind, type OperationsRequestItem, type OperationsShiftItem } from '../api/operationsProjectionClient';
 import { getStaticOperationalFallbackPolicy, staticOperationalFallbackNotice, staticOperationalFallbacksAllowed, type StaticOperationalFallbackPolicy } from '../api/runtimeEnvironmentClient';
 import { getStaffSession } from '../api/staffAccountClient';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { NYCZoneMap } from '../map/NYCZoneMap';
 import { dashboardGreeting } from './dashboardGreeting';
 
 type DashboardStatus = 'complete' | 'draft' | 'in_review' | 'incomplete' | 'pending';
@@ -505,6 +506,25 @@ function dynamicZonesMetric(copy: DashboardCopy, data: DashboardIntakes, languag
   };
 }
 
+const areaKeyByName: Record<DashboardCopy['zoneAreas'][number]['name'], OperationsAreaKey> = {
+  Bronx: 'bronx',
+  Brooklyn: 'brooklyn',
+  Manhattan: 'manhattan',
+  Queens: 'queens',
+  'Staten Island': 'staten_island',
+};
+
+function zoneAreasAsAreaSummary(zoneAreas: DashboardCopy['zoneAreas']): OperationsAreaSummaryItem[] {
+  return zoneAreas.map((area) => ({
+    areaKey: areaKeyByName[area.name],
+    areaLabel: area.name,
+    pendingReviewCount: 0,
+    requestCount: 0,
+    shiftCount: 0,
+    workerSlots: area.count,
+  }));
+}
+
 function IconMark({ name }: { name: IconName }) {
   return (
     <span aria-hidden="true" className="dashboard-icon">
@@ -572,6 +592,7 @@ export function Dashboard() {
   const queueRows = useMemo(() => dynamicQueueRows(copy, intakes, language), [copy, intakes, language]);
   const scheduleRows = useMemo(() => dynamicScheduleRows(copy, intakes, language), [copy, intakes, language]);
   const zoneAreas = useMemo(() => dynamicZoneAreas(copy, intakes), [copy, intakes]);
+  const zoneAreaSummary = useMemo(() => zoneAreasAsAreaSummary(zoneAreas), [zoneAreas]);
   const zonesMetric = useMemo(() => dynamicZonesMetric(copy, intakes, language), [copy, intakes, language]);
   const operationsNotice = useMemo(() => projectionNotice(intakes.operationsStatus, language, intakes.staticFallbackPolicy), [intakes.operationsStatus, intakes.staticFallbackPolicy, language]);
   const allowStaticFallbacks = staticOperationalFallbacksAllowed(intakes.staticFallbackPolicy);
@@ -719,7 +740,7 @@ export function Dashboard() {
             <p><strong>{zonesMetric.value}</strong> {zonesMetric.meta}</p>
           </div>
           <div aria-hidden="true" className="dashboard-map">
-            <ZoneMapArtwork areas={zoneAreas} />
+            <NYCZoneMap areaSummary={zoneAreaSummary} compact decorative language={language} />
           </div>
         </section>
 

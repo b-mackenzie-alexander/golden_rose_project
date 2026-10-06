@@ -235,10 +235,10 @@ describe('Dashboard', () => {
     expect(view.container.querySelector('.brand-rose')).toBeInTheDocument();
     expect(view.container.querySelector('.skyline-artwork')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'La comunidad nos mueve' })).toHaveClass('mission-statement-mark');
-    expect(view.container.querySelector('.zone-map-artwork')).toBeInTheDocument();
-    expect(view.container.querySelectorAll('.zone-map-artwork__borough')).toHaveLength(5);
-    expect(view.container.querySelector('.zone-map-artwork')?.textContent).toContain('Brooklyn2');
-    expect(view.container.querySelector('.zone-map-artwork')?.textContent).toContain('Manhattan0');
+    expect(view.container.querySelector('.nyc-zone-map')).toBeInTheDocument();
+    expect(view.container.querySelectorAll('.nyc-zone-map__zone')).toHaveLength(10);
+    expect(view.container.querySelector('.nyc-zone-map')?.textContent).toContain('Central Brooklyn');
+    expect(view.container.querySelector('.nyc-zone-map')?.textContent).toContain('2 slots pending');
     expect(await runAxe(view.container)).toEqual([]);
   });
 
@@ -563,11 +563,15 @@ describe('Dashboard', () => {
       </LanguageProvider>,
     );
 
-    expect(screen.getByRole('heading', { name: 'Activity map' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Zone snapshot' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'NYC zone map' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Pilot zone snapshot' })).toBeInTheDocument();
     expect(screen.getByText(/Exact household and worksite locations remain restricted/)).toBeInTheDocument();
-    expect(await screen.findByText('Projected worker slots')).toBeInTheDocument();
-    expect(view.container.querySelector('.zone-map-artwork')?.textContent).toContain('Brooklyn2');
+    expect(screen.queryByRole('button', { name: 'Zone overlay' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Heat intensity' })).not.toBeInTheDocument();
+    expect(await screen.findByText('projected slots awaiting zone assignment')).toBeInTheDocument();
+    expect(screen.getByText('1 request / 2 slots')).toBeInTheDocument();
+    expect(view.container.querySelector('.nyc-zone-map')?.textContent).toContain('Central Brooklyn');
+    expect(view.container.querySelector('.nyc-zone-map')?.textContent).toContain('2 slots pending');
     expect(await runAxe(view.container)).toEqual([]);
 
     view.unmount();
@@ -600,10 +604,10 @@ describe('Dashboard', () => {
     );
 
     expect(await screen.findByRole('status')).toHaveTextContent('static examples are disabled');
-    const total = screen.getByText('Projected worker slots').closest('p');
-    expect(total).toHaveTextContent('0 Projected worker slots');
-    expect(view.container.querySelector('.zone-map-artwork')?.textContent).toContain('Brooklyn0');
-    expect(view.container.querySelector('.zone-map-artwork')?.textContent).toContain('Manhattan0');
+    const total = screen.getByText('projected slots awaiting zone assignment').closest('p');
+    expect(total).toHaveTextContent('0 projected slots awaiting zone assignment');
+    expect(view.container.querySelector('.nyc-zone-map')?.textContent).toContain('Central Brooklyn');
+    expect(view.container.querySelector('.nyc-zone-map')?.textContent).toContain('0 slots pending');
 
     view.unmount();
     render(

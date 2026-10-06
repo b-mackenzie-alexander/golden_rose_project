@@ -10,7 +10,12 @@ type GoogleCredentialResponse = {
 
 type GoogleAccountsId = {
   disableAutoSelect: () => void;
-  initialize: (config: { client_id: string; callback: (response: GoogleCredentialResponse) => void; auto_select?: boolean }) => void;
+  initialize: (config: {
+    client_id: string;
+    callback: (response: GoogleCredentialResponse) => void;
+    auto_select?: boolean;
+    essential_claims?: string;
+  }) => void;
   renderButton: (parent: HTMLElement, options: { size: 'medium'; theme: 'outline'; text: 'signin_with'; shape: 'rectangular' }) => void;
 };
 
@@ -132,6 +137,7 @@ export function GoogleStaffSignIn({ compact = false, onSignedIn }: GoogleStaffSi
       window.google.accounts.id.initialize({
         client_id: googleClientId,
         auto_select: false,
+        essential_claims: 'auth_time, amr',
         callback: (response) => {
           if (!response.credential) {
             setState('failed');

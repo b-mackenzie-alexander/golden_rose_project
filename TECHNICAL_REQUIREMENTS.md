@@ -1,5 +1,13 @@
 # Technical Requirements — Golden Rose Operations Platform
 
+## 2026-10-06 — Staff-pilot identity and onboarding baseline
+
+The controlled staff-pilot runtime now has validated named-account staff OIDC for the initial onboarding account. PR #167 was deployed through signed image admission, reviewed Terraform service refresh, protected service gate, Cloud Run v2 readback and browser validation. The staff personal account page must continue to resolve a verified identity-provider session to a durable Golden Rose staff account before showing permissions or account details; unauthenticated staff-session reads must fail closed.
+
+The staff account administration surface must remain application-authorized and no-store/auth-sensitive. It may onboard additional staff accounts only through explicit human staff action and durable provider-subject binding; email alone is not a durable account key. Recovery and session-revocation controls must remain evidence-recording workflows unless a later provider-side integration is separately approved and proven.
+
+Before Golden Rose staff pilot handoff, technical acceptance still needs UI polish and manual review: reduce routine exposure of raw provider subjects, clarify initial-owner versus remaining-operator-task wording, verify English/Spanish and accessibility behavior, and provide staff instructions for account onboarding and issue collection. This validated onboarding baseline is not production completion, support activation, export/import, current-environment migration, client-owned transition or automated matching/ranking/eligibility/referral/placement authority.
+
 ## 2026-09-29 — Client package index validator
 
 The active Tranche 2 portability slice adds `deploy/gcp/templates/client-production-package-index.example.json` and `scripts/validate_client_package_index.py`. A later approved operator can keep a filled package index outside source control and validate that the package runbooks, placeholder templates and offline validator scripts were reviewed with value-safe evidence.

@@ -1,5 +1,13 @@
 # Security — Golden Rose Operations Platform
 
+## 2026-10-06 — Controlled staff-pilot identity validation
+
+PR #167 is merged at protected `develop@3ddf85b1e3ca68cc1eea366cad61decde147cb00` and the controlled live-data staff-pilot service has been refreshed with the remediated image. The approved service-only deployment passed signed-image admission, reviewed Terraform apply, protected service gate, Cloud Run v2 readback, read-only health/readiness smoke and human browser validation for the initial owner Google onboarding account.
+
+The current security posture is stronger than the PR #156 source-only state: named staff OIDC is deployed for the staff-pilot runtime, synthetic staff runtime is disabled, the initial Golden Rose owner account resolves after human Google sign-in, account-level MFA evidence is recorded, and staff account administration is reachable only after a verified session. Recovery and session-revocation actions remain evidence records in Golden Rose; provider-side factor reset, forced logout, token revocation and session revocation remain outside the application unless separately integrated and proven.
+
+This status does not authorize additional cloud mutation, new staff-account bootstrap, provider-side identity mutation, credential rotation, support activation, production completion, live data entry, export/import, current-environment migration, client-owned transition, destructive cleanup or shared-runtime rollout. Before staff handoff, polish should reduce exposure of raw provider-subject details in routine admin views, keep onboarding wording clear, and complete manual bilingual/accessibility/staff-workflow acceptance.
+
 ## 2026-10-01 — Controlled live-data staff pilot security posture
 
 PR #156 is merged at protected `develop@985a8d1ac8630310ea58c0bca809665612c5ddbc`. The current source posture is a controlled live-data staff pilot package, not a fictional-demo or feedback-only package. Real worker and employer records may be entered only after a separate operator-held cloud packet validates named staff access, staff OIDC/MFA posture, disabled presentation seed/shared gate/static examples, live-data scope, backup/restore posture, data-governance basics, support/training/manual acceptance, rollback/closeout ownership and migration-disposition planning.

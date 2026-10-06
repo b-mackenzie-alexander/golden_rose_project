@@ -1,5 +1,11 @@
 # Production-readiness and staff identity plan — 2026-09-27
 
+## 2026-10-06 superseding status
+
+This plan has now advanced beyond source-only staff identity readiness. PR #167, `fix: tolerate missing Google AMR claim for staff pilot`, is merged at protected `develop@3ddf85b1e3ca68cc1eea366cad61decde147cb00` and deployed through the controlled staff-pilot service path. The initial owner onboarding account can complete human Google sign-in and resolve to a durable Golden Rose staff account with active lifecycle state, owner role, account-level MFA evidence, production staff OIDC readiness, synthetic runtime disabled and staff account administration access.
+
+Do not restart Tranche 1 from this document. The remaining immediate work is pilot-prep refinement: staff account/admin UX polish, staff onboarding instructions, manual English/Spanish/accessibility/staff-workflow acceptance, issue-collection procedure and additional named staff account setup as authorized. The validated initial owner session removes a critical blocking gap, but it does not make the product complete and does not itself authorize broad staff handoff, live data entry, provider-side reset/revocation execution, support activation, export/import, current-environment migration or client-owned transition.
+
 ## 2026-10-01 superseding status
 
 This plan has been substantially executed in source through PR #156, `feat: add live-data staff pilot readiness`, merged into protected `develop` at `985a8d1ac8630310ea58c0bca809665612c5ddbc`. Do not restart Tranche 1 from this document. Staff authentication/account lifecycle/admin surfaces, deployable-package portability validators, operations-readiness evidence contracts, staff-feedback and transition-planning evidence, and the controlled live-data staff pilot readiness packet now exist in source.

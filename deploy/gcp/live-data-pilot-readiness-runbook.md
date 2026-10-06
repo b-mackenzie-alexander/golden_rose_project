@@ -78,6 +78,13 @@ and should include, outside source control:
 - smoke/readiness results after deployment
 - staff pilot opening receipt and closeout owner
 
+As of 2026-10-06, the controlled staff-pilot service has a validated initial
+owner onboarding account after PR #167 deployment. Future pilot-opening evidence
+should treat that as the starting identity baseline, not as product completion:
+additional staff onboarding, staff instructions, UI polish, manual
+English/Spanish/accessibility/staff-workflow acceptance, issue collection and
+record-disposition boundaries remain separate pilot-opening tasks.
+
 No cloud inspection, Terraform plan/apply, migration execution, service update,
 runtime access change, credential rotation or live-data admission follows from
 this source runbook alone.
@@ -87,7 +94,8 @@ this source runbook alone.
 Stop before opening the live-data pilot if any of these are true:
 
 - staff access is shared, anonymous or not attributable to named accounts
-- staff OIDC issuer, audience, JWKS or MFA claim semantics are missing
+- staff OIDC issuer, audience or JWKS semantics are missing, or Golden Rose
+  account-level MFA evidence is not recorded for the admitted staff account
 - demo access, presentation seed data or static operational examples would be
   visible in the pilot
 - staff do not have concise working instructions and an escalation path

@@ -26,7 +26,7 @@ def _valid_training_acceptance_evidence() -> dict[str, Any]:
         },
         "source": {
             "source_commit": "e" * 40,
-            "migration_revision": "0014_request_shift_review",
+            "migration_revision": "0015_staff_account_corrections",
         },
         "training_acceptance": {
             "staff_training_status": "ready",

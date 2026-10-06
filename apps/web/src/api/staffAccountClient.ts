@@ -7,6 +7,7 @@ export type StaffAccountEvent =
   | 'staff_account.activated'
   | 'staff_account.suspended'
   | 'staff_account.deprovisioned'
+  | 'staff_account.corrected'
   | 'staff_account.recovery_recorded'
   | 'staff_account.sessions_revoked';
 export type StaffDelegationEvent = 'staff_delegation.granted' | 'staff_delegation.revoked';
@@ -123,6 +124,11 @@ export type CreateStaffAccountInput = {
   commandId: string;
 };
 
+export type CorrectStaffAccountInput = CreateStaffAccountInput & {
+  staffId: string;
+  expectedVersion: number;
+};
+
 export type StaffAccountTransitionInput = {
   staffId: string;
   expectedVersion: number;
@@ -173,6 +179,7 @@ const events = new Set<StaffAccountEvent>([
   'staff_account.activated',
   'staff_account.suspended',
   'staff_account.deprovisioned',
+  'staff_account.corrected',
   'staff_account.recovery_recorded',
   'staff_account.sessions_revoked',
 ]);
@@ -524,6 +531,22 @@ export async function createStaffAccount(input: CreateStaffAccountInput): Promis
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'Idempotency-Key': input.commandId },
     body: JSON.stringify({
+      provider_subject: input.providerSubject,
+      display_name: input.displayName,
+      role_name: input.roleName,
+      permission_names: input.permissionNames,
+      mfa_enrolled: input.mfaEnrolled,
+      reason_text: input.reasonText,
+    }),
+  }, parseLifecycle, true);
+}
+
+export async function correctStaffAccount(input: CorrectStaffAccountInput): Promise<StaffAccountResult<StaffAccountLifecycleResult>> {
+  return request(`/staff-accounts/${input.staffId}/correct-onboarding`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'Idempotency-Key': input.commandId },
+    body: JSON.stringify({
+      expected_version: input.expectedVersion,
       provider_subject: input.providerSubject,
       display_name: input.displayName,
       role_name: input.roleName,

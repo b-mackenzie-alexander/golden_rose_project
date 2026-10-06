@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 
 import {
   activateStaffAccount,
+  correctStaffAccount,
   createStaffAccount,
   deprovisionStaffAccount,
   getStaffIdentityReadiness,
@@ -307,13 +308,20 @@ it('maps staff authentication and account-state problem responses', async () => 
   expect(await getStaffSession()).toEqual({ ok: false, failure: { kind: 'identity_provider_unavailable' } });
 });
 
-it('creates and activates accounts with idempotency headers and version validation', async () => {
+it('creates, corrects, and activates accounts with idempotency headers and version validation', async () => {
   const activeAccount = { ...account, lifecycle_status: 'active', mfa_enrolled: true, version: 2 };
+  const correctedAccount = { ...account, display_name: 'Mariela Rivera', mfa_enrolled: true, version: 2 };
   const fetchMock = vi.fn<typeof fetch>()
     .mockResolvedValueOnce(
       new Response(JSON.stringify({ account, event_type: 'staff_account.created', result_version: 1 }), {
         status: 201,
         headers: { 'Content-Type': 'application/json', 'Idempotency-Result-Version': '1' },
+      }),
+    )
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({ account: correctedAccount, event_type: 'staff_account.corrected', result_version: 2 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Result-Version': '2' },
       }),
     )
     .mockResolvedValueOnce(
@@ -333,6 +341,17 @@ it('creates and activates accounts with idempotency headers and version validati
     reasonText: 'Initial onboarding',
     roleName: 'operations_staff',
   });
+  const corrected = await correctStaffAccount({
+    commandId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    expectedVersion: 1,
+    displayName: 'Mariela Rivera',
+    mfaEnrolled: true,
+    permissionNames: ['staff_account:read', 'intake:read'],
+    providerSubject: 'oidc:staff:corrected',
+    reasonText: 'Correct onboarding',
+    roleName: 'operations_staff',
+    staffId: account.staff_id,
+  });
   const activated = await activateStaffAccount({
     commandId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
     expectedVersion: 1,
@@ -342,6 +361,7 @@ it('creates and activates accounts with idempotency headers and version validati
   });
 
   expect(created.ok).toBe(true);
+  expect(corrected.ok).toBe(true);
   expect(activated.ok).toBe(true);
   const firstCall = fetchMock.mock.calls[0];
   expect(firstCall?.[0]).toBe('/api/staff/v1/staff-accounts');
@@ -349,7 +369,19 @@ it('creates and activates accounts with idempotency headers and version validati
     method: 'POST',
     headers: { 'Idempotency-Key': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
   });
-  expect(fetchMock).toHaveBeenNthCalledWith(2, `/api/staff/v1/staff-accounts/${account.staff_id}/activate`, expect.objectContaining({
+  expect(fetchMock).toHaveBeenNthCalledWith(2, `/api/staff/v1/staff-accounts/${account.staff_id}/correct-onboarding`, expect.objectContaining({
+    method: 'POST',
+    body: JSON.stringify({
+      expected_version: 1,
+      provider_subject: 'oidc:staff:corrected',
+      display_name: 'Mariela Rivera',
+      role_name: 'operations_staff',
+      permission_names: ['staff_account:read', 'intake:read'],
+      mfa_enrolled: true,
+      reason_text: 'Correct onboarding',
+    }),
+  }));
+  expect(fetchMock).toHaveBeenNthCalledWith(3, `/api/staff/v1/staff-accounts/${account.staff_id}/activate`, expect.objectContaining({
     method: 'POST',
     body: JSON.stringify({ expected_version: 1, reason_text: 'MFA confirmed', mfa_enrolled: true }),
   }));

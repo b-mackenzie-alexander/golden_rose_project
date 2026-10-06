@@ -228,6 +228,72 @@ def update_staff_account_lifecycle(
     return StaffAccountRecord(*row)
 
 
+def update_staff_account_onboarding(
+    *,
+    session: Session,
+    staff_id: UUID,
+    expected_version: int,
+    provider_subject: str,
+    display_name: str,
+    role_name: str,
+    mfa_enrolled: bool,
+    updated_at: datetime,
+    actor_id: UUID,
+) -> StaffAccountRecord:
+    row = session.execute(
+        update(staff_accounts)
+        .where(
+            staff_accounts.c.staff_id == staff_id,
+            staff_accounts.c.version == expected_version,
+        )
+        .values(
+            provider_subject=provider_subject,
+            display_name=display_name,
+            role_name=role_name,
+            mfa_enrolled=mfa_enrolled,
+            updated_at=updated_at,
+            updated_by=actor_id,
+            version=expected_version + 1,
+        )
+        .returning(
+            staff_accounts.c.staff_id,
+            staff_accounts.c.provider_subject,
+            staff_accounts.c.display_name,
+            staff_accounts.c.role_name,
+            staff_accounts.c.lifecycle_status,
+            staff_accounts.c.mfa_enrolled,
+            staff_accounts.c.created_at,
+            staff_accounts.c.created_by,
+            staff_accounts.c.updated_at,
+            staff_accounts.c.updated_by,
+            staff_accounts.c.version,
+        )
+    ).one()
+    return StaffAccountRecord(*row)
+
+
+def revoke_active_staff_permission_grants(
+    *,
+    session: Session,
+    staff_id: UUID,
+    revoked_at: datetime,
+    actor_id: UUID,
+    reason_text: str,
+) -> None:
+    session.execute(
+        update(staff_permission_grants)
+        .where(
+            staff_permission_grants.c.staff_id == staff_id,
+            staff_permission_grants.c.revoked_at.is_(None),
+        )
+        .values(
+            revoked_at=revoked_at,
+            revoked_by=actor_id,
+            revocation_reason=reason_text,
+        )
+    )
+
+
 def insert_staff_permission_grants(
     *,
     session: Session,

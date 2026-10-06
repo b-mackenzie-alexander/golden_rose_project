@@ -32,7 +32,7 @@ def _valid_closeout_receipt() -> dict[str, Any]:
         },
         "source": {
             "source_commit": "c" * 40,
-            "migration_revision": "0014_request_shift_review",
+            "migration_revision": "0015_staff_account_corrections",
         },
         "preconditions": {
             "activation_receipt_status": "ready",

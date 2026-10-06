@@ -23,7 +23,7 @@ def _valid_operations_readiness_evidence() -> dict[str, Any]:
         },
         "source": {
             "source_commit": "b" * 40,
-            "migration_revision": "0014_request_shift_review",
+            "migration_revision": "0015_staff_account_corrections",
         },
         "operations": {
             "monitoring_configuration_status": "ready",

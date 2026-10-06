@@ -3,6 +3,7 @@ import type { SyntheticEvent } from 'react';
 
 import {
   activateStaffAccount,
+  correctStaffAccount,
   createStaffAccount,
   deprovisionStaffAccount,
   grantStaffDelegation,
@@ -101,6 +102,7 @@ const eventLabels: Record<StaffAccountLifecycleEvent['eventType'], { en: string;
   'staff_account.activated': { en: 'Account activated', es: 'Cuenta activada' },
   'staff_account.suspended': { en: 'Account suspended', es: 'Cuenta suspendida' },
   'staff_account.deprovisioned': { en: 'Account deprovisioned', es: 'Cuenta retirada' },
+  'staff_account.corrected': { en: 'Account corrected', es: 'Cuenta corregida' },
   'staff_account.recovery_recorded': { en: 'Recovery evidence recorded', es: 'Evidencia de recuperacion registrada' },
   'staff_account.sessions_revoked': { en: 'Session-revocation evidence recorded', es: 'Evidencia de revocacion de sesion registrada' },
 };
@@ -141,6 +143,10 @@ function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function providerSubjectStatus(language: 'en' | 'es') {
+  return language === 'en' ? 'Identity provider subject recorded' : 'Sujeto del proveedor registrado';
 }
 
 function formatStatusTransition(event: StaffAccountLifecycleEvent, language: 'en' | 'es') {
@@ -206,6 +212,8 @@ export function StaffAccountAdmin() {
   const [accessFailure, setAccessFailure] = useState<StaffAccountFailureKind | null>(null);
   const [createForm, setCreateForm] = useState<CreateForm>(emptyCreate);
   const [createErrors, setCreateErrors] = useState<Partial<Record<keyof CreateForm, string>>>({});
+  const [correctionForm, setCorrectionForm] = useState<(CreateForm & { account: StaffAccount }) | null>(null);
+  const [correctionErrors, setCorrectionErrors] = useState<Partial<Record<keyof CreateForm, string>>>({});
   const [actionForm, setActionForm] = useState<ActionForm | null>(null);
   const [actionError, setActionError] = useState('');
   const [delegationPanel, setDelegationPanel] = useState<DelegationPanel | null>(null);
@@ -272,13 +280,13 @@ export function StaffAccountAdmin() {
   const signInRequired = accessFailure === 'sign_in_required' || accessFailure === 'authentication_failed';
   const adminControlsReady = accountsLoaded;
 
-  function validateCreate() {
+  function validateAccountForm(form: CreateForm, setErrors: (errors: Partial<Record<keyof CreateForm, string>>) => void) {
     const next: Partial<Record<keyof CreateForm, string>> = {};
-    if (createForm.displayName.trim().length === 0) next.displayName = language === 'en' ? 'Display name is required.' : 'Nombre visible requerido.';
-    if (createForm.providerSubject.trim().length === 0) next.providerSubject = language === 'en' ? 'Provider subject is required.' : 'Sujeto del proveedor requerido.';
-    if (createForm.permissionNames.length === 0) next.permissionNames = language === 'en' ? 'Select at least one permission.' : 'Seleccione al menos un permiso.';
-    if (createForm.reasonText.trim().length === 0) next.reasonText = language === 'en' ? 'Reason is required.' : 'Motivo requerido.';
-    setCreateErrors(next);
+    if (form.displayName.trim().length === 0) next.displayName = language === 'en' ? 'Display name is required.' : 'Nombre visible requerido.';
+    if (form.providerSubject.trim().length === 0) next.providerSubject = language === 'en' ? 'Provider subject is required.' : 'Sujeto del proveedor requerido.';
+    if (form.permissionNames.length === 0) next.permissionNames = language === 'en' ? 'Select at least one permission.' : 'Seleccione al menos un permiso.';
+    if (form.reasonText.trim().length === 0) next.reasonText = language === 'en' ? 'Reason is required.' : 'Motivo requerido.';
+    setErrors(next);
     return Object.keys(next).length === 0;
   }
 
@@ -286,7 +294,7 @@ export function StaffAccountAdmin() {
     event.preventDefault();
     setNotice('');
     setError('');
-    if (!validateCreate()) return;
+    if (!validateAccountForm(createForm, setCreateErrors)) return;
     const result = await createStaffAccount({ ...createForm, commandId: createCommandId() });
     if (!result.ok) {
       setError(failureText(result.failure.kind, language));
@@ -296,6 +304,28 @@ export function StaffAccountAdmin() {
     setNotice(language === 'en' ? 'Staff account created in suspended onboarding state.' : 'Cuenta creada en estado suspendido para incorporacion.');
     setCreateForm(emptyCreate);
     setCreateErrors({});
+  }
+
+  async function submitCorrection(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setNotice('');
+    setError('');
+    if (correctionForm === null) return;
+    if (!validateAccountForm(correctionForm, setCorrectionErrors)) return;
+    const result = await correctStaffAccount({
+      ...correctionForm,
+      staffId: correctionForm.account.staffId,
+      expectedVersion: correctionForm.account.version,
+      commandId: createCommandId(),
+    });
+    if (!result.ok) {
+      setError(failureText(result.failure.kind, language));
+      return;
+    }
+    setAccounts((current) => upsertAccount(current, result.value.account));
+    setNotice(language === 'en' ? 'Staff account onboarding details corrected.' : 'Detalles de incorporacion corregidos.');
+    setCorrectionForm(null);
+    setCorrectionErrors({});
   }
 
   async function submitAction(event: SyntheticEvent<HTMLFormElement>) {
@@ -338,6 +368,31 @@ export function StaffAccountAdmin() {
         ? current.permissionNames.filter((item) => item !== permission)
         : [...current.permissionNames, permission],
     }));
+  }
+
+  function toggleCorrectionPermission(permission: string) {
+    setCorrectionForm((current) => {
+      if (current === null) return current;
+      return {
+        ...current,
+        permissionNames: current.permissionNames.includes(permission)
+          ? current.permissionNames.filter((item) => item !== permission)
+          : [...current.permissionNames, permission],
+      };
+    });
+  }
+
+  function openCorrection(account: StaffAccount) {
+    setCorrectionForm({
+      account,
+      displayName: account.displayName,
+      providerSubject: account.providerSubject,
+      roleName: account.roleName,
+      permissionNames: ['staff_account:read'],
+      mfaEnrolled: account.mfaEnrolled,
+      reasonText: '',
+    });
+    setCorrectionErrors({});
   }
 
   async function openDelegations(account: StaffAccount) {
@@ -490,7 +545,7 @@ export function StaffAccountAdmin() {
               <div role="row" className="staff-account-row" key={account.staffId}>
                 <span role="cell">
                   <strong>{account.displayName}</strong>
-                  <small>{account.providerSubject}</small>
+                  <small>{providerSubjectStatus(language)}</small>
                 </span>
                 <span role="cell">{roleLabels[account.roleName][language]}</span>
                 <span role="cell">
@@ -504,6 +559,9 @@ export function StaffAccountAdmin() {
                 <span role="cell" className="staff-account-actions">
                   {account.lifecycleStatus !== 'active' && account.lifecycleStatus !== 'deprovisioned' ? (
                     <button className="focus-ring" type="button" onClick={() => { setActionForm({ account, action: 'activate', reasonText: '', mfaEnrolled: true }); }}>{actionLabels.activate[language]}</button>
+                  ) : null}
+                  {account.lifecycleStatus === 'suspended' ? (
+                    <button className="focus-ring" type="button" onClick={() => { openCorrection(account); }}>{language === 'en' ? 'Correct' : 'Corregir'}</button>
                   ) : null}
                   {account.lifecycleStatus === 'active' ? (
                     <button className="focus-ring" type="button" onClick={() => { setActionForm({ account, action: 'suspend', reasonText: '', mfaEnrolled: false }); }}>{actionLabels.suspend[language]}</button>
@@ -576,6 +634,62 @@ export function StaffAccountAdmin() {
           </form>
         </section>
       </div>
+      ) : null}
+
+      {correctionForm ? (
+        <section className="staff-account-panel staff-action-panel" aria-labelledby="account-correction-heading">
+          <div className="staff-account-panel-header">
+            <h3 id="account-correction-heading">{language === 'en' ? 'Correct onboarding' : 'Corregir incorporacion'}: {correctionForm.account.displayName}</h3>
+            <button className="staff-secondary-button focus-ring" type="button" onClick={() => { setCorrectionForm(null); }}>{language === 'en' ? 'Close' : 'Cerrar'}</button>
+          </div>
+          <p className="staff-account-helper">
+            {language === 'en'
+              ? 'Correct suspended onboarding details before activation. Named permissions selected here replace the suspended account permissions. Deprovision accounts that should not remain usable.'
+              : 'Corrija detalles de incorporacion suspendida antes de activar. Los permisos nombrados seleccionados aqui reemplazan los permisos de la cuenta suspendida. Retire cuentas que no deben quedar utilizables.'}
+          </p>
+          <form className="staff-account-form" onSubmit={(event) => { void submitCorrection(event); }}>
+            <label>
+              <span>{language === 'en' ? 'Display name' : 'Nombre visible'}</span>
+              <input className="focus-ring" value={correctionForm.displayName} onChange={(event) => { setCorrectionForm({ ...correctionForm, displayName: event.target.value }); }} />
+              {correctionErrors.displayName ? <small role="alert">{correctionErrors.displayName}</small> : null}
+            </label>
+            <label>
+              <span>{language === 'en' ? 'Provider subject' : 'Sujeto del proveedor'}</span>
+              <input className="focus-ring" value={correctionForm.providerSubject} onChange={(event) => { setCorrectionForm({ ...correctionForm, providerSubject: event.target.value }); }} />
+              {correctionErrors.providerSubject ? <small role="alert">{correctionErrors.providerSubject}</small> : null}
+            </label>
+            <div className="calendar-form-row">
+              <label>
+                <span>{language === 'en' ? 'Role' : 'Rol'}</span>
+                <select className="focus-ring" value={correctionForm.roleName} onChange={(event) => { setCorrectionForm({ ...correctionForm, roleName: event.target.value as StaffAccountRole }); }}>
+                  {(Object.keys(roleLabels) as StaffAccountRole[]).map((role) => (
+                    <option key={role} value={role}>{roleLabels[role][language]}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="staff-checkbox-label">
+                <input checked={correctionForm.mfaEnrolled} type="checkbox" onChange={(event) => { setCorrectionForm({ ...correctionForm, mfaEnrolled: event.target.checked }); }} />
+                <span>{language === 'en' ? 'MFA already enrolled' : 'MFA ya inscrito'}</span>
+              </label>
+            </div>
+            <fieldset className="staff-permission-fieldset">
+              <legend>{language === 'en' ? 'Named permissions' : 'Permisos nombrados'}</legend>
+              {permissions.map((permission) => (
+                <label key={permission}>
+                  <input checked={correctionForm.permissionNames.includes(permission)} type="checkbox" onChange={() => { toggleCorrectionPermission(permission); }} />
+                  <span>{permission}</span>
+                </label>
+              ))}
+              {correctionErrors.permissionNames ? <small role="alert">{correctionErrors.permissionNames}</small> : null}
+            </fieldset>
+            <label>
+              <span>{language === 'en' ? 'Reason' : 'Motivo'}</span>
+              <textarea className="focus-ring" value={correctionForm.reasonText} onChange={(event) => { setCorrectionForm({ ...correctionForm, reasonText: event.target.value }); }} />
+              {correctionErrors.reasonText ? <small role="alert">{correctionErrors.reasonText}</small> : null}
+            </label>
+            <button className="staff-primary-button focus-ring" type="submit">{language === 'en' ? 'Save correction' : 'Guardar correccion'}</button>
+          </form>
+        </section>
       ) : null}
 
       {actionForm ? (

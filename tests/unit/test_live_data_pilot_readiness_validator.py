@@ -32,7 +32,7 @@ def _valid_live_data_pilot_readiness() -> dict[str, Any]:
         },
         "source": {
             "source_commit": "f" * 40,
-            "migration_revision": "0014_request_shift_review",
+            "migration_revision": "0015_staff_account_corrections",
         },
         "pilot_readiness": {
             "operating_boundary_status": "ready",

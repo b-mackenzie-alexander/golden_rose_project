@@ -30,7 +30,7 @@ def _valid_transition_planning() -> dict[str, Any]:
         },
         "source": {
             "source_commit": "e" * 40,
-            "migration_revision": "0014_request_shift_review",
+            "migration_revision": "0015_staff_account_corrections",
         },
         "transition_planning": {
             "management_model_status": "ready",

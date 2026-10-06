@@ -53,7 +53,7 @@ export function AppShell() {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [dataSearchItems, setDataSearchItems] = useState<DataSearchItem[]>([]);
   const isDark = theme === 'dark';
-  const navItems = [
+  const primaryNavItems = [
     { icon: 'home', label: language === 'en' ? 'Home' : 'Inicio', to: '/' },
     {
       icon: 'worker',
@@ -73,10 +73,12 @@ export function AppShell() {
     },
     { icon: 'calendar', label: language === 'en' ? 'Calendar' : 'Calendario', to: '/staff/calendar' },
     { icon: 'queue', label: language === 'en' ? 'Work queues' : 'Colas de trabajo', to: '/staff/queues' },
-    { icon: 'workers', label: language === 'en' ? 'My account' : 'Mi cuenta', to: '/staff/account' },
-    { icon: 'workers', label: language === 'en' ? 'Staff accounts' : 'Cuentas del personal', to: '/staff/admin/accounts' },
     { icon: 'map', label: language === 'en' ? 'Map' : 'Mapa', to: '/staff/map' },
     { icon: 'reports', label: language === 'en' ? 'Reports' : 'Informes', to: '/staff/reports' },
+  ] satisfies Array<{ icon: IconName; label: string; to: string }>;
+  const accountNavItems = [
+    { icon: 'workers', label: language === 'en' ? 'My account' : 'Mi cuenta', to: '/staff/account' },
+    { icon: 'workers', label: language === 'en' ? 'Staff accounts' : 'Cuentas del personal', to: '/staff/admin/accounts' },
   ] satisfies Array<{ icon: IconName; label: string; to: string }>;
   const searchItems = useMemo<Array<SearchItem>>(() => [
     {
@@ -415,7 +417,17 @@ export function AppShell() {
         </div>
         <nav aria-label={messages.primaryNavigation} className="primary-navigation">
           <ul>
-            {navItems.map((item) => (
+            {primaryNavItems.map((item) => (
+              <li key={item.to}>
+                <NavLink className="focus-ring nav-link control-44" to={item.to}>
+                  <span aria-hidden="true" className="nav-link__icon"><IconSymbol name={item.icon} /></span>
+                  <span>{item.label}</span>
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+          <ul className="nav-account-group">
+            {accountNavItems.map((item) => (
               <li key={item.to}>
                 <NavLink className="focus-ring nav-link control-44" to={item.to}>
                   <span aria-hidden="true" className="nav-link__icon"><IconSymbol name={item.icon} /></span>

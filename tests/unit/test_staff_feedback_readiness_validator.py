@@ -28,7 +28,7 @@ def _valid_staff_feedback_readiness() -> dict[str, Any]:
         },
         "source": {
             "source_commit": "e" * 40,
-            "migration_revision": "0014_request_shift_review",
+            "migration_revision": "0015_staff_account_corrections",
         },
         "feedback_readiness": {
             "current_environment_scope_status": "ready",

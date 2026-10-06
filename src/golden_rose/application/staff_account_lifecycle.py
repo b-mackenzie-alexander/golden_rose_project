@@ -28,7 +28,9 @@ from golden_rose.persistence.staff_accounts import (
     insert_staff_account,
     insert_staff_permission_grants,
     list_active_staff_permissions,
+    revoke_active_staff_permission_grants,
     update_staff_account_lifecycle,
+    update_staff_account_onboarding,
 )
 
 
@@ -129,6 +131,109 @@ def create_staff_account(
     return StaffAccountLifecycleResult(
         account=account,
         event_type="staff_account.created",
+        result_version=account.version,
+    )
+
+
+def correct_staff_account_onboarding(
+    *,
+    session: Session,
+    principal: StaffPrincipal,
+    command_id: UUID,
+    staff_id: UUID,
+    expected_version: int,
+    provider_subject: str,
+    display_name: str,
+    role_name: str,
+    permission_names: frozenset[str],
+    mfa_enrolled: bool,
+    clock: Clock,
+    identifiers: IdentifierFactory,
+    reason_text: str,
+) -> StaffAccountLifecycleResult:
+    if not can_create_staff_account(principal):
+        msg = "principal lacks staff_account:create"
+        raise PermissionError(msg)
+
+    provider_subject = _require_text("provider_subject", provider_subject, 256)
+    display_name = _require_text("display_name", display_name, 160)
+    reason_text = _require_text("reason_text", reason_text, 512)
+    permissions = _validate_permission_names(permission_names)
+    _validate_role_permissions(role_name=role_name, permissions=permissions)
+    _deny_self_escalation(
+        principal=principal,
+        target_staff_id=staff_id,
+        requested_permissions=permissions,
+    )
+    if role_name not in STAFF_ACCOUNT_ROLES:
+        raise StaffAccountLifecycleError("invalid staff role")
+    if staff_id == principal.actor_id:
+        raise StaffAccountLifecycleError("staff account cannot correct itself")
+
+    now = clock.now()
+    try:
+        existing = get_staff_account_by_id_for_update(session=session, staff_id=staff_id)
+        if existing.version != expected_version:
+            raise StaffAccountVersionConflictError("staff account version conflict")
+        if existing.lifecycle_status != "suspended":
+            raise StaffAccountLifecycleError("only suspended onboarding accounts can be corrected")
+        account = update_staff_account_onboarding(
+            session=session,
+            staff_id=staff_id,
+            expected_version=expected_version,
+            provider_subject=provider_subject,
+            display_name=display_name,
+            role_name=role_name,
+            mfa_enrolled=mfa_enrolled,
+            updated_at=now,
+            actor_id=principal.actor_id,
+        )
+        revoke_active_staff_permission_grants(
+            session=session,
+            staff_id=staff_id,
+            revoked_at=now,
+            actor_id=principal.actor_id,
+            reason_text=reason_text,
+        )
+        grants = tuple((identifiers.new_uuid4(), item) for item in sorted(permissions))
+        insert_staff_permission_grants(
+            session=session,
+            grants=grants,
+            staff_id=staff_id,
+            granted_at=now,
+            actor_id=principal.actor_id,
+        )
+        insert_lifecycle_event(
+            session=session,
+            event_id=identifiers.new_uuid4(),
+            command_id=command_id,
+            staff_id=staff_id,
+            actor_id=principal.actor_id,
+            event_type="staff_account.corrected",
+            previous_status=existing.lifecycle_status,
+            new_status=account.lifecycle_status,
+            previous_version=existing.version,
+            new_version=account.version,
+            occurred_at=now,
+            reason_text=reason_text,
+        )
+        session.commit()
+    except NoResultFound as exc:
+        session.rollback()
+        raise StaffAccountNotFoundError("staff account not found") from exc
+    except StaffAccountVersionConflictError:
+        session.rollback()
+        raise
+    except SQLAlchemyError as exc:
+        session.rollback()
+        raise SafePersistenceError("persistence operation failed") from exc
+    except Exception:
+        session.rollback()
+        raise
+
+    return StaffAccountLifecycleResult(
+        account=account,
+        event_type="staff_account.corrected",
         result_version=account.version,
     )
 

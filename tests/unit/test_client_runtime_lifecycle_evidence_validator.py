@@ -24,7 +24,7 @@ def _valid_runtime_lifecycle_evidence() -> dict[str, Any]:
         },
         "source": {
             "source_commit": "c" * 40,
-            "migration_revision": "0014_request_shift_review",
+            "migration_revision": "0015_staff_account_corrections",
         },
         "runtime_lifecycle": {
             "github_actions_runtime_status": "ready",

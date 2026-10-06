@@ -24,7 +24,7 @@ def _valid_copy_approval_evidence() -> dict[str, Any]:
         },
         "source": {
             "source_commit": "e" * 40,
-            "migration_revision": "0014_request_shift_review",
+            "migration_revision": "0015_staff_account_corrections",
         },
         "copy_approval": {
             "copy_inventory_status": "ready",

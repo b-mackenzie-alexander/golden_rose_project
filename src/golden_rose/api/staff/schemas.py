@@ -200,6 +200,10 @@ class CreateStaffAccountRequest(BaseModel):
         return _normalize_staff_text("reason_text", value, 512)
 
 
+class CorrectStaffAccountRequest(CreateStaffAccountRequest):
+    expected_version: int = Field(ge=1, le=2_147_483_646, strict=True)
+
+
 class StaffAccountTransitionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -311,6 +315,7 @@ class StaffAccountLifecycleEventResponse(BaseModel):
         "staff_account.activated",
         "staff_account.suspended",
         "staff_account.deprovisioned",
+        "staff_account.corrected",
         "staff_account.recovery_recorded",
         "staff_account.sessions_revoked",
     ]
@@ -348,6 +353,7 @@ class StaffAccountLifecycleResponse(BaseModel):
         "staff_account.activated",
         "staff_account.suspended",
         "staff_account.deprovisioned",
+        "staff_account.corrected",
         "staff_account.recovery_recorded",
         "staff_account.sessions_revoked",
     ]

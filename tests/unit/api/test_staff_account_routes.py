@@ -423,6 +423,103 @@ def test_create_staff_account_routes_normalized_admin_request(
     assert create.call_args.kwargs["reason_text"] == "Initial onboarding"
 
 
+def test_correct_staff_account_routes_normalized_admin_request(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = http
+    correct = Mock(
+        return_value=lifecycle_result(
+            event_type="staff_account.corrected",
+            record=account_record(version=2, mfa_enrolled=True),
+        )
+    )
+    monkeypatch.setattr(staff_accounts, "correct_staff_account_onboarding", correct)
+
+    response = client.post(
+        f"/api/staff/v1/staff-accounts/{STAFF_ID}/correct-onboarding",
+        headers=command_headers(),
+        json={
+            "expected_version": 1,
+            "provider_subject": " oidc:staff:corrected ",
+            "display_name": " Mariela   Rivera ",
+            "role_name": "operations_staff",
+            "permission_names": ["intake:read", "worker:read"],
+            "mfa_enrolled": True,
+            "reason_text": " Correct onboarding record ",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["vary"] == "Authorization"
+    assert response.headers["idempotency-result-version"] == "2"
+    assert response.json()["event_type"] == "staff_account.corrected"
+    assert correct.call_args.kwargs["staff_id"] == STAFF_ID
+    assert correct.call_args.kwargs["expected_version"] == 1
+    assert correct.call_args.kwargs["provider_subject"] == "oidc:staff:corrected"
+    assert correct.call_args.kwargs["display_name"] == "Mariela Rivera"
+    assert correct.call_args.kwargs["permission_names"] == frozenset({"intake:read", "worker:read"})
+    assert correct.call_args.kwargs["mfa_enrolled"] is True
+    assert correct.call_args.kwargs["reason_text"] == "Correct onboarding record"
+
+
+def test_staff_account_correction_route_preserves_forbidden_boundary(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = http
+    correct = Mock(side_effect=PermissionError("private correction permission"))
+    monkeypatch.setattr(staff_accounts, "correct_staff_account_onboarding", correct)
+
+    response = client.post(
+        f"/api/staff/v1/staff-accounts/{STAFF_ID}/correct-onboarding",
+        headers=command_headers(),
+        json={
+            "expected_version": 1,
+            "provider_subject": "oidc:staff:corrected",
+            "display_name": "Mariela Rivera",
+            "role_name": "operations_staff",
+            "permission_names": ["staff_account:read"],
+            "mfa_enrolled": True,
+            "reason_text": "Correct onboarding record",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["detail"] == "forbidden"
+    assert "private" not in response.text
+
+
+def test_staff_account_correction_route_returns_recoverable_lifecycle_error(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = http
+    correct = Mock(side_effect=StaffAccountVersionConflictError("stale correction"))
+    monkeypatch.setattr(staff_accounts, "correct_staff_account_onboarding", correct)
+
+    response = client.post(
+        f"/api/staff/v1/staff-accounts/{STAFF_ID}/correct-onboarding",
+        headers=command_headers(),
+        json={
+            "expected_version": 1,
+            "provider_subject": "oidc:staff:corrected",
+            "display_name": "Mariela Rivera",
+            "role_name": "operations_staff",
+            "permission_names": ["staff_account:read"],
+            "mfa_enrolled": True,
+            "reason_text": "Correct onboarding record",
+        },
+    )
+
+    assert response.status_code == 412
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["detail"] == "staff account version conflict"
+    assert "stale" not in response.text
+
+
 def test_activate_staff_account_routes_mfa_confirmation(
     http: tuple[TestClient, FixedIdentifiers],
     monkeypatch: pytest.MonkeyPatch,

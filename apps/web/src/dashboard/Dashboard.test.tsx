@@ -7,12 +7,15 @@ import * as intakeApi from '../api/intakeClient';
 import type { IntakeKind, IntakeSummary } from '../api/intakeContracts';
 import * as operationsApi from '../api/operationsProjectionClient';
 import * as runtimeApi from '../api/runtimeEnvironmentClient';
+import * as staffAccountApi from '../api/staffAccountClient';
 import { AppRoutes } from '../app/App';
+import { dashboardGreeting } from './dashboardGreeting';
 import { LanguageProvider } from '../i18n/LanguageProvider';
 import { runAxe } from '../test/axe';
 
 vi.mock('../api/intakeClient');
 vi.mock('../api/operationsProjectionClient');
+vi.mock('../api/staffAccountClient');
 vi.mock('../api/runtimeEnvironmentClient', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/runtimeEnvironmentClient')>();
   return { ...actual, getStaticOperationalFallbackPolicy: vi.fn() };
@@ -146,6 +149,55 @@ describe('Dashboard', () => {
       },
     });
     vi.mocked(runtimeApi.getStaticOperationalFallbackPolicy).mockResolvedValue('allow');
+    vi.mocked(staffAccountApi.getStaffSession).mockResolvedValue({
+      ok: true,
+      value: {
+        actorId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        roleName: 'owner',
+        permissionNames: ['staff_account:read'],
+        authContext: 'staff_oidc',
+        account: {
+          staffId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          providerSubject: 'oidc:staff:owner',
+          displayName: 'Beatrice Santos',
+          roleName: 'owner',
+          lifecycleStatus: 'active',
+          mfaEnrolled: true,
+          createdAt: '2026-10-06T12:00:00Z',
+          createdBy: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          updatedAt: '2026-10-06T12:00:00Z',
+          updatedBy: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          version: 1,
+        },
+        delegations: [],
+      },
+    });
+  });
+
+  it('formats dashboard greetings from the active account and local time of day', () => {
+    expect(dashboardGreeting('Beatrice Santos', 'en', new Date(2026, 9, 6, 11, 59))).toBe('Good morning, Beatrice Santos');
+    expect(dashboardGreeting('Beatrice Santos', 'en', new Date(2026, 9, 6, 12, 0))).toBe('Good afternoon, Beatrice Santos');
+    expect(dashboardGreeting('Beatrice Santos', 'en', new Date(2026, 9, 6, 16, 59))).toBe('Good afternoon, Beatrice Santos');
+    expect(dashboardGreeting('Beatrice Santos', 'en', new Date(2026, 9, 6, 17, 0))).toBe('Good evening, Beatrice Santos');
+    expect(dashboardGreeting('  ', 'es', new Date(2026, 9, 6, 11, 59))).toBe('Buenos días');
+    expect(dashboardGreeting(null, 'es', new Date(2026, 9, 6, 12, 0))).toBe('Buenas tardes');
+    expect(dashboardGreeting('Beatrice Santos', 'es', new Date(2026, 9, 6, 17, 0))).toBe('Buenas noches, Beatrice Santos');
+  });
+
+  it('falls back to a generic dashboard greeting when the staff session cannot be read', async () => {
+    vi.mocked(staffAccountApi.getStaffSession).mockRejectedValue(new Error('session unavailable'));
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /Beatrice Santos/ })).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('heading', { name: /^Good (morning|afternoon|evening)$/ })).toBeInTheDocument();
   });
 
   it('renders the staff workspace dashboard from the home route', async () => {
@@ -159,7 +211,7 @@ describe('Dashboard', () => {
 
     expect(screen.getByRole('heading', { name: 'Nuestro Corazón Dorado' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('heading', { name: 'Good morning, Mariela' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Beatrice Santos/ })).toBeInTheDocument();
     await screen.findAllByText('Dynamic Worker One');
     await screen.findAllByText('Projected Employer');
     expect(screen.getAllByRole('link').some((link) => (
@@ -205,7 +257,7 @@ describe('Dashboard', () => {
     expect(document.documentElement.lang).toBe('es');
     expect(screen.getByRole('heading', { name: 'Nuestro Corazón Dorado' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Inicio' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('heading', { name: 'Buenos días, Mariela' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Beatrice Santos/ })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Prioridades de hoy' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Agenda de hoy' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Acciones rapidas' })).toBeInTheDocument();

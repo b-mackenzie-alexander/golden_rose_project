@@ -221,6 +221,41 @@ it('corrects suspended onboarding details without deleting the account', async (
   expect(screen.queryByRole('heading', { name: /Correct onboarding/ })).not.toBeInTheDocument();
 });
 
+it('shows correction validation and recoverable command errors', async () => {
+  const user = userEvent.setup();
+  vi.mocked(correctStaffAccount).mockResolvedValue({ ok: false, failure: { kind: 'stale' } });
+
+  render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
+  await screen.findByText('Mariela Torres');
+
+  await user.click(screen.getByRole('button', { name: 'Correct' }));
+  const firstPanel = screen.getByRole('heading', { name: 'Correct onboarding: Mariela Torres' }).closest('section');
+  expect(firstPanel).not.toBeNull();
+  const firstCorrection = within(firstPanel as HTMLElement);
+  await user.clear(firstCorrection.getByRole('textbox', { name: /Display name/ }));
+  await user.clear(firstCorrection.getByRole('textbox', { name: /Provider subject/ }));
+  await user.click(firstCorrection.getByLabelText('staff_account:read'));
+  await user.click(firstCorrection.getByRole('button', { name: 'Save correction' }));
+
+  expect(firstCorrection.getByText('Display name is required.')).toBeInTheDocument();
+  expect(firstCorrection.getByText('Provider subject is required.')).toBeInTheDocument();
+  expect(firstCorrection.getByText('Select at least one permission.')).toBeInTheDocument();
+  expect(firstCorrection.getByText('Reason is required.')).toBeInTheDocument();
+  expect(correctStaffAccount).not.toHaveBeenCalled();
+
+  await user.click(firstCorrection.getByRole('button', { name: 'Close' }));
+  await user.click(screen.getByRole('button', { name: 'Correct' }));
+  const secondPanel = screen.getByRole('heading', { name: 'Correct onboarding: Mariela Torres' }).closest('section');
+  expect(secondPanel).not.toBeNull();
+  const secondCorrection = within(secondPanel as HTMLElement);
+  await user.type(secondCorrection.getByLabelText('Reason'), 'Version changed during onboarding correction');
+  await user.click(secondCorrection.getByRole('button', { name: 'Save correction' }));
+
+  expect(correctStaffAccount).toHaveBeenCalledTimes(1);
+  expect(await screen.findByText('The account changed in another session. Reload before trying again.')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Correct onboarding: Mariela Torres' })).toBeInTheDocument();
+});
+
 it('filters staff accounts by lifecycle, MFA readiness, and search text', async () => {
   const user = userEvent.setup();
   const activeStaff: StaffAccount = {

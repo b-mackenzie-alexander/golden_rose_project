@@ -175,11 +175,29 @@ describe('Dashboard', () => {
   });
 
   it('formats dashboard greetings from the active account and local time of day', () => {
-    expect(dashboardGreeting('Beatrice Santos', 'en', new Date('2026-10-06T11:59:00-04:00'))).toBe('Good morning, Beatrice Santos');
-    expect(dashboardGreeting('Beatrice Santos', 'en', new Date('2026-10-06T12:00:00-04:00'))).toBe('Good afternoon, Beatrice Santos');
-    expect(dashboardGreeting('Beatrice Santos', 'en', new Date('2026-10-06T16:59:00-04:00'))).toBe('Good afternoon, Beatrice Santos');
-    expect(dashboardGreeting('Beatrice Santos', 'en', new Date('2026-10-06T17:00:00-04:00'))).toBe('Good evening, Beatrice Santos');
-    expect(dashboardGreeting('Beatrice Santos', 'es', new Date('2026-10-06T17:00:00-04:00'))).toBe('Buenas noches, Beatrice Santos');
+    expect(dashboardGreeting('Beatrice Santos', 'en', new Date(2026, 9, 6, 11, 59))).toBe('Good morning, Beatrice Santos');
+    expect(dashboardGreeting('Beatrice Santos', 'en', new Date(2026, 9, 6, 12, 0))).toBe('Good afternoon, Beatrice Santos');
+    expect(dashboardGreeting('Beatrice Santos', 'en', new Date(2026, 9, 6, 16, 59))).toBe('Good afternoon, Beatrice Santos');
+    expect(dashboardGreeting('Beatrice Santos', 'en', new Date(2026, 9, 6, 17, 0))).toBe('Good evening, Beatrice Santos');
+    expect(dashboardGreeting('  ', 'es', new Date(2026, 9, 6, 11, 59))).toBe('Buenos días');
+    expect(dashboardGreeting(null, 'es', new Date(2026, 9, 6, 12, 0))).toBe('Buenas tardes');
+    expect(dashboardGreeting('Beatrice Santos', 'es', new Date(2026, 9, 6, 17, 0))).toBe('Buenas noches, Beatrice Santos');
+  });
+
+  it('falls back to a generic dashboard greeting when the staff session cannot be read', async () => {
+    vi.mocked(staffAccountApi.getStaffSession).mockRejectedValue(new Error('session unavailable'));
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /Beatrice Santos/ })).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('heading', { name: /^Good (morning|afternoon|evening)$/ })).toBeInTheDocument();
   });
 
   it('renders the staff workspace dashboard from the home route', async () => {

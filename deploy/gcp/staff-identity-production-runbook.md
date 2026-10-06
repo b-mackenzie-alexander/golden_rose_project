@@ -12,9 +12,12 @@ or a shared-runtime rollout.
 - Production must not set `GOLDEN_ROSE_SYNTHETIC_STAFF_ID`.
 - Production must not enable demo access or presentation seed data.
 - Staff account records must exist in Golden Rose before live staff use.
-- Staff MFA evidence comes from the configured identity-provider claims and is
-  recorded/displayed by Golden Rose; factor reset remains a provider-side
-  operation outside the application.
+- Staff MFA evidence must be recorded/displayed by Golden Rose before live
+  staff use. Provider token claims such as Google `amr` may be unavailable in
+  ordinary browser sign-in flows, so Golden Rose account-level MFA evidence is
+  the application gate unless a later provider adapter supplies stronger
+  verified claim semantics. Factor reset remains a provider-side operation
+  outside the application.
 - Recovery and session-revocation actions in Golden Rose record evidence only.
   They do not perform provider-side account recovery, factor reset, token
   revocation, session revocation, or logout.
@@ -44,16 +47,18 @@ GOLDEN_ROSE_PRESENTATION_DEMO_SEED_ENABLED=false
    and JWKS endpoint.
 2. Confirm the application audience value is provider-approved and environment
    specific.
-3. Confirm MFA claim semantics with the provider owner before admitting live
-   staff sessions.
+3. Confirm MFA posture with the provider owner before admitting live staff
+   sessions. If the provider does not reliably supply token-level MFA claims,
+   record the authorized account-level MFA evidence path and keep it visible in
+   Golden Rose account readiness.
 4. Prepare Staff OIDC configuration secrets before the service-stage Terraform
    plan: `staff-oidc-issuer`, `staff-oidc-audience` and
    `staff-oidc-jwks-url` must already exist in Secret Manager with enabled
    `latest` versions. Terraform may look up those containers and grant runtime
    access, but it must not create the containers or write provider values.
 5. Create the initial Golden Rose staff accounts while they remain suspended.
-6. Activate only accounts whose provider subject and MFA evidence have been
-   verified by an authorized human operator.
+6. Activate only accounts whose provider subject and Golden Rose MFA evidence
+   have been verified by an authorized human operator.
 7. Record the provider-side recovery and session-revocation procedure in the
    operational handoff materials before production use.
 8. Verify `/api/staff/v1/staff-identity-readiness` returns
@@ -78,7 +83,8 @@ Stop before live use if any of these are true:
 - OIDC issuer, audience or JWKS settings are missing or unapproved.
 - Staff OIDC Secret Manager containers or their enabled `latest` versions are
   missing before the service-stage Terraform plan.
-- The MFA claim mapping has not been confirmed.
+- The MFA evidence posture has not been confirmed for the admitted staff
+  account.
 - No authorized human operator has verified the initial staff account subjects.
 - Recovery/session-revocation provider procedures have not been recorded.
 - The readiness endpoint reports a synthetic identity boundary.

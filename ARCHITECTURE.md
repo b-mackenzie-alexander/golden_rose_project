@@ -1,5 +1,13 @@
 # Architecture — Golden Rose Operations Platform
 
+## 2026-10-06 — Current architecture status after PR #167 deployment
+
+Protected `develop@3ddf85b1e3ca68cc1eea366cad61decde147cb00` is deployed to the controlled staff-pilot Cloud Run service with the PR #167 staff OIDC remediation. The service now exercises the intended staff identity architecture in the browser: Google provides the external sign-in token, Golden Rose remains the durable account, lifecycle, permission, delegation, recovery-evidence and session-evidence authority, and the staff personal account/admin surfaces resolve the initial owner account only after a verified staff identity-provider session.
+
+Architectural boundaries remain unchanged. Staff OIDC validates identity; Golden Rose application records control authorization and lifecycle. Provider-side factor reset, forced logout, token revocation and session revocation are not performed by the application. Dashboard, account administration, intake, queue, calendar, map and report surfaces remain staff-only. No public worker/employer self-service, automated matching/ranking/eligibility/referral/placement, export/import, client-owned transition or product-completion claim follows from this deployment.
+
+Known architecture/UX follow-up before staff pilot handoff: routine account-list views should avoid over-emphasizing raw provider subjects, operator-readiness copy should separate the validated initial owner session from remaining onboarding/runbook work, and staff acceptance should exercise English/Spanish/accessibility plus actual daily-use navigation before real worker/employer records are entered.
+
 ## 2026-10-01 — Current architecture status after PR #156
 
 Protected `develop@985a8d1ac8630310ea58c0bca809665612c5ddbc` contains the current source architecture for a controlled live-data staff pilot. The application is a staff-only operations platform with durable worker/employer intake, review, finalization, corrections/current-facts review, staff personal accounts and account administration, request/shift lifecycle foundations, operations projections, deployable-package validators and a live-data pilot readiness packet.

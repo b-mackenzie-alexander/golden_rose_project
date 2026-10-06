@@ -1,5 +1,11 @@
 # Technology Decisions — Golden Rose Operations Platform
 
+## 2026-10-06 — PR #167 staff-pilot identity deployment status
+
+PR #167 is merged at protected `develop@3ddf85b1e3ca68cc1eea366cad61decde147cb00` and deployed through the existing signed-image, Terraform service-stage and protected service-gate path for the controlled live-data staff-pilot runtime. This is not a new technology decision, but it validates the selected Google Sign-In plus Golden Rose durable staff-account architecture for the initial onboarding account.
+
+The decision boundary remains unchanged: Google sign-in supplies the external identity token; Golden Rose owns account lifecycle, roles, named permissions, delegations, recovery evidence and session-revocation evidence. Provider-side reset/revocation/forced-logout mechanics, wider staff onboarding, live staff data entry, production completion, client-owned transition, uploads and public worker/employer identity each remain separate gates.
+
 ## 2026-09-16 — PR #108 develop dashboard deployment status
 
 PR #108 is merged at protected `develop@dd6697871986fa5677e722b2805a21a8a7776b64` and deployed to the existing private fictional-synthetic `develop` service. This is a stakeholder-review update to the accepted temporary develop target, not a new technology decision or production promotion. It confirms that the current dashboard shell/map/calendar/queues source can be published through the existing signed-image and service-stage deployment path without database migration execution.

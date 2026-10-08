@@ -488,6 +488,7 @@ staff_accounts = Table(
     metadata,
     Column("staff_id", UUID(as_uuid=True), primary_key=True),
     Column("provider_subject", String(256), nullable=False),
+    Column("provider_email", String(320)),
     Column("display_name", String(160), nullable=False),
     Column("role_name", String(80), nullable=False),
     Column("lifecycle_status", String(32), nullable=False),
@@ -498,7 +499,13 @@ staff_accounts = Table(
     Column("updated_by", UUID(as_uuid=True), nullable=False),
     Column("version", Integer, nullable=False),
     UniqueConstraint("provider_subject", name="uq_staff_accounts_provider_subject"),
+    UniqueConstraint("provider_email", name="uq_staff_accounts_provider_email"),
     CheckConstraint("btrim(provider_subject)<>''", name="ck_staff_accounts_subject_nonblank"),
+    CheckConstraint(
+        "provider_email IS NULL OR (provider_email=lower(provider_email) "
+        "AND btrim(provider_email)<>'' AND position('@' in provider_email)>1)",
+        name="ck_staff_accounts_provider_email_shape",
+    ),
     CheckConstraint("btrim(display_name)<>''", name="ck_staff_accounts_display_name_nonblank"),
     CheckConstraint(
         "role_name IN ('owner','delegated_manager','operations_staff','platform_administrator')",

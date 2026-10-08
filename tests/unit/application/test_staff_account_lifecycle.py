@@ -71,10 +71,13 @@ def _record(
     status: str = "suspended",
     version: int = 1,
     mfa_enrolled: bool = False,
+    provider_subject: str = "oidc:staff:123",
+    provider_email: str | None = None,
 ) -> StaffAccountRecord:
     return StaffAccountRecord(
         staff_id=STAFF_ID,
-        provider_subject="oidc:staff:123",
+        provider_subject=provider_subject,
+        provider_email=provider_email,
         display_name="Mariela Torres",
         role_name="operations_staff",
         lifecycle_status=status,  # type: ignore[arg-type]
@@ -111,6 +114,7 @@ def test_create_staff_account_records_grants_and_lifecycle_event(monkeypatch: py
         command_id=COMMAND_ID,
         staff_id=STAFF_ID,
         provider_subject=" oidc:staff:123 ",
+        provider_email=None,
         display_name=" Mariela   Torres ",
         role_name="operations_staff",
         permission_names=frozenset({"intake:read"}),
@@ -122,6 +126,7 @@ def test_create_staff_account_records_grants_and_lifecycle_event(monkeypatch: py
 
     assert result.event_type == "staff_account.created"
     assert observed["account"]["provider_subject"] == "oidc:staff:123"
+    assert observed["account"]["provider_email"] is None
     assert observed["account"]["display_name"] == "Mariela Torres"
     assert observed["account"]["lifecycle_status"] == "suspended"
     assert observed["grants"]["grants"] == ((GRANT_ID, "intake:read"),)
@@ -130,6 +135,44 @@ def test_create_staff_account_records_grants_and_lifecycle_event(monkeypatch: py
     assert observed["event"]["reason_text"] == "Initial staff onboarding"
     assert session.commits == 1
     assert session.rollbacks == 0
+
+
+def test_create_staff_account_accepts_google_email_without_provider_subject(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+    observed: dict[str, Any] = {}
+
+    def insert_account(**kwargs):
+        observed["account"] = kwargs
+        return _record(
+            provider_subject=kwargs["provider_subject"],
+            provider_email=kwargs["provider_email"],
+        )
+
+    monkeypatch.setattr(lifecycle_module, "insert_staff_account", insert_account)
+    monkeypatch.setattr(lifecycle_module, "insert_staff_permission_grants", lambda **_kwargs: None)
+    monkeypatch.setattr(lifecycle_module, "insert_lifecycle_event", lambda **_kwargs: None)
+
+    result = create_staff_account(
+        session=session,  # type: ignore[arg-type]
+        principal=_principal("staff_account:create", "intake:read"),
+        command_id=COMMAND_ID,
+        staff_id=STAFF_ID,
+        provider_subject="",
+        provider_email=" Mariela.Torres@Example.Test ",
+        display_name="Mariela Torres",
+        role_name="operations_staff",
+        permission_names=frozenset({"intake:read"}),
+        mfa_enrolled=False,
+        clock=FixedClock(),
+        identifiers=FixedIdentifiers(),
+        reason_text="Initial staff onboarding",
+    )
+
+    assert result.account.provider_subject.startswith("pending-google-email:")
+    assert observed["account"]["provider_email"] == "mariela.torres@example.test"
+    assert session.commits == 1
 
 
 def test_correct_staff_account_onboarding_replaces_details_grants_and_records_event(
@@ -179,6 +222,7 @@ def test_correct_staff_account_onboarding_replaces_details_grants_and_records_ev
         staff_id=STAFF_ID,
         expected_version=1,
         provider_subject=" oidc:staff:corrected ",
+        provider_email=None,
         display_name=" Mariela   Rivera ",
         role_name="operations_staff",
         permission_names=frozenset({"intake:read", "staff_account:read"}),
@@ -191,6 +235,7 @@ def test_correct_staff_account_onboarding_replaces_details_grants_and_records_ev
     assert result.event_type == "staff_account.corrected"
     assert observed["get"]["staff_id"] == STAFF_ID
     assert observed["account"]["provider_subject"] == "oidc:staff:corrected"
+    assert observed["account"]["provider_email"] is None
     assert observed["account"]["display_name"] == "Mariela Rivera"
     assert observed["account"]["expected_version"] == 1
     assert observed["revoked_grants"]["reason_text"] == "Corrected onboarding record"
@@ -225,6 +270,7 @@ def test_correct_staff_account_onboarding_rejects_active_accounts(
             staff_id=STAFF_ID,
             expected_version=3,
             provider_subject="oidc:staff:123",
+            provider_email=None,
             display_name="Mariela Torres",
             role_name="operations_staff",
             permission_names=frozenset({"staff_account:read"}),
@@ -266,6 +312,7 @@ def test_correct_staff_account_onboarding_rolls_back_recoverable_read_errors(
             staff_id=STAFF_ID,
             expected_version=1,
             provider_subject="oidc:staff:123",
+            provider_email=None,
             display_name="Mariela Torres",
             role_name="operations_staff",
             permission_names=frozenset({"staff_account:read"}),
@@ -302,6 +349,7 @@ def test_correct_staff_account_onboarding_wraps_persistence_errors(
             staff_id=STAFF_ID,
             expected_version=1,
             provider_subject="oidc:staff:123",
+            provider_email=None,
             display_name="Mariela Torres",
             role_name="operations_staff",
             permission_names=frozenset({"staff_account:read"}),
@@ -323,6 +371,7 @@ def test_create_staff_account_denies_platform_admin_operational_data() -> None:
             command_id=COMMAND_ID,
             staff_id=STAFF_ID,
             provider_subject="oidc:staff:123",
+            provider_email=None,
             display_name="Platform Admin",
             role_name="platform_administrator",
             permission_names=frozenset({"employer:read"}),
@@ -341,6 +390,7 @@ def test_create_staff_account_requires_permission() -> None:
             command_id=COMMAND_ID,
             staff_id=STAFF_ID,
             provider_subject="oidc:staff:123",
+            provider_email=None,
             display_name="Mariela Torres",
             role_name="operations_staff",
             permission_names=frozenset({"intake:read"}),
@@ -359,6 +409,7 @@ def test_create_staff_account_rejects_invalid_role() -> None:
             command_id=COMMAND_ID,
             staff_id=STAFF_ID,
             provider_subject="oidc:staff:123",
+            provider_email=None,
             display_name="Mariela Torres",
             role_name="shadow_admin",
             permission_names=frozenset({"intake:read"}),
@@ -370,13 +421,14 @@ def test_create_staff_account_rejects_invalid_role() -> None:
 
 
 def test_create_staff_account_requires_text_and_permissions() -> None:
-    with pytest.raises(StaffAccountLifecycleError, match="invalid provider_subject"):
+    with pytest.raises(StaffAccountLifecycleError, match="requires provider subject or email"):
         create_staff_account(
             session=FakeSession(),  # type: ignore[arg-type]
             principal=_principal("staff_account:create"),
             command_id=COMMAND_ID,
             staff_id=STAFF_ID,
             provider_subject=" ",
+            provider_email=None,
             display_name="Mariela Torres",
             role_name="operations_staff",
             permission_names=frozenset({"intake:read"}),
@@ -392,6 +444,7 @@ def test_create_staff_account_requires_text_and_permissions() -> None:
             command_id=COMMAND_ID,
             staff_id=STAFF_ID,
             provider_subject="oidc:staff:123",
+            provider_email=None,
             display_name="Mariela Torres",
             role_name="operations_staff",
             permission_names=frozenset(),
@@ -407,6 +460,7 @@ def test_create_staff_account_requires_text_and_permissions() -> None:
             command_id=COMMAND_ID,
             staff_id=STAFF_ID,
             provider_subject="oidc:staff:123",
+            provider_email=None,
             display_name="Mariela Torres",
             role_name="operations_staff",
             permission_names=frozenset({"intake:read", " intake:read "}),
@@ -425,6 +479,7 @@ def test_create_staff_account_denies_self_escalation() -> None:
             command_id=COMMAND_ID,
             staff_id=STAFF_ID,
             provider_subject="oidc:staff:123",
+            provider_email=None,
             display_name="Mariela Torres",
             role_name="operations_staff",
             permission_names=frozenset({"staff_account:create", "intake:read"}),
@@ -503,6 +558,40 @@ def test_activate_staff_account_transitions_and_records_evidence(monkeypatch: py
     assert observed["event"]["previous_status"] == "suspended"
     assert observed["event"]["new_status"] == "active"
     assert session.commits == 1
+
+
+def test_activate_staff_account_rejects_pending_google_email_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_id_for_update",
+        lambda **_kwargs: _record(
+            status="suspended",
+            version=1,
+            provider_subject="pending-google-email:abc123",
+            provider_email="mariela.torres@example.test",
+        ),
+    )
+    update = Mock()
+    monkeypatch.setattr(lifecycle_module, "update_staff_account_lifecycle", update)
+
+    with pytest.raises(StaffAccountLifecycleError, match="verified Google sign-in"):
+        activate_staff_account(
+            session=session,  # type: ignore[arg-type]
+            principal=_principal("staff_account:activate"),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            expected_version=1,
+            mfa_enrolled=True,
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="MFA complete",
+        )
+
+    update.assert_not_called()
+    assert session.rollbacks == 1
 
 
 def test_suspend_staff_account_requires_permission() -> None:
@@ -975,6 +1064,68 @@ def test_resolve_staff_principal_from_claims_reports_missing_account(
         )
 
 
+def test_resolve_staff_principal_binds_pending_google_email_account(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+    observed: dict[str, Any] = {}
+
+    def missing_account(**_kwargs):
+        raise NoResultFound()
+
+    def pending_account(**kwargs):
+        observed["pending"] = kwargs
+        return _record(
+            status="suspended",
+            version=1,
+            provider_subject="pending-google-email:abc123",
+            provider_email="mariela.torres@example.test",
+        )
+
+    def update_binding(**kwargs):
+        observed["binding"] = kwargs
+        return _record(
+            status="suspended",
+            version=2,
+            mfa_enrolled=True,
+            provider_subject=kwargs["provider_subject"],
+            provider_email="mariela.torres@example.test",
+        )
+
+    def insert_event(**kwargs) -> None:
+        observed["event"] = kwargs
+
+    monkeypatch.setattr(lifecycle_module, "get_staff_account_by_provider_subject", missing_account)
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_pending_staff_account_by_provider_email_for_update",
+        pending_account,
+    )
+    monkeypatch.setattr(lifecycle_module, "update_staff_account_provider_binding", update_binding)
+    monkeypatch.setattr(lifecycle_module, "insert_lifecycle_event", insert_event)
+    monkeypatch.setattr(
+        lifecycle_module,
+        "list_active_staff_permissions",
+        lambda **_kwargs: frozenset({"intake:read"}),
+    )
+
+    with pytest.raises(ValueError, match="eligible"):
+        resolve_staff_principal_from_claims(
+            session=session,  # type: ignore[arg-type]
+            claims=StaffIdentityClaims(
+                provider_subject="oidc:staff:bound",
+                provider_email=" Mariela.Torres@Example.Test ",
+                mfa_verified=True,
+            ),
+        )
+
+    assert observed["pending"]["provider_email"] == "mariela.torres@example.test"
+    assert observed["binding"]["provider_subject"] == "oidc:staff:bound"
+    assert observed["binding"]["mfa_enrolled"] is True
+    assert observed["event"]["event_type"] == "staff_account.corrected"
+    assert session.commits == 1
+
+
 def test_resolve_staff_principal_from_claims_returns_active_account(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1016,6 +1167,7 @@ def test_staff_account_lifecycle_database_failure_is_safe_and_rolls_back(
             command_id=COMMAND_ID,
             staff_id=STAFF_ID,
             provider_subject="oidc:staff:123",
+            provider_email=None,
             display_name="Mariela Torres",
             role_name="operations_staff",
             permission_names=frozenset({"intake:read"}),

@@ -96,6 +96,7 @@ class StaffOidcJwksTokenVerifier:
         return StaffIdentityClaims(
             provider_subject=subject.strip(),
             mfa_verified=_has_mfa_claim(payload),
+            provider_email=_verified_email_claim(payload),
             session_id=_optional_string_claim(payload, "sid")
             or _optional_string_claim(payload, "jti"),
         )
@@ -198,6 +199,26 @@ def _has_mfa_claim(payload: Mapping[str, Any]) -> bool:
     return isinstance(methods, list) and any(
         isinstance(item, str) and item in MFA_AUTHENTICATION_METHODS for item in methods
     )
+
+
+def _verified_email_claim(payload: Mapping[str, Any]) -> str | None:
+    if payload.get("email_verified") is not True:
+        return None
+    value = payload.get("email")
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().lower()
+    if (
+        not normalized
+        or len(normalized) > 320
+        or normalized.count("@") != 1
+        or any(ch.isspace() for ch in normalized)
+    ):
+        return None
+    local, domain = normalized.split("@", 1)
+    if not local or "." not in domain or domain.startswith(".") or domain.endswith("."):
+        return None
+    return normalized
 
 
 def _optional_string_claim(payload: Mapping[str, Any], name: str) -> str | None:

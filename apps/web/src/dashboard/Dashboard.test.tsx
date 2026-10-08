@@ -159,6 +159,7 @@ describe('Dashboard', () => {
         account: {
           staffId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
           providerSubject: 'oidc:staff:owner',
+          providerEmail: 'beatrice.santos@example.test',
           displayName: 'Beatrice Santos',
           roleName: 'owner',
           lifecycleStatus: 'active',

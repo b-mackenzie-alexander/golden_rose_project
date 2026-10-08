@@ -82,10 +82,12 @@ def account_record(
     status: str = "suspended",
     version: int = 1,
     mfa_enrolled: bool = False,
+    provider_email: str | None = None,
 ) -> StaffAccountRecord:
     return StaffAccountRecord(
         staff_id=staff_id,
         provider_subject="oidc:staff:123",
+        provider_email=provider_email,
         display_name="Mariela Torres",
         role_name="operations_staff",
         lifecycle_status=status,  # type: ignore[arg-type]
@@ -312,6 +314,7 @@ def test_staff_session_returns_current_account_context_no_store(
         "account": {
             "staff_id": str(ACTOR_ID),
             "provider_subject": "oidc:staff:123",
+            "provider_email": None,
             "display_name": "Mariela Torres",
             "role_name": "operations_staff",
             "lifecycle_status": "active",
@@ -418,9 +421,46 @@ def test_create_staff_account_routes_normalized_admin_request(
     assert identifiers.generated == [GENERATED_STAFF_ID]
     assert create.call_args.kwargs["staff_id"] == GENERATED_STAFF_ID
     assert create.call_args.kwargs["provider_subject"] == "oidc:staff:123"
+    assert create.call_args.kwargs["provider_email"] is None
     assert create.call_args.kwargs["display_name"] == "Mariela Torres"
     assert create.call_args.kwargs["permission_names"] == frozenset({"intake:read", "worker:read"})
     assert create.call_args.kwargs["reason_text"] == "Initial onboarding"
+
+
+def test_create_staff_account_accepts_google_email_onboarding(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = http
+    create = Mock(
+        return_value=lifecycle_result(
+            event_type="staff_account.created",
+            record=account_record(
+                staff_id=GENERATED_STAFF_ID,
+                provider_email="mariela.torres@example.test",
+            ),
+        )
+    )
+    monkeypatch.setattr(staff_accounts, "create_staff_account", create)
+
+    response = client.post(
+        "/api/staff/v1/staff-accounts",
+        headers=command_headers(),
+        json={
+            "provider_subject": "",
+            "provider_email": " Mariela.Torres@Example.Test ",
+            "display_name": "Mariela Torres",
+            "role_name": "operations_staff",
+            "permission_names": ["intake:read"],
+            "mfa_enrolled": False,
+            "reason_text": "Initial onboarding",
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["account"]["provider_email"] == "mariela.torres@example.test"
+    assert create.call_args.kwargs["provider_subject"] == ""
+    assert create.call_args.kwargs["provider_email"] == "mariela.torres@example.test"
 
 
 def test_correct_staff_account_routes_normalized_admin_request(
@@ -458,6 +498,7 @@ def test_correct_staff_account_routes_normalized_admin_request(
     assert correct.call_args.kwargs["staff_id"] == STAFF_ID
     assert correct.call_args.kwargs["expected_version"] == 1
     assert correct.call_args.kwargs["provider_subject"] == "oidc:staff:corrected"
+    assert correct.call_args.kwargs["provider_email"] is None
     assert correct.call_args.kwargs["display_name"] == "Mariela Rivera"
     assert correct.call_args.kwargs["permission_names"] == frozenset({"intake:read", "worker:read"})
     assert correct.call_args.kwargs["mfa_enrolled"] is True

@@ -60,6 +60,7 @@ class StaffAccount:
 class StaffIdentityClaims:
     provider_subject: str
     mfa_verified: bool
+    provider_email: str | None = None
     session_id: str | None = None
 
 

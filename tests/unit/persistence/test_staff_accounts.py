@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from golden_rose.persistence.staff_accounts import (
+    get_pending_staff_account_by_provider_email_for_update,
     get_staff_account_by_id,
     get_staff_account_by_id_for_update,
     get_staff_account_by_provider_subject,
@@ -16,6 +17,8 @@ from golden_rose.persistence.staff_accounts import (
     list_staff_delegations,
     revoke_staff_delegation,
     update_staff_account_lifecycle,
+    update_staff_account_onboarding,
+    update_staff_account_provider_binding,
 )
 
 NOW = datetime(2026, 9, 27, 20, 0, tzinfo=UTC)
@@ -64,10 +67,16 @@ class FakeSession:
         return self.result
 
 
-def _row(*, status: str = "suspended", version: int = 1) -> tuple[object, ...]:
+def _row(
+    *,
+    status: str = "suspended",
+    version: int = 1,
+    provider_email: str | None = None,
+) -> tuple[object, ...]:
     return (
         STAFF_ID,
         "oidc:staff:123",
+        provider_email,
         "Mariela Torres",
         "operations_staff",
         status,
@@ -125,6 +134,7 @@ def test_insert_staff_account_executes_insert_and_returns_record() -> None:
         session=session,  # type: ignore[arg-type]
         staff_id=STAFF_ID,
         provider_subject="oidc:staff:123",
+        provider_email=None,
         display_name="Mariela Torres",
         role_name="operations_staff",
         lifecycle_status="suspended",
@@ -135,6 +145,7 @@ def test_insert_staff_account_executes_insert_and_returns_record() -> None:
 
     assert len(session.calls) == 1
     assert record.staff_id == STAFF_ID
+    assert record.provider_email is None
     assert record.lifecycle_status == "suspended"
     assert record.version == 1
     assert record.updated_by == ACTOR_ID
@@ -165,6 +176,28 @@ def test_get_staff_account_by_provider_subject_maps_row() -> None:
     assert len(session.calls) == 1
     assert record.provider_subject == "oidc:staff:123"
     assert record.lifecycle_status == "active"
+
+
+def test_get_pending_staff_account_by_provider_email_for_update_maps_row() -> None:
+    session = FakeSession(
+        FakeOneResult(
+            _row(
+                status="suspended",
+                version=2,
+                provider_email="mariela.torres@example.test",
+            )
+        )
+    )
+
+    record = get_pending_staff_account_by_provider_email_for_update(
+        session=session,  # type: ignore[arg-type]
+        provider_email="mariela.torres@example.test",
+        pending_subject_prefix="pending-google-email:",
+    )
+
+    assert len(session.calls) == 1
+    assert record.provider_email == "mariela.torres@example.test"
+    assert record.lifecycle_status == "suspended"
 
 
 def test_get_staff_account_by_id_maps_row() -> None:
@@ -215,6 +248,60 @@ def test_update_staff_account_lifecycle_maps_returning_row() -> None:
 
     assert len(session.calls) == 1
     assert record.lifecycle_status == "active"
+    assert record.version == 2
+
+
+def test_update_staff_account_onboarding_maps_returning_row() -> None:
+    session = FakeSession(
+        FakeOneResult(
+            _row(
+                status="suspended",
+                version=2,
+                provider_email="mariela.rivera@example.test",
+            )
+        )
+    )
+
+    record = update_staff_account_onboarding(
+        session=session,  # type: ignore[arg-type]
+        staff_id=STAFF_ID,
+        expected_version=1,
+        provider_subject="oidc:staff:corrected",
+        provider_email="mariela.rivera@example.test",
+        display_name="Mariela Rivera",
+        role_name="operations_staff",
+        mfa_enrolled=True,
+        updated_at=NOW,
+        actor_id=ACTOR_ID,
+    )
+
+    assert len(session.calls) == 1
+    assert record.provider_email == "mariela.rivera@example.test"
+    assert record.version == 2
+
+
+def test_update_staff_account_provider_binding_maps_returning_row() -> None:
+    session = FakeSession(
+        FakeOneResult(
+            _row(
+                status="suspended",
+                version=2,
+                provider_email="mariela.torres@example.test",
+            )
+        )
+    )
+
+    record = update_staff_account_provider_binding(
+        session=session,  # type: ignore[arg-type]
+        staff_id=STAFF_ID,
+        expected_version=1,
+        provider_subject="oidc:staff:bound",
+        mfa_enrolled=True,
+        updated_at=NOW,
+    )
+
+    assert len(session.calls) == 1
+    assert record.provider_email == "mariela.torres@example.test"
     assert record.version == 2
 
 

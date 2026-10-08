@@ -189,6 +189,8 @@ const zoneLabels: Record<OperationsZoneKey, OperationsZoneSummaryItem['zoneLabel
 function fallbackZoneSummary(zone: PilotZoneDefinition, aggregate: OperationsAreaSummaryItem): OperationsZoneSummaryItem {
   return {
     areaKey: zone.areaKey,
+    intakeWorkerResidenceCount: 0,
+    intakeWorksiteCount: 0,
     pendingReviewCount: zone.aggregateAnchor ? aggregate.pendingReviewCount : 0,
     requestCount: zone.aggregateAnchor ? aggregate.requestCount : 0,
     shiftCount: zone.aggregateAnchor ? aggregate.shiftCount : 0,

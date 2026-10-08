@@ -81,6 +81,8 @@ export type OperationsZoneSummaryItem = {
   areaKey: OperationsAreaKey;
   workerResidenceCount: number;
   worksiteCount: number;
+  intakeWorkerResidenceCount: number;
+  intakeWorksiteCount: number;
   requestCount: number;
   shiftCount: number;
   workerSlots: number;
@@ -266,6 +268,8 @@ function parseZoneSummaryItem(value: unknown): OperationsZoneSummaryItem | null 
   if (
     !nonNegative(value.worker_residence_count) ||
     !nonNegative(value.worksite_count) ||
+    !nonNegative(value.intake_worker_residence_count) ||
+    !nonNegative(value.intake_worksite_count) ||
     !nonNegative(value.request_count) ||
     !nonNegative(value.shift_count) ||
     !nonNegative(value.worker_slots) ||
@@ -277,6 +281,8 @@ function parseZoneSummaryItem(value: unknown): OperationsZoneSummaryItem | null 
     areaKey: value.area_key as OperationsAreaKey,
     workerResidenceCount: value.worker_residence_count,
     worksiteCount: value.worksite_count,
+    intakeWorkerResidenceCount: value.intake_worker_residence_count,
+    intakeWorksiteCount: value.intake_worksite_count,
     requestCount: value.request_count,
     shiftCount: value.shift_count,
     workerSlots: value.worker_slots,

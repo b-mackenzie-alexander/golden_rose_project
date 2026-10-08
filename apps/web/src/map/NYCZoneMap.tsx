@@ -33,6 +33,18 @@ function zoneDetail(summary: OperationsZoneSummaryItem, language: Language) {
     : `${countLabel(summary.requestCount, 'request', 'requests')} / ${countLabel(summary.workerSlots, 'slot', 'slots')}`;
 }
 
+function totalWorkerResidences(summary: OperationsZoneSummaryItem) {
+  return summary.workerResidenceCount + summary.intakeWorkerResidenceCount;
+}
+
+function totalWorksites(summary: OperationsZoneSummaryItem) {
+  return summary.worksiteCount + summary.intakeWorksiteCount;
+}
+
+function intakePlanningCount(summary: OperationsZoneSummaryItem) {
+  return summary.intakeWorkerResidenceCount + summary.intakeWorksiteCount;
+}
+
 export function NYCZoneMap({ areaSummary, compact = false, decorative = false, language, zoneSummary = [] }: NYCZoneMapProps) {
   const zones = useMemo(() => buildPilotZones(areaSummary, zoneSummary), [areaSummary, zoneSummary]);
 
@@ -64,10 +76,13 @@ export function NYCZoneMap({ areaSummary, compact = false, decorative = false, l
           role={decorative ? undefined : 'list'}
         >
           {zones.map((zone) => {
-            const hasDemand = zone.summary.requestCount > 0 || zone.summary.workerSlots > 0 || zone.summary.workerResidenceCount > 0 || zone.summary.worksiteCount > 0;
+            const workerResidences = totalWorkerResidences(zone.summary);
+            const worksites = totalWorksites(zone.summary);
+            const intakeCount = intakePlanningCount(zone.summary);
+            const hasDemand = zone.summary.requestCount > 0 || zone.summary.workerSlots > 0 || workerResidences > 0 || worksites > 0;
             const ariaLabel = language === 'es'
-              ? `${zone.label.es}. ${String(zone.summary.workerResidenceCount)} residencias de trabajadores, ${String(zone.summary.worksiteCount)} lugares de trabajo, ${String(zone.summary.requestCount)} solicitudes, ${String(zone.summary.workerSlots)} cupos.`
-              : `${zone.label.en}. ${String(zone.summary.workerResidenceCount)} worker residences, ${String(zone.summary.worksiteCount)} worksites, ${String(zone.summary.requestCount)} requests, ${String(zone.summary.workerSlots)} slots.`;
+              ? `${zone.label.es}. ${String(workerResidences)} residencias de trabajadores, ${String(worksites)} lugares de trabajo, ${String(zone.summary.requestCount)} solicitudes, ${String(zone.summary.workerSlots)} cupos, ${String(intakeCount)} senales de planificacion de registros.`
+              : `${zone.label.en}. ${String(workerResidences)} worker residences, ${String(worksites)} worksites, ${String(zone.summary.requestCount)} requests, ${String(zone.summary.workerSlots)} slots, ${String(intakeCount)} intake-stage planning signals.`;
             return (
               <div
                 aria-label={decorative ? undefined : ariaLabel}
@@ -88,10 +103,17 @@ export function NYCZoneMap({ areaSummary, compact = false, decorative = false, l
                   <strong>{zone.label[language]}</strong>
                   <span>
                     {language === 'es'
-                      ? `${String(zone.summary.workerResidenceCount)} trabajadores / ${String(zone.summary.worksiteCount)} lugares`
-                      : `${String(zone.summary.workerResidenceCount)} workers / ${String(zone.summary.worksiteCount)} worksites`}
+                      ? `${String(workerResidences)} trabajadores / ${String(worksites)} lugares`
+                      : `${String(workerResidences)} workers / ${String(worksites)} worksites`}
                   </span>
                   <small>{zoneDetail(zone.summary, language)}</small>
+                  {intakeCount > 0 ? (
+                    <small>
+                      {language === 'es'
+                        ? `${String(intakeCount)} en registros sin finalizar`
+                        : `${String(intakeCount)} from unfinalized intakes`}
+                    </small>
+                  ) : null}
                 </span>
               </div>
             );
@@ -113,8 +135,8 @@ export function NYCZoneMap({ areaSummary, compact = false, decorative = false, l
       {!compact ? (
         <p className="nyc-zone-map__note">
           {language === 'es'
-            ? 'Las zonas piloto estan listas para renombrarse o combinarse; los agregados actuales se muestran sin puntos individuales ni direcciones exactas.'
-            : 'Pilot zones can be renamed or combined later; current aggregates are shown without individual dots or exact addresses.'}
+            ? 'Las zonas piloto estan listas para renombrarse o combinarse; los agregados actuales incluyen registros sin finalizar sin puntos individuales ni direcciones exactas.'
+            : 'Pilot zones can be renamed or combined later; current aggregates include unfinalized intake-stage planning signals without individual dots or exact addresses.'}
         </p>
       ) : null}
     </div>

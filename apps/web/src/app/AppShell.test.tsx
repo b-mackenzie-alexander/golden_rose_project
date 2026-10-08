@@ -105,6 +105,36 @@ describe('AppShell', () => {
     });
   });
 
+  it('clears the staff browser session with Spanish labels when Google auto-select is unavailable', async () => {
+    const user = userEvent.setup();
+    setStaffIdToken('stored-token', Date.now() + 60_000);
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/staff/account']}>
+          <AppShell />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Cambiar a español' }));
+
+    const signOut = screen.getByRole('button', { name: 'Cerrar sesion de Golden Rose' });
+    expect(signOut).toHaveTextContent('Cerrar sesion');
+    expect(signOut).toHaveAttribute(
+      'title',
+      'Borra esta sesion de Golden Rose en el navegador. Google puede seguir activo.',
+    );
+    expect(bearerHeaders(undefined).get('Authorization')).toBe('Bearer stored-token');
+
+    await user.click(signOut);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Cerrar sesion de Golden Rose' })).not.toBeInTheDocument();
+      expect(bearerHeaders(undefined).has('Authorization')).toBe(false);
+    });
+  });
+
   it('persists light and dark mode from the utility toggle', async () => {
     const user = userEvent.setup();
     render(

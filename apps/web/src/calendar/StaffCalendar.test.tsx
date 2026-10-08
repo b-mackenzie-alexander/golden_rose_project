@@ -64,8 +64,32 @@ const projectionExtras = {
   },
 };
 
+function calendarDate(offsetDays: number) {
+  const today = new Date();
+  const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offsetDays, 10, 0, 0, 0);
+  return {
+    dateLabel: new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date),
+    dayLabel: new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(date),
+    iso: date.toISOString(),
+  };
+}
+
+function currentMonthHeading() {
+  return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date());
+}
+
+function firstPopulatedCalendarDay() {
+  const button = screen.getAllByRole('button').find((candidate) => (
+    candidate.classList.contains('calendar-day-button') &&
+    !candidate.textContent.endsWith('0')
+  ));
+  if (!button) throw new Error('No populated calendar day was rendered.');
+  return button;
+}
+
 describe('StaffCalendar', () => {
   beforeEach(() => {
+    const projectedShiftDay = calendarDate(1);
     window.localStorage.clear();
     vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue({
       ok: true,
@@ -83,8 +107,8 @@ describe('StaffCalendar', () => {
             shiftStatus: 'pending_review',
             roleTitle: 'Home aide',
             workerCount: 1,
-            startsAt: '2026-09-29T14:00:00Z',
-            endsAt: '2026-09-29T18:00:00Z',
+            startsAt: projectedShiftDay.iso,
+            endsAt: new Date(new Date(projectedShiftDay.iso).getTime() + 4 * 60 * 60 * 1000).toISOString(),
             timeZone: 'America/New_York',
             version: 2,
             updatedAt: '2026-09-29T13:45:00Z',
@@ -96,16 +120,40 @@ describe('StaffCalendar', () => {
     vi.mocked(runtimeApi.getStaticOperationalFallbackPolicy).mockResolvedValue('allow');
   });
 
+  it('starts with the current day and can switch to the current-year month view', async () => {
+    const user = userEvent.setup();
+    const today = calendarDate(0);
+    const monthEnd = new Date();
+    monthEnd.setMonth(monthEnd.getMonth() + 1, 0);
+
+    renderCalendar();
+
+    await waitFor(() => {
+      expect(getDayButton(today.dayLabel, today.dateLabel, '0')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Jan 27')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Month' }));
+
+    expect(screen.getAllByText(currentMonthHeading()).length).toBeGreaterThanOrEqual(1);
+    const monthButtons = screen.getAllByRole('button').filter((button) => (
+      button.classList.contains('calendar-day-button')
+    ));
+    expect(monthButtons.length).toBe(monthEnd.getDate());
+    expect(monthButtons.some((button) => button.textContent.includes(String(monthEnd.getDate())))).toBe(true);
+  });
+
   it('adds and removes a personal calendar event from the selected day', async () => {
+    const projectedShiftDay = calendarDate(1);
     const user = userEvent.setup();
     let view = renderCalendar();
     await waitFor(() => {
-      expect(getDayButton('Tue', 'Jan 28', '1')).toBeInTheDocument();
+      expect(getDayButton(projectedShiftDay.dayLabel, projectedShiftDay.dateLabel, '1')).toBeInTheDocument();
     });
     expect(screen.getByText('Projected shifts')).toBeInTheDocument();
     expect(screen.getByText('Projected worker slots')).toBeInTheDocument();
     expect(screen.getByText('Request-derived shifts only; personal events stay separate.')).toBeInTheDocument();
-    await user.click(getDayButton('Tue', 'Jan 28', '1'));
+    await user.click(getDayButton(projectedShiftDay.dayLabel, projectedShiftDay.dateLabel, '1'));
     const form = screen.getByRole('heading', { name: 'Add event' }).closest('form');
     if (!form) throw new Error('Add event form was not rendered.');
     const eventForm = within(form);
@@ -121,14 +169,14 @@ describe('StaffCalendar', () => {
 
     expect(screen.getAllByText('Prepare demo script')).toHaveLength(2);
     expect(screen.getAllByText('Stakeholder presentation prep').length).toBeGreaterThanOrEqual(1);
-    expect(getDayButton('Tue', 'Jan 28', '2')).toBeInTheDocument();
+    expect(getDayButton(projectedShiftDay.dayLabel, projectedShiftDay.dateLabel, '2')).toBeInTheDocument();
 
     view.unmount();
     view = renderCalendar();
     await waitFor(() => {
-      expect(getDayButton('Tue', 'Jan 28', '2')).toBeInTheDocument();
+      expect(getDayButton(projectedShiftDay.dayLabel, projectedShiftDay.dateLabel, '2')).toBeInTheDocument();
     });
-    await user.click(getDayButton('Tue', 'Jan 28', '2'));
+    await user.click(getDayButton(projectedShiftDay.dayLabel, projectedShiftDay.dateLabel, '2'));
     expect(screen.getAllByText('Prepare demo script')).toHaveLength(2);
 
     await user.click(screen.getByRole('button', { name: 'Edit event' }));
@@ -145,14 +193,14 @@ describe('StaffCalendar', () => {
     await user.click(screen.getByRole('button', { name: 'Remove event' }));
     expect(screen.getByRole('status')).toHaveTextContent('Event removed');
     expect(screen.queryByText('Finalize demo script')).not.toBeInTheDocument();
-    expect(getDayButton('Tue', 'Jan 28', '1')).toBeInTheDocument();
+    expect(getDayButton(projectedShiftDay.dayLabel, projectedShiftDay.dateLabel, '1')).toBeInTheDocument();
 
     view.unmount();
     renderCalendar();
     await waitFor(() => {
-      expect(getDayButton('Tue', 'Jan 28', '1')).toBeInTheDocument();
+      expect(getDayButton(projectedShiftDay.dayLabel, projectedShiftDay.dateLabel, '1')).toBeInTheDocument();
     });
-    await user.click(getDayButton('Tue', 'Jan 28', '1'));
+    await user.click(getDayButton(projectedShiftDay.dayLabel, projectedShiftDay.dateLabel, '1'));
     expect(screen.queryByText('Finalize demo script')).not.toBeInTheDocument();
   });
 
@@ -182,7 +230,8 @@ describe('StaffCalendar', () => {
     renderCalendar();
 
     expect(await screen.findByRole('status')).toHaveTextContent('not authorized to read projected shifts');
-    expect(screen.getAllByText('Team check-in').length).toBeGreaterThan(0);
+    await userEvent.click(firstPopulatedCalendarDay());
+    expect(screen.getAllByText(/Team check-in|Call Restaurante La Esperanza|Interview with Ana Quispe|Review pending intakes|Follow-up with Maria Lopez|Bright Horizons staffing call|Meet Carlos Mendoza|Worker intake review block|Clean Homes LLC confirmation|Interview with Carlos Mendoza/).length).toBeGreaterThan(0);
   });
 
   it('does not show seeded calendar events in production mode when shift reads fail', async () => {

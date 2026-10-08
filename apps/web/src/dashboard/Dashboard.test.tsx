@@ -97,8 +97,28 @@ const projectionExtras = {
   },
 };
 
+function calendarDate(offsetDays: number) {
+  const today = new Date();
+  const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offsetDays, 10, 0, 0, 0);
+  return {
+    dateLabel: new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date),
+    iso: date.toISOString(),
+  };
+}
+
+function currentWeekRange() {
+  const start = new Date();
+  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+  if (sameMonth) {
+    return `${new Intl.DateTimeFormat('en-US', { month: 'long' }).format(start)} ${String(start.getDate())} - ${String(end.getDate())}, ${String(start.getFullYear())}`;
+  }
+  return `${new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: start.getFullYear() === end.getFullYear() ? undefined : 'numeric' }).format(start)} - ${new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(end)}`;
+}
+
 describe('Dashboard', () => {
   beforeEach(() => {
+    const projectedShiftDay = calendarDate(1);
     window.localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
     vi.mocked(intakeApi.queryIntakes).mockImplementation((kind) => Promise.resolve({
@@ -138,8 +158,8 @@ describe('Dashboard', () => {
             shiftStatus: 'pending_review',
             roleTitle: 'Home aide',
             workerCount: 1,
-            startsAt: '2026-10-01T14:00:00Z',
-            endsAt: '2026-10-01T18:00:00Z',
+            startsAt: projectedShiftDay.iso,
+            endsAt: new Date(new Date(projectedShiftDay.iso).getTime() + 4 * 60 * 60 * 1000).toISOString(),
             timeZone: 'America/New_York',
             version: 2,
             updatedAt: '2026-10-01T13:45:00Z',
@@ -446,7 +466,7 @@ describe('Dashboard', () => {
     await user.click(calendarResult);
 
     expect(screen.getByRole('heading', { name: 'Calendar' })).toBeInTheDocument();
-    expect(screen.getByText('January 27 - February 2, 2025')).toBeInTheDocument();
+    expect(screen.getByText(currentWeekRange())).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: "Today's agenda" })).toBeInTheDocument();
   });
 
@@ -498,6 +518,7 @@ describe('Dashboard', () => {
   });
 
   it('renders the staff calendar route with selectable static agenda data', async () => {
+    const projectedShiftDay = calendarDate(1);
     const user = userEvent.setup();
     const view = render(
       <LanguageProvider>
@@ -510,7 +531,7 @@ describe('Dashboard', () => {
     expect(screen.getByRole('link', { name: 'Calendar' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('heading', { name: 'Calendar' })).toBeInTheDocument();
 
-    const thursdayButton = screen.getByText('Jan 30').closest('button');
+    const thursdayButton = screen.getByText(projectedShiftDay.dateLabel).closest('button');
     if (thursdayButton === null) {
       throw new Error('Thursday calendar button was not rendered.');
     }

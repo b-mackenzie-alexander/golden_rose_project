@@ -4,7 +4,7 @@ import { beforeEach, vi } from 'vitest';
 
 import * as operationsApi from '../api/operationsProjectionClient';
 import * as runtimeApi from '../api/runtimeEnvironmentClient';
-import { LanguageProvider } from '../i18n/LanguageProvider';
+import { LanguageProvider, useLanguage } from '../i18n/LanguageProvider';
 import { StaffCalendar } from './StaffCalendar';
 
 vi.mock('../api/operationsProjectionClient');
@@ -13,9 +13,17 @@ vi.mock('../api/runtimeEnvironmentClient', async (importOriginal) => {
   return { ...actual, getStaticOperationalFallbackPolicy: vi.fn() };
 });
 
-function renderCalendar() {
+const manualEventsStorageKey = 'golden-rose.staff-calendar.manual-events.v1';
+
+function SpanishToggle() {
+  const { toggleLanguage } = useLanguage();
+  return <button type="button" onClick={toggleLanguage}>Español</button>;
+}
+
+function renderCalendar(options: { withSpanishToggle?: boolean } = {}) {
   return render(
     <LanguageProvider>
+      {options.withSpanishToggle ? <SpanishToggle /> : null}
       <StaffCalendar />
     </LanguageProvider>,
   );
@@ -78,12 +86,28 @@ function currentMonthHeading() {
   return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date());
 }
 
+function monthHeadingWithOffset(offsetMonths: number, locale = 'en-US') {
+  const today = new Date();
+  return new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(
+    new Date(today.getFullYear(), today.getMonth() + offsetMonths, 1),
+  );
+}
+
 function firstPopulatedCalendarDay() {
   const button = screen.getAllByRole('button').find((candidate) => (
     candidate.classList.contains('calendar-day-button') &&
     !candidate.textContent.endsWith('0')
   ));
   if (!button) throw new Error('No populated calendar day was rendered.');
+  return button;
+}
+
+function getCalendarDayByShortLabel(shortLabel: string) {
+  const button = screen.getAllByRole('button').find((candidate) => (
+    candidate.classList.contains('calendar-day-button') &&
+    candidate.textContent.includes(shortLabel)
+  ));
+  if (!button) throw new Error(`Calendar day was not rendered for ${shortLabel}.`);
   return button;
 }
 
@@ -141,6 +165,98 @@ describe('StaffCalendar', () => {
     ));
     expect(monthButtons.length).toBe(monthEnd.getDate());
     expect(monthButtons.some((button) => button.textContent.includes(String(monthEnd.getDate())))).toBe(true);
+  });
+
+  it('navigates the current-year month view and returns to today in week view', async () => {
+    const user = userEvent.setup();
+    const today = new Date();
+    const navigationOffset = today.getMonth() < 11 ? 1 : -1;
+    const navigationButton = navigationOffset === 1 ? 'Next month' : 'Previous month';
+    const targetMonth = new Date(today.getFullYear(), today.getMonth() + navigationOffset, 1);
+
+    renderCalendar();
+
+    await user.click(screen.getByRole('button', { name: 'Month' }));
+    await user.click(screen.getByRole('button', { name: navigationButton }));
+
+    expect(screen.getAllByText(monthHeadingWithOffset(navigationOffset)).length).toBeGreaterThanOrEqual(1);
+    const selectedMonthDay = screen.getAllByRole('button').find((button) => (
+      button.classList.contains('calendar-month-day') &&
+      button.textContent.includes(String(targetMonth.getDate())) &&
+      button.getAttribute('aria-pressed') === 'true'
+    ));
+    expect(selectedMonthDay).toBeDefined();
+
+    await user.click(screen.getByRole('button', { name: 'Today' }));
+
+    expect(screen.getByRole('button', { name: 'Week' })).toHaveAttribute('aria-pressed', 'true');
+    const currentDay = calendarDate(0);
+    expect(getDayButton(currentDay.dayLabel, currentDay.dateLabel, '0')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('renders Spanish labels and date ranges from the same calendar state', async () => {
+    const user = userEvent.setup();
+
+    renderCalendar({ withSpanishToggle: true });
+
+    await user.click(screen.getByRole('button', { name: 'Español' }));
+
+    expect(screen.getByRole('heading', { name: 'Calendario' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hoy' })).toBeInTheDocument();
+    expect(screen.getByText(/ de \d{4}$/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Mes' }));
+    expect(screen.getAllByText(monthHeadingWithOffset(0, 'es-US')).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('normalizes saved legacy weekday events into the current seven-day range', async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(manualEventsStorageKey, JSON.stringify([
+      {
+        assignee: '',
+        dayId: 'mon',
+        duration: '45 min',
+        id: 'manual-legacy-monday',
+        meta: '',
+        scope: 'personal',
+        time24: '08:30',
+        title: 'Legacy Monday note',
+      },
+      {
+        assignee: 'Ignored',
+        dayId: 'tue',
+        duration: '30 min',
+        id: 'bad-scope-event',
+        meta: 'Should not render',
+        scope: 'system',
+        time24: '09:00',
+        title: 'Invalid stored event',
+      },
+    ]));
+
+    renderCalendar();
+
+    await waitFor(() => expect(getCalendarDayByShortLabel('Mon')).toBeInTheDocument());
+    await user.click(getCalendarDayByShortLabel('Mon'));
+
+    expect(screen.getAllByText('Legacy Monday note').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('Invalid stored event')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Edit event' }));
+    expect(screen.getByRole('heading', { name: 'Edit event' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Cancel edit' }));
+    expect(screen.getByRole('heading', { name: 'Add event' })).toBeInTheDocument();
+  });
+
+  it('ignores invalid stored event payloads without breaking the calendar', async () => {
+    window.localStorage.setItem(manualEventsStorageKey, '{not valid json');
+
+    renderCalendar();
+
+    await waitFor(() => {
+      expect(screen.getByText('Projected shifts')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Legacy Monday note')).not.toBeInTheDocument();
   });
 
   it('adds and removes a personal calendar event from the selected day', async () => {
@@ -247,6 +363,19 @@ describe('StaffCalendar', () => {
     expect(screen.getByText('Open slots')).toBeInTheDocument();
     expect(screen.queryByText('Team check-in')).not.toBeInTheDocument();
     expect(screen.queryByText('Call Restaurante La Esperanza')).not.toBeInTheDocument();
+  });
+
+  it('explains validation failures while keeping static fallback examples available', async () => {
+    vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue({
+      ok: false,
+      failure: { kind: 'validation' },
+    });
+
+    renderCalendar();
+
+    expect(await screen.findByRole('status')).toHaveTextContent('could not be validated');
+    await userEvent.click(getCalendarDayByShortLabel('Mon'));
+    expect(screen.getAllByText('Team check-in').length).toBeGreaterThanOrEqual(1);
   });
 
   it('keeps a successful empty shift projection empty instead of showing seeded events', async () => {

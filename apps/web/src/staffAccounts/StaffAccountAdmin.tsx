@@ -24,6 +24,7 @@ type AccountAction = 'activate' | 'suspend' | 'deprovision' | 'recovery' | 'sess
 type AccountFilter = 'all' | 'active' | 'suspended' | 'deprovisioned' | 'mfa_pending';
 type CreateForm = {
   displayName: string;
+  providerEmail: string;
   providerSubject: string;
   roleName: StaffAccountRole;
   permissionNames: string[];
@@ -123,6 +124,7 @@ const failureLabels: Record<StaffAccountFailureKind, { en: string; es: string }>
 
 const emptyCreate: CreateForm = {
   displayName: '',
+  providerEmail: '',
   providerSubject: '',
   roleName: 'operations_staff',
   permissionNames: ['staff_account:read'],
@@ -145,8 +147,15 @@ function formatDate(value: string) {
   return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-function providerSubjectStatus(language: 'en' | 'es') {
-  return language === 'en' ? 'Identity provider subject recorded' : 'Sujeto del proveedor registrado';
+function isPendingProviderSubject(value: string) {
+  return value.startsWith('pending-google-email:');
+}
+
+function providerSubjectStatus(account: StaffAccount, language: 'en' | 'es') {
+  if (isPendingProviderSubject(account.providerSubject)) {
+    return language === 'en' ? 'Waiting for verified Google sign-in' : 'Esperando inicio de Google verificado';
+  }
+  return language === 'en' ? 'Google sign-in binding recorded' : 'Inicio con Google vinculado';
 }
 
 function formatStatusTransition(event: StaffAccountLifecycleEvent, language: 'en' | 'es') {
@@ -233,7 +242,7 @@ export function StaffAccountAdmin() {
         || (accountFilter === 'mfa_pending' && !account.mfaEnrolled && account.lifecycleStatus !== 'deprovisioned');
       const matchesSearch = normalizedSearch.length === 0
         || account.displayName.toLowerCase().includes(normalizedSearch)
-        || account.providerSubject.toLowerCase().includes(normalizedSearch);
+        || (account.providerEmail?.toLowerCase().includes(normalizedSearch) ?? false);
       return matchesFilter && matchesSearch;
     });
   }, [accountFilter, accounts, searchTerm]);
@@ -283,7 +292,12 @@ export function StaffAccountAdmin() {
   function validateAccountForm(form: CreateForm, setErrors: (errors: Partial<Record<keyof CreateForm, string>>) => void) {
     const next: Partial<Record<keyof CreateForm, string>> = {};
     if (form.displayName.trim().length === 0) next.displayName = language === 'en' ? 'Display name is required.' : 'Nombre visible requerido.';
-    if (form.providerSubject.trim().length === 0) next.providerSubject = language === 'en' ? 'Provider subject is required.' : 'Sujeto del proveedor requerido.';
+    if (form.providerEmail.trim().length === 0 && form.providerSubject.trim().length === 0) {
+      next.providerEmail = language === 'en' ? 'Google email or provider subject is required.' : 'Correo de Google o sujeto del proveedor requerido.';
+    }
+    if (form.providerEmail.trim().length > 0 && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.providerEmail.trim())) {
+      next.providerEmail = language === 'en' ? 'Enter a valid Google email address.' : 'Ingrese un correo de Google valido.';
+    }
     if (form.permissionNames.length === 0) next.permissionNames = language === 'en' ? 'Select at least one permission.' : 'Seleccione al menos un permiso.';
     if (form.reasonText.trim().length === 0) next.reasonText = language === 'en' ? 'Reason is required.' : 'Motivo requerido.';
     setErrors(next);
@@ -386,7 +400,8 @@ export function StaffAccountAdmin() {
     setCorrectionForm({
       account,
       displayName: account.displayName,
-      providerSubject: account.providerSubject,
+      providerEmail: account.providerEmail ?? '',
+      providerSubject: isPendingProviderSubject(account.providerSubject) ? '' : account.providerSubject,
       roleName: account.roleName,
       permissionNames: ['staff_account:read'],
       mfaEnrolled: account.mfaEnrolled,
@@ -519,7 +534,7 @@ export function StaffAccountAdmin() {
               <span>{language === 'en' ? 'Find account' : 'Buscar cuenta'}</span>
               <input
                 className="focus-ring"
-                placeholder={language === 'en' ? 'Name or provider subject' : 'Nombre o sujeto del proveedor'}
+                placeholder={language === 'en' ? 'Name or Google email' : 'Nombre o correo de Google'}
                 value={searchTerm}
                 onChange={(event) => { setSearchTerm(event.target.value); }}
               />
@@ -545,7 +560,8 @@ export function StaffAccountAdmin() {
               <div role="row" className="staff-account-row" key={account.staffId}>
                 <span role="cell">
                   <strong>{account.displayName}</strong>
-                  <small>{providerSubjectStatus(language)}</small>
+                  {account.providerEmail ? <small>{account.providerEmail}</small> : null}
+                  <small>{providerSubjectStatus(account, language)}</small>
                 </span>
                 <span role="cell">{roleLabels[account.roleName][language]}</span>
                 <span role="cell">
@@ -558,7 +574,21 @@ export function StaffAccountAdmin() {
                 </span>
                 <span role="cell" className="staff-account-actions">
                   {account.lifecycleStatus !== 'active' && account.lifecycleStatus !== 'deprovisioned' ? (
-                    <button className="focus-ring" type="button" onClick={() => { setActionForm({ account, action: 'activate', reasonText: '', mfaEnrolled: true }); }}>{actionLabels.activate[language]}</button>
+                    <button
+                      className="focus-ring"
+                      disabled={isPendingProviderSubject(account.providerSubject)}
+                      title={
+                        isPendingProviderSubject(account.providerSubject)
+                          ? language === 'en'
+                            ? 'Waiting for the first verified Google sign-in before activation.'
+                            : 'Esperando el primer inicio verificado de Google antes de activar.'
+                          : undefined
+                      }
+                      type="button"
+                      onClick={() => { setActionForm({ account, action: 'activate', reasonText: '', mfaEnrolled: true }); }}
+                    >
+                      {actionLabels.activate[language]}
+                    </button>
                   ) : null}
                   {account.lifecycleStatus === 'suspended' ? (
                     <button className="focus-ring" type="button" onClick={() => { openCorrection(account); }}>{language === 'en' ? 'Correct' : 'Corregir'}</button>
@@ -597,8 +627,18 @@ export function StaffAccountAdmin() {
               {createErrors.displayName ? <small role="alert">{createErrors.displayName}</small> : null}
             </label>
             <label>
-              <span>{language === 'en' ? 'Provider subject' : 'Sujeto del proveedor'}</span>
+              <span>{language === 'en' ? 'Google email for sign-in' : 'Correo de Google para iniciar sesion'}</span>
+              <input className="focus-ring" type="email" value={createForm.providerEmail} onChange={(event) => { setCreateForm({ ...createForm, providerEmail: event.target.value }); }} />
+              {createErrors.providerEmail ? <small role="alert">{createErrors.providerEmail}</small> : null}
+            </label>
+            <label>
+              <span>{language === 'en' ? 'Provider subject, if already known' : 'Sujeto del proveedor, si ya se conoce'}</span>
               <input className="focus-ring" value={createForm.providerSubject} onChange={(event) => { setCreateForm({ ...createForm, providerSubject: event.target.value }); }} />
+              <small>
+                {language === 'en'
+                  ? 'Leave blank for normal Google email onboarding. The stable sign-in subject binds after the person signs in once.'
+                  : 'Dejelo vacio para incorporacion normal por correo de Google. El sujeto estable se vincula despues del primer inicio.'}
+              </small>
               {createErrors.providerSubject ? <small role="alert">{createErrors.providerSubject}</small> : null}
             </label>
             <div className="calendar-form-row">
@@ -654,8 +694,18 @@ export function StaffAccountAdmin() {
               {correctionErrors.displayName ? <small role="alert">{correctionErrors.displayName}</small> : null}
             </label>
             <label>
-              <span>{language === 'en' ? 'Provider subject' : 'Sujeto del proveedor'}</span>
+              <span>{language === 'en' ? 'Google email for sign-in' : 'Correo de Google para iniciar sesion'}</span>
+              <input className="focus-ring" type="email" value={correctionForm.providerEmail} onChange={(event) => { setCorrectionForm({ ...correctionForm, providerEmail: event.target.value }); }} />
+              {correctionErrors.providerEmail ? <small role="alert">{correctionErrors.providerEmail}</small> : null}
+            </label>
+            <label>
+              <span>{language === 'en' ? 'Provider subject, if already known' : 'Sujeto del proveedor, si ya se conoce'}</span>
               <input className="focus-ring" value={correctionForm.providerSubject} onChange={(event) => { setCorrectionForm({ ...correctionForm, providerSubject: event.target.value }); }} />
+              <small>
+                {language === 'en'
+                  ? 'Leave blank to keep this account waiting for the first verified Google sign-in.'
+                  : 'Dejelo vacio para mantener la cuenta esperando el primer inicio de Google verificado.'}
+              </small>
               {correctionErrors.providerSubject ? <small role="alert">{correctionErrors.providerSubject}</small> : null}
             </label>
             <div className="calendar-form-row">

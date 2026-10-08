@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from golden_rose.application.employer_text import (
     normalize_employer_text,
@@ -165,7 +165,8 @@ def _normalize_staff_text(field_name: str, value: str, max_length: int) -> str:
 class CreateStaffAccountRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    provider_subject: str
+    provider_subject: str = ""
+    provider_email: str | None = None
     display_name: str
     role_name: StaffAccountRoleName
     permission_names: tuple[str, ...]
@@ -175,7 +176,36 @@ class CreateStaffAccountRequest(BaseModel):
     @field_validator("provider_subject")
     @classmethod
     def validate_provider_subject(cls, value: str) -> str:
+        if value == "":
+            return value
         return _normalize_staff_text("provider_subject", value, 256)
+
+    @field_validator("provider_email")
+    @classmethod
+    def validate_provider_email(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().lower()
+        if (
+            not normalized
+            or len(normalized) > 320
+            or normalized.count("@") != 1
+            or any(ch.isspace() for ch in normalized)
+        ):
+            msg = "provider_email must be a verified Google email address"
+            raise ValueError(msg)
+        local, domain = normalized.split("@", 1)
+        if not local or "." not in domain or domain.startswith(".") or domain.endswith("."):
+            msg = "provider_email must be a verified Google email address"
+            raise ValueError(msg)
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_identity_handle(self) -> "CreateStaffAccountRequest":
+        if not self.provider_subject and self.provider_email is None:
+            msg = "provider_subject or provider_email is required"
+            raise ValueError(msg)
+        return self
 
     @field_validator("display_name")
     @classmethod
@@ -225,6 +255,7 @@ class StaffAccountResponse(BaseModel):
 
     staff_id: UUID
     provider_subject: str
+    provider_email: str | None
     display_name: str
     role_name: StaffAccountRoleName
     lifecycle_status: StaffAccountLifecycleStatus

@@ -28,6 +28,7 @@ afterEach(() => {
 const account = {
   staffId: '22222222-2222-4222-8222-222222222222',
   providerSubject: 'oidc:staff:123',
+  providerEmail: 'mariela.torres@example.test',
   displayName: 'Mariela Torres',
   roleName: 'operations_staff' as const,
   lifecycleStatus: 'active' as const,

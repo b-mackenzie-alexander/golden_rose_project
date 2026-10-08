@@ -20,6 +20,7 @@ import {
 const account = {
   staff_id: '22222222-2222-4222-8222-222222222222',
   provider_subject: 'oidc:staff:123',
+  provider_email: 'mariela.torres@example.test',
   display_name: 'Mariela Torres',
   role_name: 'operations_staff',
   lifecycle_status: 'suspended',
@@ -104,6 +105,7 @@ it('lists staff accounts with no-store fetch options and strict response parsing
     value: [{
       staffId: account.staff_id,
       providerSubject: account.provider_subject,
+      providerEmail: account.provider_email,
       displayName: account.display_name,
       roleName: account.role_name,
       lifecycleStatus: account.lifecycle_status,
@@ -154,6 +156,7 @@ it('reads the current staff session with account and delegation context', async 
       account: {
         staffId: account.staff_id,
         providerSubject: account.provider_subject,
+        providerEmail: account.provider_email,
         displayName: account.display_name,
         roleName: account.role_name,
         lifecycleStatus: account.lifecycle_status,
@@ -374,6 +377,7 @@ it('creates, corrects, and activates accounts with idempotency headers and versi
     body: JSON.stringify({
       expected_version: 1,
       provider_subject: 'oidc:staff:corrected',
+      provider_email: null,
       display_name: 'Mariela Rivera',
       role_name: 'operations_staff',
       permission_names: ['staff_account:read', 'intake:read'],

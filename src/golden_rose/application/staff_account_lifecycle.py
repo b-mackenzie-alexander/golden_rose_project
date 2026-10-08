@@ -1,6 +1,8 @@
+import hashlib
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import cast
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy.exc import NoResultFound, SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -22,6 +24,7 @@ from golden_rose.identifiers import IdentifierFactory
 from golden_rose.persistence.staff_accounts import (
     StaffAccountRecord,
     StaffAccountStatus,
+    get_pending_staff_account_by_provider_email_for_update,
     get_staff_account_by_id_for_update,
     get_staff_account_by_provider_subject,
     insert_lifecycle_event,
@@ -31,7 +34,10 @@ from golden_rose.persistence.staff_accounts import (
     revoke_active_staff_permission_grants,
     update_staff_account_lifecycle,
     update_staff_account_onboarding,
+    update_staff_account_provider_binding,
 )
+
+PENDING_PROVIDER_SUBJECT_PREFIX = "pending-google-email:"
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +66,7 @@ def create_staff_account(
     command_id: UUID,
     staff_id: UUID,
     provider_subject: str,
+    provider_email: str | None,
     display_name: str,
     role_name: str,
     permission_names: frozenset[str],
@@ -72,7 +79,8 @@ def create_staff_account(
         msg = "principal lacks staff_account:create"
         raise PermissionError(msg)
 
-    provider_subject = _require_text("provider_subject", provider_subject, 256)
+    provider_email = _normalize_provider_email(provider_email)
+    provider_subject = _normalize_provider_subject(provider_subject, provider_email)
     display_name = _require_text("display_name", display_name, 160)
     reason_text = _require_text("reason_text", reason_text, 512)
     permissions = _validate_permission_names(permission_names)
@@ -91,6 +99,7 @@ def create_staff_account(
             session=session,
             staff_id=staff_id,
             provider_subject=provider_subject,
+            provider_email=provider_email,
             display_name=display_name,
             role_name=role_name,
             lifecycle_status="suspended",
@@ -143,6 +152,7 @@ def correct_staff_account_onboarding(
     staff_id: UUID,
     expected_version: int,
     provider_subject: str,
+    provider_email: str | None,
     display_name: str,
     role_name: str,
     permission_names: frozenset[str],
@@ -155,7 +165,8 @@ def correct_staff_account_onboarding(
         msg = "principal lacks staff_account:create"
         raise PermissionError(msg)
 
-    provider_subject = _require_text("provider_subject", provider_subject, 256)
+    provider_email = _normalize_provider_email(provider_email)
+    provider_subject = _normalize_provider_subject(provider_subject, provider_email)
     display_name = _require_text("display_name", display_name, 160)
     reason_text = _require_text("reason_text", reason_text, 512)
     permissions = _validate_permission_names(permission_names)
@@ -182,6 +193,7 @@ def correct_staff_account_onboarding(
             staff_id=staff_id,
             expected_version=expected_version,
             provider_subject=provider_subject,
+            provider_email=provider_email,
             display_name=display_name,
             role_name=role_name,
             mfa_enrolled=mfa_enrolled,
@@ -399,7 +411,9 @@ def resolve_staff_principal_from_claims(
             provider_subject=_require_text("provider_subject", claims.provider_subject, 256),
         )
     except NoResultFound as exc:
-        raise StaffAccountNotFoundError("staff account not found") from exc
+        if claims.provider_email is None:
+            raise StaffAccountNotFoundError("staff account not found") from exc
+        account = _bind_pending_google_email_account(session=session, claims=claims)
     permissions = list_active_staff_permissions(session=session, staff_id=account.staff_id)
     return StaffAccount(
         staff_id=account.staff_id,
@@ -410,6 +424,57 @@ def resolve_staff_principal_from_claims(
         permissions=permissions,
         mfa_enrolled=account.mfa_enrolled,
     ).to_principal()
+
+
+def _bind_pending_google_email_account(
+    *,
+    session: Session,
+    claims: StaffIdentityClaims,
+) -> StaffAccountRecord:
+    provider_email = _normalize_provider_email(claims.provider_email)
+    if provider_email is None:
+        raise StaffAccountNotFoundError("staff account not found")
+    provider_subject = _require_text("provider_subject", claims.provider_subject, 256)
+    now = datetime.now(UTC)
+    try:
+        pending = get_pending_staff_account_by_provider_email_for_update(
+            session=session,
+            provider_email=provider_email,
+            pending_subject_prefix=PENDING_PROVIDER_SUBJECT_PREFIX,
+        )
+        updated = update_staff_account_provider_binding(
+            session=session,
+            staff_id=pending.staff_id,
+            expected_version=pending.version,
+            provider_subject=provider_subject,
+            mfa_enrolled=pending.mfa_enrolled or claims.mfa_verified,
+            updated_at=now,
+        )
+        insert_lifecycle_event(
+            session=session,
+            event_id=uuid4(),
+            command_id=uuid4(),
+            staff_id=pending.staff_id,
+            actor_id=pending.staff_id,
+            event_type="staff_account.corrected",
+            previous_status=pending.lifecycle_status,
+            new_status=updated.lifecycle_status,
+            previous_version=pending.version,
+            new_version=updated.version,
+            occurred_at=now,
+            reason_text="Verified Google sign-in bound the pending staff account email.",
+        )
+        session.commit()
+    except NoResultFound as exc:
+        session.rollback()
+        raise StaffAccountNotFoundError("staff account not found") from exc
+    except SQLAlchemyError as exc:
+        session.rollback()
+        raise SafePersistenceError("persistence operation failed") from exc
+    except Exception:
+        session.rollback()
+        raise
+    return updated
 
 
 def _record_staff_account_evidence(
@@ -489,6 +554,12 @@ def _transition_staff_account(
             raise StaffAccountVersionConflictError("staff account version conflict")
         if current.lifecycle_status == "deprovisioned" and new_status != "deprovisioned":
             raise StaffAccountLifecycleError("deprovisioned staff account cannot be reactivated")
+        if event_type == "staff_account.activated" and _is_pending_provider_subject(
+            current.provider_subject
+        ):
+            raise StaffAccountLifecycleError(
+                "staff account requires verified Google sign-in binding"
+            )
         if current.lifecycle_status == new_status and current.mfa_enrolled == mfa_enrolled:
             raise StaffAccountLifecycleError("staff account transition requires a change")
         updated = update_staff_account_lifecycle(
@@ -533,6 +604,36 @@ def _require_text(field: str, value: str, max_length: int) -> str:
     if not normalized or len(normalized) > max_length:
         raise StaffAccountLifecycleError(f"invalid {field}")
     return normalized
+
+
+def _normalize_provider_email(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    if (
+        not normalized
+        or len(normalized) > 320
+        or normalized.count("@") != 1
+        or any(ch.isspace() for ch in normalized)
+    ):
+        raise StaffAccountLifecycleError("invalid provider_email")
+    local, domain = normalized.split("@", 1)
+    if not local or "." not in domain or domain.startswith(".") or domain.endswith("."):
+        raise StaffAccountLifecycleError("invalid provider_email")
+    return normalized
+
+
+def _normalize_provider_subject(provider_subject: str, provider_email: str | None) -> str:
+    if provider_subject.strip():
+        return _require_text("provider_subject", provider_subject, 256)
+    if provider_email is None:
+        raise StaffAccountLifecycleError("staff account requires provider subject or email")
+    digest = hashlib.sha256(provider_email.encode("utf-8")).hexdigest()
+    return PENDING_PROVIDER_SUBJECT_PREFIX + digest
+
+
+def _is_pending_provider_subject(provider_subject: str) -> bool:
+    return provider_subject.startswith(PENDING_PROVIDER_SUBJECT_PREFIX)
 
 
 def _validate_permission_names(permission_names: frozenset[str]) -> frozenset[str]:

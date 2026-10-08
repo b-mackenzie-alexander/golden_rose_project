@@ -53,6 +53,7 @@ def _account(*, status: str = "active") -> StaffAccountRecord:
     return StaffAccountRecord(
         staff_id=GRANTEE_ID,
         provider_subject="oidc:staff:grantee",
+        provider_email=None,
         display_name="Mariela Torres",
         role_name="operations_staff",
         lifecycle_status=status,  # type: ignore[arg-type]

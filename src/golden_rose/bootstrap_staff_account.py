@@ -134,11 +134,11 @@ def bootstrap_first_staff_account(
             text(
                 """
                 INSERT INTO staff_accounts (
-                    staff_id, provider_subject, display_name, role_name,
+                    staff_id, provider_subject, provider_email, display_name, role_name,
                     lifecycle_status, mfa_enrolled, created_at, created_by,
                     updated_at, updated_by, version
                 ) VALUES (
-                    :staff_id, :provider_subject, :display_name, 'owner',
+                    :staff_id, :provider_subject, NULL, :display_name, 'owner',
                     'active', true, :occurred_at, :staff_id,
                     :occurred_at, :staff_id, 1
                 )

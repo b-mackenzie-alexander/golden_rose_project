@@ -50,6 +50,7 @@ vi.mock('../auth/GoogleStaffSignIn', () => ({
 const suspended: StaffAccount = {
   staffId: '22222222-2222-4222-8222-222222222222',
   providerSubject: 'oidc:staff:123',
+  providerEmail: 'mariela.torres@example.test',
   displayName: 'Mariela Torres',
   roleName: 'operations_staff',
   lifecycleStatus: 'suspended',
@@ -127,27 +128,39 @@ function lastElement<T>(items: T[]): T {
 
 it('creates a suspended onboarding account and shows field-local validation', async () => {
   const user = userEvent.setup();
-  const created = { ...suspended, staffId: '33333333-3333-4333-8333-333333333333', displayName: 'Sofia Diaz', providerSubject: 'oidc:staff:456' };
+  const created = {
+    ...suspended,
+    staffId: '33333333-3333-4333-8333-333333333333',
+    displayName: 'Sofia Diaz',
+    providerSubject: 'pending-google-email:abc123',
+    providerEmail: 'sofia.diaz@example.test',
+  };
   vi.mocked(createStaffAccount).mockResolvedValue({ ok: true, value: { account: created, eventType: 'staff_account.created', resultVersion: 1 } });
 
   render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
   await screen.findByText('Mariela Torres');
-  expect(screen.getByText('Identity provider subject recorded')).toBeInTheDocument();
+  expect(screen.getByText('Google sign-in binding recorded')).toBeInTheDocument();
   expect(screen.queryByText('oidc:staff:123')).not.toBeInTheDocument();
 
   await user.click(screen.getByRole('button', { name: 'Create staff account' }));
   expect(screen.getByText('Display name is required.')).toBeInTheDocument();
-  expect(screen.getByText('Provider subject is required.')).toBeInTheDocument();
+  expect(screen.getByText('Google email or provider subject is required.')).toBeInTheDocument();
 
-  await user.type(screen.getByRole('textbox', { name: /Display name/ }), 'Sofia Diaz');
-  await user.type(screen.getByRole('textbox', { name: /Provider subject/ }), 'oidc:staff:456');
-  await user.type(screen.getByRole('textbox', { name: /Reason/ }), 'Initial onboarding approved');
-  await user.click(screen.getByLabelText('staff_account:create'));
-  await user.click(screen.getByRole('button', { name: 'Create staff account' }));
+  const createPanel = screen.getByRole('heading', { name: /Onboard staff account/ }).closest('section');
+  expect(createPanel).not.toBeNull();
+  const createForm = within(createPanel as HTMLElement);
+  await user.type(createForm.getByRole('textbox', { name: /Display name/ }), 'Sofia Diaz');
+  const googleEmailInput = createForm.getAllByRole('textbox', { name: /Google email/ })[0];
+  expect(googleEmailInput).toBeDefined();
+  await user.type(googleEmailInput as HTMLElement, 'sofia.diaz@example.test');
+  await user.type(createForm.getByRole('textbox', { name: /Reason/ }), 'Initial onboarding approved');
+  await user.click(createForm.getByLabelText('staff_account:create'));
+  await user.click(createForm.getByRole('button', { name: 'Create staff account' }));
 
   const createCall = vi.mocked(createStaffAccount).mock.calls[0]?.[0];
   expect(createCall?.displayName).toBe('Sofia Diaz');
-  expect(createCall?.providerSubject).toBe('oidc:staff:456');
+  expect(createCall?.providerEmail).toBe('sofia.diaz@example.test');
+  expect(createCall?.providerSubject).toBe('');
   expect(createCall?.permissionNames).toEqual(expect.arrayContaining(['staff_account:read', 'staff_account:create']));
   expect(createCall?.reasonText).toBe('Initial onboarding approved');
   expect(await screen.findByText('Staff account created in suspended onboarding state.')).toBeInTheDocument();
@@ -233,12 +246,13 @@ it('shows correction validation and recoverable command errors', async () => {
   expect(firstPanel).not.toBeNull();
   const firstCorrection = within(firstPanel as HTMLElement);
   await user.clear(firstCorrection.getByRole('textbox', { name: /Display name/ }));
+  await user.clear(firstCorrection.getByRole('textbox', { name: /Google email/ }));
   await user.clear(firstCorrection.getByRole('textbox', { name: /Provider subject/ }));
   await user.click(firstCorrection.getByLabelText('staff_account:read'));
   await user.click(firstCorrection.getByRole('button', { name: 'Save correction' }));
 
   expect(firstCorrection.getByText('Display name is required.')).toBeInTheDocument();
-  expect(firstCorrection.getByText('Provider subject is required.')).toBeInTheDocument();
+  expect(firstCorrection.getByText('Google email or provider subject is required.')).toBeInTheDocument();
   expect(firstCorrection.getByText('Select at least one permission.')).toBeInTheDocument();
   expect(firstCorrection.getByText('Reason is required.')).toBeInTheDocument();
   expect(correctStaffAccount).not.toHaveBeenCalled();
@@ -370,7 +384,7 @@ it('shows recoverable list, create, and action errors', async () => {
   expect((await screen.findAllByText('Active')).length).toBeGreaterThan(0);
 
   await user.type(screen.getByRole('textbox', { name: 'Display name' }), 'Denied Staff');
-  await user.type(screen.getByRole('textbox', { name: 'Provider subject' }), 'oidc:staff:789');
+  await user.type(screen.getByRole('textbox', { name: /Provider subject/ }), 'oidc:staff:789');
   await user.type(screen.getByRole('textbox', { name: 'Reason' }), 'Try denied create');
   await user.click(screen.getByRole('button', { name: 'Create staff account' }));
   expect(await screen.findByText('This staff session does not have permission for that account action.')).toBeInTheDocument();

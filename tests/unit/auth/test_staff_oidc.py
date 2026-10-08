@@ -77,6 +77,8 @@ class SigningKey:
             "iss": "https://accounts.example.test",
             "aud": "golden-rose-staff",
             "sub": "oidc:staff:123",
+            "email": "Mariela.Torres@Example.Test",
+            "email_verified": True,
             "iat": now,
             "exp": now + 300,
             "amr": ["pwd", "mfa"],
@@ -116,6 +118,7 @@ def test_jwks_verifier_returns_staff_identity_claims() -> None:
     claims = verifier.verify(token=key.token(), settings=_settings())
 
     assert claims.provider_subject == "oidc:staff:123"
+    assert claims.provider_email == "mariela.torres@example.test"
     assert claims.mfa_verified is True
     assert claims.session_id == "session-123"
 
@@ -213,6 +216,18 @@ def test_jwks_verifier_preserves_missing_mfa_as_unverified_claim() -> None:
     claims = verifier.verify(token=key.token({"amr": ["pwd"]}), settings=_settings())
 
     assert claims.mfa_verified is False
+
+
+def test_jwks_verifier_ignores_unverified_email_claim() -> None:
+    key = SigningKey()
+    verifier = StaffOidcJwksTokenVerifier(fetch_jwks=lambda _url: {"keys": [key.jwk()]})
+
+    claims = verifier.verify(
+        token=key.token({"email": "staff@example.test", "email_verified": False}),
+        settings=_settings(),
+    )
+
+    assert claims.provider_email is None
 
 
 def test_jwks_verifier_rejects_unknown_key_id() -> None:

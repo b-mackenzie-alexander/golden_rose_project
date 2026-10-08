@@ -20,6 +20,7 @@ StaffAccountStatus = Literal["active", "suspended", "deprovisioned"]
 class StaffAccountRecord:
     staff_id: UUID
     provider_subject: str
+    provider_email: str | None
     display_name: str
     role_name: str
     lifecycle_status: StaffAccountStatus
@@ -67,6 +68,7 @@ def insert_staff_account(
     session: Session,
     staff_id: UUID,
     provider_subject: str,
+    provider_email: str | None,
     display_name: str,
     role_name: str,
     lifecycle_status: StaffAccountStatus,
@@ -78,6 +80,7 @@ def insert_staff_account(
         insert(staff_accounts).values(
             staff_id=staff_id,
             provider_subject=provider_subject,
+            provider_email=provider_email,
             display_name=display_name,
             role_name=role_name,
             lifecycle_status=lifecycle_status,
@@ -92,6 +95,7 @@ def insert_staff_account(
     return StaffAccountRecord(
         staff_id=staff_id,
         provider_subject=provider_subject,
+        provider_email=provider_email,
         display_name=display_name,
         role_name=role_name,
         lifecycle_status=lifecycle_status,
@@ -109,6 +113,7 @@ def get_staff_account_by_id_for_update(*, session: Session, staff_id: UUID) -> S
         select(
             staff_accounts.c.staff_id,
             staff_accounts.c.provider_subject,
+            staff_accounts.c.provider_email,
             staff_accounts.c.display_name,
             staff_accounts.c.role_name,
             staff_accounts.c.lifecycle_status,
@@ -134,6 +139,7 @@ def get_staff_account_by_provider_subject(
         select(
             staff_accounts.c.staff_id,
             staff_accounts.c.provider_subject,
+            staff_accounts.c.provider_email,
             staff_accounts.c.display_name,
             staff_accounts.c.role_name,
             staff_accounts.c.lifecycle_status,
@@ -148,11 +154,43 @@ def get_staff_account_by_provider_subject(
     return StaffAccountRecord(*row)
 
 
+def get_pending_staff_account_by_provider_email_for_update(
+    *,
+    session: Session,
+    provider_email: str,
+    pending_subject_prefix: str,
+) -> StaffAccountRecord:
+    row = session.execute(
+        select(
+            staff_accounts.c.staff_id,
+            staff_accounts.c.provider_subject,
+            staff_accounts.c.provider_email,
+            staff_accounts.c.display_name,
+            staff_accounts.c.role_name,
+            staff_accounts.c.lifecycle_status,
+            staff_accounts.c.mfa_enrolled,
+            staff_accounts.c.created_at,
+            staff_accounts.c.created_by,
+            staff_accounts.c.updated_at,
+            staff_accounts.c.updated_by,
+            staff_accounts.c.version,
+        )
+        .where(
+            staff_accounts.c.provider_email == provider_email,
+            staff_accounts.c.lifecycle_status == "suspended",
+            staff_accounts.c.provider_subject.startswith(pending_subject_prefix),
+        )
+        .with_for_update()
+    ).one()
+    return StaffAccountRecord(*row)
+
+
 def get_staff_account_by_id(*, session: Session, staff_id: UUID) -> StaffAccountRecord:
     row = session.execute(
         select(
             staff_accounts.c.staff_id,
             staff_accounts.c.provider_subject,
+            staff_accounts.c.provider_email,
             staff_accounts.c.display_name,
             staff_accounts.c.role_name,
             staff_accounts.c.lifecycle_status,
@@ -172,6 +210,7 @@ def list_staff_accounts(*, session: Session, limit: int = 50) -> tuple[StaffAcco
         select(
             staff_accounts.c.staff_id,
             staff_accounts.c.provider_subject,
+            staff_accounts.c.provider_email,
             staff_accounts.c.display_name,
             staff_accounts.c.role_name,
             staff_accounts.c.lifecycle_status,
@@ -214,6 +253,7 @@ def update_staff_account_lifecycle(
         .returning(
             staff_accounts.c.staff_id,
             staff_accounts.c.provider_subject,
+            staff_accounts.c.provider_email,
             staff_accounts.c.display_name,
             staff_accounts.c.role_name,
             staff_accounts.c.lifecycle_status,
@@ -234,6 +274,7 @@ def update_staff_account_onboarding(
     staff_id: UUID,
     expected_version: int,
     provider_subject: str,
+    provider_email: str | None,
     display_name: str,
     role_name: str,
     mfa_enrolled: bool,
@@ -248,6 +289,7 @@ def update_staff_account_onboarding(
         )
         .values(
             provider_subject=provider_subject,
+            provider_email=provider_email,
             display_name=display_name,
             role_name=role_name,
             mfa_enrolled=mfa_enrolled,
@@ -258,6 +300,47 @@ def update_staff_account_onboarding(
         .returning(
             staff_accounts.c.staff_id,
             staff_accounts.c.provider_subject,
+            staff_accounts.c.provider_email,
+            staff_accounts.c.display_name,
+            staff_accounts.c.role_name,
+            staff_accounts.c.lifecycle_status,
+            staff_accounts.c.mfa_enrolled,
+            staff_accounts.c.created_at,
+            staff_accounts.c.created_by,
+            staff_accounts.c.updated_at,
+            staff_accounts.c.updated_by,
+            staff_accounts.c.version,
+        )
+    ).one()
+    return StaffAccountRecord(*row)
+
+
+def update_staff_account_provider_binding(
+    *,
+    session: Session,
+    staff_id: UUID,
+    expected_version: int,
+    provider_subject: str,
+    mfa_enrolled: bool,
+    updated_at: datetime,
+) -> StaffAccountRecord:
+    row = session.execute(
+        update(staff_accounts)
+        .where(
+            staff_accounts.c.staff_id == staff_id,
+            staff_accounts.c.version == expected_version,
+        )
+        .values(
+            provider_subject=provider_subject,
+            mfa_enrolled=mfa_enrolled,
+            updated_at=updated_at,
+            updated_by=staff_id,
+            version=expected_version + 1,
+        )
+        .returning(
+            staff_accounts.c.staff_id,
+            staff_accounts.c.provider_subject,
+            staff_accounts.c.provider_email,
             staff_accounts.c.display_name,
             staff_accounts.c.role_name,
             staff_accounts.c.lifecycle_status,

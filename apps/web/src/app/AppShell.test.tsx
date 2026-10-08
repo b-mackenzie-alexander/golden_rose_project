@@ -1,14 +1,23 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
+import { afterEach, vi } from 'vitest';
 
 import { AppShell } from './AppShell';
+import { bearerHeaders, clearStaffIdToken, setStaffIdToken } from '../auth/staffAuthSession';
 import { LanguageProvider } from '../i18n/LanguageProvider';
+
+afterEach(() => {
+  clearStaffIdToken();
+  vi.restoreAllMocks();
+  window.google = undefined;
+});
 
 describe('AppShell', () => {
   beforeEach(() => {
     window.localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
+    clearStaffIdToken();
   });
 
   it('renders the dashboard shell navigation and language action', () => {
@@ -60,6 +69,70 @@ describe('AppShell', () => {
     expect(accountButton).toHaveTextContent('Verify session');
     expect(accountButton).not.toHaveTextContent('Mariela Torres');
     expect(accountButton).not.toHaveTextContent('Operations team');
+    expect(screen.queryByRole('button', { name: 'Sign out of Golden Rose session' })).not.toBeInTheDocument();
+  });
+
+  it('clears the Golden Rose staff browser session from the header', async () => {
+    const user = userEvent.setup();
+    const disableAutoSelect = vi.fn();
+    setStaffIdToken('stored-token', Date.now() + 60_000);
+    window.google = {
+      accounts: {
+        id: {
+          disableAutoSelect,
+          initialize: vi.fn(),
+          renderButton: vi.fn(),
+        },
+      },
+    };
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/staff/map']}>
+          <AppShell />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    expect(bearerHeaders(undefined).get('Authorization')).toBe('Bearer stored-token');
+
+    await user.click(screen.getByRole('button', { name: 'Sign out of Golden Rose session' }));
+
+    await waitFor(() => {
+      expect(disableAutoSelect).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('button', { name: 'Sign out of Golden Rose session' })).not.toBeInTheDocument();
+      expect(bearerHeaders(undefined).has('Authorization')).toBe(false);
+    });
+  });
+
+  it('clears the staff browser session with Spanish labels when Google auto-select is unavailable', async () => {
+    const user = userEvent.setup();
+    setStaffIdToken('stored-token', Date.now() + 60_000);
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/staff/account']}>
+          <AppShell />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Cambiar a español' }));
+
+    const signOut = screen.getByRole('button', { name: 'Cerrar sesion de Golden Rose' });
+    expect(signOut).toHaveTextContent('Cerrar sesion');
+    expect(signOut).toHaveAttribute(
+      'title',
+      'Borra esta sesion de Golden Rose en el navegador. Google puede seguir activo.',
+    );
+    expect(bearerHeaders(undefined).get('Authorization')).toBe('Bearer stored-token');
+
+    await user.click(signOut);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Cerrar sesion de Golden Rose' })).not.toBeInTheDocument();
+      expect(bearerHeaders(undefined).has('Authorization')).toBe(false);
+    });
   });
 
   it('persists light and dark mode from the utility toggle', async () => {

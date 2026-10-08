@@ -136,7 +136,7 @@ def test_worker_residential_address_revision_persists_for_fresh_read(client):
     assert first_read.json()["candidate"] == {
         "line1": "2020 East Dr",
         "locality": "Brooklyn",
-        "region": "New York",
+        "region": "NY",
         "postal_code": "11202",
         "country": "US",
     }

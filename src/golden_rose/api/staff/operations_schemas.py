@@ -83,6 +83,8 @@ class OperationsZoneSummaryItem(IntakeValue):
     area_key: Literal["bronx", "brooklyn", "manhattan", "queens", "staten_island"]
     worker_residence_count: int = Field(ge=0, le=2147483647)
     worksite_count: int = Field(ge=0, le=2147483647)
+    intake_worker_residence_count: int = Field(ge=0, le=2147483647)
+    intake_worksite_count: int = Field(ge=0, le=2147483647)
     request_count: int = Field(ge=0, le=2147483647)
     shift_count: int = Field(ge=0, le=2147483647)
     worker_slots: int = Field(ge=0, le=2147483647)

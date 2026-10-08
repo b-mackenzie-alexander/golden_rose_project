@@ -35,9 +35,18 @@ def test_reject_invalid_worker(content):
 
 def test_address_partial_country_explicit():
     assert Address.model_validate({"line1": " X "}).to_content() == {"line1": "X"}
-    for value in ("us", "ZZ"):
+    assert Address.model_validate(
+        {"region": "New York", "postal_code": "10001 1234", "country": "US"}
+    ).to_content() == {"region": "NY", "postal_code": "10001-1234", "country": "US"}
+    for country_value in ("us", "ZZ"):
         with pytest.raises(ValidationError):
-            Address.model_validate({"country": value})
+            Address.model_validate({"country": country_value})
+    for invalid_address in (
+        {"region": "Fictional region", "country": "US"},
+        {"postal_code": "ABCDE", "country": "US"},
+    ):
+        with pytest.raises(ValidationError):
+            Address.model_validate(invalid_address)
 
 
 @pytest.mark.parametrize(

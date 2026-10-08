@@ -26,7 +26,7 @@ describe('typed partial fields', () => {
     const user = userEvent.setup();
     render(<Form kind="worker" />);
     await user.type(screen.getByLabelText('First name'), 'Fictional');
-    await user.type(screen.getByLabelText('Middle initial'), 'Q');
+    await user.type(screen.getByLabelText('Middle initial'), 'quincy');
     expect(screen.getByLabelText('Middle initial')).toHaveValue('Q');
     expect(screen.getByLabelText('Last name')).toHaveValue('');
     expect(captured()).toContain('"full_name":"Fictional Q"');
@@ -125,9 +125,11 @@ describe('typed partial fields', () => {
     input('Address line 1', 'Fictional line');
     input('Address line 2', 'Fictional unit');
     input('City / locality', 'Fictional locality');
-    input('State / region', 'Fictional region');
-    input('Postal code', '00000');
+    input('State / region', 'new york');
+    input('Postal code', '100011234');
     expect(captured()).toContain('"country":"US"');
+    expect(captured()).toContain('"region":"NY"');
+    expect(captured()).toContain('"postal_code":"10001-1234"');
     expect(screen.queryByLabelText('Country code (2 uppercase letters)')).not.toBeInTheDocument();
     input('Address line 2', '');
     expect(captured()).not.toContain('line2');

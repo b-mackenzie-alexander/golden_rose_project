@@ -13,7 +13,9 @@ from golden_rose.auth.permissions import EMPLOYER_READ_PERMISSION, SHIFT_NEED_RE
 from golden_rose.auth.principal import StaffPrincipal
 from golden_rose.persistence.models import (
     employers,
+    intake_addresses,
     intake_finalizations,
+    intakes,
     shift_needs,
     staffing_requests,
     worker_residences,
@@ -314,6 +316,8 @@ def _empty_zone_summary() -> dict[str, dict[str, int | str]]:
             "area_key": area_key,
             "worker_residence_count": 0,
             "worksite_count": 0,
+            "intake_worker_residence_count": 0,
+            "intake_worksite_count": 0,
             "request_count": 0,
             "shift_count": 0,
             "worker_slots": 0,
@@ -325,12 +329,25 @@ def _empty_zone_summary() -> dict[str, dict[str, int | str]]:
 
 def _build_zone_summary(
     *,
+    intake_stage_rows: Sequence[Mapping[str, Any]],
     request_area_rows: Sequence[Mapping[str, Any]],
     shift_area_rows: Sequence[Mapping[str, Any]],
     worker_zone_rows: Sequence[Mapping[str, Any]],
 ) -> list[dict[str, int | str]]:
     zones = _empty_zone_summary()
     worksites_by_zone: dict[str, set[object]] = {key: set() for key, _label, _area in ZONE_BUCKETS}
+
+    for row in intake_stage_rows:
+        key = _zone_key(locality=row.get("locality"), postal_code=row.get("postal_code"))
+        if key is None:
+            continue
+        section = row.get("section")
+        if section == "worker_residence":
+            zones[key]["intake_worker_residence_count"] = (
+                int(zones[key]["intake_worker_residence_count"]) + 1
+            )
+        elif section == "worksite_address":
+            zones[key]["intake_worksite_count"] = int(zones[key]["intake_worksite_count"]) + 1
 
     for row in worker_zone_rows:
         key = _zone_key(locality=row.get("locality"), postal_code=row.get("postal_code"))
@@ -647,6 +664,31 @@ def query_operations_projection(
             if "worker_residence:read" in principal.permissions
             else []
         )
+        intake_address_sections: list[str] = []
+        if "intake:read" in principal.permissions:
+            if "worker_residence:read" in principal.permissions:
+                intake_address_sections.append("worker_residence")
+            if "worksite_address:read" in principal.permissions:
+                intake_address_sections.append("worksite_address")
+        intake_stage_rows = (
+            session.execute(
+                select(
+                    intake_addresses.c.section,
+                    intake_addresses.c.locality,
+                    intake_addresses.c.postal_code,
+                )
+                .join(intakes, intakes.c.intake_id == intake_addresses.c.intake_id)
+                .where(
+                    intakes.c.lifecycle_status == "draft",
+                    intake_addresses.c.section.in_(intake_address_sections),
+                )
+                .limit(500)
+            )
+            .mappings()
+            .all()
+            if intake_address_sections
+            else []
+        )
         shift_calendar_rows = (
             session.execute(
                 select(
@@ -721,6 +763,7 @@ def query_operations_projection(
         shift_area_rows=cast(Sequence[Mapping[str, Any]], shift_area_rows),
     )
     zone_summary = _build_zone_summary(
+        intake_stage_rows=cast(Sequence[Mapping[str, Any]], intake_stage_rows),
         request_area_rows=cast(Sequence[Mapping[str, Any]], request_area_rows),
         shift_area_rows=cast(Sequence[Mapping[str, Any]], shift_area_rows),
         worker_zone_rows=cast(Sequence[Mapping[str, Any]], worker_zone_rows),

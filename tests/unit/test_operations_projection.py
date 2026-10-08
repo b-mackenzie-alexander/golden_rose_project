@@ -74,7 +74,9 @@ def all_permissions() -> StaffPrincipal:
         "employer:read",
         "staffing_request:read",
         "shift_need:read",
+        "intake:read",
         "worker_residence:read",
+        "worksite_address:read",
     )
 
 
@@ -86,6 +88,8 @@ def empty_zone_summary() -> list[dict[str, object]]:
             "area_key": area_key,
             "worker_residence_count": 0,
             "worksite_count": 0,
+            "intake_worker_residence_count": 0,
+            "intake_worksite_count": 0,
             "request_count": 0,
             "shift_count": 0,
             "worker_slots": 0,
@@ -330,7 +334,7 @@ def test_operations_projection_returns_request_and_shift_items():
             "newest_item_updated_at": None,
         },
     }
-    assert len(session.executed) == 8
+    assert len(session.executed) == 9
     assert session.rollbacks == 0
 
 
@@ -387,6 +391,25 @@ def test_operations_projection_aggregates_broad_area_and_reporting_totals():
                 [
                     {"locality": "Crown Heights", "postal_code": "11213"},
                     {"locality": "Astoria", "postal_code": "11103"},
+                ]
+            ),
+            FakeResult(
+                [
+                    {
+                        "section": "worker_residence",
+                        "locality": "Crown Heights",
+                        "postal_code": "11213",
+                    },
+                    {
+                        "section": "worksite_address",
+                        "locality": "Brooklyn",
+                        "postal_code": "11213",
+                    },
+                    {
+                        "section": "worker_residence",
+                        "locality": "Outside",
+                        "postal_code": "99999",
+                    },
                 ]
             ),
             FakeResult(
@@ -469,12 +492,15 @@ def test_operations_projection_aggregates_broad_area_and_reporting_totals():
         "area_key": "brooklyn",
         "worker_residence_count": 1,
         "worksite_count": 1,
+        "intake_worker_residence_count": 1,
+        "intake_worksite_count": 1,
         "request_count": 1,
         "shift_count": 1,
         "worker_slots": 2,
         "pending_review_count": 2,
     }
     assert zones["northwest_queens"]["worker_residence_count"] == 1
+    assert zones["northwest_queens"]["intake_worker_residence_count"] == 0
     assert zones["central_queens"]["worker_slots"] == 3
     assert zones["midtown_lower_manhattan"]["request_count"] == 1
     assert result["report_summary"] == {

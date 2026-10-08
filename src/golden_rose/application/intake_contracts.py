@@ -267,6 +267,70 @@ COUNTRIES = frozenset(
         "ZW",
     ]
 )
+US_REGION_CODES = frozenset(
+    [
+        "AK",
+        "AL",
+        "AR",
+        "AS",
+        "AZ",
+        "CA",
+        "CO",
+        "CT",
+        "DC",
+        "DE",
+        "FL",
+        "GA",
+        "GU",
+        "HI",
+        "IA",
+        "ID",
+        "IL",
+        "IN",
+        "KS",
+        "KY",
+        "LA",
+        "MA",
+        "MD",
+        "ME",
+        "MI",
+        "MN",
+        "MO",
+        "MP",
+        "MS",
+        "MT",
+        "NC",
+        "ND",
+        "NE",
+        "NH",
+        "NJ",
+        "NM",
+        "NV",
+        "NY",
+        "OH",
+        "OK",
+        "OR",
+        "PA",
+        "PR",
+        "RI",
+        "SC",
+        "SD",
+        "TN",
+        "TX",
+        "UM",
+        "UT",
+        "VA",
+        "VI",
+        "VT",
+        "WA",
+        "WI",
+        "WV",
+        "WY",
+    ]
+)
+US_REGION_ALIASES = {
+    "new york": "NY",
+}
 # Source: SIX ISO 4217 List One, Pblshd 2026-01-01; retrieved 2026-09-14.
 # https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-one.xml
 CURRENCIES = frozenset(
@@ -492,6 +556,24 @@ class Address(IntakeValue):
     def validate_country(self) -> "Address":
         if self.country is not None and self.country not in COUNTRIES:
             raise ValueError("Invalid country")
+        if self.country == "US":
+            if self.region is not None:
+                normalized_region = (
+                    US_REGION_ALIASES.get(" ".join(self.region.lower().replace(".", " ").split()))
+                    or self.region.upper()
+                )
+                if normalized_region not in US_REGION_CODES:
+                    raise ValueError("Invalid US state or territory")
+                self.region = normalized_region
+            if self.postal_code is not None:
+                match = re.fullmatch(r"([0-9]{5})(?:[- ]?([0-9]{4}))?", self.postal_code)
+                if not match:
+                    raise ValueError("Invalid US ZIP code")
+                self.postal_code = (
+                    match.group(1)
+                    if match.group(2) is None
+                    else f"{match.group(1)}-{match.group(2)}"
+                )
         return self
 
 

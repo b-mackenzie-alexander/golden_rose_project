@@ -142,8 +142,8 @@ function StaffMapPreview() {
           <p className="module-preview-helper">
             {zoneSummary.length > 0
               ? language === 'en'
-                ? 'Zone counts use coarse locality and postal-code assignment. Exact addresses stay hidden.'
-                : 'Los conteos por zona usan localidad y codigo postal de forma general. Las direcciones exactas permanecen ocultas.'
+                ? 'Zone counts use coarse locality and postal-code assignment, including saved unfinalized intake addresses as planning signals. Exact addresses stay hidden.'
+                : 'Los conteos por zona usan localidad y codigo postal de forma general e incluyen direcciones guardadas de registros sin finalizar como senales de planificacion. Las direcciones exactas permanecen ocultas.'
               : language === 'en'
                 ? 'Current demand is still stored by borough while the zone projection loads.'
                 : 'La demanda actual todavia se muestra por condado mientras carga la proyeccion por zona.'}
@@ -161,8 +161,8 @@ function StaffMapPreview() {
       <section className="module-preview-panel" aria-labelledby="privacy-boundary-heading">
         <h3 id="privacy-boundary-heading">{language === 'en' ? 'Privacy boundary' : 'Limite de privacidad'}</h3>
         <p>{language === 'en'
-          ? 'This view intentionally uses aggregate zone counts only. It does not drop pins for individual workers, households, employers, or worksites, and address reveals remain permission-gated inside intake workflows.'
-          : 'Esta vista usa solo conteos agregados por zona. No coloca puntos de trabajadores, hogares, empleadores ni lugares de trabajo individuales, y las direcciones siguen protegidas por permisos dentro de los registros.'}</p>
+          ? 'This view intentionally uses aggregate zone counts only, including intake-stage planning signals before finalization. It does not drop pins for individual workers, households, employers, or worksites, and address reveals remain permission-gated inside intake workflows.'
+          : 'Esta vista usa solo conteos agregados por zona, incluidas senales de planificacion de registros antes de finalizar. No coloca puntos de trabajadores, hogares, empleadores ni lugares de trabajo individuales, y las direcciones siguen protegidas por permisos dentro de los registros.'}</p>
       </section>
     </section>
   );

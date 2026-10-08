@@ -16,8 +16,9 @@ type FieldProps = {
   max?: number;
   options?: readonly (readonly [string, string, string])[];
   error?: string;
+  transform?: (value: string) => string;
 };
-export function Field({ label, value, change, type = 'text', max = 200, options, error }: FieldProps) {
+export function Field({ label, value, change, type = 'text', max = 200, options, error, transform }: FieldProps) {
   const id = useId();
   const errorId = `${id}-error`;
   const { language } = useLanguage();
@@ -72,11 +73,12 @@ export function Field({ label, value, change, type = 'text', max = 200, options,
           aria-invalid={error ? 'true' : undefined}
           aria-describedby={describedBy}
           onChange={(event) => {
+            const nextValue = transform ? transform(event.target.value) : event.target.value;
             change(
-              event.target.value
+              nextValue
                 ? type === 'number'
-                  ? Number(event.target.value)
-                  : event.target.value
+                  ? Number(nextValue)
+                  : nextValue
                 : undefined,
             );
           }}
@@ -105,10 +107,14 @@ function splitWorkerName(value: DraftValue | undefined) {
   if (parts.length === 0) return { first: '', middle: '', last: '' };
   if (parts.length === 1) return { first: parts[0] ?? '', middle: '', last: '' };
   if (parts.length === 2) return { first: parts[0] ?? '', middle: '', last: parts[1] ?? '' };
-  return { first: parts[0] ?? '', middle: parts.slice(1, -1).join(' '), last: parts.at(-1) ?? '' };
+  return { first: parts[0] ?? '', middle: normalizeMiddleInitial(parts.slice(1, -1).join(' ')), last: parts.at(-1) ?? '' };
 }
 function joinWorkerName(first: string, middle: string, last: string) {
   return [first.trim(), middle.trim(), last.trim()].filter(Boolean).join(' ') || undefined;
+}
+function normalizeMiddleInitial(value: string) {
+  const match = value.trim().match(/\p{L}/u);
+  return match ? match[0].toLocaleUpperCase() : '';
 }
 type WorkerNameParts = ReturnType<typeof splitWorkerName>;
 function WorkerNameFields({
@@ -138,7 +144,11 @@ function WorkerNameFields({
   }, [source]);
   const setPart = (part: keyof WorkerNameParts, next: DraftValue | undefined) => {
     setParts((previous) => {
-      const draft = { ...previous, [part]: typeof next === 'string' ? next : '' };
+      const nextText = typeof next === 'string' ? next : '';
+      const draft = {
+        ...previous,
+        [part]: part === 'middle' ? normalizeMiddleInitial(nextText) : nextText,
+      };
       const joined = joinWorkerName(draft.first, draft.middle, draft.last);
       lastEmitted.current = joined ?? '';
       change(joined);
@@ -160,7 +170,8 @@ function WorkerNameFields({
       <Field
         label={[labels.middleInitial, labels.middleInitial]}
         value={parts.middle}
-        max={10}
+        max={1}
+        transform={normalizeMiddleInitial}
         change={(v) => {
           setPart('middle', v);
         }}
@@ -191,6 +202,15 @@ function addressWithUsCountry(value: DraftObject): DraftObject {
   const content = value;
   return Object.keys(content).length ? { ...content, country: 'US' } : {};
 }
+function normalizeUsRegion(value: string) {
+  const compact = value.trim().toLowerCase().replace(/[^a-z]+/g, ' ');
+  if (compact === 'new york') return 'NY';
+  return value.replace(/[^a-z]/gi, '').slice(0, 2).toUpperCase();
+}
+function normalizeUsPostalCode(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 9);
+  return digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits;
+}
 export function AddressFields({
   value,
   change,
@@ -202,8 +222,8 @@ export function AddressFields({
     ['line1', ['Address line 1', 'Dirección, línea 1'], 200],
     ['line2', ['Address line 2', 'Dirección, línea 2'], 200],
     ['locality', ['City / locality', 'Ciudad / localidad'], 100],
-    ['region', ['State / region', 'Estado / región'], 100],
-    ['postal_code', ['Postal code', 'Código postal'], 32],
+    ['region', ['State / region', 'Estado / región'], 2],
+    ['postal_code', ['Postal code', 'Código postal'], 10],
   ];
   return (
     <div className="intake-fields">
@@ -213,6 +233,13 @@ export function AddressFields({
           label={label}
           max={max}
           value={value[key]}
+          transform={
+            key === 'region'
+              ? normalizeUsRegion
+              : key === 'postal_code'
+                ? normalizeUsPostalCode
+                : undefined
+          }
           change={(v) => {
             change(addressWithUsCountry(withValue(value, key, v)));
           }}

@@ -6,6 +6,7 @@ import { BrandRose, IconSymbol } from '../dashboard/artwork';
 import type { IconName } from '../dashboard/artwork';
 import { queryIntakes } from '../api/intakeClient';
 import type { DraftObject, IntakeKind, IntakeSummary } from '../api/intakeContracts';
+import { clearStaffIdToken, useStaffAuthSession } from '../auth/staffAuthSession';
 import { useLanguage } from '../i18n/LanguageProvider';
 
 type ThemeMode = 'dark' | 'light';
@@ -48,11 +49,13 @@ export function AppShell() {
   const { messages, toggleLanguage, language } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
+  const staffAuthSession = useStaffAuthSession();
   const [theme, setTheme] = useState<ThemeMode>('light');
   const [searchValue, setSearchValue] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [dataSearchItems, setDataSearchItems] = useState<DataSearchItem[]>([]);
   const isDark = theme === 'dark';
+  const hasStaffBrowserSession = staffAuthSession.idToken !== null;
   const primaryNavItems = [
     { icon: 'home', label: language === 'en' ? 'Home' : 'Inicio', to: '/' },
     {
@@ -285,6 +288,12 @@ export function AppShell() {
     }
   }
 
+  function signOutOfGoldenRoseSession() {
+    window.google?.accounts?.id?.disableAutoSelect();
+    clearStaffIdToken();
+    void navigate('/staff/account');
+  }
+
   return (
     <div className="staff-shell">
       <header className="app-header" role="banner">
@@ -389,6 +398,19 @@ export function AppShell() {
               <IconSymbol name="bell" />
               <span className="notification-badge">3</span>
             </button>
+            {hasStaffBrowserSession ? (
+              <button
+                aria-label={language === 'en' ? 'Sign out of Golden Rose session' : 'Cerrar sesion de Golden Rose'}
+                className="header-signout focus-ring"
+                title={language === 'en'
+                  ? 'Clears this browser session for Golden Rose. Google may still be signed in.'
+                  : 'Borra esta sesion de Golden Rose en el navegador. Google puede seguir activo.'}
+                type="button"
+                onClick={signOutOfGoldenRoseSession}
+              >
+                {language === 'en' ? 'Sign out' : 'Cerrar sesion'}
+              </button>
+            ) : null}
             <button
               aria-label={language === 'en' ? 'Open my staff account' : 'Abrir mi cuenta del personal'}
               className="user-menu focus-ring"

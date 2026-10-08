@@ -27,7 +27,10 @@ type ProjectionStatus = 'loading' | 'ready' | OperationsProjectionFailureKind;
 
 type CalendarDay = {
   date: string;
+  dateValue: Date;
+  dayOfMonth: string;
   id: string;
+  isToday: boolean;
   label: string;
   shortLabel: string;
 };
@@ -47,8 +50,11 @@ type CalendarCopy = {
   eventRemoved: string;
   eventUpdated: string;
   events: CalendarEvent[];
+  monthView: string;
+  nextMonth: string;
   openSlots: string;
   personalCalendar: string;
+  previousMonth: string;
   projectedShifts: string;
   projectedWorkerSlots: string;
   projectionSeparate: string;
@@ -62,9 +68,8 @@ type CalendarCopy = {
   thisWeek: string;
   timeLabel: string;
   titleLabel: string;
+  today: string;
   updateEvent: string;
-  weekDays: CalendarDay[];
-  weekRange: string;
   weekView: string;
 };
 
@@ -94,8 +99,11 @@ const englishCalendar: CalendarCopy = {
     { accent: 'warning', assignee: 'Sofia Diaz', dayId: 'thu', duration: '30 min', id: 'seed-thu-clean', kind: 'employer', meta: 'Follow-up', scope: 'company', sortMinutes: 660, time: '11:00 AM', title: 'Clean Homes LLC confirmation' },
     { accent: 'success', assignee: 'Ana Torres', dayId: 'fri', duration: '45 min', id: 'seed-fri-carlos', kind: 'interview', meta: 'Interview', scope: 'company', sortMinutes: 840, time: '2:00 PM', title: 'Interview with Carlos Mendoza' },
   ],
+  monthView: 'Month',
+  nextMonth: 'Next month',
   openSlots: 'Open slots',
   personalCalendar: 'My calendar',
+  previousMonth: 'Previous month',
   projectedShifts: 'Projected shifts',
   projectedWorkerSlots: 'Projected worker slots',
   projectionSeparate: 'Request-derived shifts only; personal events stay separate.',
@@ -113,17 +121,8 @@ const englishCalendar: CalendarCopy = {
   thisWeek: 'This week',
   timeLabel: 'Time',
   titleLabel: 'Title',
+  today: 'Today',
   updateEvent: 'Update event',
-  weekDays: [
-    { date: 'Jan 27', id: 'mon', label: 'Monday', shortLabel: 'Mon' },
-    { date: 'Jan 28', id: 'tue', label: 'Tuesday', shortLabel: 'Tue' },
-    { date: 'Jan 29', id: 'wed', label: 'Wednesday', shortLabel: 'Wed' },
-    { date: 'Jan 30', id: 'thu', label: 'Thursday', shortLabel: 'Thu' },
-    { date: 'Jan 31', id: 'fri', label: 'Friday', shortLabel: 'Fri' },
-    { date: 'Feb 1', id: 'sat', label: 'Saturday', shortLabel: 'Sat' },
-    { date: 'Feb 2', id: 'sun', label: 'Sunday', shortLabel: 'Sun' },
-  ],
-  weekRange: 'January 27 - February 2, 2025',
   weekView: 'Week',
 };
 
@@ -153,8 +152,11 @@ const spanishCalendar: CalendarCopy = {
     { accent: 'warning', assignee: 'Sofia Diaz', dayId: 'thu', duration: '30 min', id: 'seed-thu-clean', kind: 'employer', meta: 'Seguimiento', scope: 'company', sortMinutes: 660, time: '11:00 a. m.', title: 'Confirmacion de Clean Homes LLC' },
     { accent: 'success', assignee: 'Ana Torres', dayId: 'fri', duration: '45 min', id: 'seed-fri-carlos', kind: 'interview', meta: 'Entrevista', scope: 'company', sortMinutes: 840, time: '2:00 p. m.', title: 'Entrevista con Carlos Mendoza' },
   ],
+  monthView: 'Mes',
+  nextMonth: 'Mes siguiente',
   openSlots: 'Espacios abiertos',
   personalCalendar: 'Mi calendario',
+  previousMonth: 'Mes anterior',
   projectedShifts: 'Turnos proyectados',
   projectedWorkerSlots: 'Cupos proyectados',
   projectionSeparate: 'Solo turnos derivados de solicitudes; los eventos personales siguen separados.',
@@ -172,17 +174,8 @@ const spanishCalendar: CalendarCopy = {
   thisWeek: 'Esta semana',
   timeLabel: 'Hora',
   titleLabel: 'Titulo',
+  today: 'Hoy',
   updateEvent: 'Actualizar evento',
-  weekDays: [
-    { date: '27 ene.', id: 'mon', label: 'Lunes', shortLabel: 'Lun' },
-    { date: '28 ene.', id: 'tue', label: 'Martes', shortLabel: 'Mar' },
-    { date: '29 ene.', id: 'wed', label: 'Miercoles', shortLabel: 'Mie' },
-    { date: '30 ene.', id: 'thu', label: 'Jueves', shortLabel: 'Jue' },
-    { date: '31 ene.', id: 'fri', label: 'Viernes', shortLabel: 'Vie' },
-    { date: '1 feb.', id: 'sat', label: 'Sabado', shortLabel: 'Sab' },
-    { date: '2 feb.', id: 'sun', label: 'Domingo', shortLabel: 'Dom' },
-  ],
-  weekRange: '27 de enero - 2 de febrero de 2025',
   weekView: 'Semana',
 };
 
@@ -226,9 +219,84 @@ const defaultForm: CalendarFormState = {
   title: '',
 };
 
+const legacyWeekdayIds = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+
+function startOfLocalDay(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
+function addDays(value: Date, days: number) {
+  const next = startOfLocalDay(value);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function dateId(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${String(year)}-${month}-${day}`;
+}
+
+function formatDateRange(start: Date, end: Date, language: 'en' | 'es') {
+  const locale = language === 'es' ? 'es-US' : 'en-US';
+  const sameYear = start.getFullYear() === end.getFullYear();
+  const sameMonth = sameYear && start.getMonth() === end.getMonth();
+  if (sameMonth) {
+    const month = new Intl.DateTimeFormat(locale, { month: 'long' }).format(start);
+    return language === 'es'
+      ? `${String(start.getDate())} - ${String(end.getDate())} de ${month} de ${String(start.getFullYear())}`
+      : `${month} ${String(start.getDate())} - ${String(end.getDate())}, ${String(start.getFullYear())}`;
+  }
+  return `${new Intl.DateTimeFormat(locale, { month: 'long', day: 'numeric', year: sameYear ? undefined : 'numeric' }).format(start)} - ${new Intl.DateTimeFormat(locale, { month: 'long', day: 'numeric', year: 'numeric' }).format(end)}`;
+}
+
+function buildCalendarDay(value: Date, today: Date, language: 'en' | 'es'): CalendarDay {
+  const locale = language === 'es' ? 'es-US' : 'en-US';
+  return {
+    date: new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(value),
+    dateValue: value,
+    dayOfMonth: String(value.getDate()),
+    id: dateId(value),
+    isToday: dateId(value) === dateId(today),
+    label: new Intl.DateTimeFormat(locale, { weekday: 'long', month: 'long', day: 'numeric' }).format(value),
+    shortLabel: new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(value),
+  };
+}
+
+function buildWeekDays(today: Date, language: 'en' | 'es') {
+  return Array.from({ length: 7 }, (_, index) => buildCalendarDay(addDays(today, index), today, language));
+}
+
+function buildMonthDays(monthDate: Date, today: Date, language: 'en' | 'es') {
+  const first = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
+  return Array.from({ length: daysInMonth }, (_, index) => buildCalendarDay(addDays(first, index), today, language));
+}
+
+function buildWeekdayHeadings(language: 'en' | 'es') {
+  const sunday = new Date(2026, 0, 4);
+  return Array.from({ length: 7 }, (_, index) => new Intl.DateTimeFormat(language === 'es' ? 'es-US' : 'en-US', {
+    weekday: 'short',
+  }).format(addDays(sunday, index)));
+}
+
+function formatMonthHeading(value: Date, language: 'en' | 'es') {
+  return new Intl.DateTimeFormat(language === 'es' ? 'es-US' : 'en-US', {
+    month: 'long',
+    year: 'numeric',
+  }).format(value);
+}
+
+function normalizeCalendarDayId(dayId: string, weekDays: CalendarDay[]) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dayId)) return dayId;
+  const legacyIndex = legacyWeekdayIds.findIndex((weekday) => weekday === dayId);
+  return weekDays.find((day) => day.dateValue.getDay() === legacyIndex)?.id ?? dayId;
+}
+
 function formatTime(value: string, language: 'en' | 'es') {
   const [hour = '0', minute = '0'] = value.split(':');
-  const date = new Date(2025, 0, 27, Number(hour), Number(minute));
+  const date = new Date(2026, 0, 1, Number(hour), Number(minute));
   return new Intl.DateTimeFormat(language === 'es' ? 'es-US' : 'en-US', {
     hour: 'numeric',
     minute: '2-digit',
@@ -263,11 +331,11 @@ function writeStoredEvents(events: StoredCalendarEvent[]) {
   window.localStorage.setItem(manualEventsStorageKey, JSON.stringify(events));
 }
 
-function toCalendarEvent(event: StoredCalendarEvent, language: 'en' | 'es'): CalendarEvent {
+function toCalendarEvent(event: StoredCalendarEvent, language: 'en' | 'es', weekDays: CalendarDay[]): CalendarEvent {
   return {
     accent: event.scope === 'company' ? 'warning' : 'info',
     assignee: event.assignee || (event.scope === 'company' ? 'Operations' : 'Me'),
-    dayId: event.dayId,
+    dayId: normalizeCalendarDayId(event.dayId, weekDays),
     duration: event.duration,
     id: event.id,
     kind: event.scope === 'company' ? 'staff' : 'focus',
@@ -284,7 +352,7 @@ function toCalendarEvent(event: StoredCalendarEvent, language: 'en' | 'es'): Cal
 function dayIdFromInstant(value: string): string | null {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][date.getDay()] ?? null;
+  return dateId(date);
 }
 
 function durationLabel(startValue: string, endValue: string, language: 'en' | 'es') {
@@ -369,7 +437,11 @@ function projectionNotice(status: ProjectionStatus, language: 'en' | 'es', fallb
 export function StaffCalendar() {
   const { language } = useLanguage();
   const copy = language === 'es' ? spanishCalendar : englishCalendar;
-  const [selectedDayId, setSelectedDayId] = useState('mon');
+  const today = useMemo(() => startOfLocalDay(new Date()), []);
+  const currentYear = today.getFullYear();
+  const [selectedDayId, setSelectedDayId] = useState(() => dateId(today));
+  const [visibleMonth, setVisibleMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
+  const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
   const [manualEvents, setManualEvents] = useState<StoredCalendarEvent[]>(() => readStoredEvents());
   const [shiftEvents, setShiftEvents] = useState<OperationsShiftItem[]>([]);
   const [calendarSummary, setCalendarSummary] = useState<OperationsCalendarSummary | null>(null);
@@ -378,10 +450,25 @@ export function StaffCalendar() {
   const [form, setForm] = useState<CalendarFormState>(defaultForm);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
-  const fallbackDay = copy.weekDays[0];
+  const weekDays = useMemo(() => buildWeekDays(today, language), [language, today]);
+  const monthDays = useMemo(() => buildMonthDays(visibleMonth, today, language), [language, today, visibleMonth]);
+  const weekdayHeadings = useMemo(() => buildWeekdayHeadings(language), [language]);
+  const monthCells = useMemo(() => {
+    const firstDay = monthDays[0];
+    const leadingEmptyDays = firstDay?.dateValue.getDay() ?? 0;
+    return [
+      ...Array.from<null>({ length: leadingEmptyDays }).fill(null),
+      ...monthDays,
+    ];
+  }, [monthDays]);
+  const fallbackDay = weekDays[0];
   if (fallbackDay === undefined) {
     throw new Error('Staff calendar requires at least one day.');
   }
+  const weekRange = formatDateRange(weekDays[0]?.dateValue ?? today, weekDays[weekDays.length - 1]?.dateValue ?? today, language);
+  const monthHeading = formatMonthHeading(visibleMonth, language);
+  const canGoPreviousMonth = visibleMonth.getFullYear() > currentYear || visibleMonth.getMonth() > 0;
+  const canGoNextMonth = visibleMonth.getFullYear() < currentYear || visibleMonth.getMonth() < 11;
   useEffect(() => {
     let cancelled = false;
     void Promise.all([
@@ -406,17 +493,25 @@ export function StaffCalendar() {
       cancelled = true;
     };
   }, []);
-  const selectedDay = copy.weekDays.find((day) => day.id === selectedDayId) ?? fallbackDay;
+  const allVisibleDays = useMemo(() => {
+    const days = new Map<string, CalendarDay>();
+    for (const day of weekDays) days.set(day.id, day);
+    for (const day of monthDays) days.set(day.id, day);
+    return Array.from(days.values()).sort((left, right) => left.dateValue.getTime() - right.dateValue.getTime());
+  }, [monthDays, weekDays]);
+  const selectedDay = allVisibleDays.find((day) => day.id === selectedDayId) ?? fallbackDay;
   const events = useMemo(
     () => [
       ...(shiftEvents.length
         ? shiftEvents
             .map((event) => toShiftEvent(event, language))
             .filter((event): event is CalendarEvent => event !== null)
-        : projectionStatus === 'ready' || !staticOperationalFallbacksAllowed(staticFallbackPolicy) ? [] : copy.events),
-      ...manualEvents.map((event) => toCalendarEvent(event, language)),
+        : projectionStatus === 'ready' || !staticOperationalFallbacksAllowed(staticFallbackPolicy)
+          ? []
+          : copy.events.map((event) => ({ ...event, dayId: normalizeCalendarDayId(event.dayId, weekDays) }))),
+      ...manualEvents.map((event) => toCalendarEvent(event, language, weekDays)),
     ].sort((left, right) => left.sortMinutes - right.sortMinutes || left.title.localeCompare(right.title)),
-    [copy.events, language, manualEvents, projectionStatus, shiftEvents, staticFallbackPolicy],
+    [copy.events, language, manualEvents, projectionStatus, shiftEvents, staticFallbackPolicy, weekDays],
   );
   const operationsNotice = useMemo(
     () => projectionNotice(projectionStatus, language, staticFallbackPolicy),
@@ -426,10 +521,10 @@ export function StaffCalendar() {
     () => events.filter((event) => event.dayId === selectedDay.id),
     [events, selectedDay.id],
   );
-  const eventsByDay = useMemo(() => new Map(copy.weekDays.map((day) => [
+  const eventsByDay = useMemo(() => new Map(allVisibleDays.map((day) => [
     day.id,
     events.filter((event) => event.dayId === day.id),
-  ])), [copy.weekDays, events]);
+  ])), [allVisibleDays, events]);
   const summaryItems = useMemo(() => {
     if (projectionStatus === 'ready' && calendarSummary !== null) {
       return [
@@ -489,7 +584,12 @@ export function StaffCalendar() {
     if (!canEditEvent(event)) return;
     const storedEvent = manualEvents.find((candidate) => candidate.id === event.id);
     if (!storedEvent) return;
-    setSelectedDayId(storedEvent.dayId);
+    const normalizedDayId = normalizeCalendarDayId(storedEvent.dayId, weekDays);
+    setSelectedDayId(normalizedDayId);
+    const selectedDate = new Date(`${normalizedDayId}T00:00:00`);
+    if (!Number.isNaN(selectedDate.getTime())) {
+      setVisibleMonth(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
+    }
     setEditingEventId(storedEvent.id);
     setForm({
       assignee: storedEvent.assignee,
@@ -515,6 +615,23 @@ export function StaffCalendar() {
     setEditingEventId(null);
     setForm(defaultForm);
   }
+  function selectCalendarDay(day: CalendarDay) {
+    setSelectedDayId(day.id);
+    setVisibleMonth(new Date(day.dateValue.getFullYear(), day.dateValue.getMonth(), 1));
+  }
+  function showToday() {
+    setSelectedDayId(dateId(today));
+    setVisibleMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+    setViewMode('week');
+  }
+  function shiftVisibleMonth(delta: -1 | 1) {
+    setVisibleMonth((current) => {
+      const next = new Date(current.getFullYear(), current.getMonth() + delta, 1);
+      if (next.getFullYear() !== currentYear) return current;
+      setSelectedDayId(dateId(next));
+      return next;
+    });
+  }
 
   return (
     <section aria-labelledby="calendar-heading" className="staff-calendar-page">
@@ -525,7 +642,8 @@ export function StaffCalendar() {
           <p>{copy.subtitle}</p>
         </div>
         <div className="calendar-toolbar" aria-label={language === 'es' ? 'Controles del calendario' : 'Calendar controls'}>
-          <span>{copy.weekRange}</span>
+          <button className="focus-ring" type="button" onClick={showToday}>{copy.today}</button>
+          <span>{viewMode === 'week' ? weekRange : monthHeading}</span>
         </div>
       </div>
 
@@ -550,30 +668,86 @@ export function StaffCalendar() {
       <div className="calendar-layout">
         <section className="calendar-panel calendar-week-panel" aria-labelledby="calendar-week-heading">
           <div className="calendar-panel-header">
-            <h3 id="calendar-week-heading">{copy.weekView}</h3>
+            <h3 id="calendar-week-heading">{viewMode === 'week' ? copy.weekView : copy.monthView}</h3>
             <div className="calendar-view-toggle" aria-label={language === 'es' ? 'Vista del calendario' : 'Calendar view'}>
-              <button aria-pressed="true" className="focus-ring" type="button">{copy.weekView}</button>
-              <button aria-pressed="false" className="focus-ring" type="button">{copy.dayView}</button>
+              <button
+                aria-pressed={viewMode === 'week'}
+                className="focus-ring"
+                type="button"
+                onClick={() => {
+                  setViewMode('week');
+                }}
+              >
+                {copy.weekView}
+              </button>
+              <button
+                aria-pressed={viewMode === 'month'}
+                className="focus-ring"
+                type="button"
+                onClick={() => {
+                  setViewMode('month');
+                }}
+              >
+                {copy.monthView}
+              </button>
             </div>
           </div>
 
-          <div className="calendar-day-strip">
-            {copy.weekDays.map((day) => {
+          {viewMode === 'month' ? (
+            <div className="calendar-month-toolbar" aria-label={language === 'es' ? 'Controles de mes' : 'Month controls'}>
+              <button
+                className="focus-ring"
+                disabled={!canGoPreviousMonth}
+                type="button"
+                onClick={() => {
+                  shiftVisibleMonth(-1);
+                }}
+              >
+                {copy.previousMonth}
+              </button>
+              <strong>{monthHeading}</strong>
+              <button
+                className="focus-ring"
+                disabled={!canGoNextMonth}
+                type="button"
+                onClick={() => {
+                  shiftVisibleMonth(1);
+                }}
+              >
+                {copy.nextMonth}
+              </button>
+            </div>
+          ) : null}
+
+          {viewMode === 'month' ? (
+            <div className="calendar-month-weekdays" aria-hidden="true">
+              {weekdayHeadings.map((weekday) => (
+                <span key={weekday}>{weekday}</span>
+              ))}
+            </div>
+          ) : null}
+
+          <div className={viewMode === 'week' ? 'calendar-day-strip' : 'calendar-month-grid'}>
+            {(viewMode === 'week' ? weekDays : monthCells).map((day, index) => {
+              if (day === null) {
+                return <div aria-hidden="true" className="calendar-month-day-empty" key={`empty-${String(index)}`} />;
+              }
               const eventCount = eventsByDay.get(day.id)?.length ?? 0;
               const isSelected = day.id === selectedDay.id;
               return (
                 <button
                   aria-pressed={isSelected}
-                  className="calendar-day-button focus-ring"
+                  className={viewMode === 'week' ? 'calendar-day-button focus-ring' : 'calendar-day-button calendar-month-day focus-ring'}
                   data-selected={isSelected}
+                  data-today={day.isToday}
                   key={day.id}
                   type="button"
                   onClick={() => {
-                    setSelectedDayId(day.id);
+                    selectCalendarDay(day);
                   }}
                 >
                   <span>{day.shortLabel}</span>
-                  <strong>{day.date}</strong>
+                  <strong>{viewMode === 'week' ? day.date : day.dayOfMonth}</strong>
                   <small>{eventCount}</small>
                 </button>
               );

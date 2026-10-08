@@ -8,6 +8,14 @@ This is the concise, dated engineering and operational note log. It records obse
 - **Proposed:** a design direction, not yet approved.
 - **Validated:** corroborated and approved for the stated use.
 
+## 2026-10-08 — Staff calendar current-range UX source repair
+- **Observed:** `origin/develop` and local branch base both resolved to `771b7567086f898872f2b9737e12c301ac4ba375` before publication hygiene for `fix/calendar-current-range`.
+- **Observed:** The staff calendar no longer uses the fixed January 2025 week as its primary date model. It now opens on the current local day, renders the next seven days in a one-row week strip, maps projected shifts and browser-local manual events to exact date IDs, and keeps older local weekday event IDs compatible by normalizing them into the current seven-day range.
+- **Observed:** The month view now behaves like a standard current-year calendar surface: it shows weekday headers, leading blank cells for correct weekday alignment, the selected month heading, previous/next month controls bounded within the current year, and tighter month-day cells instead of the earlier bulky tile list.
+- **Observed:** The local browser preview on `http://127.0.0.1:5173/staff/calendar` showed `October 8 - 14, 2026` for the current seven-day range and an October 2026 month grid with October 1 aligned under Thursday.
+- **Validated:** Focused frontend checks passed: `npm --prefix apps/web test -- StaffCalendar.test.tsx Dashboard.test.tsx` reported 21 passing tests, `npm --prefix apps/web run typecheck` passed, `npm --prefix apps/web run lint` passed, `npm --prefix apps/web run build` passed with the existing Vite large-chunk warning, and `git diff --check` passed.
+- **Boundary:** This is source/frontend/local-validation work only. No cloud inspection, image publication, deployment, migration, live-data mutation, provider-side action, production-completion claim or automated matching/ranking/eligibility/referral/placement occurred.
+
 ## 2026-09-17 — Demo UX source repairs
 - **Observed:** `origin/develop` was fetched and advanced to `7671443`, the PR #109 docs merge after PR #108. A local repair branch `fix/worker-intake-dashboard-links` was created from that protected tip.
 - **Observed:** Dashboard Worker-intake KPI and priority/recent worker rows now link with queue/exact-reference intent. The intake workspace reads `queue=review`, `q=...`, `reference=...`, and `open=match` URL state, loads matching drafts without manual typing, filters the review queue client-side for non-current review states, and opens a single matching named or referenced intake directly.

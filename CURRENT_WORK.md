@@ -1,5 +1,15 @@
 # Current Work — Golden Rose Operations Platform
 
+## 2026-10-08 — Staff calendar current-range UX active
+
+- **Staffing:** One independent developer; focused frontend tests, local type/lint/build checks, browser smoke and later PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** Protected `develop` is at `771b756` after the staff-account correction authority hotfix. The staff pilot has started, and browser review found the staff calendar still behaved like an old mock surface: it opened on fixed January 2025 dates and the month option did not provide a conventional calendar view. Fresh source work is active on `fix/calendar-current-range` to make the calendar begin at the current local day, show the next seven days in a clean one-row week strip, and offer a current-year month view with standard weekday alignment and month navigation.
+- **Gate budget:** Source/frontend/local-validation work only. No cloud inspection or mutation, Terraform plan/apply, live migration execution, service update, new account bootstrap, live/client data entry, production-completion claim, provider-side reset/session-revocation execution, credential rotation, export/import execution, client-owned environment transition, destructive cleanup, shared-runtime rollout or automated matching/ranking/eligibility/referral/placement follows from this branch.
+- **Next executable action:** Publish this source PR to `develop`. After protected merge, use a separately approved image/service path before asking staff to rely on the calendar in the running pilot environment.
+- **Do not regress:** Human staff decision boundaries; no automated matching/ranking/eligibility/referral/placement; staff-only named-account access; no static stale operational examples in the live-data pilot; request-derived shifts remain separate from browser-local personal calendar entries; company-calendar mutation remains permission-gated; no exact worksite/location exposure beyond existing authorized projections; immutable intake history and exact retries; restricted-field permissions; bilingual/accessibility parity; separate public/staff identity planes; auth-sensitive no-store handling; durable current-environment records with migration-disposition tracking until a separately approved client-owned transition/export/import packet exists.
+
+**Validation to date:** Focused frontend calendar/dashboard route tests passed 21 tests with existing jsdom canvas notices. Frontend typecheck, lint, production build and `git diff --check` passed; the build retains the existing Vite large-chunk warning. Local browser smoke on `http://127.0.0.1:5173/staff/calendar` confirmed the week range renders as the current seven-day range, the week strip stays one clean row, and the month view renders a conventional October 2026 grid with October 1 aligned under Thursday.
+
 ## 2026-10-08 — Staff account correction runtime authority active
 
 - **Staffing:** One independent developer; focused automated tests, local type/lint/static checks and later PR gates provide quality evidence, not independent-human authorization.

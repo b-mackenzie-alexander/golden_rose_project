@@ -14,6 +14,7 @@ import {
   recordSessionRevocationEvidence,
   revokeStaffDelegation,
   suspendStaffAccount,
+  updateStaffAccountGoogleEmail,
 } from '../api/staffAccountClient';
 import type { StaffAccount, StaffAccountFailureKind, StaffAccountLifecycleEvent, StaffAccountRole, StaffDelegation } from '../api/staffAccountClient';
 import { GoogleStaffSignIn } from '../auth/GoogleStaffSignIn';
@@ -36,6 +37,11 @@ type ActionForm = {
   action: AccountAction;
   reasonText: string;
   mfaEnrolled: boolean;
+};
+type EmailForm = {
+  account: StaffAccount;
+  providerEmail: string;
+  reasonText: string;
 };
 type DelegationPanel = {
   account: StaffAccount;
@@ -104,6 +110,7 @@ const eventLabels: Record<StaffAccountLifecycleEvent['eventType'], { en: string;
   'staff_account.suspended': { en: 'Account suspended', es: 'Cuenta suspendida' },
   'staff_account.deprovisioned': { en: 'Account deprovisioned', es: 'Cuenta retirada' },
   'staff_account.corrected': { en: 'Account corrected', es: 'Cuenta corregida' },
+  'staff_account.signin_email_updated': { en: 'Google email updated', es: 'Correo de Google actualizado' },
   'staff_account.recovery_recorded': { en: 'Recovery evidence recorded', es: 'Evidencia de recuperacion registrada' },
   'staff_account.sessions_revoked': { en: 'Session-revocation evidence recorded', es: 'Evidencia de revocacion de sesion registrada' },
 };
@@ -223,6 +230,8 @@ export function StaffAccountAdmin() {
   const [createErrors, setCreateErrors] = useState<Partial<Record<keyof CreateForm, string>>>({});
   const [correctionForm, setCorrectionForm] = useState<(CreateForm & { account: StaffAccount }) | null>(null);
   const [correctionErrors, setCorrectionErrors] = useState<Partial<Record<keyof CreateForm, string>>>({});
+  const [emailForm, setEmailForm] = useState<EmailForm | null>(null);
+  const [emailErrors, setEmailErrors] = useState<Partial<Record<'providerEmail' | 'reasonText', string>>>({});
   const [actionForm, setActionForm] = useState<ActionForm | null>(null);
   const [actionError, setActionError] = useState('');
   const [delegationPanel, setDelegationPanel] = useState<DelegationPanel | null>(null);
@@ -342,6 +351,37 @@ export function StaffAccountAdmin() {
     setCorrectionErrors({});
   }
 
+  async function submitEmailUpdate(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setNotice('');
+    setError('');
+    if (emailForm === null) return;
+    const next: Partial<Record<'providerEmail' | 'reasonText', string>> = {};
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailForm.providerEmail.trim())) {
+      next.providerEmail = language === 'en' ? 'Enter a valid Google email address.' : 'Ingrese un correo de Google valido.';
+    }
+    if (emailForm.reasonText.trim().length === 0) {
+      next.reasonText = language === 'en' ? 'Reason is required.' : 'Motivo requerido.';
+    }
+    setEmailErrors(next);
+    if (Object.keys(next).length > 0) return;
+    const result = await updateStaffAccountGoogleEmail({
+      staffId: emailForm.account.staffId,
+      expectedVersion: emailForm.account.version,
+      providerEmail: emailForm.providerEmail,
+      reasonText: emailForm.reasonText,
+      commandId: createCommandId(),
+    });
+    if (!result.ok) {
+      setError(failureText(result.failure.kind, language));
+      return;
+    }
+    setAccounts((current) => upsertAccount(current, result.value.account));
+    setNotice(language === 'en' ? 'Staff account Google email updated.' : 'Correo de Google actualizado.');
+    setEmailForm(null);
+    setEmailErrors({});
+  }
+
   async function submitAction(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     setActionError('');
@@ -408,6 +448,15 @@ export function StaffAccountAdmin() {
       reasonText: '',
     });
     setCorrectionErrors({});
+  }
+
+  function openEmailUpdate(account: StaffAccount) {
+    setEmailForm({
+      account,
+      providerEmail: account.providerEmail ?? '',
+      reasonText: '',
+    });
+    setEmailErrors({});
   }
 
   async function openDelegations(account: StaffAccount) {
@@ -593,6 +642,9 @@ export function StaffAccountAdmin() {
                   {account.lifecycleStatus === 'suspended' ? (
                     <button className="focus-ring" type="button" onClick={() => { openCorrection(account); }}>{language === 'en' ? 'Correct' : 'Corregir'}</button>
                   ) : null}
+                  {account.lifecycleStatus !== 'deprovisioned' ? (
+                    <button className="focus-ring" type="button" onClick={() => { openEmailUpdate(account); }}>{language === 'en' ? 'Google email' : 'Correo Google'}</button>
+                  ) : null}
                   {account.lifecycleStatus === 'active' ? (
                     <button className="focus-ring" type="button" onClick={() => { setActionForm({ account, action: 'suspend', reasonText: '', mfaEnrolled: false }); }}>{actionLabels.suspend[language]}</button>
                   ) : null}
@@ -738,6 +790,33 @@ export function StaffAccountAdmin() {
               {correctionErrors.reasonText ? <small role="alert">{correctionErrors.reasonText}</small> : null}
             </label>
             <button className="staff-primary-button focus-ring" type="submit">{language === 'en' ? 'Save correction' : 'Guardar correccion'}</button>
+          </form>
+        </section>
+      ) : null}
+
+      {emailForm ? (
+        <section className="staff-account-panel staff-action-panel" aria-labelledby="account-email-heading">
+          <div className="staff-account-panel-header">
+            <h3 id="account-email-heading">{language === 'en' ? 'Manage Google email' : 'Administrar correo de Google'}: {emailForm.account.displayName}</h3>
+            <button className="staff-secondary-button focus-ring" type="button" onClick={() => { setEmailForm(null); }}>{language === 'en' ? 'Close' : 'Cerrar'}</button>
+          </div>
+          <p className="staff-account-helper">
+            {language === 'en'
+              ? 'Add a missing Google email without changing the existing verified binding. Replacing an existing email resets the Google binding, suspends the account, clears MFA evidence, and requires the next verified Google sign-in before activation.'
+              : 'Agregue un correo de Google faltante sin cambiar el vinculo verificado existente. Reemplazar un correo existente reinicia el vinculo de Google, suspende la cuenta, borra la evidencia MFA y requiere el proximo inicio verificado antes de activar.'}
+          </p>
+          <form className="staff-account-form" onSubmit={(event) => { void submitEmailUpdate(event); }}>
+            <label>
+              <span>{language === 'en' ? 'Google email for sign-in' : 'Correo de Google para iniciar sesion'}</span>
+              <input className="focus-ring" type="email" value={emailForm.providerEmail} onChange={(event) => { setEmailForm({ ...emailForm, providerEmail: event.target.value }); }} />
+              {emailErrors.providerEmail ? <small role="alert">{emailErrors.providerEmail}</small> : null}
+            </label>
+            <label>
+              <span>{language === 'en' ? 'Reason' : 'Motivo'}</span>
+              <textarea className="focus-ring" value={emailForm.reasonText} onChange={(event) => { setEmailForm({ ...emailForm, reasonText: event.target.value }); }} />
+              {emailErrors.reasonText ? <small role="alert">{emailErrors.reasonText}</small> : null}
+            </label>
+            <button className="staff-primary-button focus-ring" type="submit">{language === 'en' ? 'Save Google email' : 'Guardar correo'}</button>
           </form>
         </section>
       ) : null}

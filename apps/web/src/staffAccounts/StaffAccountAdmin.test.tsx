@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -15,6 +15,7 @@ import {
   recordSessionRevocationEvidence,
   revokeStaffDelegation,
   suspendStaffAccount,
+  updateStaffAccountGoogleEmail,
 } from '../api/staffAccountClient';
 import type { StaffAccount, StaffAccountLifecycleEvent, StaffDelegation } from '../api/staffAccountClient';
 import { LanguageProvider } from '../i18n/LanguageProvider';
@@ -39,6 +40,7 @@ vi.mock('../api/staffAccountClient', () => ({
   recordSessionRevocationEvidence: vi.fn(),
   revokeStaffDelegation: vi.fn(),
   suspendStaffAccount: vi.fn(),
+  updateStaffAccountGoogleEmail: vi.fn(),
 }));
 
 vi.mock('../auth/GoogleStaffSignIn', () => ({
@@ -149,18 +151,30 @@ it('creates a suspended onboarding account and shows field-local validation', as
   const createPanel = screen.getByRole('heading', { name: /Onboard staff account/ }).closest('section');
   expect(createPanel).not.toBeNull();
   const createForm = within(createPanel as HTMLElement);
+  const createFormElement = createPanel?.querySelector('form');
+  expect(createFormElement).not.toBeNull();
   await user.type(createForm.getByRole('textbox', { name: /Display name/ }), 'Sofia Diaz');
   const googleEmailInput = createForm.getAllByRole('textbox', { name: /Google email/ })[0];
   expect(googleEmailInput).toBeDefined();
+  fireEvent.change(googleEmailInput as HTMLElement, { target: { value: 'not-an-email' } });
+  fireEvent.submit(createFormElement as HTMLFormElement);
+  expect(createForm.getByText('Enter a valid Google email address.')).toBeInTheDocument();
+  await user.clear(googleEmailInput as HTMLElement);
   await user.type(googleEmailInput as HTMLElement, 'sofia.diaz@example.test');
+  await user.selectOptions(createForm.getByLabelText('Role'), 'delegated_manager');
+  await user.click(createForm.getByLabelText('MFA already enrolled'));
   await user.type(createForm.getByRole('textbox', { name: /Reason/ }), 'Initial onboarding approved');
   await user.click(createForm.getByLabelText('staff_account:create'));
+  await user.click(createForm.getByLabelText('staff_account:read'));
+  await user.click(createForm.getByLabelText('staff_account:read'));
   await user.click(createForm.getByRole('button', { name: 'Create staff account' }));
 
   const createCall = vi.mocked(createStaffAccount).mock.calls[0]?.[0];
   expect(createCall?.displayName).toBe('Sofia Diaz');
   expect(createCall?.providerEmail).toBe('sofia.diaz@example.test');
   expect(createCall?.providerSubject).toBe('');
+  expect(createCall?.roleName).toBe('delegated_manager');
+  expect(createCall?.mfaEnrolled).toBe(true);
   expect(createCall?.permissionNames).toEqual(expect.arrayContaining(['staff_account:read', 'staff_account:create']));
   expect(createCall?.reasonText).toBe('Initial onboarding approved');
   expect(await screen.findByText('Staff account created in suspended onboarding state.')).toBeInTheDocument();
@@ -213,6 +227,7 @@ it('corrects suspended onboarding details without deleting the account', async (
   await user.type(correction.getByRole('textbox', { name: /Display name/ }), 'Mariela Rivera');
   await user.clear(correction.getByRole('textbox', { name: /Provider subject/ }));
   await user.type(correction.getByRole('textbox', { name: /Provider subject/ }), 'oidc:staff:corrected');
+  await user.selectOptions(correction.getByLabelText('Role'), 'delegated_manager');
   await user.click(correction.getByLabelText('MFA already enrolled'));
   await user.click(correction.getByLabelText('intake:read'));
   await user.type(correction.getByLabelText('Reason'), 'Corrected provider subject before activation');
@@ -225,6 +240,7 @@ it('corrects suspended onboarding details without deleting the account', async (
     expectedVersion: 1,
     displayName: 'Mariela Rivera',
     providerSubject: 'oidc:staff:corrected',
+    roleName: 'delegated_manager',
     mfaEnrolled: true,
     reasonText: 'Corrected provider subject before activation',
   });
@@ -232,6 +248,97 @@ it('corrects suspended onboarding details without deleting the account', async (
   expect(await screen.findByText('Staff account onboarding details corrected.')).toBeInTheDocument();
   expect(screen.getByText('Mariela Rivera')).toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: /Correct onboarding/ })).not.toBeInTheDocument();
+});
+
+it('updates Google email for an existing account', async () => {
+  const user = userEvent.setup();
+  const updated = {
+    ...active,
+    providerEmail: 'new.email@example.test',
+    lifecycleStatus: 'suspended' as const,
+    mfaEnrolled: false,
+    providerSubject: 'pending-google-email:def456',
+    version: 3,
+  };
+  vi.mocked(listStaffAccounts).mockResolvedValue({ ok: true, value: [active] });
+  vi.mocked(updateStaffAccountGoogleEmail).mockResolvedValue({
+    ok: true,
+    value: { account: updated, eventType: 'staff_account.signin_email_updated', resultVersion: 3 },
+  });
+
+  render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
+  await screen.findByText('Mariela Torres');
+
+  await user.click(screen.getByRole('button', { name: 'Google email' }));
+  const emailPanel = screen.getByRole('heading', { name: 'Manage Google email: Mariela Torres' }).closest('section');
+  expect(emailPanel).not.toBeNull();
+  const emailForm = within(emailPanel as HTMLElement);
+  expect(emailForm.getByText(/Replacing an existing email resets/)).toBeInTheDocument();
+  await user.clear(emailForm.getByRole('textbox', { name: /Google email/ }));
+  await user.type(emailForm.getByRole('textbox', { name: /Google email/ }), 'new.email@example.test');
+  await user.type(emailForm.getByRole('textbox', { name: /Reason/ }), 'Correct the staff Google email');
+  await user.click(emailForm.getByRole('button', { name: 'Save Google email' }));
+
+  expect(updateStaffAccountGoogleEmail).toHaveBeenCalledWith(expect.objectContaining({
+    staffId: active.staffId,
+    expectedVersion: active.version,
+    providerEmail: 'new.email@example.test',
+    reasonText: 'Correct the staff Google email',
+  }));
+  expect(await screen.findByText('Staff account Google email updated.')).toBeInTheDocument();
+  expect(screen.getByText('new.email@example.test')).toBeInTheDocument();
+  expect(screen.getByText('Waiting for verified Google sign-in')).toBeInTheDocument();
+});
+
+it('validates and preserves the Google email form after recoverable errors', async () => {
+  const user = userEvent.setup();
+  vi.mocked(listStaffAccounts).mockResolvedValue({ ok: true, value: [active] });
+  vi.mocked(updateStaffAccountGoogleEmail).mockResolvedValue({ ok: false, failure: { kind: 'stale' } });
+
+  render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
+  await screen.findByText('Mariela Torres');
+
+  await user.click(screen.getByRole('button', { name: 'Google email' }));
+  const firstPanel = screen.getByRole('heading', { name: 'Manage Google email: Mariela Torres' }).closest('section');
+  expect(firstPanel).not.toBeNull();
+  const firstForm = within(firstPanel as HTMLElement);
+  const firstFormElement = firstPanel?.querySelector('form');
+  expect(firstFormElement).not.toBeNull();
+  await user.clear(firstForm.getByRole('textbox', { name: /Google email/ }));
+  fireEvent.change(firstForm.getByRole('textbox', { name: /Google email/ }), { target: { value: 'not-an-email' } });
+  fireEvent.submit(firstFormElement as HTMLFormElement);
+
+  expect(firstForm.getByText('Enter a valid Google email address.')).toBeInTheDocument();
+  expect(firstForm.getByText('Reason is required.')).toBeInTheDocument();
+  expect(updateStaffAccountGoogleEmail).not.toHaveBeenCalled();
+
+  await user.clear(firstForm.getByRole('textbox', { name: /Google email/ }));
+  await user.type(firstForm.getByRole('textbox', { name: /Google email/ }), 'missing.reason@example.test');
+  await user.click(firstForm.getByRole('button', { name: 'Save Google email' }));
+
+  expect(firstForm.getByText('Reason is required.')).toBeInTheDocument();
+  expect(updateStaffAccountGoogleEmail).not.toHaveBeenCalled();
+
+  await user.click(firstForm.getByRole('button', { name: 'Close' }));
+  expect(screen.queryByRole('heading', { name: 'Manage Google email: Mariela Torres' })).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'Google email' }));
+  const secondPanel = screen.getByRole('heading', { name: 'Manage Google email: Mariela Torres' }).closest('section');
+  expect(secondPanel).not.toBeNull();
+  const secondForm = within(secondPanel as HTMLElement);
+  await user.clear(secondForm.getByRole('textbox', { name: /Google email/ }));
+  await user.type(secondForm.getByRole('textbox', { name: /Google email/ }), 'corrected@example.test');
+  await user.type(secondForm.getByRole('textbox', { name: /Reason/ }), 'Version changed during email correction');
+  await user.click(secondForm.getByRole('button', { name: 'Save Google email' }));
+
+  expect(updateStaffAccountGoogleEmail).toHaveBeenCalledWith(expect.objectContaining({
+    staffId: active.staffId,
+    expectedVersion: active.version,
+    providerEmail: 'corrected@example.test',
+    reasonText: 'Version changed during email correction',
+  }));
+  expect(await screen.findByText('The account changed in another session. Reload before trying again.')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Manage Google email: Mariela Torres' })).toBeInTheDocument();
 });
 
 it('shows correction validation and recoverable command errors', async () => {
@@ -348,6 +455,8 @@ it('activates with MFA evidence and records recovery evidence without provider-s
 
   await user.click(screen.getByRole('button', { name: 'Activate' }));
   expect(screen.getByText('Activation requires confirmed MFA enrollment.')).toBeInTheDocument();
+  await user.click(lastElement(screen.getAllByLabelText('MFA enrollment confirmed')));
+  await user.click(lastElement(screen.getAllByLabelText('MFA enrollment confirmed')));
   await user.type(lastElement(screen.getAllByLabelText('Reason')), 'MFA confirmed in provider console');
   await user.click(lastElement(screen.getAllByRole('button', { name: 'Activate' })));
 
@@ -423,7 +532,9 @@ it('lists, grants, and revokes account delegations', async () => {
     revocationReason: 'Coverage ended',
   };
   vi.mocked(grantStaffDelegation).mockResolvedValue({ ok: true, value: { delegation, eventType: 'staff_delegation.granted', resultVersion: 1 } });
-  vi.mocked(revokeStaffDelegation).mockResolvedValue({ ok: true, value: { delegation: revoked, eventType: 'staff_delegation.revoked', resultVersion: 1 } });
+  vi.mocked(revokeStaffDelegation)
+    .mockResolvedValueOnce({ ok: false, failure: { kind: 'stale' } })
+    .mockResolvedValueOnce({ ok: true, value: { delegation: revoked, eventType: 'staff_delegation.revoked', resultVersion: 1 } });
 
   render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
   await screen.findByText('Mariela Torres');
@@ -443,7 +554,11 @@ it('lists, grants, and revokes account delegations', async () => {
   }));
   expect(await screen.findByText('Delegation recorded.')).toBeInTheDocument();
 
+  await user.click(screen.getByRole('button', { name: 'Revoke' }));
+  expect(screen.getByText('Revocation reason is required.')).toBeInTheDocument();
   await user.type(screen.getByLabelText('Revocation reason'), 'Coverage ended');
+  await user.click(screen.getByRole('button', { name: 'Revoke' }));
+  expect(await screen.findByText('The account changed in another session. Reload before trying again.')).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Revoke' }));
 
   expect(revokeStaffDelegation).toHaveBeenCalledWith(expect.objectContaining({

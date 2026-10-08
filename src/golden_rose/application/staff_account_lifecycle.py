@@ -26,6 +26,7 @@ from golden_rose.persistence.staff_accounts import (
     StaffAccountStatus,
     get_pending_staff_account_by_provider_email_for_update,
     get_staff_account_by_id_for_update,
+    get_staff_account_by_provider_email,
     get_staff_account_by_provider_subject,
     insert_lifecycle_event,
     insert_staff_account,
@@ -35,6 +36,7 @@ from golden_rose.persistence.staff_accounts import (
     update_staff_account_lifecycle,
     update_staff_account_onboarding,
     update_staff_account_provider_binding,
+    update_staff_account_signin_email,
 )
 
 PENDING_PROVIDER_SUBJECT_PREFIX = "pending-google-email:"
@@ -246,6 +248,99 @@ def correct_staff_account_onboarding(
     return StaffAccountLifecycleResult(
         account=account,
         event_type="staff_account.corrected",
+        result_version=account.version,
+    )
+
+
+def update_staff_account_google_email(
+    *,
+    session: Session,
+    principal: StaffPrincipal,
+    command_id: UUID,
+    staff_id: UUID,
+    expected_version: int,
+    provider_email: str,
+    clock: Clock,
+    identifiers: IdentifierFactory,
+    reason_text: str,
+) -> StaffAccountLifecycleResult:
+    if not can_create_staff_account(principal):
+        msg = "principal lacks staff_account:create"
+        raise PermissionError(msg)
+
+    normalized_email = _normalize_provider_email(provider_email)
+    if normalized_email is None:
+        raise StaffAccountLifecycleError("staff account requires provider_email")
+    reason_text = _require_text("reason_text", reason_text, 512)
+    now = clock.now()
+    try:
+        existing = get_staff_account_by_id_for_update(session=session, staff_id=staff_id)
+        if existing.version != expected_version:
+            raise StaffAccountVersionConflictError("staff account version conflict")
+        if existing.lifecycle_status == "deprovisioned":
+            raise StaffAccountLifecycleError("deprovisioned staff account cannot update sign-in")
+        if existing.provider_email == normalized_email:
+            raise StaffAccountLifecycleError("staff account email update requires a change")
+        duplicate = get_staff_account_by_provider_email(
+            session=session,
+            provider_email=normalized_email,
+        )
+        if duplicate is not None and duplicate.staff_id != staff_id:
+            raise StaffAccountLifecycleError("staff account email is already assigned")
+        reset_binding = existing.provider_email is not None or _is_pending_provider_subject(
+            existing.provider_subject
+        )
+        if reset_binding and staff_id == principal.actor_id:
+            raise StaffAccountLifecycleError("staff account cannot reset its own sign-in binding")
+        next_subject = (
+            _normalize_provider_subject("", normalized_email)
+            if reset_binding
+            else existing.provider_subject
+        )
+        next_status = "suspended" if reset_binding else existing.lifecycle_status
+        next_mfa = False if reset_binding else existing.mfa_enrolled
+        account = update_staff_account_signin_email(
+            session=session,
+            staff_id=staff_id,
+            expected_version=expected_version,
+            provider_subject=next_subject,
+            provider_email=normalized_email,
+            lifecycle_status=cast(StaffAccountStatus, next_status),
+            mfa_enrolled=next_mfa,
+            updated_at=now,
+            actor_id=principal.actor_id,
+        )
+        insert_lifecycle_event(
+            session=session,
+            event_id=identifiers.new_uuid4(),
+            command_id=command_id,
+            staff_id=staff_id,
+            actor_id=principal.actor_id,
+            event_type="staff_account.signin_email_updated",
+            previous_status=existing.lifecycle_status,
+            new_status=account.lifecycle_status,
+            previous_version=existing.version,
+            new_version=account.version,
+            occurred_at=now,
+            reason_text=reason_text,
+        )
+        session.commit()
+    except NoResultFound as exc:
+        session.rollback()
+        raise StaffAccountNotFoundError("staff account not found") from exc
+    except StaffAccountVersionConflictError:
+        session.rollback()
+        raise
+    except SQLAlchemyError as exc:
+        session.rollback()
+        raise SafePersistenceError("persistence operation failed") from exc
+    except Exception:
+        session.rollback()
+        raise
+
+    return StaffAccountLifecycleResult(
+        account=account,
+        event_type="staff_account.signin_email_updated",
         result_version=account.version,
     )
 

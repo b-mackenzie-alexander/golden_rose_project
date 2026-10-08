@@ -154,6 +154,32 @@ def get_staff_account_by_provider_subject(
     return StaffAccountRecord(*row)
 
 
+def get_staff_account_by_provider_email(
+    *,
+    session: Session,
+    provider_email: str,
+) -> StaffAccountRecord | None:
+    row = session.execute(
+        select(
+            staff_accounts.c.staff_id,
+            staff_accounts.c.provider_subject,
+            staff_accounts.c.provider_email,
+            staff_accounts.c.display_name,
+            staff_accounts.c.role_name,
+            staff_accounts.c.lifecycle_status,
+            staff_accounts.c.mfa_enrolled,
+            staff_accounts.c.created_at,
+            staff_accounts.c.created_by,
+            staff_accounts.c.updated_at,
+            staff_accounts.c.updated_by,
+            staff_accounts.c.version,
+        ).where(staff_accounts.c.provider_email == provider_email)
+    ).one_or_none()
+    if row is None:
+        return None
+    return StaffAccountRecord(*row)
+
+
 def get_pending_staff_account_by_provider_email_for_update(
     *,
     session: Session,
@@ -335,6 +361,51 @@ def update_staff_account_provider_binding(
             mfa_enrolled=mfa_enrolled,
             updated_at=updated_at,
             updated_by=staff_id,
+            version=expected_version + 1,
+        )
+        .returning(
+            staff_accounts.c.staff_id,
+            staff_accounts.c.provider_subject,
+            staff_accounts.c.provider_email,
+            staff_accounts.c.display_name,
+            staff_accounts.c.role_name,
+            staff_accounts.c.lifecycle_status,
+            staff_accounts.c.mfa_enrolled,
+            staff_accounts.c.created_at,
+            staff_accounts.c.created_by,
+            staff_accounts.c.updated_at,
+            staff_accounts.c.updated_by,
+            staff_accounts.c.version,
+        )
+    ).one()
+    return StaffAccountRecord(*row)
+
+
+def update_staff_account_signin_email(
+    *,
+    session: Session,
+    staff_id: UUID,
+    expected_version: int,
+    provider_subject: str,
+    provider_email: str,
+    lifecycle_status: StaffAccountStatus,
+    mfa_enrolled: bool,
+    updated_at: datetime,
+    actor_id: UUID,
+) -> StaffAccountRecord:
+    row = session.execute(
+        update(staff_accounts)
+        .where(
+            staff_accounts.c.staff_id == staff_id,
+            staff_accounts.c.version == expected_version,
+        )
+        .values(
+            provider_subject=provider_subject,
+            provider_email=provider_email,
+            lifecycle_status=lifecycle_status,
+            mfa_enrolled=mfa_enrolled,
+            updated_at=updated_at,
+            updated_by=actor_id,
             version=expected_version + 1,
         )
         .returning(

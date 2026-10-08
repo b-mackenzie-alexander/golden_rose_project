@@ -21,7 +21,7 @@ class FakeEngine:
 
 class FakeScalarResult:
     def scalar_one(self) -> str:
-        return "0016_staff_google_email"
+        return "0017_staff_signin_email_mgmt"
 
 
 class FakeConnection:

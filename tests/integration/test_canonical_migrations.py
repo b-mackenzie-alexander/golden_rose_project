@@ -54,6 +54,7 @@ def test_current_review_head_blocks_downgrade_before_schema_changes(migration_da
     with pytest.raises(RuntimeError, match="before DDL"):
         migrate(migration_database, "0008c_intake_link_authority", downgrade=True)
     assert (
-        rows(migration_database, "alembic_version")[0]["version_num"] == "0016_staff_google_email"
+        rows(migration_database, "alembic_version")[0]["version_num"]
+        == "0017_staff_signin_email_mgmt"
     )
     assert len(rows(migration_database, "canonical_review_heads")) == 1

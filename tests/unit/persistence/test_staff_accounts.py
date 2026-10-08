@@ -5,6 +5,7 @@ from golden_rose.persistence.staff_accounts import (
     get_pending_staff_account_by_provider_email_for_update,
     get_staff_account_by_id,
     get_staff_account_by_id_for_update,
+    get_staff_account_by_provider_email,
     get_staff_account_by_provider_subject,
     get_staff_delegation_by_id,
     insert_lifecycle_event,
@@ -37,6 +38,14 @@ class FakeOneResult:
 
     def one(self) -> tuple[object, ...]:
         return self.row
+
+    def one_or_none(self) -> tuple[object, ...] | None:
+        return self.row
+
+
+class FakeNoneResult:
+    def one_or_none(self) -> None:
+        return None
 
 
 class FakeScalarResult:
@@ -176,6 +185,28 @@ def test_get_staff_account_by_provider_subject_maps_row() -> None:
     assert len(session.calls) == 1
     assert record.provider_subject == "oidc:staff:123"
     assert record.lifecycle_status == "active"
+
+
+def test_get_staff_account_by_provider_email_maps_optional_row() -> None:
+    session = FakeSession(
+        [
+            FakeOneResult(_row(status="active", version=2, provider_email="mariela@example.test")),
+            FakeNoneResult(),
+        ]
+    )
+
+    record = get_staff_account_by_provider_email(
+        session=session,  # type: ignore[arg-type]
+        provider_email="mariela@example.test",
+    )
+    missing = get_staff_account_by_provider_email(
+        session=session,  # type: ignore[arg-type]
+        provider_email="missing@example.test",
+    )
+
+    assert record is not None
+    assert record.provider_email == "mariela@example.test"
+    assert missing is None
 
 
 def test_get_pending_staff_account_by_provider_email_for_update_maps_row() -> None:

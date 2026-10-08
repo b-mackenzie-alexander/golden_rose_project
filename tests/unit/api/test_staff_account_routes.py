@@ -561,6 +561,122 @@ def test_staff_account_correction_route_returns_recoverable_lifecycle_error(
     assert "stale" not in response.text
 
 
+def test_update_staff_account_google_email_routes_normalized_admin_request(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = http
+    update_email = Mock(
+        return_value=lifecycle_result(
+            event_type="staff_account.signin_email_updated",
+            record=account_record(
+                status="active",
+                version=3,
+                mfa_enrolled=True,
+                provider_email="mariela.torres@example.test",
+            ),
+        )
+    )
+    monkeypatch.setattr(staff_accounts, "update_staff_account_google_email", update_email)
+
+    response = client.post(
+        f"/api/staff/v1/staff-accounts/{STAFF_ID}/google-email",
+        headers=command_headers(),
+        json={
+            "expected_version": 2,
+            "provider_email": " Mariela.Torres@Example.Test ",
+            "reason_text": " Record existing Google email ",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["vary"] == "Authorization"
+    assert response.headers["idempotency-result-version"] == "3"
+    assert response.json()["event_type"] == "staff_account.signin_email_updated"
+    assert response.json()["account"]["provider_email"] == "mariela.torres@example.test"
+    assert update_email.call_args.kwargs["staff_id"] == STAFF_ID
+    assert update_email.call_args.kwargs["expected_version"] == 2
+    assert update_email.call_args.kwargs["provider_email"] == "mariela.torres@example.test"
+    assert update_email.call_args.kwargs["reason_text"] == "Record existing Google email"
+
+
+def test_update_staff_account_google_email_route_preserves_forbidden_boundary(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = http
+    update_email = Mock(side_effect=PermissionError("private email update permission"))
+    monkeypatch.setattr(staff_accounts, "update_staff_account_google_email", update_email)
+
+    response = client.post(
+        f"/api/staff/v1/staff-accounts/{STAFF_ID}/google-email",
+        headers=command_headers(),
+        json={
+            "expected_version": 2,
+            "provider_email": "mariela.torres@example.test",
+            "reason_text": "Record existing Google email",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["detail"] == "forbidden"
+    assert "private" not in response.text
+
+
+@pytest.mark.parametrize(
+    ("error", "status", "problem_type"),
+    [
+        (
+            StaffAccountNotFoundError("missing private account"),
+            404,
+            "https://golden-rose.local/problems/staff-account-not-found",
+        ),
+        (
+            StaffAccountVersionConflictError("private stale account"),
+            412,
+            "https://golden-rose.local/problems/staff-account-version-conflict",
+        ),
+        (
+            StaffAccountLifecycleError("private invalid email"),
+            422,
+            "https://golden-rose.local/problems/staff-account-lifecycle-invalid",
+        ),
+        (
+            SafePersistenceError("private database value"),
+            503,
+            "https://golden-rose.local/problems/service-unavailable",
+        ),
+    ],
+)
+def test_update_staff_account_google_email_route_errors_are_value_safe(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+    error: Exception,
+    status: int,
+    problem_type: str,
+) -> None:
+    client, _ = http
+    update_email = Mock(side_effect=error)
+    monkeypatch.setattr(staff_accounts, "update_staff_account_google_email", update_email)
+
+    response = client.post(
+        f"/api/staff/v1/staff-accounts/{STAFF_ID}/google-email",
+        headers=command_headers(),
+        json={
+            "expected_version": 2,
+            "provider_email": "mariela.torres@example.test",
+            "reason_text": "Record existing Google email",
+        },
+    )
+
+    assert response.status_code == status
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["type"] == problem_type
+    assert "private" not in response.text
+
+
 def test_activate_staff_account_routes_mfa_confirmation(
     http: tuple[TestClient, FixedIdentifiers],
     monkeypatch: pytest.MonkeyPatch,
@@ -587,6 +703,74 @@ def test_activate_staff_account_routes_mfa_confirmation(
     assert activate.call_args.kwargs["staff_id"] == STAFF_ID
     assert activate.call_args.kwargs["expected_version"] == 1
     assert activate.call_args.kwargs["mfa_enrolled"] is True
+
+
+def test_activate_staff_account_route_preserves_forbidden_boundary(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = http
+    activate = Mock(side_effect=PermissionError("private activation permission"))
+    monkeypatch.setattr(staff_accounts, "activate_staff_account", activate)
+
+    response = client.post(
+        f"/api/staff/v1/staff-accounts/{STAFF_ID}/activate",
+        headers=command_headers(),
+        json={"expected_version": 1, "mfa_enrolled": True, "reason_text": "MFA complete"},
+    )
+
+    assert response.status_code == 403
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["detail"] == "forbidden"
+    assert "private" not in response.text
+
+
+@pytest.mark.parametrize(
+    ("error", "status", "problem_type"),
+    [
+        (
+            StaffAccountNotFoundError("missing private account"),
+            404,
+            "https://golden-rose.local/problems/staff-account-not-found",
+        ),
+        (
+            StaffAccountVersionConflictError("private stale account"),
+            412,
+            "https://golden-rose.local/problems/staff-account-version-conflict",
+        ),
+        (
+            StaffAccountLifecycleError("private invalid activation"),
+            422,
+            "https://golden-rose.local/problems/staff-account-lifecycle-invalid",
+        ),
+        (
+            SafePersistenceError("private database value"),
+            503,
+            "https://golden-rose.local/problems/service-unavailable",
+        ),
+    ],
+)
+def test_activate_staff_account_route_errors_are_value_safe(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+    error: Exception,
+    status: int,
+    problem_type: str,
+) -> None:
+    client, _ = http
+    activate = Mock(side_effect=error)
+    monkeypatch.setattr(staff_accounts, "activate_staff_account", activate)
+
+    response = client.post(
+        f"/api/staff/v1/staff-accounts/{STAFF_ID}/activate",
+        headers=command_headers(),
+        json={"expected_version": 1, "mfa_enrolled": True, "reason_text": "MFA complete"},
+    )
+
+    assert response.status_code == status
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["type"] == problem_type
+    assert "private" not in response.text
 
 
 @pytest.mark.parametrize(
@@ -628,6 +812,57 @@ def test_terminal_staff_account_lifecycle_routes(
     assert response.json()["event_type"] == event_type
     assert response.json()["account"]["lifecycle_status"] == status
     assert command.call_args.kwargs["expected_version"] == 2
+
+
+@pytest.mark.parametrize(
+    ("path_suffix", "patch_name", "problem_type"),
+    [
+        (
+            "deprovision",
+            "deprovision_staff_account",
+            "https://golden-rose.local/problems/service-unavailable",
+        ),
+        (
+            "recovery-evidence",
+            "record_staff_account_recovery_evidence",
+            "https://golden-rose.local/problems/staff-account-lifecycle-invalid",
+        ),
+        (
+            "session-revocations",
+            "record_staff_account_session_revocation_evidence",
+            "https://golden-rose.local/problems/staff-account-version-conflict",
+        ),
+    ],
+)
+def test_remaining_staff_account_lifecycle_route_errors_are_value_safe(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+    path_suffix: str,
+    patch_name: str,
+    problem_type: str,
+) -> None:
+    client, _ = http
+    errors: dict[str, Exception] = {
+        "deprovision_staff_account": SafePersistenceError("private database value"),
+        "record_staff_account_recovery_evidence": StaffAccountLifecycleError(
+            "private recovery detail"
+        ),
+        "record_staff_account_session_revocation_evidence": StaffAccountVersionConflictError(
+            "private stale version"
+        ),
+    }
+    command = Mock(side_effect=errors[patch_name])
+    monkeypatch.setattr(staff_accounts, patch_name, command)
+
+    response = client.post(
+        f"/api/staff/v1/staff-accounts/{STAFF_ID}/{path_suffix}",
+        headers=command_headers(),
+        json={"expected_version": 2, "reason_text": "Access review"},
+    )
+
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["type"] == problem_type
+    assert "private" not in response.text
 
 
 @pytest.mark.parametrize(

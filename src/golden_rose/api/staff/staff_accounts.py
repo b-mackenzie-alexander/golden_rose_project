@@ -28,6 +28,7 @@ from golden_rose.api.staff.schemas import (
     StaffDelegationListResponse,
     StaffDelegationResponse,
     StaffDelegationRevokeRequest,
+    UpdateStaffAccountGoogleEmailRequest,
 )
 from golden_rose.application.errors import SafePersistenceError
 from golden_rose.application.staff_account_delegations import (
@@ -51,6 +52,7 @@ from golden_rose.application.staff_account_lifecycle import (
     record_staff_account_recovery_evidence,
     record_staff_account_session_revocation_evidence,
     suspend_staff_account,
+    update_staff_account_google_email,
 )
 from golden_rose.auth.permissions import can_read_staff_account
 from golden_rose.auth.principal import StaffPrincipal
@@ -451,6 +453,51 @@ def post_staff_account_onboarding_correction(
             role_name=request.role_name,
             permission_names=frozenset(request.permission_names),
             mfa_enrolled=request.mfa_enrolled,
+            clock=clock,
+            identifiers=identifiers,
+            reason_text=request.reason_text,
+        )
+    except PermissionError:
+        return no_store_problem_response(
+            status_code=403,
+            title="Forbidden",
+            detail="forbidden",
+            type_="https://golden-rose.local/problems/forbidden",
+        )
+    except (
+        StaffAccountLifecycleError,
+        StaffAccountNotFoundError,
+        StaffAccountVersionConflictError,
+        SafePersistenceError,
+    ) as exc:
+        return _problem_for_lifecycle_error(exc)
+    _lifecycle_response(result, response)
+    return _lifecycle_body(result)
+
+
+@router.post(
+    "/{staff_id}/google-email",
+    response_model=StaffAccountLifecycleResponse,
+    status_code=status.HTTP_200_OK,
+)
+def post_staff_account_google_email_update(
+    staff_id: UUID,
+    request: UpdateStaffAccountGoogleEmailRequest,
+    response: Response,
+    idempotency_key: Annotated[UUID, Depends(get_idempotency_key)],
+    session: Annotated[Session, Depends(get_db_session)],
+    principal: Annotated[StaffPrincipal, Depends(get_staff_principal)],
+    clock: Annotated[Clock, Depends(get_clock)],
+    identifiers: Annotated[IdentifierFactory, Depends(get_identifier_factory)],
+) -> StaffAccountLifecycleResponse | Response:
+    try:
+        result = update_staff_account_google_email(
+            session=session,
+            principal=principal,
+            command_id=idempotency_key,
+            staff_id=staff_id,
+            expected_version=request.expected_version,
+            provider_email=request.provider_email,
             clock=clock,
             identifiers=identifiers,
             reason_text=request.reason_text,

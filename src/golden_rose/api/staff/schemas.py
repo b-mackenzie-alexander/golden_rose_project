@@ -250,6 +250,28 @@ class ActivateStaffAccountRequest(StaffAccountTransitionRequest):
     mfa_enrolled: bool
 
 
+class UpdateStaffAccountGoogleEmailRequest(StaffAccountTransitionRequest):
+    provider_email: str
+
+    @field_validator("provider_email")
+    @classmethod
+    def validate_provider_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if (
+            not normalized
+            or len(normalized) > 320
+            or normalized.count("@") != 1
+            or any(ch.isspace() for ch in normalized)
+        ):
+            msg = "provider_email must be a verified Google email address"
+            raise ValueError(msg)
+        local, domain = normalized.split("@", 1)
+        if not local or "." not in domain or domain.startswith(".") or domain.endswith("."):
+            msg = "provider_email must be a verified Google email address"
+            raise ValueError(msg)
+        return normalized
+
+
 class StaffAccountResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
@@ -347,6 +369,7 @@ class StaffAccountLifecycleEventResponse(BaseModel):
         "staff_account.suspended",
         "staff_account.deprovisioned",
         "staff_account.corrected",
+        "staff_account.signin_email_updated",
         "staff_account.recovery_recorded",
         "staff_account.sessions_revoked",
     ]
@@ -385,6 +408,7 @@ class StaffAccountLifecycleResponse(BaseModel):
         "staff_account.suspended",
         "staff_account.deprovisioned",
         "staff_account.corrected",
+        "staff_account.signin_email_updated",
         "staff_account.recovery_recorded",
         "staff_account.sessions_revoked",
     ]

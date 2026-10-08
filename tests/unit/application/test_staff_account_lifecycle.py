@@ -20,6 +20,7 @@ from golden_rose.application.staff_account_lifecycle import (
     record_staff_account_session_revocation_evidence,
     resolve_staff_principal_from_claims,
     suspend_staff_account,
+    update_staff_account_google_email,
 )
 from golden_rose.auth.principal import StaffPrincipal
 from golden_rose.auth.staff_accounts import StaffIdentityClaims
@@ -68,6 +69,7 @@ def _principal(*permissions: str, actor_id: UUID = ACTOR_ID) -> StaffPrincipal:
 
 def _record(
     *,
+    staff_id: UUID = STAFF_ID,
     status: str = "suspended",
     version: int = 1,
     mfa_enrolled: bool = False,
@@ -75,7 +77,7 @@ def _record(
     provider_email: str | None = None,
 ) -> StaffAccountRecord:
     return StaffAccountRecord(
-        staff_id=STAFF_ID,
+        staff_id=staff_id,
         provider_subject=provider_subject,
         provider_email=provider_email,
         display_name="Mariela Torres",
@@ -283,6 +285,66 @@ def test_correct_staff_account_onboarding_rejects_active_accounts(
     assert session.rollbacks == 1
 
 
+def test_correct_staff_account_onboarding_requires_permission() -> None:
+    with pytest.raises(PermissionError, match="staff_account:create"):
+        correct_staff_account_onboarding(
+            session=FakeSession(),  # type: ignore[arg-type]
+            principal=_principal(),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            expected_version=1,
+            provider_subject="oidc:staff:123",
+            provider_email=None,
+            display_name="Mariela Torres",
+            role_name="operations_staff",
+            permission_names=frozenset({"staff_account:read"}),
+            mfa_enrolled=True,
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="Correct onboarding",
+        )
+
+
+def test_correct_staff_account_onboarding_rejects_invalid_role() -> None:
+    with pytest.raises(StaffAccountLifecycleError, match="invalid staff role"):
+        correct_staff_account_onboarding(
+            session=FakeSession(),  # type: ignore[arg-type]
+            principal=_principal("staff_account:create"),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            expected_version=1,
+            provider_subject="oidc:staff:123",
+            provider_email=None,
+            display_name="Mariela Torres",
+            role_name="shadow_admin",
+            permission_names=frozenset({"staff_account:read"}),
+            mfa_enrolled=True,
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="Correct onboarding",
+        )
+
+
+def test_correct_staff_account_onboarding_rejects_self_correction() -> None:
+    with pytest.raises(StaffAccountLifecycleError, match="cannot correct itself"):
+        correct_staff_account_onboarding(
+            session=FakeSession(),  # type: ignore[arg-type]
+            principal=_principal("staff_account:create", "staff_account:read", actor_id=STAFF_ID),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            expected_version=1,
+            provider_subject="oidc:staff:123",
+            provider_email=None,
+            display_name="Mariela Torres",
+            role_name="operations_staff",
+            permission_names=frozenset({"staff_account:read"}),
+            mfa_enrolled=True,
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="Correct onboarding",
+        )
+
+
 @pytest.mark.parametrize(
     ("reader", "expected_error"),
     [
@@ -357,6 +419,43 @@ def test_correct_staff_account_onboarding_wraps_persistence_errors(
             clock=FixedClock(),
             identifiers=FixedIdentifiers(),
             reason_text="Persistence correction failure",
+        )
+
+    assert session.rollbacks == 1
+    assert session.commits == 0
+
+
+def test_create_staff_account_unexpected_failure_rolls_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+
+    def raise_unexpected(**_kwargs):
+        raise RuntimeError("synthetic account event failure")
+
+    monkeypatch.setattr(
+        lifecycle_module,
+        "insert_staff_account",
+        lambda **_kwargs: _record(status="suspended", version=1),
+    )
+    monkeypatch.setattr(lifecycle_module, "insert_staff_permission_grants", lambda **_kwargs: None)
+    monkeypatch.setattr(lifecycle_module, "insert_lifecycle_event", raise_unexpected)
+
+    with pytest.raises(RuntimeError, match="synthetic account event failure"):
+        create_staff_account(
+            session=session,  # type: ignore[arg-type]
+            principal=_principal("staff_account:create"),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            provider_subject="oidc:staff:123",
+            provider_email=None,
+            display_name="Mariela Torres",
+            role_name="operations_staff",
+            permission_names=frozenset({"intake:read"}),
+            mfa_enrolled=False,
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="Initial staff onboarding",
         )
 
     assert session.rollbacks == 1
@@ -488,6 +587,450 @@ def test_create_staff_account_denies_self_escalation() -> None:
             identifiers=FixedIdentifiers(),
             reason_text="Self setup",
         )
+
+
+def test_update_staff_account_google_email_adds_email_without_resetting_existing_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+    observed: dict[str, Any] = {}
+
+    def update_account(**kwargs):
+        observed["account"] = kwargs
+        return _record(
+            status="active",
+            version=3,
+            mfa_enrolled=True,
+            provider_subject=kwargs["provider_subject"],
+            provider_email=kwargs["provider_email"],
+        )
+
+    def insert_event(**kwargs) -> None:
+        observed["event"] = kwargs
+
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_id_for_update",
+        lambda **_kwargs: _record(status="active", version=2, mfa_enrolled=True),
+    )
+    monkeypatch.setattr(
+        lifecycle_module, "get_staff_account_by_provider_email", lambda **_kwargs: None
+    )
+    monkeypatch.setattr(lifecycle_module, "update_staff_account_signin_email", update_account)
+    monkeypatch.setattr(lifecycle_module, "insert_lifecycle_event", insert_event)
+
+    result = update_staff_account_google_email(
+        session=session,  # type: ignore[arg-type]
+        principal=_principal("staff_account:create"),
+        command_id=COMMAND_ID,
+        staff_id=STAFF_ID,
+        expected_version=2,
+        provider_email=" Mariela.Torres@Example.Test ",
+        clock=FixedClock(),
+        identifiers=FixedIdentifiers(),
+        reason_text=" Record Google email for existing account ",
+    )
+
+    assert result.event_type == "staff_account.signin_email_updated"
+    assert observed["account"]["provider_subject"] == "oidc:staff:123"
+    assert observed["account"]["provider_email"] == "mariela.torres@example.test"
+    assert observed["account"]["lifecycle_status"] == "active"
+    assert observed["account"]["mfa_enrolled"] is True
+    assert observed["event"]["previous_status"] == "active"
+    assert observed["event"]["new_status"] == "active"
+    assert observed["event"]["previous_version"] == 2
+    assert observed["event"]["new_version"] == 3
+    assert observed["event"]["event_type"] == "staff_account.signin_email_updated"
+    assert session.commits == 1
+    assert session.rollbacks == 0
+
+
+def test_update_staff_account_google_email_replaces_existing_email_with_pending_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+    observed: dict[str, Any] = {}
+
+    def update_account(**kwargs):
+        observed["account"] = kwargs
+        return _record(
+            status=kwargs["lifecycle_status"],
+            version=4,
+            mfa_enrolled=kwargs["mfa_enrolled"],
+            provider_subject=kwargs["provider_subject"],
+            provider_email=kwargs["provider_email"],
+        )
+
+    def insert_event(**kwargs) -> None:
+        observed["event"] = kwargs
+
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_id_for_update",
+        lambda **_kwargs: _record(
+            status="active",
+            version=3,
+            mfa_enrolled=True,
+            provider_email="old@example.test",
+        ),
+    )
+    monkeypatch.setattr(
+        lifecycle_module, "get_staff_account_by_provider_email", lambda **_kwargs: None
+    )
+    monkeypatch.setattr(lifecycle_module, "update_staff_account_signin_email", update_account)
+    monkeypatch.setattr(lifecycle_module, "insert_lifecycle_event", insert_event)
+
+    result = update_staff_account_google_email(
+        session=session,  # type: ignore[arg-type]
+        principal=_principal("staff_account:create"),
+        command_id=COMMAND_ID,
+        staff_id=STAFF_ID,
+        expected_version=3,
+        provider_email="new@example.test",
+        clock=FixedClock(),
+        identifiers=FixedIdentifiers(),
+        reason_text="Replace staff Google sign-in email",
+    )
+
+    assert result.account.provider_subject.startswith("pending-google-email:")
+    assert observed["account"]["provider_email"] == "new@example.test"
+    assert observed["account"]["lifecycle_status"] == "suspended"
+    assert observed["account"]["mfa_enrolled"] is False
+    assert observed["event"]["previous_status"] == "active"
+    assert observed["event"]["new_status"] == "suspended"
+    assert session.commits == 1
+
+
+def test_update_staff_account_google_email_rejects_self_reset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_id_for_update",
+        lambda **_kwargs: _record(
+            status="active",
+            version=1,
+            mfa_enrolled=True,
+            provider_email="old@example.test",
+        ),
+    )
+    monkeypatch.setattr(
+        lifecycle_module, "get_staff_account_by_provider_email", lambda **_kwargs: None
+    )
+
+    with pytest.raises(StaffAccountLifecycleError, match="cannot reset its own sign-in"):
+        update_staff_account_google_email(
+            session=session,  # type: ignore[arg-type]
+            principal=_principal("staff_account:create", actor_id=STAFF_ID),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            expected_version=1,
+            provider_email="new@example.test",
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="Replace own sign-in email",
+        )
+
+    assert session.rollbacks == 1
+
+
+def test_update_staff_account_google_email_rejects_duplicate_email(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_id_for_update",
+        lambda **_kwargs: _record(status="active", version=1, mfa_enrolled=True),
+    )
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_provider_email",
+        lambda **_kwargs: _record(
+            staff_id=UUID("99999999-9999-4999-8999-999999999999"),
+            provider_email="assigned@example.test",
+        ),
+    )
+
+    with pytest.raises(StaffAccountLifecycleError, match="already assigned"):
+        update_staff_account_google_email(
+            session=session,  # type: ignore[arg-type]
+            principal=_principal("staff_account:create"),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            expected_version=1,
+            provider_email="assigned@example.test",
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="Use already assigned email",
+        )
+
+    assert session.rollbacks == 1
+
+
+def test_update_staff_account_google_email_requires_permission() -> None:
+    with pytest.raises(PermissionError, match="staff_account:create"):
+        update_staff_account_google_email(
+            session=FakeSession(),  # type: ignore[arg-type]
+            principal=_principal(),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            expected_version=1,
+            provider_email="mariela.torres@example.test",
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="Record Google email",
+        )
+
+
+@pytest.mark.parametrize(
+    "provider_email",
+    [
+        "",
+        "missing-at-sign.example.test",
+        "mariela torres@example.test",
+        "mariela@localhost",
+        "mariela@.example.test",
+        "mariela@example.test.",
+    ],
+)
+def test_update_staff_account_google_email_rejects_invalid_email(provider_email: str) -> None:
+    with pytest.raises(StaffAccountLifecycleError, match="provider_email"):
+        update_staff_account_google_email(
+            session=FakeSession(),  # type: ignore[arg-type]
+            principal=_principal("staff_account:create"),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            expected_version=1,
+            provider_email=provider_email,
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="Record Google email",
+        )
+
+
+def test_update_staff_account_google_email_requires_provider_email() -> None:
+    with pytest.raises(StaffAccountLifecycleError, match="requires provider_email"):
+        update_staff_account_google_email(
+            session=FakeSession(),  # type: ignore[arg-type]
+            principal=_principal("staff_account:create"),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            expected_version=1,
+            provider_email=None,  # type: ignore[arg-type]
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="Record Google email",
+        )
+
+
+@pytest.mark.parametrize(
+    ("record", "expected_error", "match"),
+    [
+        (
+            _record(status="active", version=3, provider_email=None),
+            StaffAccountVersionConflictError,
+            "version conflict",
+        ),
+        (
+            _record(status="deprovisioned", version=1, provider_email=None),
+            StaffAccountLifecycleError,
+            "deprovisioned",
+        ),
+        (
+            _record(status="active", version=1, provider_email="mariela.torres@example.test"),
+            StaffAccountLifecycleError,
+            "requires a change",
+        ),
+    ],
+)
+def test_update_staff_account_google_email_rejects_recoverable_target_states(
+    monkeypatch: pytest.MonkeyPatch,
+    record: StaffAccountRecord,
+    expected_error: type[Exception],
+    match: str,
+) -> None:
+    session = FakeSession()
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_id_for_update",
+        lambda **_kwargs: record,
+    )
+
+    with pytest.raises(expected_error, match=match):
+        update_staff_account_google_email(
+            session=session,  # type: ignore[arg-type]
+            principal=_principal("staff_account:create"),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            expected_version=1,
+            provider_email="mariela.torres@example.test",
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="Record Google email",
+        )
+
+    assert session.rollbacks == 1
+    assert session.commits == 0
+
+
+def test_update_staff_account_google_email_reports_missing_account(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+
+    def missing_account(**_kwargs):
+        raise NoResultFound()
+
+    monkeypatch.setattr(lifecycle_module, "get_staff_account_by_id_for_update", missing_account)
+
+    with pytest.raises(StaffAccountNotFoundError, match="not found"):
+        update_staff_account_google_email(
+            session=session,  # type: ignore[arg-type]
+            principal=_principal("staff_account:create"),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            expected_version=1,
+            provider_email="mariela.torres@example.test",
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="Record Google email",
+        )
+
+    assert session.rollbacks == 1
+    assert session.commits == 0
+
+
+def test_update_staff_account_google_email_resets_pending_binding_without_existing_email(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+    observed: dict[str, Any] = {}
+
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_id_for_update",
+        lambda **_kwargs: _record(
+            status="suspended",
+            version=1,
+            mfa_enrolled=True,
+            provider_subject="pending-google-email:old",
+            provider_email=None,
+        ),
+    )
+    monkeypatch.setattr(
+        lifecycle_module, "get_staff_account_by_provider_email", lambda **_kwargs: None
+    )
+
+    def update_account(**kwargs):
+        observed["account"] = kwargs
+        return _record(
+            status=kwargs["lifecycle_status"],
+            version=2,
+            mfa_enrolled=kwargs["mfa_enrolled"],
+            provider_subject=kwargs["provider_subject"],
+            provider_email=kwargs["provider_email"],
+        )
+
+    monkeypatch.setattr(lifecycle_module, "update_staff_account_signin_email", update_account)
+    monkeypatch.setattr(lifecycle_module, "insert_lifecycle_event", lambda **_kwargs: None)
+
+    result = update_staff_account_google_email(
+        session=session,  # type: ignore[arg-type]
+        principal=_principal("staff_account:create"),
+        command_id=COMMAND_ID,
+        staff_id=STAFF_ID,
+        expected_version=1,
+        provider_email="new@example.test",
+        clock=FixedClock(),
+        identifiers=FixedIdentifiers(),
+        reason_text="Replace pending sign-in email",
+    )
+
+    assert result.account.provider_subject.startswith("pending-google-email:")
+    assert result.account.provider_subject != "pending-google-email:old"
+    assert observed["account"]["lifecycle_status"] == "suspended"
+    assert observed["account"]["mfa_enrolled"] is False
+    assert session.commits == 1
+
+
+def test_update_staff_account_google_email_same_staff_duplicate_does_not_block(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_id_for_update",
+        lambda **_kwargs: _record(status="active", version=1, provider_email=None),
+    )
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_provider_email",
+        lambda **_kwargs: _record(staff_id=STAFF_ID, provider_email="mariela.torres@example.test"),
+    )
+    monkeypatch.setattr(
+        lifecycle_module,
+        "update_staff_account_signin_email",
+        lambda **kwargs: _record(
+            status=kwargs["lifecycle_status"],
+            version=2,
+            mfa_enrolled=kwargs["mfa_enrolled"],
+            provider_subject=kwargs["provider_subject"],
+            provider_email=kwargs["provider_email"],
+        ),
+    )
+    monkeypatch.setattr(lifecycle_module, "insert_lifecycle_event", lambda **_kwargs: None)
+
+    result = update_staff_account_google_email(
+        session=session,  # type: ignore[arg-type]
+        principal=_principal("staff_account:create"),
+        command_id=COMMAND_ID,
+        staff_id=STAFF_ID,
+        expected_version=1,
+        provider_email="mariela.torres@example.test",
+        clock=FixedClock(),
+        identifiers=FixedIdentifiers(),
+        reason_text="Record Google email",
+    )
+
+    assert result.account.provider_email == "mariela.torres@example.test"
+    assert session.commits == 1
+
+
+def test_update_staff_account_google_email_database_failure_is_safe_and_rolls_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_id_for_update",
+        lambda **_kwargs: _record(status="active", version=1, provider_email=None),
+    )
+    monkeypatch.setattr(
+        lifecycle_module, "get_staff_account_by_provider_email", lambda **_kwargs: None
+    )
+    monkeypatch.setattr(
+        lifecycle_module,
+        "update_staff_account_signin_email",
+        Mock(side_effect=SQLAlchemyError("private database details")),
+    )
+
+    with pytest.raises(SafePersistenceError, match="persistence operation failed"):
+        update_staff_account_google_email(
+            session=session,  # type: ignore[arg-type]
+            principal=_principal("staff_account:create"),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            expected_version=1,
+            provider_email="mariela.torres@example.test",
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="Record Google email",
+        )
+
+    assert session.rollbacks == 1
+    assert session.commits == 0
 
 
 def test_activate_staff_account_requires_mfa() -> None:
@@ -799,6 +1342,89 @@ def test_record_staff_account_session_revocation_evidence_allows_deprovisioned_a
     assert session.commits == 1
 
 
+def test_staff_account_recovery_evidence_reports_missing_account(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+
+    def missing_account(**_kwargs):
+        raise NoResultFound()
+
+    monkeypatch.setattr(lifecycle_module, "get_staff_account_by_id_for_update", missing_account)
+
+    with pytest.raises(StaffAccountNotFoundError, match="not found"):
+        record_staff_account_recovery_evidence(
+            session=session,  # type: ignore[arg-type]
+            principal=_principal("staff_account:recovery:record"),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            expected_version=1,
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="Recovery",
+        )
+
+    assert session.rollbacks == 1
+    assert session.commits == 0
+
+
+def test_staff_account_recovery_evidence_rejects_stale_version(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_id_for_update",
+        lambda **_kwargs: _record(status="active", version=2, mfa_enrolled=True),
+    )
+
+    with pytest.raises(StaffAccountVersionConflictError, match="version conflict"):
+        record_staff_account_recovery_evidence(
+            session=session,  # type: ignore[arg-type]
+            principal=_principal("staff_account:recovery:record"),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            expected_version=1,
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="Recovery",
+        )
+
+    assert session.rollbacks == 1
+    assert session.commits == 0
+
+
+def test_staff_account_recovery_evidence_database_failure_is_safe_and_rolls_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_id_for_update",
+        lambda **_kwargs: _record(status="active", version=1, mfa_enrolled=True),
+    )
+    monkeypatch.setattr(
+        lifecycle_module,
+        "insert_lifecycle_event",
+        Mock(side_effect=SQLAlchemyError("private recovery detail")),
+    )
+
+    with pytest.raises(SafePersistenceError, match="persistence operation failed"):
+        record_staff_account_recovery_evidence(
+            session=session,  # type: ignore[arg-type]
+            principal=_principal("staff_account:recovery:record"),
+            command_id=COMMAND_ID,
+            staff_id=STAFF_ID,
+            expected_version=1,
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(),
+            reason_text="Recovery",
+        )
+
+    assert session.rollbacks == 1
+    assert session.commits == 0
+
+
 def test_staff_account_recovery_evidence_requires_permission() -> None:
     with pytest.raises(PermissionError, match="staff_account:recovery:record"):
         record_staff_account_recovery_evidence(
@@ -1062,6 +1688,146 @@ def test_resolve_staff_principal_from_claims_reports_missing_account(
             session=FakeSession(),  # type: ignore[arg-type]
             claims=StaffIdentityClaims(provider_subject="oidc:staff:123", mfa_verified=True),
         )
+
+
+def test_resolve_staff_principal_from_claims_reports_missing_pending_email(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+
+    def missing_account(**_kwargs):
+        raise NoResultFound()
+
+    monkeypatch.setattr(lifecycle_module, "get_staff_account_by_provider_subject", missing_account)
+
+    with pytest.raises(StaffAccountNotFoundError, match="not found"):
+        resolve_staff_principal_from_claims(
+            session=session,  # type: ignore[arg-type]
+            claims=StaffIdentityClaims(
+                provider_subject="oidc:staff:missing",
+                provider_email=None,
+                mfa_verified=True,
+            ),
+        )
+
+    assert session.rollbacks == 0
+
+
+def test_resolve_staff_principal_from_claims_reports_missing_pending_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+
+    def missing_account(**_kwargs):
+        raise NoResultFound()
+
+    monkeypatch.setattr(lifecycle_module, "get_staff_account_by_provider_subject", missing_account)
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_pending_staff_account_by_provider_email_for_update",
+        missing_account,
+    )
+
+    with pytest.raises(StaffAccountNotFoundError, match="not found"):
+        resolve_staff_principal_from_claims(
+            session=session,  # type: ignore[arg-type]
+            claims=StaffIdentityClaims(
+                provider_subject="oidc:staff:missing",
+                provider_email="mariela.torres@example.test",
+                mfa_verified=True,
+            ),
+        )
+
+    assert session.rollbacks == 1
+    assert session.commits == 0
+
+
+def test_resolve_staff_principal_from_claims_wraps_pending_binding_database_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+
+    def missing_account(**_kwargs):
+        raise NoResultFound()
+
+    monkeypatch.setattr(lifecycle_module, "get_staff_account_by_provider_subject", missing_account)
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_pending_staff_account_by_provider_email_for_update",
+        lambda **_kwargs: _record(
+            status="suspended",
+            version=1,
+            provider_subject="pending-google-email:abc123",
+            provider_email="mariela.torres@example.test",
+        ),
+    )
+    monkeypatch.setattr(
+        lifecycle_module,
+        "update_staff_account_provider_binding",
+        Mock(side_effect=SQLAlchemyError("private binding details")),
+    )
+
+    with pytest.raises(SafePersistenceError, match="persistence operation failed"):
+        resolve_staff_principal_from_claims(
+            session=session,  # type: ignore[arg-type]
+            claims=StaffIdentityClaims(
+                provider_subject="oidc:staff:bound",
+                provider_email="mariela.torres@example.test",
+                mfa_verified=True,
+            ),
+        )
+
+    assert session.rollbacks == 1
+    assert session.commits == 0
+
+
+def test_resolve_staff_principal_from_claims_pending_binding_unexpected_failure_rolls_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+
+    def missing_account(**_kwargs):
+        raise NoResultFound()
+
+    monkeypatch.setattr(lifecycle_module, "get_staff_account_by_provider_subject", missing_account)
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_pending_staff_account_by_provider_email_for_update",
+        lambda **_kwargs: _record(
+            status="suspended",
+            version=1,
+            provider_subject="pending-google-email:abc123",
+            provider_email="mariela.torres@example.test",
+        ),
+    )
+    monkeypatch.setattr(
+        lifecycle_module,
+        "update_staff_account_provider_binding",
+        lambda **_kwargs: _record(
+            status="suspended",
+            version=2,
+            provider_subject="oidc:staff:bound",
+            provider_email="mariela.torres@example.test",
+        ),
+    )
+    monkeypatch.setattr(
+        lifecycle_module,
+        "insert_lifecycle_event",
+        Mock(side_effect=RuntimeError("synthetic binding event failure")),
+    )
+
+    with pytest.raises(RuntimeError, match="synthetic binding event failure"):
+        resolve_staff_principal_from_claims(
+            session=session,  # type: ignore[arg-type]
+            claims=StaffIdentityClaims(
+                provider_subject="oidc:staff:bound",
+                provider_email="mariela.torres@example.test",
+                mfa_verified=True,
+            ),
+        )
+
+    assert session.rollbacks == 1
+    assert session.commits == 0
 
 
 def test_resolve_staff_principal_binds_pending_google_email_account(

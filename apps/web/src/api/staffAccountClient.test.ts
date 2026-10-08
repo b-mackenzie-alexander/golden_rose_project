@@ -15,6 +15,7 @@ import {
   recordSessionRevocationEvidence,
   revokeStaffDelegation,
   suspendStaffAccount,
+  updateStaffAccountGoogleEmail,
 } from './staffAccountClient';
 
 const account = {
@@ -311,9 +312,16 @@ it('maps staff authentication and account-state problem responses', async () => 
   expect(await getStaffSession()).toEqual({ ok: false, failure: { kind: 'identity_provider_unavailable' } });
 });
 
-it('creates, corrects, and activates accounts with idempotency headers and version validation', async () => {
+it('creates, corrects, updates Google email, and activates accounts with idempotency headers and version validation', async () => {
   const activeAccount = { ...account, lifecycle_status: 'active', mfa_enrolled: true, version: 2 };
   const correctedAccount = { ...account, display_name: 'Mariela Rivera', mfa_enrolled: true, version: 2 };
+  const emailUpdatedAccount = {
+    ...correctedAccount,
+    provider_email: 'new.email@example.test',
+    lifecycle_status: 'suspended',
+    mfa_enrolled: false,
+    version: 3,
+  };
   const fetchMock = vi.fn<typeof fetch>()
     .mockResolvedValueOnce(
       new Response(JSON.stringify({ account, event_type: 'staff_account.created', result_version: 1 }), {
@@ -331,6 +339,16 @@ it('creates, corrects, and activates accounts with idempotency headers and versi
       new Response(JSON.stringify({ account: activeAccount, event_type: 'staff_account.activated', result_version: 2 }), {
         status: 200,
         headers: { 'Content-Type': 'application/json', 'Idempotency-Result-Version': '2' },
+      }),
+    )
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({
+        account: emailUpdatedAccount,
+        event_type: 'staff_account.signin_email_updated',
+        result_version: 3,
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Result-Version': '3' },
       }),
     );
   vi.stubGlobal('fetch', fetchMock);
@@ -362,10 +380,18 @@ it('creates, corrects, and activates accounts with idempotency headers and versi
     reasonText: 'MFA confirmed',
     staffId: account.staff_id,
   });
+  const emailUpdated = await updateStaffAccountGoogleEmail({
+    commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    expectedVersion: 2,
+    providerEmail: 'new.email@example.test',
+    reasonText: 'Correct staff Google email',
+    staffId: account.staff_id,
+  });
 
   expect(created.ok).toBe(true);
   expect(corrected.ok).toBe(true);
   expect(activated.ok).toBe(true);
+  expect(emailUpdated.ok).toBe(true);
   const firstCall = fetchMock.mock.calls[0];
   expect(firstCall?.[0]).toBe('/api/staff/v1/staff-accounts');
   expect(firstCall?.[1]).toMatchObject({
@@ -388,6 +414,14 @@ it('creates, corrects, and activates accounts with idempotency headers and versi
   expect(fetchMock).toHaveBeenNthCalledWith(3, `/api/staff/v1/staff-accounts/${account.staff_id}/activate`, expect.objectContaining({
     method: 'POST',
     body: JSON.stringify({ expected_version: 1, reason_text: 'MFA confirmed', mfa_enrolled: true }),
+  }));
+  expect(fetchMock).toHaveBeenNthCalledWith(4, `/api/staff/v1/staff-accounts/${account.staff_id}/google-email`, expect.objectContaining({
+    method: 'POST',
+    body: JSON.stringify({
+      expected_version: 2,
+      provider_email: 'new.email@example.test',
+      reason_text: 'Correct staff Google email',
+    }),
   }));
 });
 

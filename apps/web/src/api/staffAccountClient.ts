@@ -8,6 +8,7 @@ export type StaffAccountEvent =
   | 'staff_account.suspended'
   | 'staff_account.deprovisioned'
   | 'staff_account.corrected'
+  | 'staff_account.signin_email_updated'
   | 'staff_account.recovery_recorded'
   | 'staff_account.sessions_revoked';
 export type StaffDelegationEvent = 'staff_delegation.granted' | 'staff_delegation.revoked';
@@ -142,6 +143,10 @@ export type ActivateStaffAccountInput = StaffAccountTransitionInput & {
   mfaEnrolled: boolean;
 };
 
+export type UpdateStaffAccountGoogleEmailInput = StaffAccountTransitionInput & {
+  providerEmail: string;
+};
+
 export type GrantStaffDelegationInput = {
   staffId: string;
   permissionName: string;
@@ -182,6 +187,7 @@ const events = new Set<StaffAccountEvent>([
   'staff_account.suspended',
   'staff_account.deprovisioned',
   'staff_account.corrected',
+  'staff_account.signin_email_updated',
   'staff_account.recovery_recorded',
   'staff_account.sessions_revoked',
 ]);
@@ -583,6 +589,16 @@ async function transition(
 
 export const activateStaffAccount = (input: ActivateStaffAccountInput) =>
   transition(`/staff-accounts/${input.staffId}/activate`, input);
+export const updateStaffAccountGoogleEmail = (input: UpdateStaffAccountGoogleEmailInput) =>
+  request(`/staff-accounts/${input.staffId}/google-email`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'Idempotency-Key': input.commandId },
+    body: JSON.stringify({
+      expected_version: input.expectedVersion,
+      provider_email: input.providerEmail,
+      reason_text: input.reasonText,
+    }),
+  }, parseLifecycle, true);
 export const suspendStaffAccount = (input: StaffAccountTransitionInput) =>
   transition(`/staff-accounts/${input.staffId}/suspend`, input);
 export const deprovisionStaffAccount = (input: StaffAccountTransitionInput) =>

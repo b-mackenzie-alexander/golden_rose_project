@@ -604,7 +604,7 @@ staff_account_lifecycle_events = Table(
         "event_type IN ("
         "'staff_account.created','staff_account.activated',"
         "'staff_account.suspended','staff_account.deprovisioned',"
-        "'staff_account.corrected',"
+        "'staff_account.corrected','staff_account.signin_email_updated',"
         "'staff_account.recovery_recorded','staff_account.sessions_revoked')",
         name="ck_staff_account_lifecycle_events_event_type",
     ),
@@ -631,7 +631,8 @@ staff_account_lifecycle_events = Table(
         ") OR ("
         "event_type IN ("
         "'staff_account.activated','staff_account.suspended',"
-        "'staff_account.deprovisioned','staff_account.corrected') "
+        "'staff_account.deprovisioned','staff_account.corrected',"
+        "'staff_account.signin_email_updated') "
         "AND previous_status IS NOT NULL "
         "AND previous_version IS NOT NULL "
         "AND new_version=previous_version+1"

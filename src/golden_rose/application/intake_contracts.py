@@ -558,9 +558,10 @@ class Address(IntakeValue):
             raise ValueError("Invalid country")
         if self.country == "US":
             if self.region is not None:
-                normalized_region = US_REGION_ALIASES.get(
-                    " ".join(self.region.lower().replace(".", " ").split())
-                ) or self.region.upper()
+                normalized_region = (
+                    US_REGION_ALIASES.get(" ".join(self.region.lower().replace(".", " ").split()))
+                    or self.region.upper()
+                )
                 if normalized_region not in US_REGION_CODES:
                     raise ValueError("Invalid US state or territory")
                 self.region = normalized_region

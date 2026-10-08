@@ -1,5 +1,15 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-10-08 — Staff account correction runtime authority active
+
+- **Staffing:** One independent developer; focused automated tests, local type/lint/static checks and later PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #174 is merged into protected `develop` at `ee3e091`, and cloud browser testing found staff account correction saves returning the account-service-unavailable banner. Fresh source work is active on `fix/staff-account-correction-conflicts` to repair the database authority gap rather than changing the visible staff-admin UX: the service role needs update grants for the account identity/display columns already touched by correction and sign-in email management flows.
+- **Gate budget:** Source/backend/schema/local-validation work only. No cloud inspection or mutation, Terraform plan/apply, live migration execution, service update, new account bootstrap, live/client data entry, production-completion claim, support activation, provider-side reset/session-revocation execution, credential rotation, export/import execution, client-owned environment transition, destructive cleanup, shared-runtime rollout or automated matching/ranking/eligibility/referral/placement follows from this branch.
+- **Next executable action:** Complete local validation and publish a protected PR to `develop`. After merge, run the separately approved image/migration/service path and validate staff account correction saves plus Google email management in the running environment.
+- **Do not regress:** Human staff decision boundaries; no automated matching/ranking/eligibility/referral/placement; staff-only named-account access; no raw provider subjects/tokens in chat or source docs; email remains an admin-facing sign-in handle, not the durable account key; no public worker/employer self-service; immutable intake history and exact retries; restricted-field permissions; bilingual/accessibility parity; separate public/staff identity planes; auth-sensitive no-store handling; durable current-environment records with migration-disposition tracking until a separately approved client-owned transition/export/import packet exists.
+
+**Validation to date:** Focused staff-account correction authority/readiness/demo tests passed 13 tests; focused staff account lifecycle/persistence/API/auth tests passed 130 tests; full backend mypy passed across 274 source files; focused Ruff format/check, Alembic head check and `git diff --check` passed. Local disposable PostgreSQL integration migration tests could not run because `127.0.0.1:55432` was unavailable.
+
 ## 2026-10-08 — Intake-stage map planning signals and session sign-out active
 
 - **Staffing:** One independent developer; focused automated tests, local type/lint/static checks, production build and later PR gates provide quality evidence, not independent-human authorization.

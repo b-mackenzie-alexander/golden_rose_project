@@ -67,9 +67,12 @@ export const workflowText = {
     'Catalog maintenance requires owner authority or explicit manager delegation. Entries describe interests, not eligibility or ranking.',
     'El mantenimiento del catálogo requiere autorización del propietario o delegación explícita al gerente. Las entradas describen intereses, no elegibilidad ni clasificación.',
   ],
-  code: ['Immutable code', 'Código inmutable'],
   labelEn: ['English label', 'Etiqueta en inglés'],
   labelEs: ['Spanish label', 'Etiqueta en español'],
+  labelGuidance: [
+    'Enter an English label, a Spanish label, or both. If only one label is entered, it is used temporarily in both languages until a translation is added.',
+    'Ingrese una etiqueta en inglés, una etiqueta en español o ambas. Si solo se ingresa una etiqueta, se usa temporalmente en ambos idiomas hasta agregar una traducción.',
+  ],
   active: ['Active', 'Activo'],
   retired: ['Retired', 'Retirado'],
   create: ['Create interest', 'Crear interés'],

@@ -5,9 +5,11 @@ import pytest
 from pydantic import ValidationError
 
 from golden_rose.api.staff.intake_review_schemas import (
+    CreateWorkInterestRequest,
     FollowUpIntakeRequest,
     IntakeHistoryPage,
     ReviewIntakeRequest,
+    ReviseWorkInterestRequest,
 )
 
 
@@ -134,3 +136,31 @@ def test_restricted_history_note_keeps_original_command_bound():
 
     with pytest.raises(ValidationError):
         RestrictedHistoryResponse.model_validate({"event_id": str(uuid4()), "note": "x" * 513})
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected_en", "expected_es"),
+    [
+        ({"label_en": "Care aide"}, "Care aide", "Care aide"),
+        ({"label_es": "Ayudante"}, "Ayudante", "Ayudante"),
+        ({"label_en": "Care aide", "label_es": "Ayudante"}, "Care aide", "Ayudante"),
+        ({"label_en": " ", "label_es": "Ayudante"}, "Ayudante", "Ayudante"),
+    ],
+)
+def test_catalog_label_requests_accept_either_language(payload, expected_en, expected_es):
+    created = CreateWorkInterestRequest.model_validate({"code": "care_aide", **payload})
+    assert created.label_en == expected_en
+    assert created.label_es == expected_es
+    revised = ReviseWorkInterestRequest.model_validate(
+        {"expected_version": 1, "active": True, **payload}
+    )
+    assert revised.label_en == expected_en
+    assert revised.label_es == expected_es
+
+
+@pytest.mark.parametrize("payload", [{}, {"label_en": " "}, {"label_es": " "}])
+def test_catalog_label_requests_reject_missing_labels(payload):
+    with pytest.raises(ValidationError):
+        CreateWorkInterestRequest.model_validate({"code": "care_aide", **payload})
+    with pytest.raises(ValidationError):
+        ReviseWorkInterestRequest.model_validate({"expected_version": 1, "active": True, **payload})

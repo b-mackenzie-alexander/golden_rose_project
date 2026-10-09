@@ -1,5 +1,15 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-10-09 — Google Calendar sync pilot planning active
+
+- **Staffing:** One independent developer; source planning, local documentation review, later focused implementation tests, fresh agent/session review and protected PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** The staff pilot is live, and the owner has asked whether Google Calendar sync could make migration easier. The accepted delivery shape is two-phase: first land a planning/source contract for the Google Calendar integration boundary, then implement a bounded pilot MVP as a separate protected PR.
+- **Gate budget:** Source documentation/planning only in this branch. No cloud inspection or mutation, Terraform plan/apply, live migration execution, service update, OAuth client activation, consent-screen update, refresh-token storage, Calendar API provider mutation, webhook exposure, scheduler/job activation, credential rotation, provider-side recovery/session-revocation execution, live/client data entry, export/import execution, client-owned environment transition, production-completion claim, destructive cleanup, shared-runtime rollout or automated matching/ranking/eligibility/referral/placement follows.
+- **Next executable action:** Publish the planning PR. After merge, implement the pilot MVP as a read-only Google Calendar migration assistant that stages imported events as staff-reviewed candidates and requires explicit staff action before linking or drafting Golden Rose records.
+- **Do not regress:** PostgreSQL Golden Rose records remain authoritative; Google Calendar content is unverified external migration evidence; imported candidates stay separate from request-derived shifts and browser-local personal notes; no broad two-way sync, automatic operational writes, automated matching/ranking/eligibility/referral/placement, unrestricted exact-location exposure, provider token leakage, or raw Google event payload leakage.
+
+**Planning artifact:** [Google Calendar sync pilot plan](docs/planning/2026-10-09-google-calendar-sync-pilot-plan.md).
+
 ## 2026-10-08 — Work-interest catalog label management active
 
 - **Staffing:** One independent developer; focused frontend/backend unit tests, local type/lint checks and later PR gates provide quality evidence, not independent-human authorization.

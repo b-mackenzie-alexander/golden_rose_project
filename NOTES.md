@@ -8,6 +8,14 @@ This is the concise, dated engineering and operational note log. It records obse
 - **Proposed:** a design direction, not yet approved.
 - **Validated:** corroborated and approved for the stated use.
 
+## 2026-10-09 — Google Calendar sync pilot planning
+- **Reported:** The controlled staff pilot is officially launched, the owner is working through workflows, and she asked whether syncing between her Google account calendar and the dashboard calendar could make migration easier.
+- **Observed:** Local `develop` and `origin/develop` both resolved to `4dc99a607349ae2bc9ce8f03aad7e8f0b08061e7` after fetch before this planning branch. That tip includes PR #177, `fix: simplify work interest catalog labels`.
+- **Proposed:** Use a two-PR delivery path: first land a source-only Google Calendar sync planning contract, then implement a separate pilot MVP.
+- **Accepted:** The initial pilot shape is a Google Calendar migration assistant, not full two-way sync. Imported Google events should appear as staff-reviewed candidates; staff must explicitly ignore, link, or draft-start any item before it affects Golden Rose operational records.
+- **Boundary:** This planning branch performs no cloud inspection, Terraform, deployment, live migration, OAuth client activation, Calendar API provider mutation, refresh-token storage, webhook exposure, scheduler/job activation, live/client data entry, export/import execution, production-completion claim or automated matching/ranking/eligibility/referral/placement.
+- **Detailed plan:** `docs/planning/2026-10-09-google-calendar-sync-pilot-plan.md`.
+
 ## 2026-10-08 — Staff calendar current-range UX source repair
 - **Observed:** `origin/develop` and local branch base both resolved to `771b7567086f898872f2b9737e12c301ac4ba375` before publication hygiene for `fix/calendar-current-range`.
 - **Observed:** The staff calendar no longer uses the fixed January 2025 week as its primary date model. It now opens on the current local day, renders the next seven days in a one-row week strip, maps projected shifts and browser-local manual events to exact date IDs, and keeps older local weekday event IDs compatible by normalizing them into the current seven-day range.

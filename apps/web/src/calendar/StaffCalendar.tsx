@@ -1,5 +1,6 @@
 import { type SyntheticEvent, useEffect, useMemo, useState } from 'react';
 
+import { disposeExternalCalendarCandidate, getCalendarImportSummary, type CalendarImportDisposition, type CalendarImportFailureKind, type CalendarImportSummary, type ExternalCalendarImport } from '../api/calendarImportClient';
 import { getOperationsProjection, type OperationsCalendarSummary, type OperationsProjectionFailureKind, type OperationsShiftItem } from '../api/operationsProjectionClient';
 import { getStaticOperationalFallbackPolicy, staticOperationalFallbackNotice, staticOperationalFallbacksAllowed, type StaticOperationalFallbackPolicy } from '../api/runtimeEnvironmentClient';
 import { IconSymbol } from '../dashboard/artwork';
@@ -24,6 +25,7 @@ type CalendarEvent = {
 };
 
 type ProjectionStatus = 'loading' | 'ready' | OperationsProjectionFailureKind;
+type CalendarImportStatus = 'loading' | 'ready' | CalendarImportFailureKind;
 
 type CalendarDay = {
   date: string;
@@ -50,6 +52,19 @@ type CalendarCopy = {
   eventRemoved: string;
   eventUpdated: string;
   events: CalendarEvent[];
+  googleCandidateLabel: string;
+  googleConfigRequired: string;
+  googleConnect: string;
+  googleHeading: string;
+  googleIgnore: string;
+  googleIgnored: string;
+  googleMarkExisting: string;
+  googleMarkedExisting: string;
+  googleNoCandidates: string;
+  googleStale: string;
+  googleSubtitle: string;
+  googleUnavailable: string;
+  googleUnverified: string;
   monthView: string;
   nextMonth: string;
   openSlots: string;
@@ -99,6 +114,19 @@ const englishCalendar: CalendarCopy = {
     { accent: 'warning', assignee: 'Sofia Diaz', dayId: 'thu', duration: '30 min', id: 'seed-thu-clean', kind: 'employer', meta: 'Follow-up', scope: 'company', sortMinutes: 660, time: '11:00 AM', title: 'Clean Homes LLC confirmation' },
     { accent: 'success', assignee: 'Ana Torres', dayId: 'fri', duration: '45 min', id: 'seed-fri-carlos', kind: 'interview', meta: 'Interview', scope: 'company', sortMinutes: 840, time: '2:00 PM', title: 'Interview with Carlos Mendoza' },
   ],
+  googleCandidateLabel: 'Google candidate',
+  googleConfigRequired: 'Google Calendar connection requires approved OAuth configuration before staff can import live events.',
+  googleConnect: 'Connect Google Calendar',
+  googleHeading: 'Google Calendar migration',
+  googleIgnore: 'Ignore',
+  googleIgnored: 'Candidate ignored',
+  googleMarkExisting: 'Already in Golden Rose',
+  googleMarkedExisting: 'Marked as existing',
+  googleNoCandidates: 'No Google Calendar candidates waiting for review.',
+  googleStale: 'This candidate changed. Refresh the calendar before deciding.',
+  googleSubtitle: 'Imported events stay outside the dashboard calendar until staff reviews them.',
+  googleUnavailable: 'Google Calendar import candidates are unavailable right now.',
+  googleUnverified: 'External, unverified',
   monthView: 'Month',
   nextMonth: 'Next month',
   openSlots: 'Open slots',
@@ -152,6 +180,19 @@ const spanishCalendar: CalendarCopy = {
     { accent: 'warning', assignee: 'Sofia Diaz', dayId: 'thu', duration: '30 min', id: 'seed-thu-clean', kind: 'employer', meta: 'Seguimiento', scope: 'company', sortMinutes: 660, time: '11:00 a. m.', title: 'Confirmacion de Clean Homes LLC' },
     { accent: 'success', assignee: 'Ana Torres', dayId: 'fri', duration: '45 min', id: 'seed-fri-carlos', kind: 'interview', meta: 'Entrevista', scope: 'company', sortMinutes: 840, time: '2:00 p. m.', title: 'Entrevista con Carlos Mendoza' },
   ],
+  googleCandidateLabel: 'Candidato de Google',
+  googleConfigRequired: 'La conexion con Google Calendar requiere configuracion OAuth aprobada antes de importar eventos reales.',
+  googleConnect: 'Conectar Google Calendar',
+  googleHeading: 'Migracion de Google Calendar',
+  googleIgnore: 'Ignorar',
+  googleIgnored: 'Candidato ignorado',
+  googleMarkExisting: 'Ya esta en Golden Rose',
+  googleMarkedExisting: 'Marcado como existente',
+  googleNoCandidates: 'No hay candidatos de Google Calendar esperando revision.',
+  googleStale: 'Este candidato cambio. Actualiza el calendario antes de decidir.',
+  googleSubtitle: 'Los eventos importados quedan fuera del calendario hasta que el personal los revise.',
+  googleUnavailable: 'Los candidatos de Google Calendar no estan disponibles ahora.',
+  googleUnverified: 'Externo, no verificado',
   monthView: 'Mes',
   nextMonth: 'Mes siguiente',
   openSlots: 'Espacios abiertos',
@@ -389,6 +430,29 @@ function toShiftEvent(item: OperationsShiftItem, language: 'en' | 'es'): Calenda
   };
 }
 
+function formatCalendarImportWindow(candidate: ExternalCalendarImport, language: 'en' | 'es') {
+  const startsAt = new Date(candidate.startsAt);
+  const endsAt = new Date(candidate.endsAt);
+  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+    return language === 'es' ? 'Horario importado' : 'Imported time';
+  }
+  const locale = language === 'es' ? 'es-US' : 'en-US';
+  const day = new Intl.DateTimeFormat(locale, {
+    month: 'short',
+    day: 'numeric',
+  }).format(startsAt);
+  const start = startsAt.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
+  const end = endsAt.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
+  return `${day}, ${start} - ${end}`;
+}
+
+function makeCalendarImportCommandId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `00000000-0000-4000-8000-${Math.random().toString(16).slice(2, 14).padEnd(12, '0')}`;
+}
+
 function canRemoveEvent(event: CalendarEvent) {
   return event.id.startsWith('manual-') && (event.scope === 'personal' || canManageCompanyCalendarEvents);
 }
@@ -447,6 +511,10 @@ export function StaffCalendar() {
   const [calendarSummary, setCalendarSummary] = useState<OperationsCalendarSummary | null>(null);
   const [projectionStatus, setProjectionStatus] = useState<ProjectionStatus>('loading');
   const [staticFallbackPolicy, setStaticFallbackPolicy] = useState<StaticOperationalFallbackPolicy>('loading');
+  const [calendarImportSummary, setCalendarImportSummary] = useState<CalendarImportSummary | null>(null);
+  const [calendarImportStatus, setCalendarImportStatus] = useState<CalendarImportStatus>('loading');
+  const [calendarImportMessage, setCalendarImportMessage] = useState('');
+  const [busyCalendarImportId, setBusyCalendarImportId] = useState<string | null>(null);
   const [form, setForm] = useState<CalendarFormState>(defaultForm);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
@@ -474,13 +542,16 @@ export function StaffCalendar() {
     void Promise.all([
       getOperationsProjection().catch(() => ({ ok: false as const, failure: { kind: 'unavailable' as const } })),
       getStaticOperationalFallbackPolicy().catch(() => 'deny' as const),
+      getCalendarImportSummary().catch(() => ({ ok: false as const, failure: { kind: 'unavailable' as const } })),
     ])
-      .then(([result, fallbackPolicy]) => {
+      .then(([result, fallbackPolicy, importResult]) => {
         if (cancelled) return;
         setShiftEvents(result.ok ? result.value.shiftItems : []);
         setCalendarSummary(result.ok ? result.value.calendarSummary : null);
         setProjectionStatus(result.ok ? 'ready' : result.failure.kind);
         setStaticFallbackPolicy(fallbackPolicy);
+        setCalendarImportSummary(importResult.ok ? importResult.value : null);
+        setCalendarImportStatus(importResult.ok ? 'ready' : importResult.failure.kind);
       })
       .catch(() => {
         if (cancelled) return;
@@ -488,6 +559,8 @@ export function StaffCalendar() {
         setCalendarSummary(null);
         setProjectionStatus('unavailable');
         setStaticFallbackPolicy('deny');
+        setCalendarImportSummary(null);
+        setCalendarImportStatus('unavailable');
       });
     return () => {
       cancelled = true;
@@ -521,6 +594,10 @@ export function StaffCalendar() {
     () => events.filter((event) => event.dayId === selectedDay.id),
     [events, selectedDay.id],
   );
+  const activeImportCandidates = useMemo(
+    () => (calendarImportSummary?.candidates ?? []).filter((candidate) => candidate.importStatus === 'candidate'),
+    [calendarImportSummary],
+  );
   const eventsByDay = useMemo(() => new Map(allVisibleDays.map((day) => [
     day.id,
     events.filter((event) => event.dayId === day.id),
@@ -540,6 +617,37 @@ export function StaffCalendar() {
       value: index === 0 ? String(events.length) : index === 1 ? String(interviews) : index === 2 ? String(followUps) : item.value,
     }));
   }, [calendarSummary, copy.projectedShifts, copy.projectedWorkerSlots, copy.summaryItems, events, language, projectionStatus]);
+  async function disposeCalendarImport(candidate: ExternalCalendarImport, disposition: CalendarImportDisposition) {
+    if (busyCalendarImportId !== null) return;
+    setBusyCalendarImportId(candidate.importId);
+    setCalendarImportMessage('');
+    const result = await disposeExternalCalendarCandidate(
+      candidate.importId,
+      candidate.version,
+      disposition,
+      disposition === 'ignored'
+        ? 'Staff ignored the Google Calendar candidate during migration review.'
+        : 'Staff marked the Google Calendar candidate as already represented in Golden Rose.',
+      makeCalendarImportCommandId(),
+    );
+    setBusyCalendarImportId(null);
+    if (!result.ok) {
+      setCalendarImportMessage(result.failure.kind === 'stale' ? copy.googleStale : copy.googleUnavailable);
+      return;
+    }
+    setCalendarImportSummary((current) => {
+      if (current === null) return current;
+      return {
+        ...current,
+        candidates: current.candidates.map((item) => (
+          item.importId === result.value.candidate.importId ? result.value.candidate : item
+        )),
+      };
+    });
+    setCalendarImportMessage(
+      disposition === 'ignored' ? copy.googleIgnored : copy.googleMarkedExisting,
+    );
+  }
   function saveManualEvent(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     const title = form.title.trim();
@@ -829,6 +937,62 @@ export function StaffCalendar() {
               </li>
             ))}
           </ol>
+          <section className="calendar-import-review" aria-labelledby="calendar-import-heading">
+            <div className="calendar-import-review-header">
+              <div>
+                <h4 id="calendar-import-heading">{copy.googleHeading}</h4>
+                <p>{copy.googleSubtitle}</p>
+              </div>
+              <button className="focus-ring" disabled type="button">
+                {copy.googleConnect}
+              </button>
+            </div>
+            {calendarImportSummary?.oauthConfigurationRequired ? (
+              <p className="calendar-import-notice">{copy.googleConfigRequired}</p>
+            ) : null}
+            {calendarImportStatus !== 'ready' && calendarImportStatus !== 'loading' ? (
+              <p className="calendar-import-notice">{copy.googleUnavailable}</p>
+            ) : null}
+            {activeImportCandidates.length > 0 ? (
+              <ul className="calendar-import-list" aria-label={copy.googleCandidateLabel}>
+                {activeImportCandidates.map((candidate) => (
+                  <li key={candidate.importId}>
+                    <div>
+                      <strong>{candidate.eventTitle}</strong>
+                      <span>{formatCalendarImportWindow(candidate, language)}</span>
+                      <small>{candidate.locationReview ?? copy.googleUnverified}</small>
+                    </div>
+                    <span>{copy.googleUnverified}</span>
+                    <div className="calendar-import-actions">
+                      <button
+                        className="focus-ring"
+                        disabled={busyCalendarImportId !== null}
+                        type="button"
+                        onClick={() => {
+                          void disposeCalendarImport(candidate, 'ignored');
+                        }}
+                      >
+                        {copy.googleIgnore}
+                      </button>
+                      <button
+                        className="focus-ring"
+                        disabled={busyCalendarImportId !== null}
+                        type="button"
+                        onClick={() => {
+                          void disposeCalendarImport(candidate, 'marked_existing');
+                        }}
+                      >
+                        {copy.googleMarkExisting}
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="calendar-import-empty">{copy.googleNoCandidates}</p>
+            )}
+            {calendarImportMessage ? <p className="calendar-status" role="status">{calendarImportMessage}</p> : null}
+          </section>
           {statusMessage ? <p className="calendar-status" role="status">{statusMessage}</p> : null}
           <form className="calendar-event-form" onSubmit={saveManualEvent}>
             <div className="calendar-event-form-header">

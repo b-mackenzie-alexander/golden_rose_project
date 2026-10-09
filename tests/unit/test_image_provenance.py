@@ -46,13 +46,15 @@ def valid_metadata() -> dict[str, object]:
             "predicateType": "https://slsa.dev/provenance/v1",
             "materials": [
                 {
-                    "uri": "pkg:docker/node@22.22.3-bookworm-slim",
+                    "uri": ("pkg:docker/public.ecr.aws/docker/library/node@22.22.3-bookworm-slim"),
                     "digest": {
                         "sha256": "16d364eebf6b62da439dc993d9b80940c78b0ca38438452f011ab9a25c752644"
                     },
                 },
                 {
-                    "uri": "pkg:docker/python@3.12.12-slim-bookworm",
+                    "uri": (
+                        "pkg:docker/public.ecr.aws/docker/library/python@3.12.12-slim-bookworm"
+                    ),
                     "digest": {
                         "sha256": "2986c55feb36e6cae00fa1fefb454283e4b33f35e75ff8bdd123b134130be301"
                     },
@@ -75,7 +77,8 @@ def valid_buildkit_metadata() -> dict[str, object]:
             "materials": [
                 {
                     "uri": (
-                        "pkg:docker/node@22.22.3-bookworm-slim?digest="
+                        "pkg:docker/public.ecr.aws/docker/library/"
+                        "node@22.22.3-bookworm-slim?digest="
                         "sha256:16d364eebf6b62da439dc993d9b80940c78b0ca38438452f011ab9a25c752644"
                     ),
                     "digest": {
@@ -84,7 +87,8 @@ def valid_buildkit_metadata() -> dict[str, object]:
                 },
                 {
                     "uri": (
-                        "pkg:docker/python@3.12.12-slim-bookworm?digest="
+                        "pkg:docker/public.ecr.aws/docker/library/"
+                        "python@3.12.12-slim-bookworm?digest="
                         "sha256:2986c55feb36e6cae00fa1fefb454283e4b33f35e75ff8bdd123b134130be301"
                     ),
                     "digest": {
@@ -94,6 +98,13 @@ def valid_buildkit_metadata() -> dict[str, object]:
             ],
         },
     }
+
+
+def valid_host_docker_driver_metadata() -> dict[str, object]:
+    metadata = valid_buildkit_metadata()
+    metadata.pop("containerimage.descriptor")
+    metadata["containerimage.config.digest"] = metadata["containerimage.digest"]
+    return metadata
 
 
 def valid_signature_verification(subject: str, digest: str) -> dict[str, object]:
@@ -350,6 +361,43 @@ def test_verify_image_provenance_accepts_current_buildkit_metadata_shape(
 
     assert result.digest == "sha256:" + "a" * 64
     assert result.canonical_image_ref is None
+
+
+def test_pr_mode_accepts_host_docker_driver_metadata_without_descriptor(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    metadata_path = tmp_path / "image-metadata.json"
+    backend_sbom_path = tmp_path / "backend-sbom.cdx.json"
+    frontend_sbom_path = tmp_path / "frontend-sbom.cdx.json"
+    raw_image_sbom_path = tmp_path / "raw-image-sbom.spdx.json"
+
+    write_json(metadata_path, valid_host_docker_driver_metadata())
+    write_json(backend_sbom_path, valid_sbom())
+    write_json(frontend_sbom_path, valid_sbom())
+    write_json(raw_image_sbom_path, valid_syft_spdx_image_sbom("sha256:" + "e" * 64))
+
+    result = module.verify_image_provenance(
+        mode="pr",
+        dockerfile_path=ROOT / "Dockerfile",
+        metadata_path=metadata_path,
+        backend_sbom_path=backend_sbom_path,
+        frontend_sbom_path=frontend_sbom_path,
+        published_image_repository=None,
+        pr_image_sbom_path=raw_image_sbom_path,
+    )
+
+    assert result.digest == "sha256:" + "a" * 64
+    assert result.canonical_image_ref is None
+
+
+def test_publish_mode_requires_image_descriptor_metadata(tmp_path: Path) -> None:
+    module = load_module()
+    paths, _, _ = _write_valid_publish_evidence(tmp_path)
+    write_json(paths["metadata"], valid_host_docker_driver_metadata())
+
+    with pytest.raises(ValueError, match="containerimage.descriptor"):
+        _verify_publish(module, paths)
 
 
 def test_verify_image_provenance_returns_canonical_digest_reference_for_publish_mode(
@@ -759,7 +807,10 @@ def test_publish_mode_rejects_spdx_dsse_attestation_for_a_different_image(
                     "predicateType": "https://slsa.dev/provenance/v1",
                     "materials": [
                         {
-                            "uri": "pkg:docker/node@22.22.3-bookworm-slim",
+                            "uri": (
+                                "pkg:docker/public.ecr.aws/docker/library/"
+                                "node@22.22.3-bookworm-slim"
+                            ),
                             "digest": {"sha256": "0" * 64},
                         }
                     ],

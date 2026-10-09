@@ -68,7 +68,8 @@ def clean_test_tables(connection) -> None:
            'employer_addresses','worksites','staffing_requests',
            'shift_need_events','staffing_request_events',
            'canonical_corrections','canonical_correction_payloads',
-           'canonical_review_heads','canonical_output_reviews','canonical_output_review_payloads')
+           'canonical_review_heads','canonical_output_reviews','canonical_output_review_payloads',
+           'external_calendar_import_events')
     """)
         )
         .scalars()
@@ -76,12 +77,24 @@ def clean_test_tables(connection) -> None:
     )
     for table in guarded_tables:
         connection.execute(text(f"ALTER TABLE {table} DISABLE TRIGGER deny_mutation_{table}"))
+    calendar_tables = tuple(
+        connection.execute(
+            text("""
+        SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname='public' AND c.relname IN
+          ('staff_calendar_connections','external_calendar_imports')
+    """)
+        )
+        .scalars()
+        .all()
+    )
     targets = ", ".join(
         [
             "audit_events",
             "command_receipts",
             "employers",
             *staff_account_tables,
+            *calendar_tables,
             *guarded_tables,
         ]
     )

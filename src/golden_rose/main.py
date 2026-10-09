@@ -10,6 +10,7 @@ from golden_rose.api.errors import install_exception_handlers
 from golden_rose.api.health import router as health_router
 from golden_rose.api.intake_transport import IntakeTransportMiddleware, intake_problem
 from golden_rose.api.staff.auth_config import router as staff_auth_config_router
+from golden_rose.api.staff.calendar_imports import router as staff_calendar_imports_router
 from golden_rose.api.staff.canonical_corrections import router as canonical_corrections_router
 from golden_rose.api.staff.canonical_reviews import router as canonical_reviews_router
 from golden_rose.api.staff.contact_details import router as staff_contact_details_router
@@ -76,6 +77,7 @@ def create_app(
     app.include_router(staff_intakes_router)
     app.include_router(staff_intake_workflows_router)
     app.include_router(staff_operations_router)
+    app.include_router(staff_calendar_imports_router)
     app.include_router(staff_operator_readiness_router)
     app.include_router(staff_session_router)
     app.include_router(staff_accounts_router)

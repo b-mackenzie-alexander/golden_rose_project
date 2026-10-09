@@ -648,6 +648,180 @@ staff_account_lifecycle_events = Table(
     ),
 )
 
+staff_calendar_connections = Table(
+    "staff_calendar_connections",
+    metadata,
+    Column("connection_id", UUID(as_uuid=True), primary_key=True),
+    Column("staff_id", UUID(as_uuid=True), nullable=False),
+    Column("provider_name", String(40), nullable=False),
+    Column("calendar_alias", String(160), nullable=False),
+    Column("token_material_ref", String(255)),
+    Column("granted_scopes", JSONB, nullable=False),
+    Column("connection_status", String(32), nullable=False),
+    Column("connected_at", TIMESTAMP(timezone=True)),
+    Column("disconnected_at", TIMESTAMP(timezone=True)),
+    Column("last_sync_status", String(32), nullable=False),
+    Column("last_sync_error", String(80)),
+    Column("created_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("created_by", UUID(as_uuid=True), nullable=False),
+    Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("updated_by", UUID(as_uuid=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    ForeignKeyConstraint(
+        ["staff_id"],
+        ["staff_accounts.staff_id"],
+        name="fk_staff_calendar_connections_staff",
+    ),
+    ForeignKeyConstraint(
+        ["created_by"],
+        ["staff_accounts.staff_id"],
+        name="fk_staff_calendar_connections_created_by",
+    ),
+    ForeignKeyConstraint(
+        ["updated_by"],
+        ["staff_accounts.staff_id"],
+        name="fk_staff_calendar_connections_updated_by",
+    ),
+    UniqueConstraint(
+        "staff_id",
+        "provider_name",
+        "calendar_alias",
+        name="uq_staff_calendar_connections_staff_provider_alias",
+    ),
+    CheckConstraint("provider_name='google_calendar'", name="ck_staff_calendar_provider"),
+    CheckConstraint("btrim(calendar_alias)<>''", name="ck_staff_calendar_alias_nonblank"),
+    CheckConstraint(
+        "jsonb_typeof(granted_scopes)='array'",
+        name="ck_staff_calendar_granted_scopes_array",
+    ),
+    CheckConstraint(
+        "connection_status IN ('authorization_required','connected','disconnected','unavailable')",
+        name="ck_staff_calendar_connection_status",
+    ),
+    CheckConstraint(
+        "last_sync_status IN ('never_synced','ready','failed','configuration_required')",
+        name="ck_staff_calendar_last_sync_status",
+    ),
+    CheckConstraint("version>=1", name="ck_staff_calendar_connections_version_positive"),
+)
+
+external_calendar_imports = Table(
+    "external_calendar_imports",
+    metadata,
+    Column("import_id", UUID(as_uuid=True), primary_key=True),
+    Column("connection_id", UUID(as_uuid=True), nullable=False),
+    Column("provider_event_uid", String(200), nullable=False),
+    Column("provider_event_updated_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("event_title", String(200), nullable=False),
+    Column("starts_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("ends_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("time_zone", String(64), nullable=False),
+    Column("location_review", String(200)),
+    Column("import_status", String(32), nullable=False),
+    Column("linked_entity_type", String(40)),
+    Column("linked_entity_id", UUID(as_uuid=True)),
+    Column("created_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("created_by", UUID(as_uuid=True), nullable=False),
+    Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("updated_by", UUID(as_uuid=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    ForeignKeyConstraint(
+        ["connection_id"],
+        ["staff_calendar_connections.connection_id"],
+        name="fk_external_calendar_imports_connection",
+    ),
+    ForeignKeyConstraint(
+        ["created_by"],
+        ["staff_accounts.staff_id"],
+        name="fk_external_calendar_imports_created_by",
+    ),
+    ForeignKeyConstraint(
+        ["updated_by"],
+        ["staff_accounts.staff_id"],
+        name="fk_external_calendar_imports_updated_by",
+    ),
+    UniqueConstraint(
+        "connection_id",
+        "provider_event_uid",
+        name="uq_external_calendar_imports_source_event",
+    ),
+    CheckConstraint("btrim(provider_event_uid)<>''", name="ck_external_calendar_uid_nonblank"),
+    CheckConstraint("btrim(event_title)<>''", name="ck_external_calendar_title_nonblank"),
+    CheckConstraint("starts_at < ends_at", name="ck_external_calendar_interval"),
+    CheckConstraint("btrim(time_zone)<>''", name="ck_external_calendar_timezone_nonblank"),
+    CheckConstraint(
+        "import_status IN ("
+        "'candidate','ignored','marked_existing','linked',"
+        "'draft_started','superseded','unavailable')",
+        name="ck_external_calendar_import_status",
+    ),
+    CheckConstraint(
+        "(linked_entity_type IS NULL AND linked_entity_id IS NULL) OR "
+        "(linked_entity_type IN ('staffing_request','shift_need','follow_up') "
+        "AND linked_entity_id IS NOT NULL)",
+        name="ck_external_calendar_link_shape",
+    ),
+    CheckConstraint("version>=1", name="ck_external_calendar_import_version_positive"),
+)
+
+external_calendar_import_events = Table(
+    "external_calendar_import_events",
+    metadata,
+    Column("event_id", UUID(as_uuid=True), primary_key=True),
+    Column("command_id", UUID(as_uuid=True), nullable=False),
+    Column("import_id", UUID(as_uuid=True), nullable=False),
+    Column("connection_id", UUID(as_uuid=True), nullable=False),
+    Column("actor_id", UUID(as_uuid=True), nullable=False),
+    Column("event_type", String(64), nullable=False),
+    Column("previous_status", String(32)),
+    Column("new_status", String(32), nullable=False),
+    Column("previous_version", Integer),
+    Column("new_version", Integer, nullable=False),
+    Column("occurred_at", TIMESTAMP(timezone=True), nullable=False),
+    Column("reason_text", String(512), nullable=False),
+    UniqueConstraint("command_id", name="uq_external_calendar_import_events_command"),
+    ForeignKeyConstraint(
+        ["import_id"],
+        ["external_calendar_imports.import_id"],
+        name="fk_external_calendar_import_events_import",
+    ),
+    ForeignKeyConstraint(
+        ["connection_id"],
+        ["staff_calendar_connections.connection_id"],
+        name="fk_external_calendar_import_events_connection",
+    ),
+    ForeignKeyConstraint(
+        ["actor_id"],
+        ["staff_accounts.staff_id"],
+        name="fk_external_calendar_import_events_actor",
+    ),
+    CheckConstraint(
+        "event_type IN ("
+        "'external_calendar.candidate_imported',"
+        "'external_calendar.candidate_deduplicated',"
+        "'external_calendar.candidate_ignored',"
+        "'external_calendar.candidate_marked_existing'"
+        ")",
+        name="ck_external_calendar_import_events_type",
+    ),
+    CheckConstraint(
+        "previous_status IS NULL OR previous_status IN "
+        "('candidate','ignored','marked_existing','linked','draft_started','superseded','unavailable')",
+        name="ck_external_calendar_event_previous_status",
+    ),
+    CheckConstraint(
+        "new_status IN "
+        "('candidate','ignored','marked_existing','linked','draft_started','superseded','unavailable')",
+        name="ck_external_calendar_event_new_status",
+    ),
+    CheckConstraint(
+        "previous_version IS NULL OR previous_version>=1",
+        name="ck_external_calendar_event_previous_version",
+    ),
+    CheckConstraint("new_version>=1", name="ck_external_calendar_event_new_version"),
+    CheckConstraint("btrim(reason_text)<>''", name="ck_external_calendar_event_reason"),
+)
+
 
 # PR B workflow history is append-only; sensitive values have separate tables.
 intake_reviews = Table(

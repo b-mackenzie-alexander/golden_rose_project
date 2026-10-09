@@ -29,6 +29,7 @@ DEMO_INTAKE_PERMISSIONS = frozenset(
         "party_address:write",
         "worksite_address:read",
         "worksite_address:write",
+        "calendar_import:manage",
     }
 )
 

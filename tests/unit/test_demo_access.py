@@ -21,7 +21,7 @@ class FakeEngine:
 
 class FakeScalarResult:
     def scalar_one(self) -> str:
-        return "0018_staff_acct_corr_auth"
+        return "0019_ext_calendar_imports"
 
 
 class FakeConnection:

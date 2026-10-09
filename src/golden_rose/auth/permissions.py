@@ -14,6 +14,7 @@ STAFF_ACCOUNT_RECOVERY_RECORD_PERMISSION = "staff_account:recovery:record"
 STAFF_ACCOUNT_SESSION_REVOKE_PERMISSION = "staff_account:session:revoke"
 STAFF_ACCOUNT_DELEGATION_GRANT_PERMISSION = "staff_account:delegation:grant"
 STAFF_ACCOUNT_DELEGATION_REVOKE_PERMISSION = "staff_account:delegation:revoke"
+CALENDAR_IMPORT_MANAGE_PERMISSION = "calendar_import:manage"
 SHIFT_NEED_CREATE_PERMISSION = "shift_need:create"
 SHIFT_NEED_READ_PERMISSION = "shift_need:read"
 SHIFT_NEED_SUBMIT_REVIEW_PERMISSION = "shift_need:submit_review"
@@ -74,6 +75,10 @@ def can_grant_staff_account_delegation(principal: StaffPrincipal) -> bool:
 
 def can_revoke_staff_account_delegation(principal: StaffPrincipal) -> bool:
     return STAFF_ACCOUNT_DELEGATION_REVOKE_PERMISSION in principal.permissions
+
+
+def can_manage_calendar_imports(principal: StaffPrincipal) -> bool:
+    return CALENDAR_IMPORT_MANAGE_PERMISSION in principal.permissions
 
 
 def can_create_shift_need(principal: StaffPrincipal) -> bool:

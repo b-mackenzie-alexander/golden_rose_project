@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 from golden_rose.auth.permissions import (
+    CALENDAR_IMPORT_MANAGE_PERMISSION,
     EMPLOYER_CONTACT_DRAFT_CREATE_PERMISSION,
     EMPLOYER_CONTACT_READ_PERMISSION,
     EMPLOYER_DRAFT_REVISE_PERMISSION,
@@ -22,6 +23,7 @@ from golden_rose.auth.permissions import (
     can_create_shift_need,
     can_create_staff_account,
     can_deprovision_staff_account,
+    can_manage_calendar_imports,
     can_read_employer,
     can_read_employer_contact,
     can_read_shift_need,
@@ -263,3 +265,20 @@ def test_shift_need_permission_constants_have_exact_values_and_require_named_gra
     assert can_read_shift_need(demand_staff) is True
     assert can_submit_shift_need_for_review(demand_staff) is True
     assert can_submit_staffing_request_for_review(demand_staff) is True
+
+
+def test_calendar_import_permission_requires_named_grant() -> None:
+    owner_with_labels_only = StaffPrincipal(
+        actor_id=uuid4(),
+        role_name="owner",
+        permissions=frozenset({"intake:read"}),
+    )
+    migration_staff = StaffPrincipal(
+        actor_id=uuid4(),
+        role_name="operations_staff",
+        permissions=frozenset({CALENDAR_IMPORT_MANAGE_PERMISSION}),
+    )
+
+    assert CALENDAR_IMPORT_MANAGE_PERMISSION == "calendar_import:manage"
+    assert can_manage_calendar_imports(owner_with_labels_only) is False
+    assert can_manage_calendar_imports(migration_staff) is True

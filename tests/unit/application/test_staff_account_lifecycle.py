@@ -473,7 +473,7 @@ def test_create_staff_account_denies_platform_admin_operational_data() -> None:
             provider_email=None,
             display_name="Platform Admin",
             role_name="platform_administrator",
-            permission_names=frozenset({"employer:read"}),
+            permission_names=frozenset({"calendar_import:manage"}),
             mfa_enrolled=False,
             clock=FixedClock(),
             identifiers=FixedIdentifiers(),

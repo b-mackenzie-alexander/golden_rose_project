@@ -15,18 +15,18 @@ ARTIFACT_REGISTRY_REPOSITORY_PATTERN = re.compile(
     r"^[a-z0-9-]+-docker\.pkg\.dev/[a-z][a-z0-9-]*/[a-z0-9-]+/[a-z0-9-]+$"
 )
 EXPECTED_BASE_IMAGES = {
-    "node:22.22.3-bookworm-slim": (
+    "public.ecr.aws/docker/library/node:22.22.3-bookworm-slim": (
         "sha256:16d364eebf6b62da439dc993d9b80940c78b0ca38438452f011ab9a25c752644"
     ),
-    "python:3.12.12-slim-bookworm": (
+    "public.ecr.aws/docker/library/python:3.12.12-slim-bookworm": (
         "sha256:2986c55feb36e6cae00fa1fefb454283e4b33f35e75ff8bdd123b134130be301"
     ),
 }
 EXPECTED_BASE_MATERIALS = {
-    "pkg:docker/node@22.22.3-bookworm-slim": (
+    "pkg:docker/public.ecr.aws/docker/library/node@22.22.3-bookworm-slim": (
         "sha256:16d364eebf6b62da439dc993d9b80940c78b0ca38438452f011ab9a25c752644"
     ),
-    "pkg:docker/python@3.12.12-slim-bookworm": (
+    "pkg:docker/public.ecr.aws/docker/library/python@3.12.12-slim-bookworm": (
         "sha256:2986c55feb36e6cae00fa1fefb454283e4b33f35e75ff8bdd123b134130be301"
     ),
 }
@@ -499,14 +499,18 @@ def _validate_provenance_materials(materials: Any) -> None:
             )
 
 
-def _validate_metadata(metadata: dict[str, Any]) -> str:
+def _validate_metadata(metadata: dict[str, Any], *, require_descriptor: bool = True) -> str:
     digest = _validate_digest(metadata.get("containerimage.digest"))
     descriptor = metadata.get("containerimage.descriptor")
-    if not isinstance(descriptor, dict):
+    if descriptor is None:
+        if require_descriptor:
+            raise ValueError("containerimage.descriptor must be an object")
+    elif not isinstance(descriptor, dict):
         raise ValueError("containerimage.descriptor must be an object")
-    descriptor_digest = descriptor.get("digest")
-    if descriptor_digest != digest:
-        raise ValueError("containerimage.descriptor digest must match containerimage.digest")
+    else:
+        descriptor_digest = descriptor.get("digest")
+        if descriptor_digest != digest:
+            raise ValueError("containerimage.descriptor digest must match containerimage.digest")
     provenance = metadata.get("buildx.build.provenance")
     if not isinstance(provenance, dict):
         raise ValueError("buildx.build.provenance must be an object")
@@ -539,7 +543,7 @@ def verify_image_provenance(
     _validate_sbom(backend_sbom_path)
     _validate_sbom(frontend_sbom_path)
     metadata = _load_json(metadata_path)
-    digest = _validate_metadata(metadata)
+    digest = _validate_metadata(metadata, require_descriptor=mode != "pr")
 
     if mode == "pr":
         image_repository = (

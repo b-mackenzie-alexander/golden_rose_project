@@ -2,18 +2,35 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, vi } from 'vitest';
 
+import * as calendarImportApi from '../api/calendarImportClient';
 import * as operationsApi from '../api/operationsProjectionClient';
 import * as runtimeApi from '../api/runtimeEnvironmentClient';
 import { LanguageProvider, useLanguage } from '../i18n/LanguageProvider';
 import { StaffCalendar } from './StaffCalendar';
 
 vi.mock('../api/operationsProjectionClient');
+vi.mock('../api/calendarImportClient');
 vi.mock('../api/runtimeEnvironmentClient', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/runtimeEnvironmentClient')>();
   return { ...actual, getStaticOperationalFallbackPolicy: vi.fn() };
 });
 
 const manualEventsStorageKey = 'golden-rose.staff-calendar.manual-events.v1';
+const googleCandidate = {
+  importId: '11111111-1111-4111-8111-111111111111',
+  connectionId: '22222222-2222-4222-8222-222222222222',
+  providerEventUpdatedAt: '2026-10-09T14:00:00Z',
+  eventTitle: 'Owner Google Calendar note',
+  startsAt: '2026-10-12T13:30:00Z',
+  endsAt: '2026-10-12T14:00:00Z',
+  timeZone: 'America/New_York',
+  locationReview: 'Queens',
+  importStatus: 'candidate' as const,
+  linkedEntityType: null,
+  linkedEntityId: null,
+  updatedAt: '2026-10-09T14:00:00Z',
+  version: 1,
+};
 
 function SpanishToggle() {
   const { toggleLanguage } = useLanguage();
@@ -142,6 +159,23 @@ describe('StaffCalendar', () => {
       },
     });
     vi.mocked(runtimeApi.getStaticOperationalFallbackPolicy).mockResolvedValue('allow');
+    vi.mocked(calendarImportApi.getCalendarImportSummary).mockResolvedValue({
+      ok: true,
+      value: {
+        connection: null,
+        candidates: [],
+        oauthConfigurationRequired: true,
+      },
+    });
+    vi.mocked(calendarImportApi.disposeExternalCalendarCandidate).mockResolvedValue({
+      ok: true,
+      value: {
+        candidate: { ...googleCandidate, importStatus: 'ignored', version: 2 },
+        eventType: 'external_calendar.candidate_ignored',
+        resultVersion: 2,
+        replayed: false,
+      },
+    });
   });
 
   it('starts with the current day and can switch to the current-year month view', async () => {
@@ -335,6 +369,61 @@ describe('StaffCalendar', () => {
     const gatedButtons = screen.getAllByRole('button', { name: 'Company calendar permission required' });
     expect(gatedButtons).toHaveLength(2);
     expect(gatedButtons.every((button) => button.hasAttribute('disabled'))).toBe(true);
+  });
+
+  it('keeps Google Calendar candidates in a separate staff review lane', async () => {
+    const user = userEvent.setup();
+    vi.mocked(calendarImportApi.getCalendarImportSummary).mockResolvedValue({
+      ok: true,
+      value: {
+        connection: {
+          connectionId: '22222222-2222-4222-8222-222222222222',
+          staffId: '33333333-3333-4333-8333-333333333333',
+          providerName: 'google_calendar',
+          calendarAlias: 'primary',
+          grantedScopes: [],
+          connectionStatus: 'authorization_required',
+          connectedAt: null,
+          disconnectedAt: null,
+          lastSyncStatus: 'configuration_required',
+          lastSyncError: 'oauth_configuration_pending',
+          updatedAt: '2026-10-09T14:00:00Z',
+          version: 1,
+        },
+        candidates: [googleCandidate],
+        oauthConfigurationRequired: true,
+      },
+    });
+    vi.mocked(calendarImportApi.disposeExternalCalendarCandidate).mockResolvedValueOnce({
+      ok: true,
+      value: {
+        candidate: { ...googleCandidate, importStatus: 'marked_existing', version: 2 },
+        eventType: 'external_calendar.candidate_marked_existing',
+        resultVersion: 2,
+        replayed: false,
+      },
+    });
+
+    renderCalendar();
+
+    expect(await screen.findByRole('heading', { name: 'Google Calendar migration' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Connect Google Calendar' })).toBeDisabled();
+    expect(screen.getByText(/requires approved OAuth configuration/)).toBeInTheDocument();
+    expect(screen.getAllByText('Owner Google Calendar note')).toHaveLength(1);
+    expect(screen.getByText('External, unverified')).toBeInTheDocument();
+    expect(screen.getByText('Request-derived shifts only; personal events stay separate.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Already in Golden Rose' }));
+
+    expect(calendarImportApi.disposeExternalCalendarCandidate).toHaveBeenCalledWith(
+      googleCandidate.importId,
+      1,
+      'marked_existing',
+      'Staff marked the Google Calendar candidate as already represented in Golden Rose.',
+      expect.any(String),
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent('Marked as existing');
+    expect(screen.queryByText('Owner Google Calendar note')).not.toBeInTheDocument();
   });
 
   it('shows fallback calendar events with a projection notice when shift reads fail', async () => {

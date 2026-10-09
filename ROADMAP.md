@@ -1,5 +1,15 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-10-08 — Work-interest catalog label management active
+
+- **Staffing:** One independent developer; focused frontend/backend unit tests, local type/lint checks and later PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #176 is merged into protected `develop` at `a674201`, and the staff pilot has moved from calendar repair to the Work-interest catalog. Fresh work is active on `fix/work-interest-catalog-labels` because the catalog's staff-facing create flow still asked non-technical users to supply an "immutable code" and did not align with the desired bilingual label workflow for Worker Intake form options. The source change hides/generated the internal code, displays only staff-meaningful labels and version/status metadata, and allows English-only, Spanish-only or bilingual entry while preserving the versioned catalog references used by saved intake selections.
+- **Gate budget:** Source/frontend/backend/local-validation work only. No cloud inspection or mutation, Terraform plan/apply, live migration execution, service update, new account bootstrap, live/client data entry, production-completion claim, provider-side reset/session-revocation execution, credential rotation, export/import execution, client-owned environment transition, destructive cleanup, shared-runtime rollout or automated matching/ranking/eligibility/referral/placement follows from this branch.
+- **Next executable action:** Finish validation and publish the protected PR to `develop`. After merge, deploy through a separately approved image/service path and validate that staff can manage catalog entries and select them from Worker Intakes in the running pilot.
+- **Do not regress:** Human staff decision boundaries; no automated matching/ranking/eligibility/referral/placement; work-interest entries describe self-reported interests only; catalog codes remain internal implementation identifiers; staff-only named-account access; no public worker/employer self-service; immutable intake history and exact retries; restricted-field permissions; bilingual/accessibility parity; separate public/staff identity planes; auth-sensitive no-store handling; durable current-environment records with migration-disposition tracking until a separately approved client-owned transition/export/import packet exists.
+
+**Validation to date:** Focused Work-interest frontend tests passed 12 tests with existing jsdom canvas notices. Focused intake review schema tests passed 35 tests. Frontend lint and typecheck passed. Focused backend mypy passed for the touched schema/application files. `git diff --check` passed. PostgreSQL-backed intake finalization integration was attempted but blocked by the unavailable local disposable test database on `127.0.0.1:55432`.
+
 ## 2026-10-08 — Staff calendar current-range UX active
 
 - **Staffing:** One independent developer; focused frontend tests, local type/lint/build checks, browser smoke and later PR gates provide quality evidence, not independent-human authorization.

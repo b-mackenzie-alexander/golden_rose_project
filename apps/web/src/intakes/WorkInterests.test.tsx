@@ -85,21 +85,23 @@ it('removes historical selection explicitly and reports catalog read denial', as
     window.dispatchEvent(new Event('pagehide'));
   });
 });
-it('creates and revises bilingual catalog entries using immutable commands and version checks', async () => {
+it('creates and revises bilingual catalog entries with staff-facing labels and version checks', async () => {
   const view = mount();
   await screen.findByRole('button', { name: 'Revise interest' });
-  fireEvent.change(screen.getByLabelText('Immutable code'), { target: { value: 'fictional' } });
   fireEvent.change(screen.getByLabelText('English label'), { target: { value: 'Fictional interest' } });
-  fireEvent.change(screen.getByLabelText('Spanish label'), { target: { value: 'Interés ficticio' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save catalog entry' }));
   await waitFor(() => {
     expect(api.saveWorkInterest).toHaveBeenCalledTimes(1);
   });
-  expect(vi.mocked(api.saveWorkInterest).mock.calls[0]?.[0].body).toEqual({
-    code: 'fictional',
+  const createBody = vi.mocked(api.saveWorkInterest).mock.calls[0]?.[0].body as Record<
+    string,
+    unknown
+  >;
+  expect(createBody).toMatchObject({
     label_en: 'Fictional interest',
-    label_es: 'Interés ficticio',
+    label_es: 'Fictional interest',
   });
+  expect(createBody.code).toMatch(/^work_[a-z0-9]{24}$/);
   fireEvent.click(screen.getByRole('button', { name: 'Revise interest' }));
   fireEvent.click(screen.getByLabelText('Active'));
   fireEvent.change(screen.getByLabelText('Spanish label'), { target: { value: 'Retirado ficticio' } });
@@ -117,7 +119,8 @@ it('creates and revises bilingual catalog entries using immutable commands and v
   expect(screen.getByRole('button', { name: 'Guardar entrada del catálogo' })).toBeInTheDocument();
   expect(await runAxe(view.container)).toEqual([]);
   fireEvent.click(screen.getByRole('button', { name: 'Crear interés' }));
-  expect(screen.getByLabelText('Código inmutable')).toHaveValue('');
+  expect(screen.getByLabelText('Etiqueta en español')).toHaveValue('');
+  expect(screen.queryByLabelText('Código inmutable')).not.toBeInTheDocument();
 });
 it('retries an unknown catalog command exactly and preserves later edits', async () => {
   vi.mocked(api.saveWorkInterest).mockResolvedValueOnce({ ok: false, failure: 'unknown' });

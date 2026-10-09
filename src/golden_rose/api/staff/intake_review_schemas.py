@@ -126,16 +126,35 @@ class QueryWorkInterestsRequest(PageRequest):
     include_retired: bool = False
 
 
-class CreateWorkInterestRequest(IntakeValue):
+class CatalogLabelRequest(IntakeValue):
+    label_en: Text100 | None = None
+    label_es: Text100 | None = None
+
+    @field_validator("label_en", "label_es", mode="before")
+    @classmethod
+    def empty_label_is_missing(cls, value: Any) -> Any:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @model_validator(mode="after")
+    def require_one_catalog_label(self) -> "CatalogLabelRequest":
+        fallback = self.label_en or self.label_es
+        if fallback is None:
+            raise ValueError("English or Spanish label required")
+        if self.label_en is None:
+            self.label_en = fallback
+        if self.label_es is None:
+            self.label_es = fallback
+        return self
+
+
+class CreateWorkInterestRequest(CatalogLabelRequest):
     code: Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[a-z0-9_]+$")]
-    label_en: Text100
-    label_es: Text100
 
 
-class ReviseWorkInterestRequest(IntakeValue):
+class ReviseWorkInterestRequest(CatalogLabelRequest):
     expected_version: int = Field(ge=1, le=2147483646)
-    label_en: Text100
-    label_es: Text100
     active: bool
 
 

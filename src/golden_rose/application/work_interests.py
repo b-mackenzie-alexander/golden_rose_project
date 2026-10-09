@@ -67,7 +67,7 @@ def execute_work_interest(
             command_id,
             command_type,
             interest_id,
-            request.model_dump(mode="json", exclude_unset=True),
+            request.model_dump(mode="json", exclude_none=True),
         )
         if receipt:
             row = get_interest(session, receipt["result_entity_id"])

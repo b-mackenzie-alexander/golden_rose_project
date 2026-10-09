@@ -7,6 +7,22 @@ import { intakeMessages } from './messages';
 import { editSection, finishSection, initialSection, type Section } from './saveState';
 import { workflowLabel } from './workflowMessages';
 
+const catalogLabels = {
+  labelEn: ['English label', 'Etiqueta en inglés'] as const,
+  labelEs: ['Spanish label', 'Etiqueta en español'] as const,
+};
+
+function generatedCatalogCode() {
+  return `work_${crypto.randomUUID().replaceAll('-', '').slice(0, 24)}`;
+}
+
+function normalizedCatalogLabels(value: DraftObject) {
+  const labelEn = typeof value.label_en === 'string' ? value.label_en.trim() : '';
+  const labelEs = typeof value.label_es === 'string' ? value.label_es.trim() : '';
+  const fallback = labelEn || labelEs;
+  return fallback ? { label_en: labelEn || fallback, label_es: labelEs || fallback } : null;
+}
+
 function useCatalog(retainPages = false) {
   const [items, setItems] = useState<WorkInterest[]>([]),
     [cursor, setCursor] = useState<string | null>(null),
@@ -221,15 +237,24 @@ export function WorkInterestCatalog() {
   async function save() {
     if (current.current.status === 'saving' || conflict) return;
     const original = current.current;
+    const labels = normalizedCatalogLabels(original.value);
+    if (!labels) {
+      update(finishSection(original, 'failed'));
+      return;
+    }
     const command =
       original.command ??
       Object.freeze({
         key: crypto.randomUUID(),
         generation: original.generation,
         path: selected ? `/work-interests/${selected.interest_id}/revisions` : '/work-interests',
-        body: structuredClone(
-          selected ? { ...original.value, expected_version: selected.version } : original.value,
-        ),
+        body: selected
+          ? {
+              expected_version: selected.version,
+              ...labels,
+              active: original.value.active === true,
+            }
+          : { code: generatedCatalogCode(), ...labels },
       });
     update({ ...original, status: 'saving', command });
     const result = await saveWorkInterest(command);
@@ -283,8 +308,12 @@ export function WorkInterestCatalog() {
       <ul>
         {catalog.items.map((entry) => (
           <li key={entry.interest_id}>
-            {language === 'en' ? entry.label_en : entry.label_es} · {entry.code} · {entry.version} ·{' '}
-            {t(entry.active ? 'active' : 'retired')}{' '}
+            <strong>{language === 'en' ? entry.label_en : entry.label_es}</strong>
+            <br />
+            <span>
+              {language === 'en' ? `Spanish: ${entry.label_es}` : `Inglés: ${entry.label_en}`} ·{' '}
+              {t('version')} {entry.version} · {t(entry.active ? 'active' : 'retired')}
+            </span>{' '}
             <button
               type="button"
               disabled={locked}
@@ -332,20 +361,9 @@ export function WorkInterestCatalog() {
         >
           <fieldset>
             <legend>{t('manage')}</legend>
-            {!selected ? (
-              <Field
-                label={['Immutable code', 'Código inmutable']}
-                max={64}
-                value={section.value.code}
-                change={(v) => {
-                  edit('code', v ?? '');
-                }}
-              />
-            ) : (
-              <p>{selected.code}</p>
-            )}
+            <p>{t('labelGuidance')}</p>
             <Field
-              label={['English label', 'Etiqueta en inglés']}
+              label={catalogLabels.labelEn}
               max={100}
               value={section.value.label_en}
               change={(v) => {
@@ -353,7 +371,7 @@ export function WorkInterestCatalog() {
               }}
             />
             <Field
-              label={['Spanish label', 'Etiqueta en español']}
+              label={catalogLabels.labelEs}
               max={100}
               value={section.value.label_es}
               change={(v) => {

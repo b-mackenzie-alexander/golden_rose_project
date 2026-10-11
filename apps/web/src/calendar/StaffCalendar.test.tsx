@@ -165,6 +165,7 @@ describe('StaffCalendar', () => {
         connection: null,
         candidates: [],
         oauthConfigurationRequired: true,
+        oauthConnectAvailable: false,
       },
     });
     vi.mocked(calendarImportApi.disposeExternalCalendarCandidate).mockResolvedValue({
@@ -175,6 +176,10 @@ describe('StaffCalendar', () => {
         resultVersion: 2,
         replayed: false,
       },
+    });
+    vi.mocked(calendarImportApi.startGoogleCalendarOAuth).mockResolvedValue({
+      ok: false,
+      failure: { kind: 'unavailable' },
     });
   });
 
@@ -392,6 +397,7 @@ describe('StaffCalendar', () => {
         },
         candidates: [googleCandidate],
         oauthConfigurationRequired: true,
+        oauthConnectAvailable: false,
       },
     });
     vi.mocked(calendarImportApi.disposeExternalCalendarCandidate).mockResolvedValueOnce({
@@ -424,6 +430,48 @@ describe('StaffCalendar', () => {
     );
     expect(await screen.findByRole('status')).toHaveTextContent('Marked as existing');
     expect(screen.queryByText('Owner Google Calendar note')).not.toBeInTheDocument();
+  });
+
+  it('enables Google Calendar connection when backend OAuth configuration is available', async () => {
+    vi.mocked(calendarImportApi.getCalendarImportSummary).mockResolvedValue({
+      ok: true,
+      value: {
+        connection: null,
+        candidates: [],
+        oauthConfigurationRequired: false,
+        oauthConnectAvailable: true,
+      },
+    });
+
+    renderCalendar();
+
+    expect(await screen.findByRole('heading', { name: 'Google Calendar migration' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Connect Google Calendar' })).toBeEnabled();
+    expect(screen.queryByText(/requires approved OAuth configuration/)).not.toBeInTheDocument();
+  });
+
+  it('shows a recoverable notice when Google Calendar connection start fails', async () => {
+    const user = userEvent.setup();
+    vi.mocked(calendarImportApi.getCalendarImportSummary).mockResolvedValue({
+      ok: true,
+      value: {
+        connection: null,
+        candidates: [],
+        oauthConfigurationRequired: false,
+        oauthConnectAvailable: true,
+      },
+    });
+
+    renderCalendar();
+
+    const connect = await screen.findByRole('button', { name: 'Connect Google Calendar' });
+    await user.click(connect);
+
+    expect(calendarImportApi.startGoogleCalendarOAuth).toHaveBeenCalledTimes(1);
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Google Calendar import candidates are unavailable right now.',
+    );
+    expect(connect).toBeEnabled();
   });
 
   it('shows fallback calendar events with a projection notice when shift reads fail', async () => {

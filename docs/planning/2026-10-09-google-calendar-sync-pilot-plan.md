@@ -5,6 +5,8 @@
 **Decision owner:** Beatrice, technical delivery owner
 **Scope:** Two-PR path for a Google Calendar migration helper: first source documentation/contract, then a bounded pilot MVP. No cloud mutation, OAuth client activation, secret creation, token storage, live webhook, deployment, automatic record creation, or two-way sync is authorized by this document.
 
+**Implementation note, 2026-10-11:** The functional follow-up branch implements source support for a one-time OAuth import bridge rather than persistent background sync. The application can enable the staff `Connect Google Calendar` action only when OAuth settings are configured, validate a signed short-lived `state` value on callback, exchange the authorization code server-side, fetch a bounded upcoming event window using the narrow Calendar Events read-only scope, and stage returned events as external review candidates. It does not persist access tokens or refresh tokens, expose webhooks, schedule background refresh, write back to Google Calendar, or activate any provider-side OAuth client/configuration by itself.
+
 ## Context
 
 The controlled staff pilot is live, and the owner is beginning to work through real workflows. She asked whether syncing between her Google account calendar and the dashboard calendar could make migration easier.

@@ -177,6 +177,46 @@ def test_insert_staff_calendar_connection_returns_authorization_placeholder() ->
     assert record.last_sync_error == "oauth_configuration_pending"
 
 
+def test_upsert_staff_calendar_connection_after_import_inserts_connected_record() -> None:
+    session = FakeSession()
+
+    record = store.upsert_staff_calendar_connection_after_import(
+        session=session,  # type: ignore[arg-type]
+        connection_id=CONNECTION_ID,
+        staff_id=ACTOR_ID,
+        calendar_alias="primary",
+        granted_scopes=["https://www.googleapis.com/auth/calendar.events.readonly"],
+        connected_at=NOW,
+        actor_id=ACTOR_ID,
+    )
+
+    assert len(session.statements) == 2
+    assert record.connection_status == "connected"
+    assert record.token_material_ref == "one_time_import_no_token_material"
+    assert record.last_sync_status == "ready"
+
+
+def test_upsert_staff_calendar_connection_after_import_updates_existing_record() -> None:
+    session = FakeSession(
+        FakeResult(one_or_none=connection_row()),
+        FakeResult(),
+        FakeResult(one=connection_row()),
+    )
+
+    record = store.upsert_staff_calendar_connection_after_import(
+        session=session,  # type: ignore[arg-type]
+        connection_id=UUID("99999999-9999-4999-8999-999999999999"),
+        staff_id=ACTOR_ID,
+        calendar_alias="primary",
+        granted_scopes=["https://www.googleapis.com/auth/calendar.events.readonly"],
+        connected_at=NOW,
+        actor_id=ACTOR_ID,
+    )
+
+    assert len(session.statements) == 3
+    assert record.connection_id == CONNECTION_ID
+
+
 def test_list_external_calendar_imports_converts_ordered_rows() -> None:
     session = FakeSession(FakeResult(rows=(import_row(version=1), import_row(version=2))))
 

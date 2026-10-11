@@ -2528,6 +2528,8 @@ def test_openapi_exposes_only_approved_staff_employer_routes() -> None:
             "/api/staff/v1/staff-identity-readiness",
             "/api/staff/v1/operations/projection",
             "/api/staff/v1/calendar-imports",
+            "/api/staff/v1/calendar-imports/oauth/start",
+            "/api/staff/v1/calendar-imports/oauth/callback",
             "/api/staff/v1/calendar-imports/candidates",
             "/api/staff/v1/calendar-imports/candidates/{import_id}/ignore",
             "/api/staff/v1/calendar-imports/candidates/{import_id}/mark-existing",
@@ -2560,6 +2562,8 @@ def test_openapi_exposes_only_approved_staff_employer_routes() -> None:
         assert set(paths["/api/staff/v1/staff-identity-readiness"]) == {"get"}
         assert set(paths["/api/staff/v1/operations/projection"]) == {"get"}
         assert set(paths["/api/staff/v1/calendar-imports"]) == {"get"}
+        assert set(paths["/api/staff/v1/calendar-imports/oauth/start"]) == {"post"}
+        assert set(paths["/api/staff/v1/calendar-imports/oauth/callback"]) == {"get"}
         assert set(paths["/api/staff/v1/calendar-imports/candidates"]) == {"post"}
         assert set(paths["/api/staff/v1/calendar-imports/candidates/{import_id}/ignore"]) == {
             "post"

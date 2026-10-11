@@ -62,6 +62,11 @@ class CalendarImportSummaryResponse(BaseModel):
     connection: StaffCalendarConnectionResponse | None
     candidates: tuple[ExternalCalendarImportResponse, ...]
     oauth_configuration_required: bool
+    oauth_connect_available: bool
+
+
+class GoogleCalendarOAuthStartResponse(BaseModel):
+    authorization_url: str
 
 
 class StageExternalCalendarCandidateRequest(BaseModel):

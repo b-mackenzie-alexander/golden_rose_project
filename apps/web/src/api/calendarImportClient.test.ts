@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   disposeExternalCalendarCandidate,
   getCalendarImportSummary,
+  startGoogleCalendarOAuth,
 } from './calendarImportClient';
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -58,6 +59,7 @@ function validSummary(overrides: Record<string, unknown> = {}) {
     connection,
     candidates: [candidate],
     oauth_configuration_required: true,
+    oauth_connect_available: false,
     ...overrides,
   };
 }
@@ -127,6 +129,7 @@ describe('calendarImportClient', () => {
           version: 1,
         }],
         oauthConfigurationRequired: true,
+        oauthConnectAvailable: false,
       },
     });
   });
@@ -145,6 +148,32 @@ describe('calendarImportClient', () => {
         connection: null,
         candidates: [],
         oauthConfigurationRequired: true,
+        oauthConnectAvailable: false,
+      },
+    });
+  });
+
+  it('starts Google Calendar OAuth with no-store staff request handling', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({
+      authorization_url: 'https://accounts.google.com/o/oauth2/v2/auth?client_id=test',
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await startGoogleCalendarOAuth();
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/staff/v1/calendar-imports/oauth/start', {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+      credentials: 'same-origin',
+      mode: 'same-origin',
+      redirect: 'error',
+      referrerPolicy: 'no-referrer',
+    });
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth?client_id=test',
       },
     });
   });
@@ -274,6 +303,8 @@ describe('calendarImportClient', () => {
     ['bad status', validSummary({ candidates: [{ ...candidate, import_status: 'accepted' }] })],
     ['bad link uuid', validSummary({ candidates: [{ ...candidate, linked_entity_id: 'not-a-uuid' }] })],
     ['bad oauth flag', validSummary({ oauth_configuration_required: 'yes' })],
+    ['bad oauth connect flag', validSummary({ oauth_connect_available: 'yes' })],
+    ['bad oauth URL', { authorization_url: 'https://calendar.google.com/' }],
     ['malformed command event', commandResponse({ event_type: 'external_calendar.deleted' })],
     ['malformed command result version', commandResponse({ result_version: 0 })],
   ])('rejects %s', async (_label, payload) => {

@@ -54,6 +54,11 @@ export type CalendarImportSummary = {
   connection: StaffCalendarConnection | null;
   candidates: ExternalCalendarImport[];
   oauthConfigurationRequired: boolean;
+  oauthConnectAvailable: boolean;
+};
+
+export type GoogleCalendarOAuthStart = {
+  authorizationUrl: string;
 };
 
 export type CalendarImportCommandResponse = {
@@ -222,11 +227,26 @@ function parseSummary(value: unknown): CalendarImportSummary | null {
   const candidates = value.candidates.map(parseImport);
   if (candidates.some((candidate) => candidate === null)) return null;
   if (typeof value.oauth_configuration_required !== 'boolean') return null;
+  if (typeof value.oauth_connect_available !== 'boolean') return null;
   return {
     connection,
     candidates: candidates.filter((candidate): candidate is ExternalCalendarImport => candidate !== null),
     oauthConfigurationRequired: value.oauth_configuration_required,
+    oauthConnectAvailable: value.oauth_connect_available,
   };
+}
+
+function parseOAuthStart(value: unknown): GoogleCalendarOAuthStart | null {
+  if (!object(value)) return null;
+  if (typeof value.authorization_url !== 'string') return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(value.authorization_url);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'https:' || parsed.hostname !== 'accounts.google.com') return null;
+  return { authorizationUrl: parsed.toString() };
 }
 
 function parseCommand(value: unknown): CalendarImportCommandResponse | null {
@@ -286,6 +306,24 @@ export async function getCalendarImportSummary(): Promise<CalendarImportResult<C
     return { ok: false, failure: { kind: 'unavailable' } };
   }
   return readCalendarImportResponse(response, parseSummary);
+}
+
+export async function startGoogleCalendarOAuth(): Promise<CalendarImportResult<GoogleCalendarOAuthStart>> {
+  let response: Response;
+  try {
+    response = await staffApiFetch('/api/staff/v1/calendar-imports/oauth/start', {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+      credentials: 'same-origin',
+      mode: 'same-origin',
+      redirect: 'error',
+      referrerPolicy: 'no-referrer',
+    });
+  } catch {
+    return { ok: false, failure: { kind: 'unavailable' } };
+  }
+  return readCalendarImportResponse(response, parseOAuthStart);
 }
 
 export async function disposeExternalCalendarCandidate(

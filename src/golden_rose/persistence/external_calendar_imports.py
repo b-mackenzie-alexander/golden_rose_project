@@ -35,6 +35,8 @@ ExternalCalendarImportStatus = Literal[
     "unavailable",
 ]
 
+ONE_TIME_IMPORT_NO_TOKEN_MATERIAL_REF = "one_time_import_no_token_material"  # nosec B105
+
 
 @dataclass(frozen=True, slots=True)
 class StaffCalendarConnectionRecord:
@@ -224,6 +226,96 @@ def insert_staff_calendar_connection(
         updated_by=actor_id,
         version=1,
     )
+
+
+def upsert_staff_calendar_connection_after_import(
+    *,
+    session: Session,
+    connection_id: UUID,
+    staff_id: UUID,
+    calendar_alias: str,
+    granted_scopes: list[str],
+    connected_at: datetime,
+    actor_id: UUID,
+) -> StaffCalendarConnectionRecord:
+    existing = (
+        session.execute(
+            select(staff_calendar_connections)
+            .where(
+                staff_calendar_connections.c.staff_id == staff_id,
+                staff_calendar_connections.c.provider_name == "google_calendar",
+                staff_calendar_connections.c.calendar_alias == calendar_alias,
+            )
+            .with_for_update()
+        )
+        .mappings()
+        .one_or_none()
+    )
+    if existing is None:
+        values = {
+            "connection_id": connection_id,
+            "staff_id": staff_id,
+            "provider_name": "google_calendar",
+            "calendar_alias": calendar_alias,
+            "token_material_ref": ONE_TIME_IMPORT_NO_TOKEN_MATERIAL_REF,
+            "granted_scopes": granted_scopes,
+            "connection_status": "connected",
+            "connected_at": connected_at,
+            "disconnected_at": None,
+            "last_sync_status": "ready",
+            "last_sync_error": None,
+            "created_at": connected_at,
+            "created_by": actor_id,
+            "updated_at": connected_at,
+            "updated_by": actor_id,
+            "version": 1,
+        }
+        session.execute(insert(staff_calendar_connections).values(**values))
+        return StaffCalendarConnectionRecord(
+            connection_id=connection_id,
+            staff_id=staff_id,
+            provider_name="google_calendar",
+            calendar_alias=calendar_alias,
+            token_material_ref=ONE_TIME_IMPORT_NO_TOKEN_MATERIAL_REF,
+            granted_scopes=granted_scopes,
+            connection_status="connected",
+            connected_at=connected_at,
+            disconnected_at=None,
+            last_sync_status="ready",
+            last_sync_error=None,
+            created_at=connected_at,
+            created_by=actor_id,
+            updated_at=connected_at,
+            updated_by=actor_id,
+            version=1,
+        )
+    next_version = int(existing.version) + 1
+    session.execute(
+        update(staff_calendar_connections)
+        .where(staff_calendar_connections.c.connection_id == existing.connection_id)
+        .values(
+            token_material_ref=ONE_TIME_IMPORT_NO_TOKEN_MATERIAL_REF,
+            granted_scopes=granted_scopes,
+            connection_status="connected",
+            connected_at=connected_at,
+            disconnected_at=None,
+            last_sync_status="ready",
+            last_sync_error=None,
+            updated_at=connected_at,
+            updated_by=actor_id,
+            version=next_version,
+        )
+    )
+    row = (
+        session.execute(
+            select(staff_calendar_connections).where(
+                staff_calendar_connections.c.connection_id == existing.connection_id
+            )
+        )
+        .mappings()
+        .one()
+    )
+    return _connection_from_row(row)
 
 
 def list_external_calendar_imports(

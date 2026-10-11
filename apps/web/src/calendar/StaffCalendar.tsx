@@ -1,6 +1,6 @@
 import { type SyntheticEvent, useEffect, useMemo, useState } from 'react';
 
-import { disposeExternalCalendarCandidate, getCalendarImportSummary, type CalendarImportDisposition, type CalendarImportFailureKind, type CalendarImportSummary, type ExternalCalendarImport } from '../api/calendarImportClient';
+import { disposeExternalCalendarCandidate, getCalendarImportSummary, startGoogleCalendarOAuth, type CalendarImportDisposition, type CalendarImportFailureKind, type CalendarImportSummary, type ExternalCalendarImport } from '../api/calendarImportClient';
 import { getOperationsProjection, type OperationsCalendarSummary, type OperationsProjectionFailureKind, type OperationsShiftItem } from '../api/operationsProjectionClient';
 import { getStaticOperationalFallbackPolicy, staticOperationalFallbackNotice, staticOperationalFallbacksAllowed, type StaticOperationalFallbackPolicy } from '../api/runtimeEnvironmentClient';
 import { IconSymbol } from '../dashboard/artwork';
@@ -53,8 +53,10 @@ type CalendarCopy = {
   eventUpdated: string;
   events: CalendarEvent[];
   googleCandidateLabel: string;
+  googleConnected: string;
   googleConfigRequired: string;
   googleConnect: string;
+  googleConnecting: string;
   googleHeading: string;
   googleIgnore: string;
   googleIgnored: string;
@@ -115,8 +117,10 @@ const englishCalendar: CalendarCopy = {
     { accent: 'success', assignee: 'Ana Torres', dayId: 'fri', duration: '45 min', id: 'seed-fri-carlos', kind: 'interview', meta: 'Interview', scope: 'company', sortMinutes: 840, time: '2:00 PM', title: 'Interview with Carlos Mendoza' },
   ],
   googleCandidateLabel: 'Google candidate',
+  googleConnected: 'Google Calendar import complete. Review the staged candidates below.',
   googleConfigRequired: 'Google Calendar connection requires approved OAuth configuration before staff can import live events.',
   googleConnect: 'Connect Google Calendar',
+  googleConnecting: 'Opening Google Calendar connection...',
   googleHeading: 'Google Calendar migration',
   googleIgnore: 'Ignore',
   googleIgnored: 'Candidate ignored',
@@ -181,8 +185,10 @@ const spanishCalendar: CalendarCopy = {
     { accent: 'success', assignee: 'Ana Torres', dayId: 'fri', duration: '45 min', id: 'seed-fri-carlos', kind: 'interview', meta: 'Entrevista', scope: 'company', sortMinutes: 840, time: '2:00 p. m.', title: 'Entrevista con Carlos Mendoza' },
   ],
   googleCandidateLabel: 'Candidato de Google',
+  googleConnected: 'La importacion de Google Calendar termino. Revisa los candidatos abajo.',
   googleConfigRequired: 'La conexion con Google Calendar requiere configuracion OAuth aprobada antes de importar eventos reales.',
   googleConnect: 'Conectar Google Calendar',
+  googleConnecting: 'Abriendo conexion con Google Calendar...',
   googleHeading: 'Migracion de Google Calendar',
   googleIgnore: 'Ignorar',
   googleIgnored: 'Candidato ignorado',
@@ -515,6 +521,7 @@ export function StaffCalendar() {
   const [calendarImportStatus, setCalendarImportStatus] = useState<CalendarImportStatus>('loading');
   const [calendarImportMessage, setCalendarImportMessage] = useState('');
   const [busyCalendarImportId, setBusyCalendarImportId] = useState<string | null>(null);
+  const [startingGoogleCalendar, setStartingGoogleCalendar] = useState(false);
   const [form, setForm] = useState<CalendarFormState>(defaultForm);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
@@ -552,6 +559,14 @@ export function StaffCalendar() {
         setStaticFallbackPolicy(fallbackPolicy);
         setCalendarImportSummary(importResult.ok ? importResult.value : null);
         setCalendarImportStatus(importResult.ok ? 'ready' : importResult.failure.kind);
+        if (typeof window !== 'undefined') {
+          const importStatus = new URLSearchParams(window.location.search).get('calendar_import');
+          if (importStatus === 'connected') {
+            setCalendarImportMessage(copy.googleConnected);
+          } else if (importStatus === 'failed') {
+            setCalendarImportMessage(copy.googleUnavailable);
+          }
+        }
       })
       .catch(() => {
         if (cancelled) return;
@@ -565,7 +580,7 @@ export function StaffCalendar() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [copy.googleConnected, copy.googleUnavailable]);
   const allVisibleDays = useMemo(() => {
     const days = new Map<string, CalendarDay>();
     for (const day of weekDays) days.set(day.id, day);
@@ -598,6 +613,7 @@ export function StaffCalendar() {
     () => (calendarImportSummary?.candidates ?? []).filter((candidate) => candidate.importStatus === 'candidate'),
     [calendarImportSummary],
   );
+  const googleConnectEnabled = calendarImportStatus === 'ready' && calendarImportSummary?.oauthConnectAvailable === true;
   const eventsByDay = useMemo(() => new Map(allVisibleDays.map((day) => [
     day.id,
     events.filter((event) => event.dayId === day.id),
@@ -647,6 +663,18 @@ export function StaffCalendar() {
     setCalendarImportMessage(
       disposition === 'ignored' ? copy.googleIgnored : copy.googleMarkedExisting,
     );
+  }
+  async function connectGoogleCalendar() {
+    if (!googleConnectEnabled || startingGoogleCalendar) return;
+    setStartingGoogleCalendar(true);
+    setCalendarImportMessage(copy.googleConnecting);
+    const result = await startGoogleCalendarOAuth();
+    if (!result.ok) {
+      setStartingGoogleCalendar(false);
+      setCalendarImportMessage(copy.googleUnavailable);
+      return;
+    }
+    window.location.assign(result.value.authorizationUrl);
   }
   function saveManualEvent(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -943,7 +971,14 @@ export function StaffCalendar() {
                 <h4 id="calendar-import-heading">{copy.googleHeading}</h4>
                 <p>{copy.googleSubtitle}</p>
               </div>
-              <button className="focus-ring" disabled type="button">
+              <button
+                className="focus-ring"
+                disabled={!googleConnectEnabled || startingGoogleCalendar}
+                type="button"
+                onClick={() => {
+                  void connectGoogleCalendar();
+                }}
+              >
                 {copy.googleConnect}
               </button>
             </div>

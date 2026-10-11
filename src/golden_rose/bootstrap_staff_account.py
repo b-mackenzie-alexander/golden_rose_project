@@ -22,6 +22,7 @@ BOOTSTRAP_REASON = (
     "Operator-approved first staff pilot bootstrap; Google provider subject captured privately."
 )
 BOOTSTRAP_PERMISSION_NAMES = (
+    "calendar_import:manage",
     "canonical:review",
     "employer:draft:create",
     "employer:draft:revise",

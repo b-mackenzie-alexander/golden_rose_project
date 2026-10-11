@@ -12,8 +12,8 @@ def test_docker_contract_uses_non_root_runtime_and_excludes_secret_surfaces() ->
     dockerignore = _read(".dockerignore")
     container_readme = _read("deploy/container/README.md")
 
-    assert "FROM node:" in dockerfile
-    assert "FROM python:" in dockerfile
+    assert "FROM public.ecr.aws/docker/library/node:" in dockerfile
+    assert "FROM public.ecr.aws/docker/library/python:" in dockerfile
     assert "useradd" in dockerfile
     assert "USER goldenrose" in dockerfile
     assert "COPY src/ ./src/" in dockerfile
@@ -52,11 +52,11 @@ def test_docker_contract_pins_base_images_by_digest() -> None:
     dockerfile = _read("Dockerfile")
 
     assert (
-        "FROM node:22.22.3-bookworm-slim@sha256:16d364eebf6b62da439dc993d9b80940c78b0ca38438452f011ab9a25c752644 AS web-build"
+        "FROM public.ecr.aws/docker/library/node:22.22.3-bookworm-slim@sha256:16d364eebf6b62da439dc993d9b80940c78b0ca38438452f011ab9a25c752644 AS web-build"
         in dockerfile
     )
     assert (
-        "FROM python:3.12.12-slim-bookworm@sha256:2986c55feb36e6cae00fa1fefb454283e4b33f35e75ff8bdd123b134130be301 AS runtime"
+        "FROM public.ecr.aws/docker/library/python:3.12.12-slim-bookworm@sha256:2986c55feb36e6cae00fa1fefb454283e4b33f35e75ff8bdd123b134130be301 AS runtime"
         in dockerfile
     )
     assert "FROM node:22.22.3-bookworm-slim AS web-build" not in dockerfile

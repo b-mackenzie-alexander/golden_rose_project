@@ -22,7 +22,7 @@ class ReadinessResponse(BaseModel):
     status: Literal["ready"]
 
 
-EXPECTED_SCHEMA_REVISION = "0018_staff_acct_corr_auth"
+EXPECTED_SCHEMA_REVISION = "0019_ext_calendar_imports"
 
 
 @router.get("/health", response_model=HealthResponse)

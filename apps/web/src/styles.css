@@ -2729,6 +2729,127 @@ select {
   color: var(--color-muted-text);
 }
 
+.calendar-import-review {
+  border-top: 1px solid var(--color-border);
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+}
+
+.calendar-import-review-header {
+  align-items: start;
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.calendar-import-review h4 {
+  color: var(--color-brand);
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 1.25rem;
+  line-height: 1.15;
+  margin: 0;
+}
+
+.calendar-import-review p {
+  color: var(--color-muted-text);
+  margin: 0.25rem 0 0;
+}
+
+.calendar-import-review-header button,
+.calendar-import-actions button {
+  background: #fffdfc;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 900;
+  min-height: 2.35rem;
+  padding: 0.35rem 0.8rem;
+}
+
+.calendar-import-review-header button:disabled,
+.calendar-import-actions button:disabled {
+  color: var(--color-muted-text);
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.calendar-import-notice {
+  background: var(--color-warning-bg);
+  border: 1px solid rgba(180, 83, 9, 0.2);
+  border-radius: 0.55rem;
+  color: #854d0e !important;
+  font-size: 0.88rem;
+  font-weight: 800;
+  padding: 0.65rem 0.8rem;
+}
+
+.calendar-import-list {
+  display: grid;
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.calendar-import-list li {
+  border: 1px solid var(--color-border);
+  border-radius: 0.7rem;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.calendar-import-list strong,
+.calendar-import-list span,
+.calendar-import-list small {
+  display: block;
+}
+
+.calendar-import-list strong {
+  color: var(--color-text);
+}
+
+.calendar-import-list span,
+.calendar-import-list small,
+.calendar-import-empty {
+  color: var(--color-muted-text);
+}
+
+.calendar-import-list > li > span {
+  background: var(--color-info-bg);
+  border-radius: 999px;
+  color: var(--color-info);
+  display: inline-flex;
+  font-size: 0.76rem;
+  font-weight: 900;
+  justify-self: start;
+  padding: 0.2rem 0.55rem;
+  text-transform: uppercase;
+}
+
+.calendar-import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.calendar-import-actions button:hover:not(:disabled) {
+  background: var(--color-surface-muted);
+}
+
+.calendar-import-empty {
+  background: var(--color-surface-muted);
+  border-radius: 0.7rem;
+  font-weight: 800;
+  margin: 0;
+  padding: var(--space-3);
+}
+
 .calendar-status {
   background: var(--color-success-bg);
   border: 1px solid rgba(22, 101, 52, 0.18);

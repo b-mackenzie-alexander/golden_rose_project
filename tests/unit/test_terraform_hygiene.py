@@ -2511,6 +2511,7 @@ def test_build_image_workflow_separates_pull_request_validation_from_publish_aut
     assert "workload_identity_provider" in workflow
     assert "docker/login-action" in workflow
     assert "docker/setup-buildx-action" in workflow
+    assert "driver: docker" in workflow
     assert "scripts/verify_image_provenance.py" in workflow
     assert "uv run python scripts/validate_sbom.py" in workflow
     assert "sigstore/cosign-installer" in workflow

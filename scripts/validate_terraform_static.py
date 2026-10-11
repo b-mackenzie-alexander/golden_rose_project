@@ -540,7 +540,10 @@ ALLOWED_WORKFLOW_JOB_CONCURRENCY = {
 ALLOWED_WORKFLOW_JOB_SERVICES = {
     ("application-quality.yml", "application"): {
         "postgres": {
-            "image": "postgres:16.10@sha256:21f6013073bc6b92830a2129570e2f5ec42a6c734b5a985a41e83aa58f54c3c1",
+            "image": (
+                "public.ecr.aws/docker/library/postgres:16.10@sha256:"
+                "21f6013073bc6b92830a2129570e2f5ec42a6c734b5a985a41e83aa58f54c3c1"
+            ),
             "env": {
                 "POSTGRES_USER": "golden_rose_test",
                 "POSTGRES_PASSWORD": "golden_rose_test_ci_password",
@@ -682,6 +685,11 @@ ALLOWED_WORKFLOW_STEP_WITH = {
         "cache": "npm",
         "cache-dependency-path": "apps/web/package-lock.json",
     },
+    (
+        "build-image.yml",
+        "build-validate",
+        "name:Set up Docker Buildx",
+    ): {"driver": "docker"},
     (
         "build-image.yml",
         "build-validate",

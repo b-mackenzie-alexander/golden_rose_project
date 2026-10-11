@@ -769,5 +769,6 @@ def _is_operational_data_permission(permission: str) -> bool:
             "worksite_address",
             "work_interest",
             "canonical",
+            "calendar_import",
         )
     )

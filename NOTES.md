@@ -8,12 +8,14 @@ This is the concise, dated engineering and operational note log. It records obse
 - **Proposed:** a design direction, not yet approved.
 - **Validated:** corroborated and approved for the stated use.
 
-## 2026-10-09 — Google Calendar sync pilot planning
+## 2026-10-09 — Google Calendar migration assistant implementation
 - **Reported:** The controlled staff pilot is officially launched, the owner is working through workflows, and she asked whether syncing between her Google account calendar and the dashboard calendar could make migration easier.
-- **Observed:** Local `develop` and `origin/develop` both resolved to `4dc99a607349ae2bc9ce8f03aad7e8f0b08061e7` after fetch before this planning branch. That tip includes PR #177, `fix: simplify work interest catalog labels`.
-- **Proposed:** Use a two-PR delivery path: first land a source-only Google Calendar sync planning contract, then implement a separate pilot MVP.
+- **Observed:** PR #178, the Google Calendar sync pilot planning contract, is merged into protected `develop` at `d8e12d6`. Local implementation work is active on `feat/google-calendar-import-candidates`.
+- **Proposed:** Keep the two-PR delivery path: PR #178 landed the source-only planning contract; this follow-up branch implements the first bounded pilot MVP.
 - **Accepted:** The initial pilot shape is a Google Calendar migration assistant, not full two-way sync. Imported Google events should appear as staff-reviewed candidates; staff must explicitly ignore, link, or draft-start any item before it affects Golden Rose operational records.
-- **Boundary:** This planning branch performs no cloud inspection, Terraform, deployment, live migration, OAuth client activation, Calendar API provider mutation, refresh-token storage, webhook exposure, scheduler/job activation, live/client data entry, export/import execution, production-completion claim or automated matching/ranking/eligibility/referral/placement.
+- **Observed:** Source implementation now adds explicit calendar-connection/import-candidate storage, no-store staff API routes, `calendar_import:manage` permission checks, bootstrap/demo permission wiring, and a separate dashboard candidate lane with disabled OAuth configuration status and ignore/mark-existing actions. API responses do not expose `provider_event_uid`.
+- **Validated:** Focused backend calendar-import/API/auth/health/demo-access tests passed 36 tests with the existing Starlette/httpx warning. Focused frontend `StaffCalendar` tests passed 12 tests. Frontend typecheck and lint passed. Full frontend coverage passed 544 tests with statements 90.57% and branches 85.07% after adding calendar-import client coverage. Focused Ruff check passed for touched Python source/tests.
+- **Boundary:** This implementation branch performs no cloud inspection, Terraform, deployment, live migration, OAuth client activation, Calendar API provider mutation, refresh-token storage, webhook exposure, scheduler/job activation, live/client data entry, export/import execution, production-completion claim or automated matching/ranking/eligibility/referral/placement.
 - **Detailed plan:** `docs/planning/2026-10-09-google-calendar-sync-pilot-plan.md`.
 
 ## 2026-10-08 — Staff calendar current-range UX source repair

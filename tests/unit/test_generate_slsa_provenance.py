@@ -38,7 +38,10 @@ def valid_metadata() -> dict[str, object]:
             "buildType": "https://mobyproject.org/buildkit@v1",
             "materials": [
                 {
-                    "uri": "pkg:docker/python@3.12.12-slim-bookworm?platform=linux%2Famd64",
+                    "uri": (
+                        "pkg:docker/public.ecr.aws/docker/library/"
+                        "python@3.12.12-slim-bookworm?platform=linux%2Famd64"
+                    ),
                     "digest": {"sha256": "c" * 64},
                 }
             ],
@@ -95,7 +98,10 @@ def test_generates_slsa_v1_predicate_from_validated_buildx_metadata() -> None:
             "digest": {"gitCommit": SOURCE_COMMIT},
         },
         {
-            "uri": "pkg:docker/python@3.12.12-slim-bookworm?platform=linux%2Famd64",
+            "uri": (
+                "pkg:docker/public.ecr.aws/docker/library/"
+                "python@3.12.12-slim-bookworm?platform=linux%2Famd64"
+            ),
             "digest": {"sha256": "c" * 64},
         },
     ]

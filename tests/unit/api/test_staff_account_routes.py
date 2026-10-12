@@ -70,6 +70,16 @@ def http(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClient, FixedIde
             }
         ),
     )
+    monkeypatch.setattr(
+        staff_accounts,
+        "list_active_staff_permission_grants",
+        Mock(return_value=frozenset({"intake:read", "worker:read"})),
+    )
+    monkeypatch.setattr(
+        staff_session,
+        "list_active_staff_permission_grants",
+        Mock(return_value=frozenset({"intake:read", "worker:read"})),
+    )
     identifiers = FixedIdentifiers()
     app.dependency_overrides[get_identifier_factory] = lambda: identifiers
     with TestClient(app, raise_server_exceptions=False) as client:
@@ -179,6 +189,7 @@ def test_list_staff_accounts_requires_read_permission_and_returns_no_store(
         str(STAFF_ID),
         str(GENERATED_STAFF_ID),
     ]
+    assert response.json()["items"][0]["permission_names"] == ["intake:read", "worker:read"]
     listed.assert_called_once()
 
 
@@ -196,6 +207,7 @@ def test_get_staff_account_returns_exact_account_or_safe_not_found(
     assert response.headers["cache-control"] == "no-store"
     assert response.json()["staff_id"] == str(STAFF_ID)
     assert response.json()["lifecycle_status"] == "active"
+    assert response.json()["permission_names"] == ["intake:read", "worker:read"]
     assert reader.call_args.kwargs["staff_id"] == STAFF_ID
 
 
@@ -319,6 +331,7 @@ def test_staff_session_returns_current_account_context_no_store(
             "role_name": "operations_staff",
             "lifecycle_status": "active",
             "mfa_enrolled": True,
+            "permission_names": ["intake:read", "worker:read"],
             "created_at": NOW.isoformat().replace("+00:00", "Z"),
             "created_by": str(ACTOR_ID),
             "updated_at": NOW.isoformat().replace("+00:00", "Z"),

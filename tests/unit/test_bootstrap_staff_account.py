@@ -97,6 +97,18 @@ def test_bootstrap_first_staff_account_creates_active_owner_and_global_grants() 
     assert result.mfa_enrolled is True
     assert result.requested_permission_count == len(BOOTSTRAP_PERMISSION_NAMES)
     assert result.active_permission_count == len(BOOTSTRAP_PERMISSION_NAMES)
+    assert {
+        "intake:draft:create",
+        "intake:draft:revise",
+        "worker_residence:read",
+        "worker_residence:write",
+        "party_address:read",
+        "party_address:write",
+        "worksite_address:read",
+        "worksite_address:write",
+        "employer_contact:details:read",
+        "staffing_request:read",
+    } <= set(BOOTSTRAP_PERMISSION_NAMES)
     joined_sql = "\n".join(statement for statement, _ in connection.calls)
     assert "INSERT INTO staff_accounts" in joined_sql
     assert "INSERT INTO staff_account_lifecycle_events" in joined_sql

@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response
@@ -15,6 +16,7 @@ from golden_rose.auth.principal import StaffPrincipal
 from golden_rose.config import Settings
 from golden_rose.persistence.staff_accounts import (
     get_staff_account_by_id,
+    list_active_staff_permission_grants,
     list_staff_delegations,
 )
 
@@ -57,6 +59,19 @@ def get_staff_session(
         role_name=principal.role_name,
         permission_names=tuple(sorted(principal.permissions)),
         auth_context=settings.auth_mode,
-        account=StaffAccountResponse.model_validate(account) if account is not None else None,
+        account=StaffAccountResponse.model_validate(
+            {
+                **asdict(account),
+                "permission_names": tuple(
+                    sorted(
+                        list_active_staff_permission_grants(
+                            session=session, staff_id=account.staff_id
+                        )
+                    )
+                ),
+            }
+        )
+        if account is not None
+        else None,
         delegations=tuple(StaffDelegationResponse.model_validate(item) for item in delegations),
     )

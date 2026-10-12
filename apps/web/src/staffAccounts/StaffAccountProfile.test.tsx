@@ -33,6 +33,7 @@ const account = {
   roleName: 'operations_staff' as const,
   lifecycleStatus: 'active' as const,
   mfaEnrolled: true,
+  permissionNames: ['intake:read', 'worker:read'],
   createdAt: '2026-09-28T12:00:00Z',
   createdBy: '11111111-1111-4111-8111-111111111111',
   updatedAt: '2026-09-28T12:30:00Z',

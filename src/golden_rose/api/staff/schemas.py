@@ -287,6 +287,7 @@ class StaffAccountResponse(BaseModel):
     updated_at: datetime
     updated_by: UUID
     version: int
+    permission_names: tuple[str, ...]
 
 
 class StaffAccountListResponse(BaseModel):

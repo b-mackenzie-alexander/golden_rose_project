@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from typing import Annotated
 from uuid import UUID
 
@@ -59,7 +60,9 @@ from golden_rose.auth.principal import StaffPrincipal
 from golden_rose.clock import Clock
 from golden_rose.identifiers import IdentifierFactory
 from golden_rose.persistence.staff_accounts import (
+    StaffAccountRecord,
     get_staff_account_by_id,
+    list_active_staff_permission_grants,
     list_staff_account_lifecycle_events,
     list_staff_accounts,
 )
@@ -74,9 +77,24 @@ def _lifecycle_response(result: StaffAccountLifecycleResult, response: Response)
     return response
 
 
-def _lifecycle_body(result: StaffAccountLifecycleResult) -> StaffAccountLifecycleResponse:
+def _account_response(session: Session, account: StaffAccountRecord) -> StaffAccountResponse:
+    return StaffAccountResponse.model_validate(
+        {
+            **asdict(account),
+            "permission_names": tuple(
+                sorted(
+                    list_active_staff_permission_grants(session=session, staff_id=account.staff_id)
+                )
+            ),
+        }
+    )
+
+
+def _lifecycle_body(
+    session: Session, result: StaffAccountLifecycleResult
+) -> StaffAccountLifecycleResponse:
     return StaffAccountLifecycleResponse(
-        account=StaffAccountResponse.model_validate(result.account),
+        account=_account_response(session, result.account),
         event_type=result.event_type,  # type: ignore[arg-type]
         result_version=result.result_version,
     )
@@ -192,7 +210,7 @@ def get_staff_accounts(
         return _problem_for_lifecycle_error(SafePersistenceError("persistence operation failed"))
     _read_response(response)
     return StaffAccountListResponse(
-        items=tuple(StaffAccountResponse.model_validate(account) for account in accounts),
+        items=tuple(_account_response(session, account) for account in accounts),
     )
 
 
@@ -213,7 +231,7 @@ def get_staff_account(
     except SQLAlchemyError:
         return _problem_for_lifecycle_error(SafePersistenceError("persistence operation failed"))
     _read_response(response)
-    return StaffAccountResponse.model_validate(account)
+    return _account_response(session, account)
 
 
 @router.get("/{staff_id}/delegations", response_model=StaffDelegationListResponse)
@@ -377,7 +395,7 @@ def post_staff_account(
     except (StaffAccountLifecycleError, SafePersistenceError) as exc:
         return _problem_for_lifecycle_error(exc)
     _lifecycle_response(result, response)
-    return _lifecycle_body(result)
+    return _lifecycle_body(session, result)
 
 
 @router.post(
@@ -422,7 +440,7 @@ def post_staff_account_activation(
     ) as exc:
         return _problem_for_lifecycle_error(exc)
     _lifecycle_response(result, response)
-    return _lifecycle_body(result)
+    return _lifecycle_body(session, result)
 
 
 @router.post(
@@ -472,7 +490,7 @@ def post_staff_account_onboarding_correction(
     ) as exc:
         return _problem_for_lifecycle_error(exc)
     _lifecycle_response(result, response)
-    return _lifecycle_body(result)
+    return _lifecycle_body(session, result)
 
 
 @router.post(
@@ -517,7 +535,7 @@ def post_staff_account_google_email_update(
     ) as exc:
         return _problem_for_lifecycle_error(exc)
     _lifecycle_response(result, response)
-    return _lifecycle_body(result)
+    return _lifecycle_body(session, result)
 
 
 @router.post(
@@ -554,7 +572,7 @@ def post_staff_account_suspension(
     ) as exc:
         return _problem_for_lifecycle_error(exc)
     _lifecycle_response(result, response)
-    return _lifecycle_body(result)
+    return _lifecycle_body(session, result)
 
 
 @router.post(
@@ -591,7 +609,7 @@ def post_staff_account_deprovisioning(
     ) as exc:
         return _problem_for_lifecycle_error(exc)
     _lifecycle_response(result, response)
-    return _lifecycle_body(result)
+    return _lifecycle_body(session, result)
 
 
 @router.post(
@@ -628,7 +646,7 @@ def post_staff_account_recovery_evidence(
     ) as exc:
         return _problem_for_lifecycle_error(exc)
     _lifecycle_response(result, response)
-    return _lifecycle_body(result)
+    return _lifecycle_body(session, result)
 
 
 @router.post(
@@ -665,4 +683,4 @@ def post_staff_account_session_revocation(
     ) as exc:
         return _problem_for_lifecycle_error(exc)
     _lifecycle_response(result, response)
-    return _lifecycle_body(result)
+    return _lifecycle_body(session, result)

@@ -57,6 +57,7 @@ const suspended: StaffAccount = {
   roleName: 'operations_staff',
   lifecycleStatus: 'suspended',
   mfaEnrolled: false,
+  permissionNames: ['staff_account:read'],
   createdAt: '2026-09-28T12:00:00Z',
   createdBy: '11111111-1111-4111-8111-111111111111',
   updatedAt: '2026-09-28T12:00:00Z',
@@ -101,6 +102,28 @@ const lifecycleEvent: StaffAccountLifecycleEvent = {
   reasonText: 'Provider ticket reviewed; evidence recorded only',
 };
 
+const createdLifecycleEvent: StaffAccountLifecycleEvent = {
+  ...lifecycleEvent,
+  eventId: '66666666-6666-4666-8666-666666666666',
+  eventType: 'staff_account.created',
+  previousStatus: null,
+  newStatus: 'suspended',
+  previousVersion: null,
+  newVersion: 1,
+  reasonText: 'Initial onboarding recorded',
+};
+
+const activatedLifecycleEvent: StaffAccountLifecycleEvent = {
+  ...lifecycleEvent,
+  eventId: '77777777-7777-4777-8777-777777777777',
+  eventType: 'staff_account.activated',
+  previousStatus: 'suspended',
+  newStatus: 'active',
+  previousVersion: 1,
+  newVersion: 2,
+  reasonText: 'MFA evidence confirmed before activation',
+};
+
 beforeEach(() => {
   vi.mocked(listStaffAccounts).mockResolvedValue({ ok: true, value: [suspended] });
   vi.mocked(createStaffAccount).mockReset();
@@ -143,6 +166,8 @@ it('creates a suspended onboarding account and shows field-local validation', as
   await screen.findByText('Mariela Torres');
   expect(screen.getByText('Google sign-in binding recorded')).toBeInTheDocument();
   expect(screen.queryByText('oidc:staff:123')).not.toBeInTheDocument();
+  expect(screen.getByText('1 named permissions')).toBeInTheDocument();
+  expect(screen.getByText('Intake write: missing')).toBeInTheDocument();
 
   await user.click(screen.getByRole('button', { name: 'Create staff account' }));
   expect(screen.getByText('Display name is required.')).toBeInTheDocument();
@@ -199,6 +224,21 @@ it('requires staff sign-in before showing account administration controls', asyn
   expect(await screen.findByText('Mariela Torres')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Create staff account' })).toBeInTheDocument();
   expect(screen.getByRole('table', { name: 'Staff account lifecycle table' })).toBeInTheDocument();
+});
+
+it('surfaces recoverable account reload failures after an initial successful load', async () => {
+  const user = userEvent.setup();
+  vi.mocked(listStaffAccounts)
+    .mockResolvedValueOnce({ ok: true, value: [suspended] })
+    .mockResolvedValueOnce({ ok: false, failure: { kind: 'unavailable' } });
+
+  render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
+  await screen.findByText('Mariela Torres');
+
+  await user.click(screen.getByRole('button', { name: 'Reload accounts' }));
+
+  expect(await screen.findByText('The account service is unavailable. Try again after the connection recovers.')).toBeInTheDocument();
+  expect(screen.queryByRole('table', { name: 'Staff account lifecycle table' })).not.toBeInTheDocument();
 });
 
 it('corrects suspended onboarding details without deleting the account', async () => {
@@ -415,6 +455,10 @@ it('filters staff accounts by lifecycle, MFA readiness, and search text', async 
 
 it('opens lifecycle evidence history without claiming provider-side execution', async () => {
   const user = userEvent.setup();
+  vi.mocked(listStaffAccountEvents).mockResolvedValue({
+    ok: true,
+    value: [createdLifecycleEvent, activatedLifecycleEvent, lifecycleEvent],
+  });
 
   render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
   await screen.findByText('Mariela Torres');
@@ -423,6 +467,10 @@ it('opens lifecycle evidence history without claiming provider-side execution', 
 
   expect(await screen.findByRole('heading', { name: 'Account history: Mariela Torres' })).toBeInTheDocument();
   expect(listStaffAccountEvents).toHaveBeenCalledWith(suspended.staffId);
+  expect(screen.getByText('Account created')).toBeInTheDocument();
+  expect(screen.getByText(/Suspended, version 1/)).toBeInTheDocument();
+  expect(screen.getByText('Account activated')).toBeInTheDocument();
+  expect(screen.getByText(/Suspended to Active, version 2/)).toBeInTheDocument();
   expect(screen.getByText('Recovery evidence recorded')).toBeInTheDocument();
   expect(screen.getByText('Provider ticket reviewed; evidence recorded only')).toBeInTheDocument();
   expect(screen.getByText(/Recovery and session entries do not confirm provider-side reset or revocation/)).toBeInTheDocument();

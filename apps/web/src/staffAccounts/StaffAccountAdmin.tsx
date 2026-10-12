@@ -60,19 +60,114 @@ type HistoryPanel = {
   error: string;
 };
 
-const permissions = [
-  'staff_account:read',
-  'staff_account:create',
-  'staff_account:activate',
-  'staff_account:suspend',
-  'staff_account:deprovision',
-  'staff_account:recovery:record',
-  'staff_account:session:revoke',
-  'staff_account:delegation:grant',
-  'staff_account:delegation:revoke',
-  'intake:read',
-  'worker:read',
-  'employer:read',
+const permissionGroups = [
+  {
+    label: { en: 'Account administration', es: 'Administracion de cuentas' },
+    items: [
+      'staff_account:read',
+      'staff_account:create',
+      'staff_account:activate',
+      'staff_account:suspend',
+      'staff_account:deprovision',
+      'staff_account:recovery:record',
+      'staff_account:session:revoke',
+      'staff_account:delegation:grant',
+      'staff_account:delegation:revoke',
+    ],
+  },
+  {
+    label: { en: 'Intake workflow', es: 'Flujo de admisiones' },
+    items: [
+      'intake:read',
+      'intake:draft:create',
+      'intake:draft:revise',
+      'intake:review',
+      'intake:follow_up',
+      'intake:link',
+      'intake:finalize',
+      'intake:restricted_history:read',
+      'canonical:review',
+    ],
+  },
+  {
+    label: { en: 'Worker records', es: 'Registros de trabajadores' },
+    items: [
+      'worker:read',
+      'worker:correct',
+      'worker_contact:read',
+      'worker_contact:correct',
+      'worker_residence:read',
+      'worker_residence:write',
+      'worker_residence:correct',
+      'worker_preferences:correct',
+      'work_interest:read',
+      'work_interest:manage',
+    ],
+  },
+  {
+    label: { en: 'Employer records', es: 'Registros de empleadores' },
+    items: [
+      'employer:read',
+      'employer:draft:create',
+      'employer:draft:revise',
+      'employer_address:correct',
+      'employer_contact:read',
+      'employer_contact:draft:create',
+      'employer_contact:details:read',
+      'employer_contact:details:correct',
+      'party_address:read',
+      'party_address:write',
+      'worksite:read',
+      'worksite:correct',
+      'worksite_address:read',
+      'worksite_address:write',
+      'staffing_request:read',
+      'staffing_request:submit_review',
+      'staffing_request:correct',
+    ],
+  },
+  {
+    label: { en: 'Calendar and requests', es: 'Calendario y solicitudes' },
+    items: [
+      'calendar_import:manage',
+      'shift_need:create',
+      'shift_need:read',
+      'shift_need:submit_review',
+    ],
+  },
+] as const;
+
+const permissionCoverage = [
+  {
+    label: { en: 'Account admin', es: 'Admin cuentas' },
+    permissions: ['staff_account:read', 'staff_account:create', 'staff_account:activate'],
+  },
+  {
+    label: { en: 'Intake write', es: 'Escribir admisiones' },
+    permissions: ['intake:read', 'intake:draft:create', 'intake:draft:revise'],
+  },
+  {
+    label: { en: 'Worker intake', es: 'Admision trabajador' },
+    permissions: ['worker:read', 'worker_contact:read', 'worker_residence:read', 'worker_residence:write'],
+  },
+  {
+    label: { en: 'Employer intake', es: 'Admision empleador' },
+    permissions: [
+      'employer:read',
+      'employer_contact:read',
+      'employer_contact:details:read',
+      'party_address:read',
+      'party_address:write',
+      'worksite:read',
+      'worksite_address:read',
+      'worksite_address:write',
+      'staffing_request:read',
+    ],
+  },
+  {
+    label: { en: 'Calendar import', es: 'Importar calendario' },
+    permissions: ['calendar_import:manage'],
+  },
 ] as const;
 
 const roleLabels: Record<StaffAccountRole, { en: string; es: string }> = {
@@ -195,6 +290,36 @@ function tomorrowLocalValue() {
 
 function failureText(kind: StaffAccountFailureKind, language: 'en' | 'es') {
   return failureLabels[kind][language];
+}
+
+function hasPermissions(account: StaffAccount, required: readonly string[]) {
+  return required.every((permission) => account.permissionNames.includes(permission));
+}
+
+function PermissionChecklist({
+  selected,
+  onToggle,
+  language,
+}: {
+  selected: string[];
+  onToggle: (permission: string) => void;
+  language: 'en' | 'es';
+}) {
+  return (
+    <>
+      {permissionGroups.map((group) => (
+        <div className="staff-permission-group" key={group.label.en}>
+          <p>{group.label[language]}</p>
+          {group.items.map((permission) => (
+            <label key={permission}>
+              <input checked={selected.includes(permission)} type="checkbox" onChange={() => { onToggle(permission); }} />
+              <span>{permission}</span>
+            </label>
+          ))}
+        </div>
+      ))}
+    </>
+  );
 }
 
 function actionHelp(action: AccountAction, language: 'en' | 'es') {
@@ -443,7 +568,7 @@ export function StaffAccountAdmin() {
       providerEmail: account.providerEmail ?? '',
       providerSubject: isPendingProviderSubject(account.providerSubject) ? '' : account.providerSubject,
       roleName: account.roleName,
-      permissionNames: ['staff_account:read'],
+      permissionNames: account.permissionNames,
       mfaEnrolled: account.mfaEnrolled,
       reasonText: '',
     });
@@ -600,7 +725,7 @@ export function StaffAccountAdmin() {
           <div className="staff-account-table" role="table" aria-label={language === 'en' ? 'Staff account lifecycle table' : 'Tabla de cuentas'}>
             <div role="row" className="staff-account-row staff-account-row--head">
               <span role="columnheader">{language === 'en' ? 'Staff member' : 'Persona'}</span>
-              <span role="columnheader">{language === 'en' ? 'Role' : 'Rol'}</span>
+              <span role="columnheader">{language === 'en' ? 'Role / permissions' : 'Rol / permisos'}</span>
               <span role="columnheader">{language === 'en' ? 'State' : 'Estado'}</span>
               <span role="columnheader">{language === 'en' ? 'Updated' : 'Actualizada'}</span>
               <span role="columnheader">{language === 'en' ? 'Actions' : 'Acciones'}</span>
@@ -612,7 +737,30 @@ export function StaffAccountAdmin() {
                   {account.providerEmail ? <small>{account.providerEmail}</small> : null}
                   <small>{providerSubjectStatus(account, language)}</small>
                 </span>
-                <span role="cell">{roleLabels[account.roleName][language]}</span>
+                <span role="cell">
+                  {roleLabels[account.roleName][language]}
+                  <small>
+                    {language === 'en'
+                      ? `${String(account.permissionNames.length)} named permissions`
+                      : `${String(account.permissionNames.length)} permisos nombrados`}
+                  </small>
+                  <div className="staff-permission-coverage" aria-label={language === 'en' ? 'Permission coverage' : 'Cobertura de permisos'}>
+                    {permissionCoverage.map((item) => {
+                      const ready = hasPermissions(account, item.permissions);
+                      return (
+                        <span key={item.label.en} data-ready={ready ? 'true' : 'false'}>
+                          {item.label[language]}: {ready ? (language === 'en' ? 'ready' : 'lista') : (language === 'en' ? 'missing' : 'faltan')}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <details className="staff-permission-details">
+                    <summary>{language === 'en' ? 'Named permissions' : 'Permisos nombrados'}</summary>
+                    <ul>
+                      {account.permissionNames.map((permission) => <li key={permission}>{permission}</li>)}
+                    </ul>
+                  </details>
+                </span>
                 <span role="cell">
                   <span className="staff-account-status" data-status={account.lifecycleStatus}>{statusLabels[account.lifecycleStatus][language]}</span>
                   <small>{account.mfaEnrolled ? 'MFA' : language === 'en' ? 'MFA pending before activation' : 'MFA pendiente antes de activar'}</small>
@@ -709,12 +857,7 @@ export function StaffAccountAdmin() {
             </div>
             <fieldset className="staff-permission-fieldset">
               <legend>{language === 'en' ? 'Named permissions' : 'Permisos nombrados'}</legend>
-              {permissions.map((permission) => (
-                <label key={permission}>
-                  <input checked={createForm.permissionNames.includes(permission)} type="checkbox" onChange={() => { togglePermission(permission); }} />
-                  <span>{permission}</span>
-                </label>
-              ))}
+              <PermissionChecklist selected={createForm.permissionNames} onToggle={togglePermission} language={language} />
               {createErrors.permissionNames ? <small role="alert">{createErrors.permissionNames}</small> : null}
             </fieldset>
             <label>
@@ -776,12 +919,7 @@ export function StaffAccountAdmin() {
             </div>
             <fieldset className="staff-permission-fieldset">
               <legend>{language === 'en' ? 'Named permissions' : 'Permisos nombrados'}</legend>
-              {permissions.map((permission) => (
-                <label key={permission}>
-                  <input checked={correctionForm.permissionNames.includes(permission)} type="checkbox" onChange={() => { toggleCorrectionPermission(permission); }} />
-                  <span>{permission}</span>
-                </label>
-              ))}
+              <PermissionChecklist selected={correctionForm.permissionNames} onToggle={toggleCorrectionPermission} language={language} />
               {correctionErrors.permissionNames ? <small role="alert">{correctionErrors.permissionNames}</small> : null}
             </fieldset>
             <label>
@@ -917,7 +1055,11 @@ export function StaffAccountAdmin() {
               <label>
                 <span>{language === 'en' ? 'Permission' : 'Permiso'}</span>
                 <select className="focus-ring" value={delegationPanel.permissionName} onChange={(event) => { setDelegationPanel({ ...delegationPanel, permissionName: event.target.value }); }}>
-                  {permissions.map((permission) => <option key={permission} value={permission}>{permission}</option>)}
+                  {permissionGroups.map((group) => (
+                    <optgroup key={group.label.en} label={group.label[language]}>
+                      {group.items.map((permission) => <option key={permission} value={permission}>{permission}</option>)}
+                    </optgroup>
+                  ))}
                 </select>
               </label>
               <label>

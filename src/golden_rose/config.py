@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     demo_access_password: SecretStr | None = Field(default=None, repr=False)
     demo_access_expires_at: datetime | None = Field(default=None, repr=False)
     presentation_demo_seed_enabled: bool = False
+    google_calendar_oauth_client_id: str | None = None
+    google_calendar_oauth_client_secret: SecretStr | None = Field(default=None, repr=False)
+    google_calendar_oauth_redirect_uri: str | None = None
+    google_calendar_import_window_days: int = Field(default=14, ge=1, le=31)
 
     @field_validator("demo_access_password", mode="before")
     @classmethod
@@ -80,6 +84,7 @@ class Settings(BaseSettings):
             raise ValueError(msg)
         if self.auth_mode == "staff_oidc":
             self._validate_staff_oidc_configuration()
+        self._validate_google_calendar_oauth_configuration()
         if self.environment == "production" and (
             self.demo_access_enabled
             or self.demo_access_password is not None
@@ -159,3 +164,48 @@ class Settings(BaseSettings):
             ):
                 msg = f"{name} must be an https URL"
                 raise ValueError(msg)
+
+    @property
+    def google_calendar_oauth_configured(self) -> bool:
+        return (
+            self.google_calendar_oauth_client_id is not None
+            and self.google_calendar_oauth_client_secret is not None
+            and self.google_calendar_oauth_redirect_uri is not None
+        )
+
+    def _validate_google_calendar_oauth_configuration(self) -> None:
+        configured_values = {
+            "google_calendar_oauth_client_id": self.google_calendar_oauth_client_id,
+            "google_calendar_oauth_client_secret": self.google_calendar_oauth_client_secret,
+            "google_calendar_oauth_redirect_uri": self.google_calendar_oauth_redirect_uri,
+        }
+        present = [
+            name
+            for name, value in configured_values.items()
+            if value is not None
+            and (not isinstance(value, str) or value.strip() != "")
+            and (not isinstance(value, SecretStr) or value.get_secret_value().strip() != "")
+        ]
+        if present and len(present) != len(configured_values):
+            msg = "Google Calendar OAuth requires client id, client secret and redirect URI"
+            raise ValueError(msg)
+        if self.google_calendar_oauth_client_id is not None:
+            client_id = self.google_calendar_oauth_client_id.strip()
+            if client_id == "" or any(ch.isspace() for ch in client_id):
+                msg = "google_calendar_oauth_client_id must be nonblank and contain no whitespace"
+                raise ValueError(msg)
+            self.google_calendar_oauth_client_id = client_id
+        if self.google_calendar_oauth_redirect_uri is not None:
+            redirect_uri = self.google_calendar_oauth_redirect_uri.strip()
+            if (
+                redirect_uri == ""
+                or any(ch.isspace() for ch in redirect_uri)
+                or (self.environment == "production" and not redirect_uri.startswith("https://"))
+                or (
+                    self.environment != "production"
+                    and not redirect_uri.startswith(("https://", "http://"))
+                )
+            ):
+                msg = "google_calendar_oauth_redirect_uri must be an allowed redirect URL"
+                raise ValueError(msg)
+            self.google_calendar_oauth_redirect_uri = redirect_uri

@@ -7,11 +7,14 @@ from sqlalchemy.exc import NoResultFound, SQLAlchemyError
 
 import golden_rose.application.calendar_imports as calendar_import_module
 from golden_rose.application.calendar_imports import (
+    GOOGLE_CALENDAR_EVENTS_READONLY_SCOPE,
     CalendarImportError,
     CalendarImportNotFoundError,
     CalendarImportVersionConflictError,
+    GoogleCalendarEventImport,
     dispose_external_calendar_candidate,
     get_calendar_import_summary,
+    import_google_calendar_events,
     stage_external_calendar_candidate,
 )
 from golden_rose.application.errors import SafePersistenceError
@@ -201,6 +204,86 @@ def test_stage_calendar_candidate_creates_authorization_placeholder_and_audit_ev
     assert observed["event"]["previous_status"] is None
     assert session.commits == 1
     assert session.rollbacks == 0
+
+
+def test_import_google_calendar_events_marks_connection_connected_and_stages_candidates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+    observed: dict[str, Any] = {"events": []}
+
+    def upsert_connection(**kwargs):
+        observed["connection"] = kwargs
+        return connection_record()
+
+    def get_by_source(**kwargs):
+        observed["lookup"] = kwargs
+        return None
+
+    def insert_candidate(**kwargs):
+        observed["candidate"] = kwargs
+        return candidate_record()
+
+    def insert_event(**kwargs):
+        observed["events"].append(kwargs)
+        return event_record(event_type=kwargs["event_type"], new_version=kwargs["new_version"])
+
+    monkeypatch.setattr(
+        calendar_import_module,
+        "upsert_staff_calendar_connection_after_import",
+        upsert_connection,
+    )
+    monkeypatch.setattr(
+        calendar_import_module,
+        "get_external_calendar_import_by_source_for_update",
+        get_by_source,
+    )
+    monkeypatch.setattr(calendar_import_module, "insert_external_calendar_import", insert_candidate)
+    monkeypatch.setattr(
+        calendar_import_module,
+        "insert_external_calendar_import_event",
+        insert_event,
+    )
+
+    result = import_google_calendar_events(
+        session=session,  # type: ignore[arg-type]
+        principal=_principal("calendar_import:manage"),
+        events=(
+            GoogleCalendarEventImport(
+                provider_event_uid=" google-private-event-uid ",
+                provider_event_updated_at=NOW,
+                event_title=" Owner calendar note ",
+                starts_at=datetime(2026, 10, 12, 13, 30, tzinfo=UTC),
+                ends_at=datetime(2026, 10, 12, 14, 0, tzinfo=UTC),
+                time_zone=" America/New_York ",
+                location_review=None,
+            ),
+        ),
+        granted_scopes=(GOOGLE_CALENDAR_EVENTS_READONLY_SCOPE,),
+        clock=FixedClock(),
+        identifiers=FixedIdentifiers(CONNECTION_ID, IMPORT_ID, EVENT_ID, COMMAND_ID),
+    )
+
+    assert result.staged_count == 1
+    assert result.deduplicated_count == 0
+    assert observed["connection"]["granted_scopes"] == [GOOGLE_CALENDAR_EVENTS_READONLY_SCOPE]
+    assert observed["candidate"]["provider_event_uid"] == "google-private-event-uid"
+    assert observed["candidate"]["event_title"] == "Owner calendar note"
+    assert observed["events"][0]["event_type"] == "external_calendar.candidate_imported"
+    assert session.commits == 1
+    assert session.rollbacks == 0
+
+
+def test_import_google_calendar_events_requires_readonly_calendar_scope() -> None:
+    with pytest.raises(CalendarImportError, match="scope is insufficient"):
+        import_google_calendar_events(
+            session=FakeSession(),  # type: ignore[arg-type]
+            principal=_principal("calendar_import:manage"),
+            events=(),
+            granted_scopes=("profile",),
+            clock=FixedClock(),
+            identifiers=FixedIdentifiers(CONNECTION_ID),
+        )
 
 
 def test_stage_calendar_candidate_deduplicates_existing_source_event(

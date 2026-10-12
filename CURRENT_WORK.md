@@ -1,5 +1,15 @@
 # Current Work — Golden Rose Operations Platform
 
+## 2026-10-12 — Staff-pilot intake write gate repair active
+
+- **Staffing:** One independent developer; source investigation, focused route tests, type/lint checks and later protected PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** After PR #180 was merged and deployed to the controlled staff pilot, staff testing reported that no account could submit Worker or Employer intakes. Source investigation found the draft-intake create route still enforced the older local/test-only gate even though the staff pilot intentionally runs as `production` with named staff OIDC and deployment target `controlled-live-data-staff-pilot`. Several related intake workflow routes reused the same local/test gate, which would also block review, link/finalization and canonical correction surfaces in the controlled staff pilot.
+- **Gate budget:** Source/backend/local-validation work only. No cloud inspection or mutation, Terraform plan/apply, image build, live migration execution, service update, new account bootstrap, credential rotation, provider-side reset/session-revocation execution, live/client data entry, export/import execution, client-owned environment transition, production-completion claim, destructive cleanup, shared-runtime rollout or automated matching/ranking/eligibility/referral/placement follows from this branch.
+- **Next executable action:** Finish local validation and publish this bounded repair PR to `develop`; after protected merge, use a separately approved image/migration/service path before asking staff to retest intake submission in the running pilot.
+- **Do not regress:** Human staff decision boundaries; no automated matching/ranking/eligibility/referral/placement; the runtime exception must remain limited to `production` + `staff_oidc` + `controlled-live-data-staff-pilot`; generic production, synthetic develop and public worker/employer self-service remain closed; staff accounts still require named permissions; immutable intake history and exact retries; restricted-field permissions; bilingual/accessibility parity; separate public/staff identity planes; auth-sensitive no-store handling; durable current-environment records with migration-disposition tracking until a separately approved client-owned transition/export/import packet exists.
+
+**Validation to date:** Focused route coverage for intake create/link/finalization passed 40 tests. Focused shared-gate route coverage for worker, employer-output, contact-detail, intake-link and intake-create routes passed 78 tests. Config/dependency tests passed 36 tests. Focused Ruff format/check, focused mypy, and `git diff --check` passed.
+
 ## 2026-10-11 — Google Calendar OAuth import follow-up active
 
 - **Staffing:** One independent developer; source implementation, focused local backend/frontend tests, type/lint checks, fresh agent/session review and protected PR gates provide quality evidence, not independent-human authorization.

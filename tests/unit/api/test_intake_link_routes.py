@@ -8,9 +8,11 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from golden_rose.api.dependencies import get_db_session, get_settings
+from golden_rose.api.dependencies import get_db_session, get_settings, get_staff_principal
 from golden_rose.api.staff import intake_workflows
 from golden_rose.application.intake_errors import IntakeError
+from golden_rose.auth.principal import StaffPrincipal
+from golden_rose.config import CONTROLLED_LIVE_DATA_STAFF_PILOT_TARGET, Settings
 from golden_rose.main import create_app
 from tests.unit.api.test_intake_schemas import response_detail
 
@@ -28,6 +30,27 @@ def http(monkeypatch) -> Iterator[Any]:
 
 def body() -> dict[str, Any]:
     return {"expected_version": 2, "party": None}
+
+
+def controlled_staff_pilot_settings() -> Settings:
+    return Settings(
+        environment="production",
+        auth_mode="staff_oidc",
+        database_url="postgresql+psycopg://test:test@127.0.0.1:55432/golden_rose",
+        synthetic_staff_id=None,
+        staff_oidc_issuer="https://accounts.example.test",
+        staff_oidc_audience="golden-rose-staff",
+        staff_oidc_jwks_url="https://accounts.example.test/.well-known/jwks.json",
+        deployment_target=CONTROLLED_LIVE_DATA_STAFF_PILOT_TARGET,
+    )
+
+
+def pilot_principal() -> StaffPrincipal:
+    return StaffPrincipal(
+        actor_id=uuid4(),
+        role_name="operations_staff",
+        permissions=frozenset({"intake:read", "intake:draft:revise"}),
+    )
 
 
 def safe(response) -> None:
@@ -77,6 +100,27 @@ def test_local_test_only(http, environment):
     assert response.status_code == 403
     safe(response)
     execute.assert_not_called()
+
+
+def test_controlled_staff_pilot_is_allowed(http):
+    client, execute, _ = http
+    target, key = uuid4(), uuid4()
+    detail = response_detail()
+    detail["summary"].update(intake_id=str(target), version=3)
+    result = {"command_id": str(key), "result_record_version": 3, "current": detail}
+    execute.return_value = result, False
+    client.app.dependency_overrides[get_settings] = controlled_staff_pilot_settings
+    client.app.dependency_overrides[get_staff_principal] = pilot_principal
+
+    response = client.post(
+        f"/api/staff/v1/intakes/{target}/links",
+        json=body(),
+        headers={"Idempotency-Key": str(key)},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == result
+    execute.assert_called_once()
 
 
 @pytest.mark.parametrize(

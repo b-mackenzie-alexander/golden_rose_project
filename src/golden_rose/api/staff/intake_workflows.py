@@ -46,7 +46,10 @@ SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
 def local_only(settings: Settings) -> None:
-    if settings.environment not in {"local", "test"}:
+    if (
+        settings.environment not in {"local", "test"}
+        and not settings.controlled_live_data_staff_pilot
+    ):
         raise IntakeError("forbidden", 403)
 
 

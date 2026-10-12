@@ -86,8 +86,10 @@ def create_draft(
     clock: ClockDep,
     settings: Annotated[Settings, Depends(get_settings)],
 ):
-    if settings.environment not in {"local", "test"}:
-        # No intake grant or fictional-field admission is activated in develop.
+    if (
+        settings.environment not in {"local", "test"}
+        and not settings.controlled_live_data_staff_pilot
+    ):
         raise IntakeError("forbidden", 403)
     return _command_response(session, principal, command_id, body, clock)
 

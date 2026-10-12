@@ -8,6 +8,14 @@ This is the concise, dated engineering and operational note log. It records obse
 - **Proposed:** a design direction, not yet approved.
 - **Validated:** corroborated and approved for the stated use.
 
+## 2026-10-12 — Staff-pilot intake write gate repair
+- **Reported:** Staff testing found that no account can submit Worker or Employer intakes in the controlled staff pilot; update/correction flows were suspected to have a similar problem.
+- **Observed:** Source investigation found the draft-intake create route still blocked every environment except `local` and `test`. Because the controlled staff pilot runs as `production` with named staff OIDC, that gate would reject every account before role-specific intake permissions were evaluated.
+- **Observed:** Related intake workflow routes shared the same local/test-only gate, which would also block link/review/follow-up/finalization and canonical correction surfaces in the controlled staff pilot.
+- **Observed:** The repair adds an exact controlled-pilot runtime predicate requiring `production`, `staff_oidc` and deployment target `controlled-live-data-staff-pilot`; draft-intake creation and the shared intake workflow gate now allow that profile while keeping generic production, synthetic develop and public self-service closed.
+- **Validated:** Focused route tests passed: 40 intake create/link/finalization tests and 78 worker/employer/contact/intake shared-gate tests. Config/dependency tests passed 36 tests. Focused Ruff format/check, focused mypy and `git diff --check` passed.
+- **Boundary:** This is source/backend/local-validation work only. No cloud inspection, Terraform, image build, deployment, migration, live data entry, production-completion claim or automated matching/ranking/eligibility/referral/placement occurred.
+
 ## 2026-10-09 — Google Calendar migration assistant implementation
 - **Reported:** The controlled staff pilot is officially launched, the owner is working through workflows, and she asked whether syncing between her Google account calendar and the dashboard calendar could make migration easier.
 - **Observed:** PR #178, the Google Calendar sync pilot planning contract, is merged into protected `develop` at `d8e12d6`. Local implementation work is active on `feat/google-calendar-import-candidates`.

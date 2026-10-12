@@ -44,6 +44,7 @@ export type StaffAccount = {
   roleName: StaffAccountRole;
   lifecycleStatus: StaffAccountStatus;
   mfaEnrolled: boolean;
+  permissionNames: string[];
   createdAt: string;
   createdBy: string;
   updatedAt: string;
@@ -271,6 +272,7 @@ function parseAccount(value: unknown): StaffAccount | null {
     'role_name',
     'lifecycle_status',
     'mfa_enrolled',
+    'permission_names',
     'created_at',
     'created_by',
     'updated_at',
@@ -284,6 +286,8 @@ function parseAccount(value: unknown): StaffAccount | null {
   if (typeof value.role_name !== 'string' || !roles.has(value.role_name as StaffAccountRole)) return null;
   if (typeof value.lifecycle_status !== 'string' || !statuses.has(value.lifecycle_status as StaffAccountStatus)) return null;
   if (typeof value.mfa_enrolled !== 'boolean') return null;
+  if (!Array.isArray(value.permission_names) || value.permission_names.length > 100) return null;
+  if (value.permission_names.some((permission) => !text(permission, 120))) return null;
   if (!timestamp(value.created_at) || !timestamp(value.updated_at)) return null;
   if (typeof value.created_by !== 'string' || !uuid.test(value.created_by)) return null;
   if (typeof value.updated_by !== 'string' || !uuid.test(value.updated_by)) return null;
@@ -296,6 +300,7 @@ function parseAccount(value: unknown): StaffAccount | null {
     roleName: value.role_name as StaffAccountRole,
     lifecycleStatus: value.lifecycle_status as StaffAccountStatus,
     mfaEnrolled: value.mfa_enrolled,
+    permissionNames: value.permission_names as string[],
     createdAt: value.created_at,
     createdBy: value.created_by,
     updatedAt: value.updated_at,

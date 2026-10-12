@@ -496,6 +496,17 @@ def list_active_staff_permissions(*, session: Session, staff_id: UUID) -> frozen
     return frozenset(direct_permissions) | frozenset(delegated_permissions)
 
 
+def list_active_staff_permission_grants(*, session: Session, staff_id: UUID) -> frozenset[str]:
+    permissions = session.execute(
+        select(staff_permission_grants.c.permission_name).where(
+            staff_permission_grants.c.staff_id == staff_id,
+            staff_permission_grants.c.scope_kind == "global",
+            staff_permission_grants.c.revoked_at.is_(None),
+        )
+    ).scalars()
+    return frozenset(permissions)
+
+
 def insert_staff_delegation(
     *,
     session: Session,

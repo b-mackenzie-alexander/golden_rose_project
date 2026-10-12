@@ -184,6 +184,7 @@ describe('Dashboard', () => {
           roleName: 'owner',
           lifecycleStatus: 'active',
           mfaEnrolled: true,
+          permissionNames: ['staff_account:read'],
           createdAt: '2026-10-06T12:00:00Z',
           createdBy: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
           updatedAt: '2026-10-06T12:00:00Z',

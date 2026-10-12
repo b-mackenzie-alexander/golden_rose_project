@@ -13,6 +13,7 @@ from golden_rose.database import validate_database_role_identifier
 Environment = Literal["local", "test", "develop", "production"]
 AuthMode = Literal["synthetic", "staff_oidc"]
 DEVELOP_DEPLOYMENT_TARGET = "gcp-develop-private-synthetic"
+CONTROLLED_LIVE_DATA_STAFF_PILOT_TARGET = "controlled-live-data-staff-pilot"
 
 
 class Settings(BaseSettings):
@@ -171,6 +172,14 @@ class Settings(BaseSettings):
             self.google_calendar_oauth_client_id is not None
             and self.google_calendar_oauth_client_secret is not None
             and self.google_calendar_oauth_redirect_uri is not None
+        )
+
+    @property
+    def controlled_live_data_staff_pilot(self) -> bool:
+        return (
+            self.environment == "production"
+            and self.auth_mode == "staff_oidc"
+            and self.deployment_target == CONTROLLED_LIVE_DATA_STAFF_PILOT_TARGET
         )
 
     def _validate_google_calendar_oauth_configuration(self) -> None:

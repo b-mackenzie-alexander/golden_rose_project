@@ -1,5 +1,15 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-10-12 — Staff-pilot intake write gate repair active
+
+- **Staffing:** One independent developer; source/backend investigation, focused route tests, local type/lint checks and later protected PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** The running controlled staff pilot exposed a blocking intake regression: staff accounts cannot submit Worker or Employer intakes. The source bug is an obsolete local/test-only write gate on draft-intake creation, plus the same gate shape on related intake workflow/correction surfaces. The active repair introduces an exact runtime predicate for the approved staff pilot: `production` environment, `staff_oidc` auth mode and `controlled-live-data-staff-pilot` deployment target.
+- **Gate budget:** Source/local-validation only in this branch. No cloud inspection or mutation, Terraform plan/apply, image build, live migration execution, service update, new account bootstrap, credential rotation, provider-side reset/session-revocation execution, live/client data entry, export/import execution, client-owned environment transition, production-completion claim, destructive cleanup, shared-runtime rollout or automated matching/ranking/eligibility/referral/placement follows.
+- **Next executable action:** Publish the protected repair PR to `develop`. After protected merge, deploy through a separately approved image/service path and browser-validate Worker and Employer intake create/revise behavior from named staff accounts in the running pilot.
+- **Do not regress:** Staff-pilot write access remains named-account and permission-gated; generic production, synthetic develop and public worker/employer self-service remain closed; no automatic matching/ranking/eligibility/referral/placement; no static operational examples; immutable intake history and exact retries; restricted-field controls; auth-sensitive no-store handling.
+
+**Validation to date:** Focused backend route tests passed: 40 intake create/link/finalization tests, 78 shared-gate worker/employer/contact/intake tests and 36 config/dependency tests. Focused Ruff format/check, focused mypy and `git diff --check` passed.
+
 ## 2026-10-11 — Google Calendar OAuth import follow-up active
 
 - **Staffing:** One independent developer; source/frontend/backend implementation, focused local tests, type/lint checks, fresh agent/session review and protected PR gates provide quality evidence, not independent-human authorization.

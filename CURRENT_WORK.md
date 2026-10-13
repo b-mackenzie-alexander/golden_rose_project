@@ -1,5 +1,15 @@
 # Current Work — Golden Rose Operations Platform
 
+## 2026-10-13 — Staff Google session reload hotfix active
+
+- **Staffing:** One independent developer; source inspection, focused frontend auth tests, full web package verification and later protected PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** The owner reports the running staff pilot now saves drafts and delegations, but a normal platform page reload forces staff to sign in again in the same browser. Source investigation found the Google staff credential was kept only in module memory, so any reload erased the Golden Rose browser session before the app could call the staff session endpoint.
+- **Gate budget:** Source/frontend/documentation/local-validation work only. No cloud inspection or mutation, Terraform plan/apply, image build, live migration execution, service update, account bootstrap execution, credential rotation, provider-side reset/session-revocation execution, live/client data entry, export/import execution, client-owned environment transition, production-completion claim, destructive cleanup, shared-runtime rollout or automated matching/ranking/eligibility/referral/placement follows from this branch.
+- **Next executable action:** Publish the bounded hotfix PR to `develop`. After protected merge, use a separately approved image/service path and browser-validate that a signed-in staff account remains authorized across page reload, while explicit sign-out still clears the Golden Rose browser session.
+- **Do not regress:** Staff sessions remain named-account and staff-OIDC gated; no provider-side Google sign-out or session revocation is claimed; no raw provider tokens in chat/source docs; no long-lived refresh-token custody; account-management RBAC/DBAC improvements remain the next separate patch; immutable intake history and exact retries; restricted-field controls; bilingual/accessibility parity; separate public/staff identity planes; auth-sensitive no-store handling; durable current-environment records with migration-disposition tracking.
+
+**Validation to date:** Focused frontend auth/header tests passed 23 tests. Full frontend `npm --prefix apps/web run verify` passed lock validation, lock tests, lint, typecheck, 554 coverage tests with branch coverage at 85.04%, and production build; existing jsdom canvas notices and Vite large-chunk warning remain.
+
 ## 2026-10-12 — Staff-pilot intake permission follow-up active
 
 - **Staffing:** One independent developer; source investigation, focused route/API/UI tests, local type/lint checks and later protected PR gates provide quality evidence, not independent-human authorization.

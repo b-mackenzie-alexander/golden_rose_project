@@ -23,10 +23,19 @@ function renderSignIn(onSignedIn = vi.fn()) {
   );
 }
 
+function credentialWithExpiration(expiresAt = Date.now() + 60_000) {
+  const payload = window.btoa(JSON.stringify({ exp: Math.floor(expiresAt / 1000) }))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/u, '');
+  return `header.${payload}.signature`;
+}
+
 describe('GoogleStaffSignIn', () => {
   it('renders a Google sign-in button and stores the returned credential', async () => {
     let callback: ((response: { credential?: string }) => void) | null = null;
     const onSignedIn = vi.fn();
+    const credential = credentialWithExpiration();
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
       auth_mode: 'staff_oidc',
       provider: 'google',
@@ -67,13 +76,17 @@ describe('GoogleStaffSignIn', () => {
     });
     const credentialCallback = callback as unknown as (response: { credential?: string }) => void;
     await act(async () => {
-      credentialCallback({ credential: 'header.payload.signature' });
+      credentialCallback({ credential });
       await Promise.resolve();
     });
 
     await waitFor(() => {
       expect(onSignedIn).toHaveBeenCalledTimes(1);
     });
+    vi.resetModules();
+    const reloadedSession = await import('./staffAuthSession');
+    expect(reloadedSession.bearerHeaders(undefined).get('Authorization')).toBe(`Bearer ${credential}`);
+    reloadedSession.clearStaffIdToken();
   });
 
   it('shows and clears a stored Google staff browser session', async () => {

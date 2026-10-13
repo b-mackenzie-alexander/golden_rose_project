@@ -78,19 +78,13 @@ def provenance_predicate() -> dict[str, Any]:
                     "digest": {"gitCommit": SOURCE_COMMIT},
                 },
                 {
-                    "uri": (
-                        "pkg:docker/docker.io/library/"
-                        "node@22.22.3-bookworm-slim?platform=linux%2Famd64"
-                    ),
+                    "uri": ("pkg:docker/node@22.22.3-bookworm-slim?platform=linux%2Famd64"),
                     "digest": {
                         "sha256": "16d364eebf6b62da439dc993d9b80940c78b0ca38438452f011ab9a25c752644"
                     },
                 },
                 {
-                    "uri": (
-                        "pkg:docker/docker.io/library/"
-                        "python@3.12.12-slim-bookworm?platform=linux%2Famd64"
-                    ),
+                    "uri": ("pkg:docker/python@3.12.12-slim-bookworm?platform=linux%2Famd64"),
                     "digest": {
                         "sha256": "2986c55feb36e6cae00fa1fefb454283e4b33f35e75ff8bdd123b134130be301"
                     },

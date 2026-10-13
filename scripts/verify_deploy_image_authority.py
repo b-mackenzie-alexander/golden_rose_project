@@ -23,10 +23,10 @@ EXPECTED_BUILDER_ID = "https://github.com/actions/runner/github-hosted"
 SPDX_SCHEMA_PATH = Path(__file__).resolve().parents[1] / "infra/policy/spdx-2.3.schema.json"
 SPDX_SCHEMA_SHA256 = "239208b7ac287b3cf5d9a9af23f9d69863971102a5e1587a27a398b43490b89b"
 EXPECTED_BASE_MATERIALS = {
-    "pkg:docker/docker.io/library/node@22.22.3-bookworm-slim": (
+    "pkg:docker/node@22.22.3-bookworm-slim": (
         "16d364eebf6b62da439dc993d9b80940c78b0ca38438452f011ab9a25c752644"
     ),
-    "pkg:docker/docker.io/library/python@3.12.12-slim-bookworm": (
+    "pkg:docker/python@3.12.12-slim-bookworm": (
         "2986c55feb36e6cae00fa1fefb454283e4b33f35e75ff8bdd123b134130be301"
     ),
 }

@@ -1,5 +1,15 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-10-13 — Staff account-management RBAC/DBAC update active
+
+- **Staffing:** One independent developer; source/backend/frontend investigation, focused account-management tests, local type/lint checks and later protected PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #184, the staff Google reload/session hotfix, is merged into protected `develop` and can ride with the next account-management deployment. Fresh source work is active on `feat/account-management-permission-clusters` to make staff account administration owner-friendly: durable role profiles apply practical permission clusters, provisioning add-ons remain explicit, active accounts can be updated permanently, and temporary delegations are labeled as expiring coverage rather than the primary way to run the business.
+- **Gate budget:** Source/local-validation only in this branch. No cloud inspection or mutation, Terraform plan/apply, image build, live migration execution, service update, account bootstrap execution, credential rotation, provider-side reset/session-revocation execution, live/client data entry, export/import execution, client-owned environment transition, production-completion claim, destructive cleanup, shared-runtime rollout or automated matching/ranking/eligibility/referral/placement follows.
+- **Next executable action:** Finish local validation and publish the protected account-management PR to `develop`. After protected merge, deploy through a separately approved image/service path and browser-validate reload persistence plus owner-managed residential-intake and jobsite/request account profiles.
+- **Do not regress:** Named permissions stay explicit authority; role profiles only select named grants. Durable access changes require explicit account correction, temporary delegations expire, staff access remains named-account/OIDC-gated, and no public self-service or automated matching/ranking/eligibility/referral/placement is introduced.
+
+**Validation to date:** Focused backend staff-account lifecycle/API route tests passed 114 tests. Focused frontend staff-account admin/profile/client tests passed 37 tests. Full frontend verify passed 556 coverage tests, coverage thresholds, lint, typecheck and production build. Focused Ruff format/check, focused backend mypy and `git diff --check` passed.
+
 ## 2026-10-13 — Staff Google session reload hotfix active
 
 - **Staffing:** One independent developer; source/frontend investigation, focused auth/header tests, full web verification and later protected PR gates provide quality evidence, not independent-human authorization.

@@ -35,8 +35,12 @@ from golden_rose.application.errors import SafePersistenceError
 from golden_rose.application.staff_account_delegations import (
     StaffDelegationConflictError,
     StaffDelegationError,
+    StaffDelegationExpiryError,
     StaffDelegationNotFoundError,
+    StaffDelegationPermissionUnavailableError,
     StaffDelegationResult,
+    StaffDelegationSelfGrantError,
+    StaffDelegationTargetUnavailableError,
     grant_staff_delegation,
     list_delegations_for_staff,
     revoke_staff_account_delegation,
@@ -161,6 +165,34 @@ def _problem_for_delegation_error(exc: Exception) -> Response:
             title="Precondition Failed",
             detail="staff delegation conflict",
             type_="https://golden-rose.local/problems/staff-delegation-conflict",
+        )
+    if isinstance(exc, StaffDelegationSelfGrantError):
+        return no_store_problem_response(
+            status_code=422,
+            title="Unprocessable Entity",
+            detail="staff delegation cannot target the current account",
+            type_="https://golden-rose.local/problems/staff-delegation-self-grant",
+        )
+    if isinstance(exc, StaffDelegationPermissionUnavailableError):
+        return no_store_problem_response(
+            status_code=422,
+            title="Unprocessable Entity",
+            detail="delegated permission is not available to this session",
+            type_="https://golden-rose.local/problems/staff-delegation-permission-unavailable",
+        )
+    if isinstance(exc, StaffDelegationTargetUnavailableError):
+        return no_store_problem_response(
+            status_code=422,
+            title="Unprocessable Entity",
+            detail="target staff account cannot receive delegation",
+            type_="https://golden-rose.local/problems/staff-delegation-target-unavailable",
+        )
+    if isinstance(exc, StaffDelegationExpiryError):
+        return no_store_problem_response(
+            status_code=422,
+            title="Unprocessable Entity",
+            detail="staff delegation expiration is invalid",
+            type_="https://golden-rose.local/problems/staff-delegation-expiration-invalid",
         )
     if isinstance(exc, StaffDelegationError):
         return no_store_problem_response(

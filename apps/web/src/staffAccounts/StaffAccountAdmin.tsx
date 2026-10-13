@@ -20,6 +20,7 @@ import type { StaffAccount, StaffAccountFailureKind, StaffAccountLifecycleEvent,
 import { GoogleStaffSignIn } from '../auth/GoogleStaffSignIn';
 import { IconSymbol } from '../dashboard/artwork';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { permissionLabel } from './permissionLabels';
 
 type AccountAction = 'activate' | 'suspend' | 'deprovision' | 'recovery' | 'session';
 type AccountFilter = 'all' | 'active' | 'suspended' | 'deprovisioned' | 'mfa_pending';
@@ -222,6 +223,10 @@ const failureLabels: Record<StaffAccountFailureKind, { en: string; es: string }>
   unavailable: { en: 'The account service is unavailable. Try again after the connection recovers.', es: 'El servicio de cuentas no esta disponible. Intente cuando se recupere la conexion.' },
   unknown_outcome: { en: 'The outcome is unknown. Retry the original account request before changing the form.', es: 'El resultado es desconocido. Reintente la solicitud original antes de cambiar el formulario.' },
   unexpected: { en: 'The account response could not be used safely.', es: 'La respuesta de cuenta no se pudo usar con seguridad.' },
+  delegation_self_grant: { en: 'Temporary delegations are for another staff account. Use Correct to add named permissions to your own account.', es: 'Las delegaciones temporales son para otra cuenta. Use Corregir para agregar permisos nombrados a su propia cuenta.' },
+  delegation_permission_unavailable: { en: 'This session cannot delegate a permission it does not currently have. Add the named permission through account correction or ask an authorized owner.', es: 'Esta sesion no puede delegar un permiso que no tiene actualmente. Agregue el permiso nombrado mediante correccion de cuenta o pida ayuda a una propietaria autorizada.' },
+  delegation_target_unavailable: { en: 'This staff account cannot receive a delegation in its current state.', es: 'Esta cuenta del personal no puede recibir una delegacion en su estado actual.' },
+  delegation_expiration_invalid: { en: 'Choose a future expiration within one year.', es: 'Elija un vencimiento futuro dentro de un ano.' },
 };
 
 const emptyCreate: CreateForm = {
@@ -313,7 +318,7 @@ function PermissionChecklist({
           {group.items.map((permission) => (
             <label key={permission}>
               <input checked={selected.includes(permission)} type="checkbox" onChange={() => { onToggle(permission); }} />
-              <span>{permission}</span>
+              <span title={permission}>{permissionLabel(permission, language)}</span>
             </label>
           ))}
         </div>
@@ -757,7 +762,7 @@ export function StaffAccountAdmin() {
                   <details className="staff-permission-details">
                     <summary>{language === 'en' ? 'Named permissions' : 'Permisos nombrados'}</summary>
                     <ul>
-                      {account.permissionNames.map((permission) => <li key={permission}>{permission}</li>)}
+                      {account.permissionNames.map((permission) => <li key={permission} title={permission}>{permissionLabel(permission, language)}</li>)}
                     </ul>
                   </details>
                 </span>
@@ -1030,7 +1035,7 @@ export function StaffAccountAdmin() {
             {delegationPanel.items.map((delegation) => (
               <div className="staff-delegation-row" key={delegation.delegationId}>
                 <span>
-                  <strong>{delegation.permissionName}</strong>
+                  <strong title={delegation.permissionName}>{permissionLabel(delegation.permissionName, language)}</strong>
                   <small>{language === 'en' ? 'Global scope' : 'Alcance global'}</small>
                 </span>
                 <span>
@@ -1057,7 +1062,7 @@ export function StaffAccountAdmin() {
                 <select className="focus-ring" value={delegationPanel.permissionName} onChange={(event) => { setDelegationPanel({ ...delegationPanel, permissionName: event.target.value }); }}>
                   {permissionGroups.map((group) => (
                     <optgroup key={group.label.en} label={group.label[language]}>
-                      {group.items.map((permission) => <option key={permission} value={permission}>{permission}</option>)}
+                      {group.items.map((permission) => <option key={permission} value={permission}>{permissionLabel(permission, language)}</option>)}
                     </optgroup>
                   ))}
                 </select>

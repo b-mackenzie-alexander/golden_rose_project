@@ -15,8 +15,12 @@ from golden_rose.application.errors import SafePersistenceError
 from golden_rose.application.staff_account_delegations import (
     StaffDelegationConflictError,
     StaffDelegationError,
+    StaffDelegationExpiryError,
     StaffDelegationNotFoundError,
+    StaffDelegationPermissionUnavailableError,
     StaffDelegationResult,
+    StaffDelegationSelfGrantError,
+    StaffDelegationTargetUnavailableError,
 )
 from golden_rose.application.staff_account_lifecycle import (
     StaffAccountLifecycleError,
@@ -1024,6 +1028,54 @@ def test_staff_account_delegation_errors_are_value_safe(
         "https://golden-rose.local/problems/staff-delegation-invalid"
     )
     assert "private" not in bad_request.text
+
+
+@pytest.mark.parametrize(
+    ("error", "problem_type"),
+    [
+        (
+            StaffDelegationSelfGrantError("private self grant detail"),
+            "https://golden-rose.local/problems/staff-delegation-self-grant",
+        ),
+        (
+            StaffDelegationPermissionUnavailableError("private permission detail"),
+            "https://golden-rose.local/problems/staff-delegation-permission-unavailable",
+        ),
+        (
+            StaffDelegationTargetUnavailableError("private target detail"),
+            "https://golden-rose.local/problems/staff-delegation-target-unavailable",
+        ),
+        (
+            StaffDelegationExpiryError("private expiry detail"),
+            "https://golden-rose.local/problems/staff-delegation-expiration-invalid",
+        ),
+    ],
+)
+def test_staff_account_delegation_known_business_rule_errors_are_actionable_and_value_safe(
+    http: tuple[TestClient, FixedIdentifiers],
+    monkeypatch: pytest.MonkeyPatch,
+    error: StaffDelegationError,
+    problem_type: str,
+) -> None:
+    client, _ = http
+    grant = Mock(side_effect=error)
+    monkeypatch.setattr(staff_accounts, "grant_staff_delegation", grant)
+
+    response = client.post(
+        f"/api/staff/v1/staff-accounts/{STAFF_ID}/delegations",
+        headers=command_headers(),
+        json={
+            "permission_name": "intake:read",
+            "scope_kind": "global",
+            "expires_at": "2026-09-29T12:00:00Z",
+            "reason_text": "Temporary coverage",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["type"] == problem_type
+    assert "private" not in response.text
 
 
 def test_staff_account_delegation_routes_preserve_forbidden_and_service_boundaries(

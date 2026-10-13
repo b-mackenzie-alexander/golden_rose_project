@@ -9,7 +9,11 @@ import golden_rose.application.staff_account_delegations as delegation_module
 from golden_rose.application.errors import SafePersistenceError
 from golden_rose.application.staff_account_delegations import (
     StaffDelegationError,
+    StaffDelegationExpiryError,
     StaffDelegationNotFoundError,
+    StaffDelegationPermissionUnavailableError,
+    StaffDelegationSelfGrantError,
+    StaffDelegationTargetUnavailableError,
     grant_staff_delegation,
     list_delegations_for_staff,
     revoke_staff_account_delegation,
@@ -187,17 +191,26 @@ def test_grant_staff_delegation_requires_permission() -> None:
 
 
 @pytest.mark.parametrize(
-    ("kwargs", "match"),
+    ("kwargs", "error_type", "match"),
     [
-        ({"permission_name": " "}, "invalid permission_name"),
-        ({"scope_kind": "case"}, "only global"),
-        ({"permission_name": "worker:read"}, "does not hold"),
-        ({"expires_at": NOW}, "expire in the future"),
-        ({"expires_at": NOW + timedelta(days=367)}, "duration is too long"),
+        ({"permission_name": " "}, StaffDelegationError, "invalid permission_name"),
+        ({"scope_kind": "case"}, StaffDelegationError, "only global"),
+        (
+            {"permission_name": "worker:read"},
+            StaffDelegationPermissionUnavailableError,
+            "does not hold",
+        ),
+        ({"expires_at": NOW}, StaffDelegationExpiryError, "expire in the future"),
+        (
+            {"expires_at": NOW + timedelta(days=367)},
+            StaffDelegationExpiryError,
+            "duration is too long",
+        ),
     ],
 )
 def test_grant_staff_delegation_rejects_invalid_input(
     kwargs: dict[str, object],
+    error_type: type[StaffDelegationError],
     match: str,
 ) -> None:
     values = {
@@ -206,7 +219,7 @@ def test_grant_staff_delegation_rejects_invalid_input(
         "expires_at": NOW + timedelta(days=7),
     } | kwargs
 
-    with pytest.raises(StaffDelegationError, match=match):
+    with pytest.raises(error_type, match=match):
         grant_staff_delegation(
             session=FakeSession(),  # type: ignore[arg-type]
             principal=_principal("staff_account:delegation:grant", "employer:read"),
@@ -221,7 +234,7 @@ def test_grant_staff_delegation_rejects_invalid_input(
 
 
 def test_grant_staff_delegation_rejects_self_delegation() -> None:
-    with pytest.raises(StaffDelegationError, match="delegate to itself"):
+    with pytest.raises(StaffDelegationSelfGrantError, match="delegate to itself"):
         grant_staff_delegation(
             session=FakeSession(),  # type: ignore[arg-type]
             principal=_principal(
@@ -248,7 +261,7 @@ def test_grant_staff_delegation_rejects_deprovisioned_target(
         lambda **_kwargs: _account(status="deprovisioned"),
     )
 
-    with pytest.raises(StaffDelegationError, match="deprovisioned"):
+    with pytest.raises(StaffDelegationTargetUnavailableError, match="deprovisioned"):
         grant_staff_delegation(
             session=FakeSession(),  # type: ignore[arg-type]
             principal=_principal("staff_account:delegation:grant", "employer:read"),

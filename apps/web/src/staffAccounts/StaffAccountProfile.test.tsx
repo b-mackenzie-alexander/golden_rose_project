@@ -123,8 +123,8 @@ it('shows the current staff account, MFA evidence, permissions, and active deleg
   expect(screen.getByText('Staff identity provider session')).toBeInTheDocument();
   expect(screen.getByText('Active')).toBeInTheDocument();
   expect(screen.getByText('MFA')).toBeInTheDocument();
-  expect(screen.getByText('intake:read')).toBeInTheDocument();
-  expect(screen.getAllByText('worker:read')).toHaveLength(2);
+  expect(screen.getByText('Intakes: Read')).toBeInTheDocument();
+  expect(screen.getAllByText('Workers: Read')).toHaveLength(2);
   expect(screen.getByText('This page reflects Golden Rose account evidence and permissions. Provider-side factor resets and session revocation remain outside this application.')).toBeInTheDocument();
   expect(screen.getByText('Production staff OIDC configured')).toBeInTheDocument();
   expect(screen.getByText('Evidence recording only')).toBeInTheDocument();

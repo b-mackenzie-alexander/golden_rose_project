@@ -306,13 +306,45 @@ it('maps staff authentication and account-state problem responses', async () => 
     .mockResolvedValueOnce(problem('https://golden-rose.local/problems/staff-authentication-required', 401))
     .mockResolvedValueOnce(problem('https://golden-rose.local/problems/staff-authentication-failed', 401))
     .mockResolvedValueOnce(problem('https://golden-rose.local/problems/staff-account-unavailable', 403))
-    .mockResolvedValueOnce(problem('https://golden-rose.local/problems/staff-identity-provider-unavailable', 503));
+    .mockResolvedValueOnce(problem('https://golden-rose.local/problems/staff-identity-provider-unavailable', 503))
+    .mockResolvedValueOnce(problem('https://golden-rose.local/problems/staff-delegation-self-grant', 422))
+    .mockResolvedValueOnce(problem('https://golden-rose.local/problems/staff-delegation-permission-unavailable', 422))
+    .mockResolvedValueOnce(problem('https://golden-rose.local/problems/staff-delegation-target-unavailable', 422))
+    .mockResolvedValueOnce(problem('https://golden-rose.local/problems/staff-delegation-expiration-invalid', 422));
   vi.stubGlobal('fetch', fetchMock);
 
   expect(await getStaffSession()).toEqual({ ok: false, failure: { kind: 'sign_in_required' } });
   expect(await getStaffSession()).toEqual({ ok: false, failure: { kind: 'authentication_failed' } });
   expect(await getStaffSession()).toEqual({ ok: false, failure: { kind: 'account_unavailable' } });
   expect(await getStaffSession()).toEqual({ ok: false, failure: { kind: 'identity_provider_unavailable' } });
+  expect(await grantStaffDelegation({
+    staffId: account.staff_id,
+    permissionName: 'intake:read',
+    expiresAt: delegation.expires_at,
+    reasonText: 'Temporary coverage',
+    commandId: delegation.delegation_id,
+  })).toEqual({ ok: false, failure: { kind: 'delegation_self_grant' } });
+  expect(await grantStaffDelegation({
+    staffId: account.staff_id,
+    permissionName: 'intake:read',
+    expiresAt: delegation.expires_at,
+    reasonText: 'Temporary coverage',
+    commandId: delegation.delegation_id,
+  })).toEqual({ ok: false, failure: { kind: 'delegation_permission_unavailable' } });
+  expect(await grantStaffDelegation({
+    staffId: account.staff_id,
+    permissionName: 'intake:read',
+    expiresAt: delegation.expires_at,
+    reasonText: 'Temporary coverage',
+    commandId: delegation.delegation_id,
+  })).toEqual({ ok: false, failure: { kind: 'delegation_target_unavailable' } });
+  expect(await grantStaffDelegation({
+    staffId: account.staff_id,
+    permissionName: 'intake:read',
+    expiresAt: delegation.expires_at,
+    reasonText: 'Temporary coverage',
+    commandId: delegation.delegation_id,
+  })).toEqual({ ok: false, failure: { kind: 'delegation_expiration_invalid' } });
 });
 
 it('creates, corrects, updates Google email, and activates accounts with idempotency headers and version validation', async () => {

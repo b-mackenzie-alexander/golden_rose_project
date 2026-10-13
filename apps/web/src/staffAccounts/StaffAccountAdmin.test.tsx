@@ -168,6 +168,7 @@ it('creates a suspended onboarding account and shows field-local validation', as
   expect(screen.queryByText('oidc:staff:123')).not.toBeInTheDocument();
   expect(screen.getByText('1 named permissions')).toBeInTheDocument();
   expect(screen.getByText('Intake write: missing')).toBeInTheDocument();
+  expect(screen.getAllByText('Staff Accounts: Read').length).toBeGreaterThan(0);
 
   await user.click(screen.getByRole('button', { name: 'Create staff account' }));
   expect(screen.getByText('Display name is required.')).toBeInTheDocument();
@@ -189,9 +190,9 @@ it('creates a suspended onboarding account and shows field-local validation', as
   await user.selectOptions(createForm.getByLabelText('Role'), 'delegated_manager');
   await user.click(createForm.getByLabelText('MFA already enrolled'));
   await user.type(createForm.getByRole('textbox', { name: /Reason/ }), 'Initial onboarding approved');
-  await user.click(createForm.getByLabelText('staff_account:create'));
-  await user.click(createForm.getByLabelText('staff_account:read'));
-  await user.click(createForm.getByLabelText('staff_account:read'));
+  await user.click(createForm.getByLabelText('Staff Accounts: Create'));
+  await user.click(createForm.getByLabelText('Staff Accounts: Read'));
+  await user.click(createForm.getByLabelText('Staff Accounts: Read'));
   await user.click(createForm.getByRole('button', { name: 'Create staff account' }));
 
   const createCall = vi.mocked(createStaffAccount).mock.calls[0]?.[0];
@@ -269,7 +270,7 @@ it('corrects suspended onboarding details without deleting the account', async (
   await user.type(correction.getByRole('textbox', { name: /Provider subject/ }), 'oidc:staff:corrected');
   await user.selectOptions(correction.getByLabelText('Role'), 'delegated_manager');
   await user.click(correction.getByLabelText('MFA already enrolled'));
-  await user.click(correction.getByLabelText('intake:read'));
+  await user.click(correction.getByLabelText('Intakes: Read'));
   await user.type(correction.getByLabelText('Reason'), 'Corrected provider subject before activation');
   await user.click(correction.getByRole('button', { name: 'Save correction' }));
 
@@ -395,7 +396,7 @@ it('shows correction validation and recoverable command errors', async () => {
   await user.clear(firstCorrection.getByRole('textbox', { name: /Display name/ }));
   await user.clear(firstCorrection.getByRole('textbox', { name: /Google email/ }));
   await user.clear(firstCorrection.getByRole('textbox', { name: /Provider subject/ }));
-  await user.click(firstCorrection.getByLabelText('staff_account:read'));
+  await user.click(firstCorrection.getByLabelText('Staff Accounts: Read'));
   await user.click(firstCorrection.getByRole('button', { name: 'Save correction' }));
 
   expect(firstCorrection.getByText('Display name is required.')).toBeInTheDocument();
@@ -589,7 +590,7 @@ it('lists, grants, and revokes account delegations', async () => {
 
   await user.click(screen.getByRole('button', { name: 'Delegations' }));
   expect(await screen.findByRole('heading', { name: 'Delegations: Mariela Torres' })).toBeInTheDocument();
-  expect(screen.getAllByText('intake:read').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('Intakes: Read').length).toBeGreaterThan(0);
   await user.selectOptions(screen.getByLabelText('Permission'), 'worker:read');
   await user.clear(lastElement(screen.getAllByLabelText('Reason')));
   await user.type(lastElement(screen.getAllByLabelText('Reason')), 'Temporary worker coverage');
@@ -623,7 +624,7 @@ it('shows recoverable delegation list and form errors', async () => {
   vi.mocked(listStaffDelegations)
     .mockResolvedValueOnce({ ok: false, failure: { kind: 'forbidden' } })
     .mockResolvedValueOnce({ ok: true, value: [] });
-  vi.mocked(grantStaffDelegation).mockResolvedValue({ ok: false, failure: { kind: 'validation' } });
+  vi.mocked(grantStaffDelegation).mockResolvedValue({ ok: false, failure: { kind: 'delegation_permission_unavailable' } });
 
   render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
   await screen.findByText('Mariela Torres');
@@ -639,7 +640,7 @@ it('shows recoverable delegation list and form errors', async () => {
 
   await user.type(lastElement(screen.getAllByLabelText('Reason')), 'Temporary coverage');
   await user.click(screen.getByRole('button', { name: 'Grant delegation' }));
-  expect(await screen.findByText('Check the highlighted account fields and try again.')).toBeInTheDocument();
+  expect(await screen.findByText('This session cannot delegate a permission it does not currently have. Add the named permission through account correction or ask an authorized owner.')).toBeInTheDocument();
 });
 
 it('blocks expired delegation grants before submitting to the API', async () => {

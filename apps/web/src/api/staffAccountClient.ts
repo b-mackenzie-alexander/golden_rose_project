@@ -113,7 +113,11 @@ export type StaffAccountFailureKind =
   | 'stale'
   | 'unavailable'
   | 'unknown_outcome'
-  | 'unexpected';
+  | 'unexpected'
+  | 'delegation_self_grant'
+  | 'delegation_permission_unavailable'
+  | 'delegation_target_unavailable'
+  | 'delegation_expiration_invalid';
 
 export type StaffAccountResult<T> = { ok: true; value: T } | { ok: false; failure: { kind: StaffAccountFailureKind } };
 
@@ -239,6 +243,18 @@ function failureFromProblem(status: number, type: string | null, command = false
   }
   if (type === 'https://golden-rose.local/problems/staff-identity-provider-unavailable') {
     return { ok: false, failure: { kind: 'identity_provider_unavailable' } };
+  }
+  if (type === 'https://golden-rose.local/problems/staff-delegation-self-grant') {
+    return { ok: false, failure: { kind: 'delegation_self_grant' } };
+  }
+  if (type === 'https://golden-rose.local/problems/staff-delegation-permission-unavailable') {
+    return { ok: false, failure: { kind: 'delegation_permission_unavailable' } };
+  }
+  if (type === 'https://golden-rose.local/problems/staff-delegation-target-unavailable') {
+    return { ok: false, failure: { kind: 'delegation_target_unavailable' } };
+  }
+  if (type === 'https://golden-rose.local/problems/staff-delegation-expiration-invalid') {
+    return { ok: false, failure: { kind: 'delegation_expiration_invalid' } };
   }
   if (status === 400 || status === 422) return { ok: false, failure: { kind: 'validation' } };
   if (status === 403) return { ok: false, failure: { kind: 'forbidden' } };

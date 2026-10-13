@@ -41,6 +41,22 @@ class StaffDelegationConflictError(StaffDelegationError):
     pass
 
 
+class StaffDelegationExpiryError(StaffDelegationError):
+    pass
+
+
+class StaffDelegationPermissionUnavailableError(StaffDelegationError):
+    pass
+
+
+class StaffDelegationSelfGrantError(StaffDelegationError):
+    pass
+
+
+class StaffDelegationTargetUnavailableError(StaffDelegationError):
+    pass
+
+
 def list_delegations_for_staff(
     *,
     session: Session,
@@ -80,21 +96,25 @@ def grant_staff_delegation(
     if scope_kind != "global":
         raise StaffDelegationError("only global staff delegations are supported")
     if grantee_staff_id == principal.actor_id:
-        raise StaffDelegationError("staff account cannot delegate to itself")
+        raise StaffDelegationSelfGrantError("staff account cannot delegate to itself")
     if permission_name not in principal.permissions:
-        raise StaffDelegationError("staff account cannot delegate permission it does not hold")
+        raise StaffDelegationPermissionUnavailableError(
+            "staff account cannot delegate permission it does not hold"
+        )
     now = clock.now()
     if expires_at <= now:
-        raise StaffDelegationError("staff delegation must expire in the future")
+        raise StaffDelegationExpiryError("staff delegation must expire in the future")
     if expires_at > now + timedelta(days=366):
-        raise StaffDelegationError("staff delegation duration is too long")
+        raise StaffDelegationExpiryError("staff delegation duration is too long")
     try:
         try:
             target = get_staff_account_by_id(session=session, staff_id=grantee_staff_id)
         except NoResultFound as exc:
             raise StaffDelegationNotFoundError("staff account not found") from exc
         if target.lifecycle_status == "deprovisioned":
-            raise StaffDelegationError("deprovisioned staff account cannot receive delegation")
+            raise StaffDelegationTargetUnavailableError(
+                "deprovisioned staff account cannot receive delegation"
+            )
         delegation = insert_staff_delegation(
             session=session,
             delegation_id=delegation_id,

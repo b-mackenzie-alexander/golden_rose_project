@@ -12,6 +12,7 @@ import type {
 import { GoogleStaffSignIn } from '../auth/GoogleStaffSignIn';
 import { IconSymbol } from '../dashboard/artwork';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { permissionLabel } from './permissionLabels';
 
 const statusLabels = {
   active: { en: 'Active', es: 'Activa' },
@@ -114,6 +115,22 @@ const failureLabels: Record<StaffAccountFailureKind, { en: string; es: string }>
   unknown_outcome: {
     en: 'The outcome is unknown. Reload before taking another account action.',
     es: 'El resultado es desconocido. Recargue antes de otra accion.',
+  },
+  delegation_self_grant: {
+    en: 'Temporary delegations are for another staff account.',
+    es: 'Las delegaciones temporales son para otra cuenta.',
+  },
+  delegation_permission_unavailable: {
+    en: 'This session cannot delegate a permission it does not currently have.',
+    es: 'Esta sesion no puede delegar un permiso que no tiene actualmente.',
+  },
+  delegation_target_unavailable: {
+    en: 'This staff account cannot receive a delegation in its current state.',
+    es: 'Esta cuenta del personal no puede recibir una delegacion en su estado actual.',
+  },
+  delegation_expiration_invalid: {
+    en: 'Choose a future expiration within one year.',
+    es: 'Elija un vencimiento futuro dentro de un ano.',
   },
 };
 
@@ -311,7 +328,7 @@ export function StaffAccountProfile() {
             <section className="staff-account-panel">
               <h3>{language === 'en' ? 'Active permissions' : 'Permisos activos'}</h3>
               <ul className="staff-profile-list">
-                {session.permissionNames.map((permission) => <li key={permission}>{permission}</li>)}
+                {session.permissionNames.map((permission) => <li key={permission} title={permission}>{permissionLabel(permission, language)}</li>)}
               </ul>
             </section>
 
@@ -321,7 +338,7 @@ export function StaffAccountProfile() {
                 <ul className="staff-profile-list">
                   {activeDelegations.map((delegation) => (
                     <li key={delegation.delegationId}>
-                      <strong>{delegation.permissionName}</strong>
+                      <strong title={delegation.permissionName}>{permissionLabel(delegation.permissionName, language)}</strong>
                       <span>{language === 'en' ? 'Expires' : 'Vence'} <time dateTime={delegation.expiresAt}>{formatDate(delegation.expiresAt)}</time></span>
                     </li>
                   ))}

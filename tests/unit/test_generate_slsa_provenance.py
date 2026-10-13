@@ -39,7 +39,7 @@ def valid_metadata() -> dict[str, object]:
             "materials": [
                 {
                     "uri": (
-                        "pkg:docker/public.ecr.aws/docker/library/"
+                        "pkg:docker/docker.io/library/"
                         "python@3.12.12-slim-bookworm?platform=linux%2Famd64"
                     ),
                     "digest": {"sha256": "c" * 64},
@@ -99,8 +99,7 @@ def test_generates_slsa_v1_predicate_from_validated_buildx_metadata() -> None:
         },
         {
             "uri": (
-                "pkg:docker/public.ecr.aws/docker/library/"
-                "python@3.12.12-slim-bookworm?platform=linux%2Famd64"
+                "pkg:docker/docker.io/library/python@3.12.12-slim-bookworm?platform=linux%2Famd64"
             ),
             "digest": {"sha256": "c" * 64},
         },

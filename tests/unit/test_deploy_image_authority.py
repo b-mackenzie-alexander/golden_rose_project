@@ -79,7 +79,7 @@ def provenance_predicate() -> dict[str, Any]:
                 },
                 {
                     "uri": (
-                        "pkg:docker/public.ecr.aws/docker/library/"
+                        "pkg:docker/docker.io/library/"
                         "node@22.22.3-bookworm-slim?platform=linux%2Famd64"
                     ),
                     "digest": {
@@ -88,7 +88,7 @@ def provenance_predicate() -> dict[str, Any]:
                 },
                 {
                     "uri": (
-                        "pkg:docker/public.ecr.aws/docker/library/"
+                        "pkg:docker/docker.io/library/"
                         "python@3.12.12-slim-bookworm?platform=linux%2Famd64"
                     ),
                     "digest": {

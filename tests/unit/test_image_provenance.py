@@ -46,15 +46,13 @@ def valid_metadata() -> dict[str, object]:
             "predicateType": "https://slsa.dev/provenance/v1",
             "materials": [
                 {
-                    "uri": ("pkg:docker/public.ecr.aws/docker/library/node@22.22.3-bookworm-slim"),
+                    "uri": ("pkg:docker/docker.io/library/node@22.22.3-bookworm-slim"),
                     "digest": {
                         "sha256": "16d364eebf6b62da439dc993d9b80940c78b0ca38438452f011ab9a25c752644"
                     },
                 },
                 {
-                    "uri": (
-                        "pkg:docker/public.ecr.aws/docker/library/python@3.12.12-slim-bookworm"
-                    ),
+                    "uri": ("pkg:docker/docker.io/library/python@3.12.12-slim-bookworm"),
                     "digest": {
                         "sha256": "2986c55feb36e6cae00fa1fefb454283e4b33f35e75ff8bdd123b134130be301"
                     },
@@ -77,7 +75,7 @@ def valid_buildkit_metadata() -> dict[str, object]:
             "materials": [
                 {
                     "uri": (
-                        "pkg:docker/public.ecr.aws/docker/library/"
+                        "pkg:docker/docker.io/library/"
                         "node@22.22.3-bookworm-slim?digest="
                         "sha256:16d364eebf6b62da439dc993d9b80940c78b0ca38438452f011ab9a25c752644"
                     ),
@@ -87,7 +85,7 @@ def valid_buildkit_metadata() -> dict[str, object]:
                 },
                 {
                     "uri": (
-                        "pkg:docker/public.ecr.aws/docker/library/"
+                        "pkg:docker/docker.io/library/"
                         "python@3.12.12-slim-bookworm?digest="
                         "sha256:2986c55feb36e6cae00fa1fefb454283e4b33f35e75ff8bdd123b134130be301"
                     ),
@@ -807,10 +805,7 @@ def test_publish_mode_rejects_spdx_dsse_attestation_for_a_different_image(
                     "predicateType": "https://slsa.dev/provenance/v1",
                     "materials": [
                         {
-                            "uri": (
-                                "pkg:docker/public.ecr.aws/docker/library/"
-                                "node@22.22.3-bookworm-slim"
-                            ),
+                            "uri": ("pkg:docker/docker.io/library/node@22.22.3-bookworm-slim"),
                             "digest": {"sha256": "0" * 64},
                         }
                     ],

@@ -1,5 +1,15 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-10-13 — Staff Google session reload hotfix active
+
+- **Staffing:** One independent developer; source/frontend investigation, focused auth/header tests, full web verification and later protected PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** After the intake permission/delegation repair, the next pilot blocker is session continuity: reloading the platform page forces staff to sign in again in the same browser. The active hotfix persists only the current expiring Google staff credential in browser session storage, restores it after a page reload, and clears expired, malformed or explicitly signed-out Golden Rose sessions.
+- **Gate budget:** Source/frontend/local-validation only in this branch. No cloud inspection or mutation, Terraform plan/apply, image build, live migration execution, service update, account bootstrap execution, credential rotation, provider-side reset/session-revocation execution, live/client data entry, export/import execution, client-owned environment transition, production-completion claim, destructive cleanup, shared-runtime rollout or automated matching/ranking/eligibility/referral/placement follows.
+- **Next executable action:** Publish the protected hotfix PR to `develop`. After merge, deploy through a separately approved image/service path and browser-validate reload persistence plus explicit sign-out from the staff onboarding and owner accounts.
+- **Do not regress:** Staff access remains named-account and OIDC-gated; this does not add persistent refresh-token custody, provider-side session revocation, automatic permission provisioning, public self-service, production-completion claims, or automated matching/ranking/eligibility/referral/placement.
+
+**Validation to date:** Focused frontend auth/header tests passed 23 tests. Full web verify passed 554 coverage tests, coverage thresholds, lint, typecheck and production build.
+
 ## 2026-10-12 — Staff-pilot intake permission follow-up active
 
 - **Staffing:** One independent developer; source/backend/frontend investigation, focused tests, local type/lint checks and later protected PR gates provide quality evidence, not independent-human authorization.

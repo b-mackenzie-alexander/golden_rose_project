@@ -19,8 +19,73 @@ export type StaffAuthSessionSnapshot = {
 const authConfigKeys = new Set(['auth_mode', 'provider', 'google_client_id']);
 const providers = new Set<StaffAuthProvider>(['synthetic', 'google', 'unsupported']);
 const listeners = new Set<() => void>();
-let idToken: string | null = null;
-let tokenExpiresAt = 0;
+const sessionStorageKey = 'golden-rose-staff-id-token-v1';
+
+type StoredStaffToken = {
+  idToken: string;
+  expiresAt: number;
+};
+
+function browserSessionStorage(): Storage | null {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+function clearStoredStaffToken() {
+  browserSessionStorage()?.removeItem(sessionStorageKey);
+}
+
+function readStoredStaffToken(): StoredStaffToken | null {
+  const storage = browserSessionStorage();
+  if (storage === null) return null;
+  const rawValue = storage.getItem(sessionStorageKey);
+  if (rawValue === null) return null;
+  try {
+    const parsed = JSON.parse(rawValue) as unknown;
+    if (
+      !object(parsed)
+      || typeof parsed.idToken !== 'string'
+      || typeof parsed.expiresAt !== 'number'
+      || !Number.isSafeInteger(parsed.expiresAt)
+    ) {
+      clearStoredStaffToken();
+      return null;
+    }
+    const expiresAt = parsed.expiresAt;
+    if (expiresAt <= 0 || Date.now() >= expiresAt) {
+      clearStoredStaffToken();
+      return null;
+    }
+    return {
+      idToken: parsed.idToken,
+      expiresAt,
+    };
+  } catch {
+    clearStoredStaffToken();
+    return null;
+  }
+}
+
+function persistStaffToken(token: string, expiresAt: number | null) {
+  const storage = browserSessionStorage();
+  if (storage === null) return;
+  if (expiresAt === null || expiresAt <= Date.now()) {
+    clearStoredStaffToken();
+    return;
+  }
+  try {
+    storage.setItem(sessionStorageKey, JSON.stringify({ idToken: token, expiresAt }));
+  } catch {
+    clearStoredStaffToken();
+  }
+}
+
+const storedStaffToken = readStoredStaffToken();
+let idToken: string | null = storedStaffToken?.idToken ?? null;
+let tokenExpiresAt = storedStaffToken?.expiresAt ?? 0;
 
 function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -47,6 +112,7 @@ export function getStaffAuthSnapshot(): StaffAuthSessionSnapshot {
   if (idToken !== null && tokenExpiresAt > 0 && Date.now() >= tokenExpiresAt) {
     idToken = null;
     tokenExpiresAt = 0;
+    clearStoredStaffToken();
   }
   return { idToken };
 }
@@ -61,12 +127,14 @@ export function subscribeStaffAuth(listener: () => void) {
 export function setStaffIdToken(token: string, expiresAt: number | null) {
   idToken = token;
   tokenExpiresAt = expiresAt ?? 0;
+  persistStaffToken(token, expiresAt);
   notify();
 }
 
 export function clearStaffIdToken() {
   idToken = null;
   tokenExpiresAt = 0;
+  clearStoredStaffToken();
   notify();
 }
 

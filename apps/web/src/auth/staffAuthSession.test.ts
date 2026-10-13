@@ -2,10 +2,23 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { bearerHeaders, clearStaffIdToken, getJwtExpiration, getStaffAuthConfig, setStaffIdToken, staffApiFetch } from './staffAuthSession';
 
+const sessionStorageKey = 'golden-rose-staff-id-token-v1';
+
 afterEach(() => {
   clearStaffIdToken();
   vi.restoreAllMocks();
 });
+
+async function expectNoReloadedStaffSessionFromStoredValue(rawValue: string) {
+  clearStaffIdToken();
+  window.sessionStorage.setItem(sessionStorageKey, rawValue);
+  vi.resetModules();
+  const reloadedSession = await import('./staffAuthSession');
+
+  expect(reloadedSession.bearerHeaders(undefined).has('Authorization')).toBe(false);
+  expect(window.sessionStorage.getItem(sessionStorageKey)).toBeNull();
+  reloadedSession.clearStaffIdToken();
+}
 
 describe('staffAuthSession', () => {
   it('attaches the staff bearer token without replacing existing headers', () => {
@@ -21,6 +34,50 @@ describe('staffAuthSession', () => {
     setStaffIdToken('expired-token', Date.now() - 1);
 
     expect(bearerHeaders(undefined).has('Authorization')).toBe(false);
+  });
+
+  it('restores an unexpired staff browser session after page reload', async () => {
+    setStaffIdToken('reload-token', Date.now() + 60_000);
+
+    vi.resetModules();
+    const reloadedSession = await import('./staffAuthSession');
+
+    expect(reloadedSession.bearerHeaders(undefined).get('Authorization')).toBe('Bearer reload-token');
+    reloadedSession.clearStaffIdToken();
+  });
+
+  it('does not restore expired or malformed browser session storage', async () => {
+    setStaffIdToken('expired-reload-token', Date.now() - 1);
+
+    vi.resetModules();
+    let reloadedSession = await import('./staffAuthSession');
+
+    expect(reloadedSession.bearerHeaders(undefined).has('Authorization')).toBe(false);
+
+    window.sessionStorage.setItem('golden-rose-staff-id-token-v1', '{');
+    vi.resetModules();
+    reloadedSession = await import('./staffAuthSession');
+
+    expect(reloadedSession.bearerHeaders(undefined).has('Authorization')).toBe(false);
+  });
+
+  it('clears invalid stored staff browser session shapes', async () => {
+    await expectNoReloadedStaffSessionFromStoredValue(JSON.stringify([]));
+    await expectNoReloadedStaffSessionFromStoredValue(JSON.stringify({ idToken: 123, expiresAt: Date.now() + 60_000 }));
+    await expectNoReloadedStaffSessionFromStoredValue(JSON.stringify({ idToken: 'token', expiresAt: 'soon' }));
+    await expectNoReloadedStaffSessionFromStoredValue(JSON.stringify({ idToken: 'token', expiresAt: 1.5 }));
+    await expectNoReloadedStaffSessionFromStoredValue(JSON.stringify({ idToken: 'token', expiresAt: 0 }));
+  });
+
+  it('keeps non-expiring tokens in memory only', async () => {
+    setStaffIdToken('memory-only-token', null);
+
+    expect(bearerHeaders(undefined).get('Authorization')).toBe('Bearer memory-only-token');
+
+    vi.resetModules();
+    const reloadedSession = await import('./staffAuthSession');
+
+    expect(reloadedSession.bearerHeaders(undefined).has('Authorization')).toBe(false);
   });
 
   it('preserves an explicit authorization header', () => {

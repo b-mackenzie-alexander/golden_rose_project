@@ -167,7 +167,7 @@ it('creates a suspended onboarding account and shows field-local validation', as
   expect(screen.getByText('Google sign-in binding recorded')).toBeInTheDocument();
   expect(screen.queryByText('oidc:staff:123')).not.toBeInTheDocument();
   expect(screen.getByText('1 named permissions')).toBeInTheDocument();
-  expect(screen.getByText('Intake write: missing')).toBeInTheDocument();
+  expect(screen.getByText('Residential intake: missing')).toBeInTheDocument();
   expect(screen.getAllByText('Staff Accounts: Read').length).toBeGreaterThan(0);
 
   await user.click(screen.getByRole('button', { name: 'Create staff account' }));
@@ -187,7 +187,7 @@ it('creates a suspended onboarding account and shows field-local validation', as
   expect(createForm.getByText('Enter a valid Google email address.')).toBeInTheDocument();
   await user.clear(googleEmailInput as HTMLElement);
   await user.type(googleEmailInput as HTMLElement, 'sofia.diaz@example.test');
-  await user.selectOptions(createForm.getByLabelText('Role'), 'delegated_manager');
+  await user.selectOptions(createForm.getByRole('combobox', { name: /Role/ }), 'delegated_manager');
   await user.click(createForm.getByLabelText('MFA already enrolled'));
   await user.type(createForm.getByRole('textbox', { name: /Reason/ }), 'Initial onboarding approved');
   await user.click(createForm.getByLabelText('Staff Accounts: Create'));
@@ -205,6 +205,47 @@ it('creates a suspended onboarding account and shows field-local validation', as
   expect(createCall?.reasonText).toBe('Initial onboarding approved');
   expect(await screen.findByText('Staff account created in suspended onboarding state.')).toBeInTheDocument();
   expect(screen.getByText('Sofia Diaz')).toBeInTheDocument();
+});
+
+it('applies durable role presets and provisioning add-ons during onboarding', async () => {
+  const user = userEvent.setup();
+  const created = {
+    ...suspended,
+    staffId: '33333333-3333-4333-8333-333333333333',
+    displayName: 'Residential Staff',
+    providerSubject: 'pending-google-email:abc123',
+    providerEmail: 'residential.staff@example.test',
+    permissionNames: ['intake:read', 'worker:read', 'calendar_import:manage'],
+  };
+  vi.mocked(createStaffAccount).mockResolvedValue({ ok: true, value: { account: created, eventType: 'staff_account.created', resultVersion: 1 } });
+
+  render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
+  await screen.findByText('Mariela Torres');
+
+  const createPanel = screen.getByRole('heading', { name: /Onboard staff account/ }).closest('section');
+  expect(createPanel).not.toBeNull();
+  const createForm = within(createPanel as HTMLElement);
+  await user.type(createForm.getByRole('textbox', { name: /Display name/ }), 'Residential Staff');
+  const googleEmailInput = createForm.getAllByRole('textbox', { name: /Google email/ })[0];
+  expect(googleEmailInput).toBeDefined();
+  await user.type(googleEmailInput as HTMLElement, 'residential.staff@example.test');
+  await user.click(createForm.getByRole('button', { name: /Residential intake operator/ }));
+  await user.click(createForm.getByRole('button', { name: /Add Google Calendar import/ }));
+  await user.type(createForm.getByRole('textbox', { name: /Reason/ }), 'Residential worker and employer coverage');
+  await user.click(createForm.getByRole('button', { name: 'Create staff account' }));
+
+  const createCall = vi.mocked(createStaffAccount).mock.calls[0]?.[0];
+  expect(createCall?.roleName).toBe('operations_staff');
+  expect(createCall?.permissionNames).toEqual(expect.arrayContaining([
+    'intake:read',
+    'worker:read',
+    'worker_residence:write',
+    'employer_contact:details:read',
+    'party_address:write',
+    'calendar_import:manage',
+  ]));
+  expect(createCall?.permissionNames).not.toContain('worksite_address:write');
+  expect(createCall?.permissionNames).not.toContain('staff_account:create');
 });
 
 it('requires staff sign-in before showing account administration controls', async () => {
@@ -259,16 +300,16 @@ it('corrects suspended onboarding details without deleting the account', async (
   render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
   await screen.findByText('Mariela Torres');
 
-  await user.click(screen.getByRole('button', { name: 'Correct' }));
+  await user.click(screen.getByRole('button', { name: 'Manage access' }));
   const correctionPanel = screen.getByRole('heading', { name: 'Correct onboarding: Mariela Torres' }).closest('section');
   expect(correctionPanel).not.toBeNull();
   const correction = within(correctionPanel as HTMLElement);
-  expect(correction.getByText(/Named permissions selected here replace/)).toBeInTheDocument();
+  expect(correction.getByText(/permanent role and permission changes/)).toBeInTheDocument();
   await user.clear(correction.getByRole('textbox', { name: /Display name/ }));
   await user.type(correction.getByRole('textbox', { name: /Display name/ }), 'Mariela Rivera');
   await user.clear(correction.getByRole('textbox', { name: /Provider subject/ }));
   await user.type(correction.getByRole('textbox', { name: /Provider subject/ }), 'oidc:staff:corrected');
-  await user.selectOptions(correction.getByLabelText('Role'), 'delegated_manager');
+  await user.selectOptions(correction.getByRole('combobox', { name: /Role/ }), 'delegated_manager');
   await user.click(correction.getByLabelText('MFA already enrolled'));
   await user.click(correction.getByLabelText('Intakes: Read'));
   await user.type(correction.getByLabelText('Reason'), 'Corrected provider subject before activation');
@@ -289,6 +330,47 @@ it('corrects suspended onboarding details without deleting the account', async (
   expect(await screen.findByText('Staff account onboarding details corrected.')).toBeInTheDocument();
   expect(screen.getByText('Mariela Rivera')).toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: /Correct onboarding/ })).not.toBeInTheDocument();
+});
+
+it('manages durable role and permission changes for active accounts', async () => {
+  const user = userEvent.setup();
+  const updated = {
+    ...active,
+    permissionNames: ['employer:read', 'worksite:read', 'worksite_address:read', 'worksite_address:write', 'staffing_request:read', 'shift_need:read'],
+    version: 3,
+  };
+  vi.mocked(listStaffAccounts).mockResolvedValue({ ok: true, value: [active] });
+  vi.mocked(correctStaffAccount).mockResolvedValue({
+    ok: true,
+    value: { account: updated, eventType: 'staff_account.corrected', resultVersion: 3 },
+  });
+
+  render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
+  await screen.findByText('Mariela Torres');
+
+  await user.click(screen.getByRole('button', { name: 'Manage access' }));
+  const accessPanel = screen.getByRole('heading', { name: 'Manage access: Mariela Torres' }).closest('section');
+  expect(accessPanel).not.toBeNull();
+  const access = within(accessPanel as HTMLElement);
+  await user.click(access.getByRole('button', { name: /Jobsite and request coordinator/ }));
+  await user.type(access.getByRole('textbox', { name: /Reason/ }), 'Move account to jobsite coordination');
+  await user.click(access.getByRole('button', { name: 'Save correction' }));
+
+  const correctionInput = vi.mocked(correctStaffAccount).mock.calls[0]?.[0];
+  expect(correctionInput).toMatchObject({
+    staffId: active.staffId,
+    expectedVersion: active.version,
+    roleName: 'operations_staff',
+    reasonText: 'Move account to jobsite coordination',
+  });
+  expect(correctionInput?.permissionNames).toEqual(expect.arrayContaining([
+    'worksite:read',
+    'worksite_address:write',
+    'staffing_request:read',
+    'shift_need:submit_review',
+  ]));
+  expect(correctionInput?.permissionNames).not.toContain('worker_residence:read');
+  expect(await screen.findByText('Staff account access updated.')).toBeInTheDocument();
 });
 
 it('updates Google email for an existing account', async () => {
@@ -389,7 +471,7 @@ it('shows correction validation and recoverable command errors', async () => {
   render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
   await screen.findByText('Mariela Torres');
 
-  await user.click(screen.getByRole('button', { name: 'Correct' }));
+  await user.click(screen.getByRole('button', { name: 'Manage access' }));
   const firstPanel = screen.getByRole('heading', { name: 'Correct onboarding: Mariela Torres' }).closest('section');
   expect(firstPanel).not.toBeNull();
   const firstCorrection = within(firstPanel as HTMLElement);
@@ -406,7 +488,7 @@ it('shows correction validation and recoverable command errors', async () => {
   expect(correctStaffAccount).not.toHaveBeenCalled();
 
   await user.click(firstCorrection.getByRole('button', { name: 'Close' }));
-  await user.click(screen.getByRole('button', { name: 'Correct' }));
+  await user.click(screen.getByRole('button', { name: 'Manage access' }));
   const secondPanel = screen.getByRole('heading', { name: 'Correct onboarding: Mariela Torres' }).closest('section');
   expect(secondPanel).not.toBeNull();
   const secondCorrection = within(secondPanel as HTMLElement);

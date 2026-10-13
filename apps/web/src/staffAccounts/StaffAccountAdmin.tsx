@@ -138,32 +138,162 @@ const permissionGroups = [
   },
 ] as const;
 
+const allPermissionNames = permissionGroups.flatMap((group) => group.items);
+const permissionOrder: Map<string, number> = new Map(allPermissionNames.map((permission, index) => [permission, index]));
+
+function sortPermissions(permissions: readonly string[]) {
+  return Array.from(new Set(permissions)).sort((left, right) => {
+    const leftOrder = permissionOrder.get(left) ?? Number.MAX_SAFE_INTEGER;
+    const rightOrder = permissionOrder.get(right) ?? Number.MAX_SAFE_INTEGER;
+    if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+    return left.localeCompare(right);
+  });
+}
+
+const permissionProfiles = [
+  {
+    id: 'owner',
+    label: { en: 'Owner / full access', es: 'Propietaria / acceso completo' },
+    summary: {
+      en: 'All staff, intake, worker, employer, jobsite, calendar, and request tools.',
+      es: 'Todas las herramientas de personal, admisiones, trabajadores, empleadores, lugares, calendario y solicitudes.',
+    },
+    roleName: 'owner',
+    permissions: allPermissionNames,
+  },
+  {
+    id: 'residential_intake',
+    label: { en: 'Residential intake operator', es: 'Operadora de admision residencial' },
+    summary: {
+      en: 'Worker and residential employer intake without jobsite or staff-account administration.',
+      es: 'Admisiones de trabajadores y empleadores residenciales sin lugares de trabajo ni administracion de cuentas.',
+    },
+    roleName: 'operations_staff',
+    permissions: [
+      'intake:read',
+      'intake:draft:create',
+      'intake:draft:revise',
+      'intake:review',
+      'intake:follow_up',
+      'worker:read',
+      'worker:correct',
+      'worker_contact:read',
+      'worker_contact:correct',
+      'worker_residence:read',
+      'worker_residence:write',
+      'worker_residence:correct',
+      'worker_preferences:correct',
+      'employer:read',
+      'employer:draft:create',
+      'employer:draft:revise',
+      'employer_address:correct',
+      'employer_contact:read',
+      'employer_contact:draft:create',
+      'employer_contact:details:read',
+      'employer_contact:details:correct',
+      'party_address:read',
+      'party_address:write',
+      'work_interest:read',
+    ],
+  },
+  {
+    id: 'jobsite_requests',
+    label: { en: 'Jobsite and request coordinator', es: 'Coordinadora de lugares y solicitudes' },
+    summary: {
+      en: 'Employer worksites, staffing requests, and shift needs without worker residential details.',
+      es: 'Lugares de empleadores, solicitudes de personal y necesidades de turnos sin detalles residenciales de trabajadores.',
+    },
+    roleName: 'operations_staff',
+    permissions: [
+      'employer:read',
+      'employer_contact:read',
+      'employer_contact:details:read',
+      'worksite:read',
+      'worksite:correct',
+      'worksite_address:read',
+      'worksite_address:write',
+      'staffing_request:read',
+      'staffing_request:submit_review',
+      'staffing_request:correct',
+      'shift_need:create',
+      'shift_need:read',
+      'shift_need:submit_review',
+    ],
+  },
+  {
+    id: 'account_manager',
+    label: { en: 'Account manager', es: 'Gerente de cuentas' },
+    summary: {
+      en: 'Create, activate, suspend, and provision staff accounts without worker or employer records.',
+      es: 'Crear, activar, suspender y provisionar cuentas sin registros de trabajadores o empleadores.',
+    },
+    roleName: 'delegated_manager',
+    permissions: [
+      'staff_account:read',
+      'staff_account:create',
+      'staff_account:activate',
+      'staff_account:suspend',
+      'staff_account:delegation:grant',
+      'staff_account:delegation:revoke',
+    ],
+  },
+  {
+    id: 'platform_support',
+    label: { en: 'Platform support', es: 'Soporte de plataforma' },
+    summary: {
+      en: 'Technical account visibility and evidence recording without operational worker or employer data.',
+      es: 'Visibilidad tecnica y registro de evidencia sin datos operativos de trabajadores o empleadores.',
+    },
+    roleName: 'platform_administrator',
+    permissions: [
+      'staff_account:read',
+      'staff_account:recovery:record',
+      'staff_account:session:revoke',
+    ],
+  },
+] as const satisfies readonly {
+  id: string;
+  label: { en: string; es: string };
+  summary: { en: string; es: string };
+  roleName: StaffAccountRole;
+  permissions: readonly string[];
+}[];
+
+const provisioningAddOns = [
+  {
+    id: 'calendar_import',
+    label: { en: 'Google Calendar import', es: 'Importacion de Google Calendar' },
+    permissions: ['calendar_import:manage'],
+  },
+  {
+    id: 'catalog_manager',
+    label: { en: 'Work-interest catalog manager', es: 'Administrar catalogo de intereses' },
+    permissions: ['work_interest:read', 'work_interest:manage'],
+  },
+  {
+    id: 'intake_finalizer',
+    label: { en: 'Intake finalizer', es: 'Finalizar admisiones' },
+    permissions: ['intake:read', 'intake:link', 'intake:finalize', 'intake:restricted_history:read', 'canonical:review'],
+  },
+  {
+    id: 'staff_recovery',
+    label: { en: 'Recovery/session evidence', es: 'Evidencia de recuperacion/sesion' },
+    permissions: ['staff_account:read', 'staff_account:recovery:record', 'staff_account:session:revoke'],
+  },
+] as const;
+
 const permissionCoverage = [
   {
     label: { en: 'Account admin', es: 'Admin cuentas' },
     permissions: ['staff_account:read', 'staff_account:create', 'staff_account:activate'],
   },
   {
-    label: { en: 'Intake write', es: 'Escribir admisiones' },
-    permissions: ['intake:read', 'intake:draft:create', 'intake:draft:revise'],
+    label: { en: 'Residential intake', es: 'Admision residencial' },
+    permissions: ['intake:read', 'intake:draft:create', 'intake:draft:revise', 'worker:read', 'worker_residence:read', 'worker_residence:write', 'employer:read', 'party_address:write'],
   },
   {
-    label: { en: 'Worker intake', es: 'Admision trabajador' },
-    permissions: ['worker:read', 'worker_contact:read', 'worker_residence:read', 'worker_residence:write'],
-  },
-  {
-    label: { en: 'Employer intake', es: 'Admision empleador' },
-    permissions: [
-      'employer:read',
-      'employer_contact:read',
-      'employer_contact:details:read',
-      'party_address:read',
-      'party_address:write',
-      'worksite:read',
-      'worksite_address:read',
-      'worksite_address:write',
-      'staffing_request:read',
-    ],
+    label: { en: 'Jobsite requests', es: 'Solicitudes de lugar' },
+    permissions: ['employer:read', 'worksite:read', 'worksite_address:read', 'worksite_address:write', 'staffing_request:read', 'shift_need:read'],
   },
   {
     label: { en: 'Calendar import', es: 'Importar calendario' },
@@ -301,17 +431,92 @@ function hasPermissions(account: StaffAccount, required: readonly string[]) {
   return required.every((permission) => account.permissionNames.includes(permission));
 }
 
+function hasSelectedPermissions(selected: readonly string[], required: readonly string[]) {
+  return required.every((permission) => selected.includes(permission));
+}
+
+function profileDescription(selected: readonly string[], profile: (typeof permissionProfiles)[number], language: 'en' | 'es') {
+  const missingCount = profile.permissions.filter((permission) => !selected.includes(permission)).length;
+  if (missingCount === 0) {
+    return language === 'en' ? 'Complete in current selection' : 'Completo en la seleccion actual';
+  }
+  return language === 'en'
+    ? `${String(missingCount)} missing from current selection`
+    : `Faltan ${String(missingCount)} en la seleccion actual`;
+}
+
+function accessSummary(roleName: StaffAccountRole, selected: readonly string[], language: 'en' | 'es') {
+  const completeProfiles = permissionProfiles.filter((profile) => profile.roleName === roleName && hasSelectedPermissions(selected, profile.permissions));
+  const [firstProfile] = completeProfiles;
+  if (firstProfile !== undefined) {
+    return language === 'en'
+      ? `${firstProfile.label.en}: ${String(selected.length)} durable permissions`
+      : `${firstProfile.label.es}: ${String(selected.length)} permisos duraderos`;
+  }
+  return language === 'en'
+    ? `${roleLabels[roleName][language]}: ${String(selected.length)} custom durable permissions`
+    : `${roleLabels[roleName][language]}: ${String(selected.length)} permisos duraderos personalizados`;
+}
+
 function PermissionChecklist({
   selected,
   onToggle,
+  onApplyPermissions,
   language,
 }: {
   selected: string[];
   onToggle: (permission: string) => void;
+  onApplyPermissions: (permissions: readonly string[], roleName?: StaffAccountRole) => void;
   language: 'en' | 'es';
 }) {
   return (
     <>
+      <div className="staff-permission-presets" aria-label={language === 'en' ? 'Role permission presets' : 'Perfiles de permisos por rol'}>
+        <p>
+          {language === 'en'
+            ? 'Apply a role preset for the durable tools this person needs, then add or remove one-off provisions below.'
+            : 'Aplique un perfil de rol para las herramientas duraderas que necesita la persona; despues agregue o quite provisiones abajo.'}
+        </p>
+        <div>
+          {permissionProfiles.map((profile) => (
+            <button
+              className="focus-ring"
+              data-active={hasSelectedPermissions(selected, profile.permissions) ? 'true' : 'false'}
+              key={profile.id}
+              type="button"
+              onClick={() => { onApplyPermissions(profile.permissions, profile.roleName); }}
+            >
+              <strong>{profile.label[language]}</strong>
+              <span>{profile.summary[language]}</span>
+              <small>{profileDescription(selected, profile, language)}</small>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="staff-permission-addons" aria-label={language === 'en' ? 'Provisioning add-ons' : 'Provisiones adicionales'}>
+        <p>{language === 'en' ? 'Provisioning add-ons' : 'Provisiones adicionales'}</p>
+        <div>
+          {provisioningAddOns.map((addOn) => {
+            const active = hasSelectedPermissions(selected, addOn.permissions);
+            return (
+              <button
+                className="focus-ring"
+                data-active={active ? 'true' : 'false'}
+                key={addOn.id}
+                type="button"
+                onClick={() => {
+                  const nextPermissions = active
+                    ? selected.filter((permission) => !(addOn.permissions as readonly string[]).includes(permission))
+                    : sortPermissions([...selected, ...addOn.permissions]);
+                  onApplyPermissions(nextPermissions);
+                }}
+              >
+                {active ? language === 'en' ? 'Remove' : 'Quitar' : language === 'en' ? 'Add' : 'Agregar'} {addOn.label[language]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
       {permissionGroups.map((group) => (
         <div className="staff-permission-group" key={group.label.en}>
           <p>{group.label[language]}</p>
@@ -476,7 +681,11 @@ export function StaffAccountAdmin() {
       return;
     }
     setAccounts((current) => upsertAccount(current, result.value.account));
-    setNotice(language === 'en' ? 'Staff account onboarding details corrected.' : 'Detalles de incorporacion corregidos.');
+    setNotice(
+      correctionForm.account.lifecycleStatus === 'suspended'
+        ? language === 'en' ? 'Staff account onboarding details corrected.' : 'Detalles de incorporacion corregidos.'
+        : language === 'en' ? 'Staff account access updated.' : 'Acceso de cuenta actualizado.',
+    );
     setCorrectionForm(null);
     setCorrectionErrors({});
   }
@@ -550,7 +759,15 @@ export function StaffAccountAdmin() {
       ...current,
       permissionNames: current.permissionNames.includes(permission)
         ? current.permissionNames.filter((item) => item !== permission)
-        : [...current.permissionNames, permission],
+        : sortPermissions([...current.permissionNames, permission]),
+    }));
+  }
+
+  function applyCreatePermissions(permissions: readonly string[], roleName?: StaffAccountRole) {
+    setCreateForm((current) => ({
+      ...current,
+      roleName: roleName ?? current.roleName,
+      permissionNames: sortPermissions(permissions),
     }));
   }
 
@@ -561,7 +778,18 @@ export function StaffAccountAdmin() {
         ...current,
         permissionNames: current.permissionNames.includes(permission)
           ? current.permissionNames.filter((item) => item !== permission)
-          : [...current.permissionNames, permission],
+          : sortPermissions([...current.permissionNames, permission]),
+      };
+    });
+  }
+
+  function applyCorrectionPermissions(permissions: readonly string[], roleName?: StaffAccountRole) {
+    setCorrectionForm((current) => {
+      if (current === null) return current;
+      return {
+        ...current,
+        roleName: roleName ?? current.roleName,
+        permissionNames: sortPermissions(permissions),
       };
     });
   }
@@ -573,7 +801,7 @@ export function StaffAccountAdmin() {
       providerEmail: account.providerEmail ?? '',
       providerSubject: isPendingProviderSubject(account.providerSubject) ? '' : account.providerSubject,
       roleName: account.roleName,
-      permissionNames: account.permissionNames,
+      permissionNames: sortPermissions(account.permissionNames),
       mfaEnrolled: account.mfaEnrolled,
       reasonText: '',
     });
@@ -744,6 +972,7 @@ export function StaffAccountAdmin() {
                 </span>
                 <span role="cell">
                   {roleLabels[account.roleName][language]}
+                  <small>{accessSummary(account.roleName, account.permissionNames, language)}</small>
                   <small>
                     {language === 'en'
                       ? `${String(account.permissionNames.length)} named permissions`
@@ -792,8 +1021,8 @@ export function StaffAccountAdmin() {
                       {actionLabels.activate[language]}
                     </button>
                   ) : null}
-                  {account.lifecycleStatus === 'suspended' ? (
-                    <button className="focus-ring" type="button" onClick={() => { openCorrection(account); }}>{language === 'en' ? 'Correct' : 'Corregir'}</button>
+                  {account.lifecycleStatus !== 'deprovisioned' ? (
+                    <button className="focus-ring" type="button" onClick={() => { openCorrection(account); }}>{language === 'en' ? 'Manage access' : 'Administrar acceso'}</button>
                   ) : null}
                   {account.lifecycleStatus !== 'deprovisioned' ? (
                     <button className="focus-ring" type="button" onClick={() => { openEmailUpdate(account); }}>{language === 'en' ? 'Google email' : 'Correo Google'}</button>
@@ -854,6 +1083,11 @@ export function StaffAccountAdmin() {
                     <option key={role} value={role}>{roleLabels[role][language]}</option>
                   ))}
                 </select>
+                <small>
+                  {language === 'en'
+                    ? 'Role is the staff job label. The permission profile below sets the durable tools.'
+                    : 'El rol es la etiqueta del puesto. El perfil de permisos abajo define las herramientas duraderas.'}
+                </small>
               </label>
               <label className="staff-checkbox-label">
                 <input checked={createForm.mfaEnrolled} type="checkbox" onChange={(event) => { setCreateForm({ ...createForm, mfaEnrolled: event.target.checked }); }} />
@@ -862,7 +1096,8 @@ export function StaffAccountAdmin() {
             </div>
             <fieldset className="staff-permission-fieldset">
               <legend>{language === 'en' ? 'Named permissions' : 'Permisos nombrados'}</legend>
-              <PermissionChecklist selected={createForm.permissionNames} onToggle={togglePermission} language={language} />
+              <p className="staff-account-helper">{accessSummary(createForm.roleName, createForm.permissionNames, language)}</p>
+              <PermissionChecklist selected={createForm.permissionNames} onApplyPermissions={applyCreatePermissions} onToggle={togglePermission} language={language} />
               {createErrors.permissionNames ? <small role="alert">{createErrors.permissionNames}</small> : null}
             </fieldset>
             <label>
@@ -879,13 +1114,17 @@ export function StaffAccountAdmin() {
       {correctionForm ? (
         <section className="staff-account-panel staff-action-panel" aria-labelledby="account-correction-heading">
           <div className="staff-account-panel-header">
-            <h3 id="account-correction-heading">{language === 'en' ? 'Correct onboarding' : 'Corregir incorporacion'}: {correctionForm.account.displayName}</h3>
+            <h3 id="account-correction-heading">
+              {correctionForm.account.lifecycleStatus === 'suspended'
+                ? language === 'en' ? 'Correct onboarding' : 'Corregir incorporacion'
+                : language === 'en' ? 'Manage access' : 'Administrar acceso'}: {correctionForm.account.displayName}
+            </h3>
             <button className="staff-secondary-button focus-ring" type="button" onClick={() => { setCorrectionForm(null); }}>{language === 'en' ? 'Close' : 'Cerrar'}</button>
           </div>
           <p className="staff-account-helper">
             {language === 'en'
-              ? 'Correct suspended onboarding details before activation. Named permissions selected here replace the suspended account permissions. Deprovision accounts that should not remain usable.'
-              : 'Corrija detalles de incorporacion suspendida antes de activar. Los permisos nombrados seleccionados aqui reemplazan los permisos de la cuenta suspendida. Retire cuentas que no deben quedar utilizables.'}
+              ? 'Use this for permanent role and permission changes. Named permissions selected here replace this account permissions. Temporary coverage belongs in Delegations.'
+              : 'Use esto para cambios permanentes de rol y permisos. Los permisos nombrados seleccionados aqui reemplazan los permisos de esta cuenta. La cobertura temporal pertenece a Delegaciones.'}
           </p>
           <form className="staff-account-form" onSubmit={(event) => { void submitCorrection(event); }}>
             <label>
@@ -916,6 +1155,11 @@ export function StaffAccountAdmin() {
                     <option key={role} value={role}>{roleLabels[role][language]}</option>
                   ))}
                 </select>
+                <small>
+                  {language === 'en'
+                    ? 'Role is the staff job label. The permission profile below sets the durable tools.'
+                    : 'El rol es la etiqueta del puesto. El perfil de permisos abajo define las herramientas duraderas.'}
+                </small>
               </label>
               <label className="staff-checkbox-label">
                 <input checked={correctionForm.mfaEnrolled} type="checkbox" onChange={(event) => { setCorrectionForm({ ...correctionForm, mfaEnrolled: event.target.checked }); }} />
@@ -924,7 +1168,8 @@ export function StaffAccountAdmin() {
             </div>
             <fieldset className="staff-permission-fieldset">
               <legend>{language === 'en' ? 'Named permissions' : 'Permisos nombrados'}</legend>
-              <PermissionChecklist selected={correctionForm.permissionNames} onToggle={toggleCorrectionPermission} language={language} />
+              <p className="staff-account-helper">{accessSummary(correctionForm.roleName, correctionForm.permissionNames, language)}</p>
+              <PermissionChecklist selected={correctionForm.permissionNames} onApplyPermissions={applyCorrectionPermissions} onToggle={toggleCorrectionPermission} language={language} />
               {correctionErrors.permissionNames ? <small role="alert">{correctionErrors.permissionNames}</small> : null}
             </fieldset>
             <label>
@@ -1029,6 +1274,11 @@ export function StaffAccountAdmin() {
             <h3 id="delegation-heading">{language === 'en' ? 'Delegations' : 'Delegaciones'}: {delegationPanel.account.displayName}</h3>
             <button className="staff-secondary-button focus-ring" type="button" onClick={() => { setDelegationPanel(null); }}>{language === 'en' ? 'Close' : 'Cerrar'}</button>
           </div>
+          <p className="staff-account-helper">
+            {language === 'en'
+              ? 'Delegations are temporary add-ons for coverage. Use Manage access for permanent role or permission changes.'
+              : 'Las delegaciones son permisos temporales para cobertura. Use Administrar acceso para cambios permanentes de rol o permisos.'}
+          </p>
           {delegationPanel.loading ? <p>{language === 'en' ? 'Loading' : 'Cargando'}</p> : null}
           {delegationPanel.error ? <p className="staff-account-error" role="alert">{delegationPanel.error}</p> : null}
           <div className="staff-delegation-list" aria-label={language === 'en' ? 'Staff delegations' : 'Delegaciones del personal'}>

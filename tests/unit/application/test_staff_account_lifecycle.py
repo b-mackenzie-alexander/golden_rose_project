@@ -254,17 +254,91 @@ def test_correct_staff_account_onboarding_replaces_details_grants_and_records_ev
     assert session.rollbacks == 0
 
 
-def test_correct_staff_account_onboarding_rejects_active_accounts(
+def test_correct_staff_account_onboarding_allows_active_account_access_updates(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = FakeSession()
+    observed: dict[str, Any] = {}
+
+    class CorrectionIdentifiers:
+        def __init__(self) -> None:
+            self.values = [
+                UUID("66666666-6666-4666-8666-666666666666"),
+                UUID("77777777-7777-4777-8777-777777777777"),
+                EVENT_ID,
+            ]
+
+        def new_uuid4(self) -> UUID:
+            return self.values.pop(0)
+
     monkeypatch.setattr(
         lifecycle_module,
         "get_staff_account_by_id_for_update",
         lambda **_: _record(status="active", version=3, mfa_enrolled=True),
     )
 
-    with pytest.raises(StaffAccountLifecycleError, match="only suspended"):
+    def update_account(**kwargs):
+        observed["account"] = kwargs
+        return _record(status="active", version=4, mfa_enrolled=True)
+
+    monkeypatch.setattr(lifecycle_module, "update_staff_account_onboarding", update_account)
+    monkeypatch.setattr(
+        lifecycle_module,
+        "revoke_active_staff_permission_grants",
+        lambda **kwargs: observed.setdefault("revoked_grants", kwargs),
+    )
+    monkeypatch.setattr(
+        lifecycle_module,
+        "insert_staff_permission_grants",
+        lambda **kwargs: observed.setdefault("grants", kwargs),
+    )
+    monkeypatch.setattr(
+        lifecycle_module,
+        "insert_lifecycle_event",
+        lambda **kwargs: observed.setdefault("event", kwargs),
+    )
+
+    result = correct_staff_account_onboarding(
+        session=session,  # type: ignore[arg-type]
+        principal=_principal("staff_account:create", "intake:read"),
+        command_id=COMMAND_ID,
+        staff_id=STAFF_ID,
+        expected_version=3,
+        provider_subject="oidc:staff:123",
+        provider_email=None,
+        display_name="Mariela Torres",
+        role_name="operations_staff",
+        permission_names=frozenset({"staff_account:read", "intake:read"}),
+        mfa_enrolled=True,
+        clock=FixedClock(),
+        identifiers=CorrectionIdentifiers(),
+        reason_text="Correct active account permissions",
+    )
+
+    assert result.account.lifecycle_status == "active"
+    assert observed["account"]["expected_version"] == 3
+    assert observed["grants"]["grants"] == (
+        (UUID("66666666-6666-4666-8666-666666666666"), "intake:read"),
+        (UUID("77777777-7777-4777-8777-777777777777"), "staff_account:read"),
+    )
+    assert observed["event"]["event_type"] == "staff_account.corrected"
+    assert observed["event"]["previous_status"] == "active"
+    assert observed["event"]["new_status"] == "active"
+    assert session.commits == 1
+    assert session.rollbacks == 0
+
+
+def test_correct_staff_account_onboarding_rejects_deprovisioned_accounts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession()
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_id_for_update",
+        lambda **_: _record(status="deprovisioned", version=3, mfa_enrolled=True),
+    )
+
+    with pytest.raises(StaffAccountLifecycleError, match="only active or suspended"):
         correct_staff_account_onboarding(
             session=session,  # type: ignore[arg-type]
             principal=_principal("staff_account:create"),
@@ -279,7 +353,7 @@ def test_correct_staff_account_onboarding_rejects_active_accounts(
             mfa_enrolled=True,
             clock=FixedClock(),
             identifiers=FixedIdentifiers(),
-            reason_text="No active correction",
+            reason_text="No deprovisioned correction",
         )
 
     assert session.rollbacks == 1

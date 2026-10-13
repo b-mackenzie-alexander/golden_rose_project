@@ -188,8 +188,10 @@ def correct_staff_account_onboarding(
         existing = get_staff_account_by_id_for_update(session=session, staff_id=staff_id)
         if existing.version != expected_version:
             raise StaffAccountVersionConflictError("staff account version conflict")
-        if existing.lifecycle_status != "suspended":
-            raise StaffAccountLifecycleError("only suspended onboarding accounts can be corrected")
+        if existing.lifecycle_status not in {"active", "suspended"}:
+            raise StaffAccountLifecycleError(
+                "only active or suspended staff accounts can be corrected"
+            )
         account = update_staff_account_onboarding(
             session=session,
             staff_id=staff_id,

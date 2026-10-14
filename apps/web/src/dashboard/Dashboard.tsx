@@ -71,7 +71,7 @@ const englishDashboard: DashboardCopy = {
   primaryQueueLink: 'View all',
   queueRows: [
     { days: '9:00 a.m.', href: '/staff/intakes/workers?reference=b7dea69e-9b10-43b3-95aa-d1cd01f6c453&open=match', icon: 'worker', name: 'Urgent intake review', next: 'Missing residential address', ref: 'Ana Quispe', status: 'incomplete' },
-    { days: '10:30 a.m.', href: '/staff/intakes/employers?reference=40bd8f48-88c2-42bf-a2bb-bd4ee6e962e2&open=match', icon: 'building', name: 'Employer follow-up', next: 'Confirm worksite details', ref: 'Restaurante La Esperanza', status: 'pending' },
+    { days: '10:30 a.m.', href: '/staff/intakes/employers?queue=review', icon: 'building', name: 'Employer intake review', next: 'Open saved employer drafts', ref: 'Employer queue', status: 'pending' },
     { days: '11:00 a.m.', href: '/staff/intakes/workers?reference=ca0a3935-e72f-4a00-be6d-af081546a73f&open=match', icon: 'worker', name: 'Complete pending interview', next: 'Review availability', ref: 'Carlos Mendoza', status: 'pending' },
     { days: '1:00 p.m.', href: '/staff/intakes/workers?queue=review', icon: 'document', name: 'Review new drafts', next: 'Three records waiting', ref: 'Staff queue', status: 'draft' },
     { days: '3:00 p.m.', href: '/staff/work-interests', icon: 'catalog', name: 'Update interest catalog', next: 'Review new skill labels', ref: 'Catalog', status: 'in_review' },
@@ -95,7 +95,7 @@ const englishDashboard: DashboardCopy = {
   scheduleLink: 'View calendar',
   scheduleRows: [
     { dot: 'danger', meta: 'Staff meeting', time: '9:00 AM', title: 'Team check-in' },
-    { dot: 'warning', meta: 'Employer intake', time: '10:30 AM', title: 'Call Restaurante La Esperanza' },
+    { dot: 'warning', meta: 'Employer queue', time: '10:30 AM', title: 'Review employer drafts' },
     { dot: 'success', meta: 'Worker registration', time: '12:00 PM', title: 'Interview with Ana Quispe' },
     { dot: 'info', meta: 'Operations', time: '2:00 PM', title: 'Team meeting' },
     { dot: 'success', meta: 'Verify documents', time: '4:00 PM', title: 'Follow-up with Maria Lopez' },
@@ -135,7 +135,7 @@ const spanishDashboard: DashboardCopy = {
   primaryQueueLink: 'Ver todas',
   queueRows: [
     { days: '9:00 a. m.', href: '/staff/intakes/workers?reference=b7dea69e-9b10-43b3-95aa-d1cd01f6c453&open=match', icon: 'worker', name: 'Revisar solicitud urgente', next: 'Falta domicilio residencial', ref: 'Ana Quispe', status: 'incomplete' },
-    { days: '10:30 a. m.', href: '/staff/intakes/employers?reference=40bd8f48-88c2-42bf-a2bb-bd4ee6e962e2&open=match', icon: 'building', name: 'Hacer seguimiento con empleador', next: 'Confirmar lugar de trabajo', ref: 'Restaurante La Esperanza', status: 'pending' },
+    { days: '10:30 a. m.', href: '/staff/intakes/employers?queue=review', icon: 'building', name: 'Revisar registros de empleadores', next: 'Abrir borradores guardados', ref: 'Cola de empleadores', status: 'pending' },
     { days: '11:00 a. m.', href: '/staff/intakes/workers?reference=ca0a3935-e72f-4a00-be6d-af081546a73f&open=match', icon: 'worker', name: 'Completar entrevista pendiente', next: 'Revisar disponibilidad', ref: 'Carlos Mendoza', status: 'pending' },
     { days: '1:00 p. m.', href: '/staff/intakes/workers?queue=review', icon: 'document', name: 'Revisar nuevos borradores', next: 'Tres registros sin revisar', ref: 'Cola del personal', status: 'draft' },
     { days: '3:00 p. m.', href: '/staff/work-interests', icon: 'catalog', name: 'Actualizar catalogo de intereses', next: 'Revisar nuevas habilidades', ref: 'Catalogo', status: 'in_review' },
@@ -159,7 +159,7 @@ const spanishDashboard: DashboardCopy = {
   scheduleLink: 'Ver calendario',
   scheduleRows: [
     { dot: 'danger', meta: 'Reunion del equipo', time: '9:00 a. m.', title: 'Revision diaria' },
-    { dot: 'warning', meta: 'Seguimiento de empleador', time: '10:30 a. m.', title: 'Llamada con Restaurante La Esperanza' },
+    { dot: 'warning', meta: 'Cola de empleadores', time: '10:30 a. m.', title: 'Revisar borradores de empleadores' },
     { dot: 'success', meta: 'Registro de trabajador', time: '12:00 p. m.', title: 'Entrevista con Ana Quispe' },
     { dot: 'info', meta: 'Operaciones', time: '2:00 p. m.', title: 'Reunion de equipo' },
     { dot: 'success', meta: 'Verificar documentos', time: '4:00 p. m.', title: 'Seguimiento con Maria Lopez' },

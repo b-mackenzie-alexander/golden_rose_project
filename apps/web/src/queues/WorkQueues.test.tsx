@@ -190,6 +190,8 @@ describe('WorkQueues', () => {
       expect(screen.getByText('Urgent intake review')).toBeInTheDocument();
     });
     expect(screen.getByRole('status')).toHaveTextContent('projection service is unavailable');
+    expect(screen.getByText('Review employer drafts')).toBeInTheDocument();
+    expect(screen.queryByText('Restaurante La Esperanza')).not.toBeInTheDocument();
   });
 
   it('does not show static queue rows in production mode when projection and intake reads fail', async () => {

@@ -1,5 +1,15 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-10-14 — Live-pilot dashboard/session label repair active
+
+- **Staffing:** One independent developer; source/frontend investigation, focused UI tests and later protected PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #185 is merged and reported live; owner-side testing confirms provisioning works and page refreshes preserve staff sessions. Fresh source work is active on `fix/live-pilot-dashboard-session-labels` to remove the named `Restaurante La Esperanza` fallback follow-up from staff-facing dashboard/queue/calendar/search surfaces and to show the current staff session display name in the header account chip instead of a static placeholder.
+- **Gate budget:** Source/frontend/local-validation only in this branch. No cloud inspection or mutation, Terraform plan/apply, image build, live migration execution, service update, live-data deletion or cleanup, account bootstrap execution, credential rotation, provider-side reset/session-revocation execution, live/client data entry, export/import execution, client-owned environment transition, production-completion claim, destructive cleanup, shared-runtime rollout or automated matching/ranking/eligibility/referral/placement follows.
+- **Next executable action:** Complete local validation and publish a protected PR to `develop` when authorized. After merge, deploy through a separately approved image/service path and browser-validate the live account chip plus absence of static named employer fallback rows. If the restaurant still appears after source deployment, investigate it as persisted pilot data under separate live-data authority.
+- **Do not regress:** No static named operational examples in the live-data pilot; staff access remains named-account/OIDC-gated; auth-sensitive no-store handling remains intact; no provider-side identity/session action or live-data cleanup is implied by this source fix.
+
+**Validation to date:** Focused frontend shell/dashboard/queue/calendar tests passed 43 tests. Frontend typecheck, frontend lint, `git diff --check` and `gitleaks dir --no-banner --redact .` passed.
+
 ## 2026-10-13 — Staff account-management RBAC/DBAC update active
 
 - **Staffing:** One independent developer; source/backend/frontend investigation, focused account-management tests, local type/lint checks and later protected PR gates provide quality evidence, not independent-human authorization.

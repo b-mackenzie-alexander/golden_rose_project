@@ -484,7 +484,8 @@ describe('StaffCalendar', () => {
 
     expect(await screen.findByRole('status')).toHaveTextContent('not authorized to read projected shifts');
     await userEvent.click(firstPopulatedCalendarDay());
-    expect(screen.getAllByText(/Team check-in|Call Restaurante La Esperanza|Interview with Ana Quispe|Review pending intakes|Follow-up with Maria Lopez|Bright Horizons staffing call|Meet Carlos Mendoza|Worker intake review block|Clean Homes LLC confirmation|Interview with Carlos Mendoza/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Team check-in|Review employer drafts|Interview with Ana Quispe|Review pending intakes|Follow-up with Maria Lopez|Bright Horizons staffing call|Meet Carlos Mendoza|Worker intake review block|Clean Homes LLC confirmation|Interview with Carlos Mendoza/).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Call Restaurante La Esperanza')).not.toBeInTheDocument();
   });
 
   it('does not show seeded calendar events in production mode when shift reads fail', async () => {

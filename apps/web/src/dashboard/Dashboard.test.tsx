@@ -252,6 +252,7 @@ describe('Dashboard', () => {
     })).toBe(true);
     expect(screen.getByRole('heading', { name: "Today's priorities" })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: "Today's schedule" })).toBeInTheDocument();
+    expect(screen.queryByText('Restaurante La Esperanza')).not.toBeInTheDocument();
     expect(screen.getAllByText('Home aide (1)').length).toBeGreaterThan(0);
     expect(screen.getByRole('heading', { name: 'Quick actions' })).toBeInTheDocument();
     expect(view.container.querySelector('.brand-rose')).toBeInTheDocument();

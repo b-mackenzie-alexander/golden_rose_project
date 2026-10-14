@@ -1,5 +1,15 @@
 # Current Work — Golden Rose Operations Platform
 
+## 2026-10-14 — Live-pilot dashboard/session label repair active
+
+- **Staffing:** One independent developer; source/frontend investigation, focused UI tests and later protected PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #185, the staff account-management provisioning update, is merged and reported live in the pilot environment. Owner-side testing reports provisioning now works and browser refreshes no longer interrupt sessions. Fresh source work is active on `fix/live-pilot-dashboard-session-labels` to remove the named `Restaurante La Esperanza` fallback follow-up from the home dashboard, work queues, calendar and global search shortcuts, and to make the header account chip display the current signed-in staff account name from the staff-session endpoint instead of the static `Staff account` placeholder.
+- **Gate budget:** Source/frontend/documentation/local-validation work only. No cloud inspection or mutation, Terraform plan/apply, image build, live migration execution, service update, live-data deletion or cleanup, account bootstrap execution, credential rotation, provider-side reset/session-revocation execution, live/client data entry, export/import execution, client-owned environment transition, production-completion claim, destructive cleanup, shared-runtime rollout or automated matching/ranking/eligibility/referral/placement follows from this branch.
+- **Next executable action:** Finish local validation and publish a bounded PR to `develop` when authorized. After protected merge, use a separately approved image/service path and browser-validate that the live header shows the signed-in staff person's display name and that dashboard fallback content no longer names a demo-like employer. If `Restaurante La Esperanza` still appears after that deploy, treat it as a possible persisted pilot record requiring separately approved live-data investigation and cleanup, not as source cleanup.
+- **Do not regress:** No static named operational examples in the controlled live-data pilot; staff access remains named-account and staff-OIDC gated; no raw provider tokens, raw subjects or private identity material in chat/source docs; auth-sensitive no-store handling; owner-friendly account management remains separate from provider-side identity actions; immutable intake history and exact retries; restricted-field controls; bilingual/accessibility parity; durable current-environment records with migration-disposition tracking.
+
+**Validation to date:** Focused frontend shell/dashboard/queue/calendar tests passed 43 tests with existing jsdom canvas notices. Frontend typecheck, frontend lint, `git diff --check` and `gitleaks dir --no-banner --redact .` passed.
+
 ## 2026-10-13 — Staff account-management RBAC/DBAC update active
 
 - **Staffing:** One independent developer; source/backend/frontend investigation, focused account-management tests, local type/lint checks and later protected PR gates provide quality evidence, not independent-human authorization.

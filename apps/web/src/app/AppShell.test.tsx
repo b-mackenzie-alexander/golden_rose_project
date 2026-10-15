@@ -123,6 +123,47 @@ describe('AppShell', () => {
     expect(accountButton).not.toHaveTextContent('Staff account');
   });
 
+  it('keeps the generic account label when server session verification is denied', async () => {
+    setStaffIdToken('stored-token', Date.now() + 60_000);
+    vi.mocked(staffAccountApi.getStaffSession).mockResolvedValue({
+      ok: false,
+      failure: { kind: 'sign_in_required' },
+    });
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppShell />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await waitFor(() => {
+      expect(staffAccountApi.getStaffSession).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.getByRole('button', { name: 'Open my staff account' })).toHaveTextContent('Staff account');
+    expect(screen.getByRole('button', { name: 'Open my staff account' })).toHaveTextContent('Verify session');
+  });
+
+  it('keeps the generic account label when session verification is unavailable', async () => {
+    setStaffIdToken('stored-token', Date.now() + 60_000);
+    vi.mocked(staffAccountApi.getStaffSession).mockRejectedValue(new Error('Network unavailable'));
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppShell />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await waitFor(() => {
+      expect(staffAccountApi.getStaffSession).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.getByRole('button', { name: 'Open my staff account' })).toHaveTextContent('Staff account');
+    expect(screen.getByRole('button', { name: 'Open my staff account' })).toHaveTextContent('Verify session');
+  });
+
   it('clears the Golden Rose staff browser session from the header', async () => {
     const user = userEvent.setup();
     const disableAutoSelect = vi.fn();

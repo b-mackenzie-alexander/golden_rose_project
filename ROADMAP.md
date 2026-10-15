@@ -8,7 +8,7 @@
 - **Next executable action:** Complete local validation and publish a protected PR to `develop` when authorized. After merge, deploy through a separately approved image/service path and browser-validate the live account chip plus absence of static named employer fallback rows. If the restaurant still appears after source deployment, investigate it as persisted pilot data under separate live-data authority.
 - **Do not regress:** No static named operational examples in the live-data pilot; staff access remains named-account/OIDC-gated; auth-sensitive no-store handling remains intact; no provider-side identity/session action or live-data cleanup is implied by this source fix.
 
-**Validation to date:** Focused frontend shell/dashboard/queue/calendar tests passed 43 tests. Frontend typecheck, frontend lint, `git diff --check` and `gitleaks dir --no-banner --redact .` passed.
+**Validation to date:** PR #186 initially missed the 85.00% frontend branch-coverage floor by 0.01 percentage points. Denied-session and session-request-failure coverage now exercises the new account-label fallback behavior. Full frontend `npm --prefix apps/web run verify` passes lock validation, lock tests, lint, typecheck, 559 coverage tests at 85.00% branch coverage, and the production build; the existing Vite large-chunk warning remains. `git diff --check` and pre-publication redacted Gitleaks scans passed.
 
 ## 2026-10-13 — Staff account-management RBAC/DBAC update active
 

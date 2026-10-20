@@ -54,6 +54,7 @@ BOOTSTRAP_PERMISSION_NAMES = (
     "staff_account:recovery:record",
     "staff_account:session:revoke",
     "staff_account:suspend",
+    "staff_account:signin:reset",
     "staffing_request:correct",
     "staffing_request:read",
     "staffing_request:submit_review",

@@ -297,11 +297,8 @@ def test_update_staff_account_onboarding_maps_returning_row() -> None:
         session=session,  # type: ignore[arg-type]
         staff_id=STAFF_ID,
         expected_version=1,
-        provider_subject="oidc:staff:corrected",
-        provider_email="mariela.rivera@example.test",
         display_name="Mariela Rivera",
         role_name="operations_staff",
-        mfa_enrolled=True,
         updated_at=NOW,
         actor_id=ACTOR_ID,
     )

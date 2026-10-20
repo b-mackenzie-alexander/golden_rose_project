@@ -1,5 +1,5 @@
 from dataclasses import asdict
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Response, status
@@ -18,6 +18,7 @@ from golden_rose.api.staff.schemas import (
     ActivateStaffAccountRequest,
     CorrectStaffAccountRequest,
     CreateStaffAccountRequest,
+    StaffAccountDiagnosticsResponse,
     StaffAccountLifecycleEventListResponse,
     StaffAccountLifecycleEventResponse,
     StaffAccountLifecycleResponse,
@@ -81,13 +82,19 @@ def _lifecycle_response(result: StaffAccountLifecycleResult, response: Response)
     return response
 
 
-def _account_response(session: Session, account: StaffAccountRecord) -> StaffAccountResponse:
+def _account_response(
+    session: Session, account: StaffAccountRecord, permissions: tuple[str, ...] | None = None
+) -> StaffAccountResponse:
     return StaffAccountResponse.model_validate(
         {
-            **asdict(account),
+            **{key: value for key, value in asdict(account).items() if key != "provider_subject"},
             "permission_names": tuple(
                 sorted(
-                    list_active_staff_permission_grants(session=session, staff_id=account.staff_id)
+                    permissions
+                    if permissions is not None
+                    else list_active_staff_permission_grants(
+                        session=session, staff_id=account.staff_id
+                    )
                 )
             ),
         }
@@ -98,7 +105,7 @@ def _lifecycle_body(
     session: Session, result: StaffAccountLifecycleResult
 ) -> StaffAccountLifecycleResponse:
     return StaffAccountLifecycleResponse(
-        account=_account_response(session, result.account),
+        account=_account_response(session, result.account, result.permission_names),
         event_type=result.event_type,  # type: ignore[arg-type]
         result_version=result.result_version,
     )
@@ -243,6 +250,37 @@ def get_staff_accounts(
     _read_response(response)
     return StaffAccountListResponse(
         items=tuple(_account_response(session, account) for account in accounts),
+    )
+
+
+@router.get("/{staff_id}/diagnostics", response_model=StaffAccountDiagnosticsResponse)
+def get_staff_account_diagnostics(
+    staff_id: UUID,
+    response: Response,
+    session: Annotated[Session, Depends(get_db_session)],
+    principal: Annotated[StaffPrincipal, Depends(get_staff_principal)],
+) -> StaffAccountDiagnosticsResponse | Response:
+    result = get_staff_account(staff_id, response, session, principal)
+    if isinstance(result, Response):
+        return result
+    reason: Literal["deprovisioned", "self_reset", "permission_required"] | None = (
+        "deprovisioned"
+        if result.lifecycle_status == "deprovisioned"
+        else "self_reset"
+        if staff_id == principal.actor_id
+        else "permission_required"
+        if not {"staff_account:create", "staff_account:signin:reset"} <= principal.permissions
+        else None
+    )
+    return StaffAccountDiagnosticsResponse(
+        account=result,
+        can_restart_signin=reason is None,
+        restart_unavailable_reason=reason,
+        can_activate=(
+            "staff_account:activate" in principal.permissions
+            and result.lifecycle_status == "suspended"
+            and result.binding_status == "google_verified"
+        ),
     )
 
 
@@ -414,7 +452,7 @@ def post_staff_account(
             principal=principal,
             command_id=idempotency_key,
             staff_id=identifiers.new_uuid4(),
-            provider_subject=request.provider_subject,
+            provider_subject="",
             provider_email=request.provider_email,
             display_name=request.display_name,
             role_name=request.role_name,
@@ -475,6 +513,7 @@ def post_staff_account_activation(
     return _lifecycle_body(session, result)
 
 
+@router.post("/{staff_id}/access", response_model=StaffAccountLifecycleResponse)
 @router.post(
     "/{staff_id}/correct-onboarding",
     response_model=StaffAccountLifecycleResponse,
@@ -497,12 +536,9 @@ def post_staff_account_onboarding_correction(
             command_id=idempotency_key,
             staff_id=staff_id,
             expected_version=request.expected_version,
-            provider_subject=request.provider_subject,
-            provider_email=request.provider_email,
             display_name=request.display_name,
             role_name=request.role_name,
             permission_names=frozenset(request.permission_names),
-            mfa_enrolled=request.mfa_enrolled,
             clock=clock,
             identifiers=identifiers,
             reason_text=request.reason_text,
@@ -525,6 +561,7 @@ def post_staff_account_onboarding_correction(
     return _lifecycle_body(session, result)
 
 
+@router.post("/{staff_id}/restart-google-signin", response_model=StaffAccountLifecycleResponse)
 @router.post(
     "/{staff_id}/google-email",
     response_model=StaffAccountLifecycleResponse,

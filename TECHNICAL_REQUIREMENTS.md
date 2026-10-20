@@ -1,5 +1,11 @@
 # Technical Requirements — Golden Rose Operations Platform
 
+## 2026-10-20 — Accepted staff onboarding and diagnostics requirements
+
+Normal staff administration must reject manually supplied subjects and identity fields on access-only edits, including legacy endpoint aliases. Pending onboarding binds only an exact verified Google email; activation requires verified provenance and deliberate account-level MFA confirmation. Existing legitimate legacy accounts retain exact-subject continuity and gain provenance only from verified credential resolution.
+
+Account managers need bilingual actionable diagnostics for pending, legacy, verified/suspended, active and deprovisioned states. A received Google credential alone must not be described as application access. Onboarding restart supports the same email with version, reason, permission, row-lock and immutable retry checks. Unknown outcomes preserve the original command/payload and block accidental dismissal/navigation until resolved. Migration 0021 is source only; live execution, initial recovery-permission provisioning and post-deploy staff acceptance require a separate approved packet. See [the accepted contract](docs/planning/2026-10-20-staff-google-binding-repair.md).
+
 ## 2026-10-06 — Staff-pilot identity and onboarding baseline
 
 The controlled staff-pilot runtime now has validated named-account staff OIDC for the initial onboarding account. PR #167 was deployed through signed image admission, reviewed Terraform service refresh, protected service gate, Cloud Run v2 readback and browser validation. The staff personal account page must continue to resolve a verified identity-provider session to a durable Golden Rose staff account before showing permissions or account details; unauthenticated staff-session reads must fail closed.

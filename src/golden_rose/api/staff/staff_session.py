@@ -61,7 +61,11 @@ def get_staff_session(
         auth_context=settings.auth_mode,
         account=StaffAccountResponse.model_validate(
             {
-                **asdict(account),
+                **{
+                    key: value
+                    for key, value in asdict(account).items()
+                    if key != "provider_subject"
+                },
                 "permission_names": tuple(
                     sorted(
                         list_active_staff_permission_grants(

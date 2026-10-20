@@ -101,5 +101,5 @@ def test_contact_email_draft_blocks_downgrade_before_constraint_removal(migratio
         migrate(migration_database, "0019_ext_calendar_imports", downgrade=True)
     with migration_database.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "0020_contact_email_fields"
+            "0021_staff_google_binding"
         )

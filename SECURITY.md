@@ -1,5 +1,19 @@
 # Security — Golden Rose Operations Platform
 
+## 2026-10-20 — Binding repair source candidate and remaining rollout boundary
+
+The accepted [repair contract](docs/planning/2026-10-20-staff-google-binding-repair.md) is implemented as a source candidate. Ordinary requests cannot install a subject, access persistence never rewrites identity/MFA, and routine serializers omit raw subjects. Verified credential resolution records explicit proof; migration preserves historical accounts as unverified and stops before DDL on an active/pending anomaly. Activation requires verified provenance and confirmed MFA without reviving Google's optional `amr` requirement.
+
+Recovery requires separate named authority, rejects self/deprovisioned targets, suspends and clears proof/MFA, preserves account/history/grants, and serializes binding/restart with immutable retry receipts. Temporary recovery grants cannot become durable through creation/access editing or be redelegated. No recovery permission is automatically distributed in migration. The backend source review found no remaining material blockers; regression/UI qualification and protected CI are separate evidence. This candidate has not been migrated or deployed. Earlier incident-gap descriptions below describe the pre-repair baseline and remain relevant to the running service until a separately approved rollout.
+
+## 2026-10-20 — Open staff identity-binding provenance and correction gap
+
+One explicitly authorized owner account was recovered through existing application onboarding commands after its stored subject was observed to be a manually supplied role label. Verified Google binding and reactivation restored access; the user confirmed the account and workspace worked. The original staff ID, audit history and 49 grants remain intact. This account recovery does not close the underlying source defect.
+
+Ordinary account creation/correction can accept subject text without Google proof, access corrections can rewrite identity fields, and the binding badge/activation check rely on the absence of a pending prefix. The actual sign-in path still verifies Google's credential and performs exact-subject resolution; no active-account email-only auto-linking was introduced during recovery. The observed incident demonstrates an access-availability failure. Source inspection also identifies a security-sensitive identity-mutation surface; it does not establish unauthorized access or exploitation.
+
+The [proposed repair contract](docs/planning/2026-10-20-staff-google-binding-repair.md) separates access edits from identity changes, introduces trustworthy provenance without mass lockout of existing named accounts, and defines an explicit, audited, permissioned and retry-safe onboarding restart. Routine responses should expose safe binding state rather than raw subjects. The repair remains unimplemented; implementation qualification, protected merge and a separately authorized migration/deployment packet are still required. The one-account recovery grants no further live-account or provider-side authority.
+
 ## 2026-10-06 — Controlled staff-pilot identity validation
 
 PR #167 is merged at protected `develop@3ddf85b1e3ca68cc1eea366cad61decde147cb00` and the controlled live-data staff-pilot service has been refreshed with the remediated image. The approved service-only deployment passed signed-image admission, reviewed Terraform apply, protected service gate, Cloud Run v2 readback, read-only health/readiness smoke and human browser validation for the initial owner Google onboarding account.

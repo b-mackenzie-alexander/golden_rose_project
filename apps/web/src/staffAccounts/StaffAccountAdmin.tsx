@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 
 import {
@@ -10,24 +10,25 @@ import {
   listStaffAccounts,
   listStaffAccountEvents,
   listStaffDelegations,
+  readStaffAccountDiagnostics,
   recordRecoveryEvidence,
   recordSessionRevocationEvidence,
   revokeStaffDelegation,
   suspendStaffAccount,
   updateStaffAccountGoogleEmail,
 } from '../api/staffAccountClient';
-import type { StaffAccount, StaffAccountFailureKind, StaffAccountLifecycleEvent, StaffAccountRole, StaffDelegation } from '../api/staffAccountClient';
+import type { StaffAccountDiagnostics, StaffAccount, StaffAccountFailureKind, StaffAccountLifecycleEvent, StaffAccountRole, StaffDelegation } from '../api/staffAccountClient';
 import { GoogleStaffSignIn } from '../auth/GoogleStaffSignIn';
 import { IconSymbol } from '../dashboard/artwork';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { permissionLabel } from './permissionLabels';
+import { NavigationGuardContext } from '../app/navigationGuardContext';
 
 type AccountAction = 'activate' | 'suspend' | 'deprovision' | 'recovery' | 'session';
 type AccountFilter = 'all' | 'active' | 'suspended' | 'deprovisioned' | 'mfa_pending';
 type CreateForm = {
   displayName: string;
   providerEmail: string;
-  providerSubject: string;
   roleName: StaffAccountRole;
   permissionNames: string[];
   mfaEnrolled: boolean;
@@ -40,6 +41,9 @@ type ActionForm = {
   mfaEnrolled: boolean;
 };
 type EmailForm = {
+  commandId: string;
+  locked: boolean;
+  uncertain: boolean;
   account: StaffAccount;
   providerEmail: string;
   reasonText: string;
@@ -69,6 +73,7 @@ const permissionGroups = [
       'staff_account:create',
       'staff_account:activate',
       'staff_account:suspend',
+      'staff_account:signin:reset',
       'staff_account:deprovision',
       'staff_account:recovery:record',
       'staff_account:session:revoke',
@@ -335,6 +340,9 @@ const eventLabels: Record<StaffAccountLifecycleEvent['eventType'], { en: string;
   'staff_account.activated': { en: 'Account activated', es: 'Cuenta activada' },
   'staff_account.suspended': { en: 'Account suspended', es: 'Cuenta suspendida' },
   'staff_account.deprovisioned': { en: 'Account deprovisioned', es: 'Cuenta retirada' },
+  'staff_account.access_updated': { en: 'Access updated', es: 'Acceso actualizado' },
+  'staff_account.binding_verified': { en: 'Google identity verified', es: 'Identidad de Google verificada' },
+  'staff_account.binding_restarted': { en: 'Google onboarding restarted', es: 'Incorporación de Google reiniciada' },
   'staff_account.corrected': { en: 'Account corrected', es: 'Cuenta corregida' },
   'staff_account.signin_email_updated': { en: 'Google email updated', es: 'Correo de Google actualizado' },
   'staff_account.recovery_recorded': { en: 'Recovery evidence recorded', es: 'Evidencia de recuperacion registrada' },
@@ -362,7 +370,6 @@ const failureLabels: Record<StaffAccountFailureKind, { en: string; es: string }>
 const emptyCreate: CreateForm = {
   displayName: '',
   providerEmail: '',
-  providerSubject: '',
   roleName: 'operations_staff',
   permissionNames: ['staff_account:read'],
   mfaEnrolled: false,
@@ -384,15 +391,13 @@ function formatDate(value: string) {
   return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-function isPendingProviderSubject(value: string) {
-  return value.startsWith('pending-google-email:');
-}
-
 function providerSubjectStatus(account: StaffAccount, language: 'en' | 'es') {
-  if (isPendingProviderSubject(account.providerSubject)) {
-    return language === 'en' ? 'Waiting for verified Google sign-in' : 'Esperando inicio de Google verificado';
-  }
-  return language === 'en' ? 'Google sign-in binding recorded' : 'Inicio con Google vinculado';
+  const labels = {
+    pending: { en: 'Waiting for Google sign-in', es: 'Esperando inicio de sesión con Google' },
+    legacy_unverified: { en: 'Legacy identity: verification needed', es: 'Identidad anterior: necesita verificación' },
+    google_verified: { en: 'Google identity verified', es: 'Identidad de Google verificada' },
+  };
+  return labels[account.bindingStatus][language];
 }
 
 function formatStatusTransition(event: StaffAccountLifecycleEvent, language: 'en' | 'es') {
@@ -555,6 +560,8 @@ function actionHelp(action: AccountAction, language: 'en' | 'es') {
 
 export function StaffAccountAdmin() {
   const { language } = useLanguage();
+  const setNavigationBlocked = useContext(NavigationGuardContext);
+  const [emailBusy, setEmailBusy] = useState(false);
   const [accounts, setAccounts] = useState<StaffAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [accountsLoaded, setAccountsLoaded] = useState(false);
@@ -573,6 +580,24 @@ export function StaffAccountAdmin() {
   const [historyPanel, setHistoryPanel] = useState<HistoryPanel | null>(null);
   const [accountFilter, setAccountFilter] = useState<AccountFilter>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const diagnosticGeneration = useRef(0);
+  const diagnosticPanelRef = useRef<HTMLElement>(null);
+  const [diagnostic, setDiagnostic] = useState<StaffAccount | null>(null);
+  const [diagnosticError, setDiagnosticError] = useState('');
+  const [diagnosticRights, setDiagnosticRights] = useState<StaffAccountDiagnostics | null>(null);
+  const [diagnosticLoading, setDiagnosticLoading] = useState(false);
+  useEffect(() => {
+    if (diagnostic || diagnosticError) diagnosticPanelRef.current?.focus();
+  }, [diagnostic, diagnosticError]);
+  async function inspectSignIn(account: StaffAccount) {
+    const generation = ++diagnosticGeneration.current;
+    setDiagnostic(null); setDiagnosticRights(null); setDiagnosticError(''); setDiagnosticLoading(true);
+    const result = await readStaffAccountDiagnostics(account.staffId);
+    if (generation !== diagnosticGeneration.current) return;
+    if (result.ok) { setDiagnostic(result.value.account); setDiagnosticRights(result.value); }
+    else setDiagnosticError(failureText(result.failure.kind, language));
+    setDiagnosticLoading(false);
+  }
   const activeCount = useMemo(() => accounts.filter((account) => account.lifecycleStatus === 'active').length, [accounts]);
   const suspendedCount = useMemo(() => accounts.filter((account) => account.lifecycleStatus === 'suspended').length, [accounts]);
   const deprovisionedCount = useMemo(() => accounts.filter((account) => account.lifecycleStatus === 'deprovisioned').length, [accounts]);
@@ -592,6 +617,7 @@ export function StaffAccountAdmin() {
   }, [accountFilter, accounts, searchTerm]);
 
   async function reloadAccounts() {
+    diagnosticGeneration.current++; setDiagnostic(null); setDiagnosticRights(null); setDiagnosticLoading(false); setDiagnosticError('');
     setLoading(true);
     setError('');
     setAccessFailure(null);
@@ -601,6 +627,7 @@ export function StaffAccountAdmin() {
       setAccountsLoaded(true);
     } else {
       setAccountsLoaded(false);
+      diagnosticGeneration.current++; setDiagnostic(null); setDiagnosticRights(null); setDiagnosticLoading(false); setDiagnosticError('');
       setAccounts([]);
       setAccessFailure(result.failure.kind);
       setError(failureText(result.failure.kind, language));
@@ -609,9 +636,12 @@ export function StaffAccountAdmin() {
   }
 
   useEffect(() => {
+    const generations = diagnosticGeneration;
     let cancelled = false;
+    void Promise.resolve().then(() => { if (!cancelled) setLoading(true); });
     void listStaffAccounts().then((result) => {
       if (cancelled) return;
+      generations.current++; setDiagnostic(null); setDiagnosticRights(null); setDiagnosticLoading(false); setDiagnosticError('');
       if (result.ok) {
         setAccounts(result.value);
         setAccountsLoaded(true);
@@ -626,20 +656,32 @@ export function StaffAccountAdmin() {
       setLoading(false);
     });
     return () => {
-      cancelled = true;
+      cancelled = true; generations.current++;
     };
   }, [language]);
 
-  const signInRequired = accessFailure === 'sign_in_required' || accessFailure === 'authentication_failed';
-  const adminControlsReady = accountsLoaded;
+  useEffect(() => {
+    setNavigationBlocked?.(Boolean(emailForm?.locked));
+    return () => { setNavigationBlocked?.(false); };
+  }, [emailForm?.locked, setNavigationBlocked]);
 
-  function validateAccountForm(form: CreateForm, setErrors: (errors: Partial<Record<keyof CreateForm, string>>) => void) {
+  useEffect(() => {
+    if (!emailForm?.locked) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    window.addEventListener('beforeunload', warn);
+    return () => { window.removeEventListener('beforeunload', warn); };
+  }, [emailForm?.locked]);
+
+  const signInRequired = accessFailure === 'sign_in_required' || accessFailure === 'authentication_failed';
+  const adminControlsReady = accountsLoaded && !loading;
+
+  function validateAccountForm(form: CreateForm, setErrors: (errors: Partial<Record<keyof CreateForm, string>>) => void, requireEmail = true) {
     const next: Partial<Record<keyof CreateForm, string>> = {};
     if (form.displayName.trim().length === 0) next.displayName = language === 'en' ? 'Display name is required.' : 'Nombre visible requerido.';
-    if (form.providerEmail.trim().length === 0 && form.providerSubject.trim().length === 0) {
-      next.providerEmail = language === 'en' ? 'Google email or provider subject is required.' : 'Correo de Google o sujeto del proveedor requerido.';
+    if (requireEmail && form.providerEmail.trim().length === 0) {
+      next.providerEmail = language === 'en' ? 'Google sign-in email is required.' : 'Se requiere el correo de inicio de sesión de Google.';
     }
-    if (form.providerEmail.trim().length > 0 && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.providerEmail.trim())) {
+    if (requireEmail && form.providerEmail.trim().length > 0 && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.providerEmail.trim())) {
       next.providerEmail = language === 'en' ? 'Enter a valid Google email address.' : 'Ingrese un correo de Google valido.';
     }
     if (form.permissionNames.length === 0) next.permissionNames = language === 'en' ? 'Select at least one permission.' : 'Seleccione al menos un permiso.';
@@ -669,9 +711,12 @@ export function StaffAccountAdmin() {
     setNotice('');
     setError('');
     if (correctionForm === null) return;
-    if (!validateAccountForm(correctionForm, setCorrectionErrors)) return;
+    if (!validateAccountForm(correctionForm, setCorrectionErrors, false)) return;
     const result = await correctStaffAccount({
-      ...correctionForm,
+      displayName: correctionForm.displayName,
+      roleName: correctionForm.roleName,
+      permissionNames: correctionForm.permissionNames,
+      reasonText: correctionForm.reasonText,
       staffId: correctionForm.account.staffId,
       expectedVersion: correctionForm.account.version,
       commandId: createCommandId(),
@@ -688,6 +733,7 @@ export function StaffAccountAdmin() {
     );
     setCorrectionForm(null);
     setCorrectionErrors({});
+    await reloadAccounts();
   }
 
   async function submitEmailUpdate(event: SyntheticEvent<HTMLFormElement>) {
@@ -704,21 +750,31 @@ export function StaffAccountAdmin() {
     }
     setEmailErrors(next);
     if (Object.keys(next).length > 0) return;
+    if (emailBusy) return;
+    setEmailBusy(true);
+    setEmailForm({ ...emailForm, locked: true });
     const result = await updateStaffAccountGoogleEmail({
       staffId: emailForm.account.staffId,
       expectedVersion: emailForm.account.version,
       providerEmail: emailForm.providerEmail,
       reasonText: emailForm.reasonText,
-      commandId: createCommandId(),
+      commandId: emailForm.commandId,
     });
+    setEmailBusy(false);
     if (!result.ok) {
+      if (emailForm.uncertain || result.failure.kind === 'unknown_outcome' || result.failure.kind === 'unavailable') {
+        setEmailForm({ ...emailForm, locked: true, uncertain: true });
+      } else {
+        setEmailForm({ ...emailForm, locked: false, commandId: createCommandId() });
+      }
       setError(failureText(result.failure.kind, language));
       return;
     }
     setAccounts((current) => upsertAccount(current, result.value.account));
-    setNotice(language === 'en' ? 'Staff account Google email updated.' : 'Correo de Google actualizado.');
+    setNotice(language === 'en' ? 'Google onboarding restarted. Ask the person to sign in, then confirm MFA and activate.' : 'Incorporación reiniciada. Pida iniciar sesión; luego confirme MFA y active.');
     setEmailForm(null);
     setEmailErrors({});
+    await reloadAccounts();
   }
 
   async function submitAction(event: SyntheticEvent<HTMLFormElement>) {
@@ -728,6 +784,10 @@ export function StaffAccountAdmin() {
     if (actionForm === null) return;
     if (actionForm.reasonText.trim().length === 0) {
       setActionError(language === 'en' ? 'Reason is required.' : 'Motivo requerido.');
+      return;
+    }
+    if (actionForm.action === 'activate' && !actionForm.mfaEnrolled) {
+      setActionError(language === 'en' ? 'Confirm MFA enrollment before activation.' : 'Confirme la inscripción de MFA antes de activar.');
       return;
     }
     const base = {
@@ -752,6 +812,7 @@ export function StaffAccountAdmin() {
     setAccounts((current) => upsertAccount(current, result.value.account));
     setNotice(actionLabels[actionForm.action][language]);
     setActionForm(null);
+    await reloadAccounts();
   }
 
   function togglePermission(permission: string) {
@@ -799,7 +860,6 @@ export function StaffAccountAdmin() {
       account,
       displayName: account.displayName,
       providerEmail: account.providerEmail ?? '',
-      providerSubject: isPendingProviderSubject(account.providerSubject) ? '' : account.providerSubject,
       roleName: account.roleName,
       permissionNames: sortPermissions(account.permissionNames),
       mfaEnrolled: account.mfaEnrolled,
@@ -809,7 +869,14 @@ export function StaffAccountAdmin() {
   }
 
   function openEmailUpdate(account: StaffAccount) {
+    if (emailForm?.locked) {
+      setError(language === 'en' ? 'Resolve the original sign-in restart before starting another.' : 'Resuelva el reinicio original antes de iniciar otro.');
+      return;
+    }
     setEmailForm({
+      commandId: createCommandId(),
+      locked: false,
+      uncertain: false,
       account,
       providerEmail: account.providerEmail ?? '',
       reasonText: '',
@@ -928,13 +995,13 @@ export function StaffAccountAdmin() {
       {signInRequired ? (
         <GoogleStaffSignIn onSignedIn={() => { void reloadAccounts(); }} />
       ) : null}
+      {loading ? <p role="status">{language === 'en' ? 'Loading accounts' : 'Cargando cuentas'}</p> : null}
 
       {adminControlsReady ? (
       <div className="staff-account-layout">
         <section className="staff-account-panel" aria-labelledby="account-list-heading">
           <div className="staff-account-panel-header">
             <h3 id="account-list-heading"><IconSymbol name="workers" /> {language === 'en' ? 'Account lifecycle' : 'Ciclo de cuentas'}</h3>
-            {loading ? <span>{language === 'en' ? 'Loading' : 'Cargando'}</span> : null}
           </div>
           <div className="staff-account-filters" aria-label={language === 'en' ? 'Account list filters' : 'Filtros de cuentas'}>
             <label>
@@ -1004,28 +1071,26 @@ export function StaffAccountAdmin() {
                   <small>{language === 'en' ? `Version ${String(account.version)}` : `Version ${String(account.version)}`}</small>
                 </span>
                 <span role="cell" className="staff-account-actions">
+                  <button className="focus-ring" type="button" onClick={() => { void inspectSignIn(account); }}>{language === 'en' ? 'Sign-in diagnostics' : 'Diagnóstico de acceso'}</button>
                   {account.lifecycleStatus !== 'active' && account.lifecycleStatus !== 'deprovisioned' ? (
                     <button
                       className="focus-ring"
-                      disabled={isPendingProviderSubject(account.providerSubject)}
+                      disabled={account.bindingStatus !== 'google_verified'}
                       title={
-                        isPendingProviderSubject(account.providerSubject)
+                        account.bindingStatus !== 'google_verified'
                           ? language === 'en'
                             ? 'Waiting for the first verified Google sign-in before activation.'
                             : 'Esperando el primer inicio verificado de Google antes de activar.'
                           : undefined
                       }
                       type="button"
-                      onClick={() => { setActionForm({ account, action: 'activate', reasonText: '', mfaEnrolled: true }); }}
+                      onClick={() => { setActionForm({ account, action: 'activate', reasonText: '', mfaEnrolled: false }); }}
                     >
                       {actionLabels.activate[language]}
                     </button>
                   ) : null}
                   {account.lifecycleStatus !== 'deprovisioned' ? (
                     <button className="focus-ring" type="button" onClick={() => { openCorrection(account); }}>{language === 'en' ? 'Manage access' : 'Administrar acceso'}</button>
-                  ) : null}
-                  {account.lifecycleStatus !== 'deprovisioned' ? (
-                    <button className="focus-ring" type="button" onClick={() => { openEmailUpdate(account); }}>{language === 'en' ? 'Google email' : 'Correo Google'}</button>
                   ) : null}
                   {account.lifecycleStatus === 'active' ? (
                     <button className="focus-ring" type="button" onClick={() => { setActionForm({ account, action: 'suspend', reasonText: '', mfaEnrolled: false }); }}>{actionLabels.suspend[language]}</button>
@@ -1042,7 +1107,7 @@ export function StaffAccountAdmin() {
                 </span>
               </div>
             ))}
-            {!loading && filteredAccounts.length === 0 ? (
+            {filteredAccounts.length === 0 ? (
               <p className="staff-account-empty">
                 {accounts.length === 0
                   ? language === 'en' ? 'No staff accounts are available to this session.' : 'No hay cuentas disponibles para esta sesion.'
@@ -1064,16 +1129,6 @@ export function StaffAccountAdmin() {
               <span>{language === 'en' ? 'Google email for sign-in' : 'Correo de Google para iniciar sesion'}</span>
               <input className="focus-ring" type="email" value={createForm.providerEmail} onChange={(event) => { setCreateForm({ ...createForm, providerEmail: event.target.value }); }} />
               {createErrors.providerEmail ? <small role="alert">{createErrors.providerEmail}</small> : null}
-            </label>
-            <label>
-              <span>{language === 'en' ? 'Provider subject, if already known' : 'Sujeto del proveedor, si ya se conoce'}</span>
-              <input className="focus-ring" value={createForm.providerSubject} onChange={(event) => { setCreateForm({ ...createForm, providerSubject: event.target.value }); }} />
-              <small>
-                {language === 'en'
-                  ? 'Leave blank for normal Google email onboarding. The stable sign-in subject binds after the person signs in once.'
-                  : 'Dejelo vacio para incorporacion normal por correo de Google. El sujeto estable se vincula despues del primer inicio.'}
-              </small>
-              {createErrors.providerSubject ? <small role="alert">{createErrors.providerSubject}</small> : null}
             </label>
             <div className="calendar-form-row">
               <label>
@@ -1111,6 +1166,48 @@ export function StaffAccountAdmin() {
       </div>
       ) : null}
 
+      {(diagnosticLoading || diagnosticError || diagnostic) ? (
+        <section ref={diagnosticPanelRef} tabIndex={-1} className="staff-account-panel focus-ring" aria-label={language === 'en' ? 'Sign-in diagnostics' : 'Diagnóstico de acceso'} aria-live="polite">
+          <div className="staff-account-panel-header">
+          <h3>{language === 'en' ? 'Sign-in diagnostics' : 'Diagnóstico de acceso'}{diagnostic ? `: ${diagnostic.displayName}` : ''}</h3>
+          <button className="staff-secondary-button focus-ring" type="button" onClick={() => { diagnosticGeneration.current++; setDiagnosticLoading(false); setDiagnostic(null); setDiagnosticError(''); setDiagnosticRights(null); }}>{language === 'en' ? 'Close diagnostics' : 'Cerrar diagnóstico'}</button>
+          </div>
+          {diagnosticLoading ? <p role="status">{language === 'en' ? 'Checking account evidence…' : 'Verificando evidencia de la cuenta…'}</p> : null}
+          {diagnosticError ? <p role="alert">{diagnosticError}</p> : null}
+          {diagnostic ? <>
+            <dl>
+              <dt>{language === 'en' ? 'Google identity' : 'Identidad de Google'}</dt><dd>{providerSubjectStatus(diagnostic, language)}</dd>
+              <dt>{language === 'en' ? 'Verification recorded' : 'Verificación registrada'}</dt><dd>{diagnostic.bindingVerifiedAt ? formatDate(diagnostic.bindingVerifiedAt) : (language === 'en' ? 'No verified evidence recorded' : 'Sin evidencia verificada')}</dd>
+              <dt>{language === 'en' ? 'Account state' : 'Estado de cuenta'}</dt><dd>{statusLabels[diagnostic.lifecycleStatus][language]}</dd>
+              <dt>MFA</dt><dd>{diagnostic.mfaEnrolled ? (language === 'en' ? 'Enrollment confirmed' : 'Inscripción confirmada') : (language === 'en' ? 'Confirmation required before activation' : 'Se requiere confirmación antes de activar')}</dd>
+            </dl>
+            <h4>{language === 'en' ? 'Next step' : 'Siguiente paso'}</h4>
+            <p>{diagnostic.lifecycleStatus === 'deprovisioned'
+              ? (language === 'en' ? 'This account cannot be reactivated. Contact the account administrator.' : 'Esta cuenta no puede reactivarse. Contacte a la administración.')
+              : diagnostic.bindingStatus === 'pending'
+                ? (language === 'en' ? 'Ask this person to sign in with the assigned Google account. Access stays suspended until a manager confirms MFA and activates it.' : 'Pida iniciar sesión con la cuenta de Google asignada. El acceso sigue suspendido hasta confirmar MFA y activar.')
+                : diagnostic.bindingStatus === 'legacy_unverified'
+                  ? (language === 'en' ? 'Ask this person to sign in to verify the existing identity. If verification fails, an authorized manager can restart Google sign-in without deleting the account.' : 'Pida iniciar sesión para verificar la identidad anterior. Si falla, una persona autorizada puede reiniciar el acceso sin borrar la cuenta.')
+                  : diagnostic.lifecycleStatus !== 'active' || !diagnostic.mfaEnrolled
+                    ? (language === 'en' ? 'Google identity is verified. Confirm MFA enrollment and activate the account when appropriate.' : 'Google verificó la identidad. Confirme MFA y active la cuenta cuando corresponda.')
+                    : (language === 'en' ? 'Account evidence permits sign-in. If access fails, check the selected Google account and obtain a new browser credential. Permissions for individual tools are reviewed separately.' : 'La evidencia permite el acceso. Si falla, revise la cuenta de Google seleccionada y obtenga una credencial nueva. Revise por separado los permisos de herramientas.')}</p>
+            <p>{language === 'en' ? 'This checks Golden Rose account evidence. It does not inspect Google passwords, reset factors, or revoke Google sessions.' : 'Este diagnóstico revisa evidencia de Golden Rose. No inspecciona contraseñas, restablece factores ni revoca sesiones de Google.'}</p>
+            <p>{diagnosticRights?.canRestartSignin
+              ? (language === 'en' ? 'You can restart Google onboarding for this account.' : 'Puede reiniciar la incorporación de Google para esta cuenta.')
+              : diagnosticRights?.restartUnavailableReason === 'self_reset'
+                ? (language === 'en' ? 'Use another authorized administrator for your own sign-in recovery.' : 'Use otra cuenta administrativa autorizada para recuperar su propio acceso.')
+                : diagnosticRights?.restartUnavailableReason === 'deprovisioned'
+                  ? (language === 'en' ? 'Recovery is unavailable for a deprovisioned account.' : 'No se puede recuperar una cuenta retirada.')
+                  : (language === 'en' ? 'Recovery requires the Google sign-in recovery permission. Ask an authorized administrator.' : 'La recuperación requiere el permiso correspondiente. Pida ayuda a una persona autorizada.')}</p>
+            <div className="staff-account-actions">
+            <button className="staff-secondary-button focus-ring" type="button" disabled={!diagnosticRights?.canRestartSignin} onClick={() => { openEmailUpdate(diagnostic); }}>{language === 'en' ? 'Restart Google sign-in' : 'Reiniciar inicio de Google'}</button>
+            <button className="staff-secondary-button focus-ring" type="button" disabled={!diagnosticRights?.canActivate} onClick={() => { setActionForm({ account: diagnostic, action: 'activate', reasonText: '', mfaEnrolled: false }); }}>{language === 'en' ? 'Activate verified account' : 'Activar cuenta verificada'}</button>
+            <button className="staff-secondary-button focus-ring" type="button" onClick={() => { void inspectSignIn(diagnostic); }}>{language === 'en' ? 'Refresh diagnostics' : 'Actualizar diagnóstico'}</button>
+            </div>
+          </> : null}
+        </section>
+      ) : null}
+
       {correctionForm ? (
         <section className="staff-account-panel staff-action-panel" aria-labelledby="account-correction-heading">
           <div className="staff-account-panel-header">
@@ -1132,21 +1229,6 @@ export function StaffAccountAdmin() {
               <input className="focus-ring" value={correctionForm.displayName} onChange={(event) => { setCorrectionForm({ ...correctionForm, displayName: event.target.value }); }} />
               {correctionErrors.displayName ? <small role="alert">{correctionErrors.displayName}</small> : null}
             </label>
-            <label>
-              <span>{language === 'en' ? 'Google email for sign-in' : 'Correo de Google para iniciar sesion'}</span>
-              <input className="focus-ring" type="email" value={correctionForm.providerEmail} onChange={(event) => { setCorrectionForm({ ...correctionForm, providerEmail: event.target.value }); }} />
-              {correctionErrors.providerEmail ? <small role="alert">{correctionErrors.providerEmail}</small> : null}
-            </label>
-            <label>
-              <span>{language === 'en' ? 'Provider subject, if already known' : 'Sujeto del proveedor, si ya se conoce'}</span>
-              <input className="focus-ring" value={correctionForm.providerSubject} onChange={(event) => { setCorrectionForm({ ...correctionForm, providerSubject: event.target.value }); }} />
-              <small>
-                {language === 'en'
-                  ? 'Leave blank to keep this account waiting for the first verified Google sign-in.'
-                  : 'Dejelo vacio para mantener la cuenta esperando el primer inicio de Google verificado.'}
-              </small>
-              {correctionErrors.providerSubject ? <small role="alert">{correctionErrors.providerSubject}</small> : null}
-            </label>
             <div className="calendar-form-row">
               <label>
                 <span>{language === 'en' ? 'Role' : 'Rol'}</span>
@@ -1160,10 +1242,6 @@ export function StaffAccountAdmin() {
                     ? 'Role is the staff job label. The permission profile below sets the durable tools.'
                     : 'El rol es la etiqueta del puesto. El perfil de permisos abajo define las herramientas duraderas.'}
                 </small>
-              </label>
-              <label className="staff-checkbox-label">
-                <input checked={correctionForm.mfaEnrolled} type="checkbox" onChange={(event) => { setCorrectionForm({ ...correctionForm, mfaEnrolled: event.target.checked }); }} />
-                <span>{language === 'en' ? 'MFA already enrolled' : 'MFA ya inscrito'}</span>
               </label>
             </div>
             <fieldset className="staff-permission-fieldset">
@@ -1185,26 +1263,26 @@ export function StaffAccountAdmin() {
       {emailForm ? (
         <section className="staff-account-panel staff-action-panel" aria-labelledby="account-email-heading">
           <div className="staff-account-panel-header">
-            <h3 id="account-email-heading">{language === 'en' ? 'Manage Google email' : 'Administrar correo de Google'}: {emailForm.account.displayName}</h3>
-            <button className="staff-secondary-button focus-ring" type="button" onClick={() => { setEmailForm(null); }}>{language === 'en' ? 'Close' : 'Cerrar'}</button>
+            <h3 id="account-email-heading">{language === 'en' ? 'Restart Google sign-in' : 'Reiniciar inicio de Google'}: {emailForm.account.displayName}</h3>
+            <button className="staff-secondary-button focus-ring" type="button" disabled={emailForm.locked} onClick={() => { setEmailForm(null); }}>{language === 'en' ? 'Close' : 'Cerrar'}</button>
           </div>
           <p className="staff-account-helper">
             {language === 'en'
-              ? 'Add a missing Google email without changing the existing verified binding. Replacing an existing email resets the Google binding, suspends the account, clears MFA evidence, and requires the next verified Google sign-in before activation.'
-              : 'Agregue un correo de Google faltante sin cambiar el vinculo verificado existente. Reemplazar un correo existente reinicia el vinculo de Google, suspende la cuenta, borra la evidencia MFA y requiere el proximo inicio verificado antes de activar.'}
+              ? 'Restart sign-in using this email or a corrected email. Access will be suspended until the person signs in with Google and an authorized manager confirms MFA and activates the account. Permissions and history are preserved. This does not sign the person out of Google.'
+              : 'Reinicie el acceso con este correo o uno corregido. La cuenta queda suspendida hasta verificar Google y confirmar MFA y activación. Se conservan permisos e historial. No se cierra la sesión de Google.'}
           </p>
           <form className="staff-account-form" onSubmit={(event) => { void submitEmailUpdate(event); }}>
             <label>
               <span>{language === 'en' ? 'Google email for sign-in' : 'Correo de Google para iniciar sesion'}</span>
-              <input className="focus-ring" type="email" value={emailForm.providerEmail} onChange={(event) => { setEmailForm({ ...emailForm, providerEmail: event.target.value }); }} />
+              <input className="focus-ring" type="email" disabled={emailForm.locked} value={emailForm.providerEmail} onChange={(event) => { setEmailForm({ ...emailForm, providerEmail: event.target.value }); }} />
               {emailErrors.providerEmail ? <small role="alert">{emailErrors.providerEmail}</small> : null}
             </label>
             <label>
               <span>{language === 'en' ? 'Reason' : 'Motivo'}</span>
-              <textarea className="focus-ring" value={emailForm.reasonText} onChange={(event) => { setEmailForm({ ...emailForm, reasonText: event.target.value }); }} />
+              <textarea className="focus-ring" disabled={emailForm.locked} value={emailForm.reasonText} onChange={(event) => { setEmailForm({ ...emailForm, reasonText: event.target.value }); }} />
               {emailErrors.reasonText ? <small role="alert">{emailErrors.reasonText}</small> : null}
             </label>
-            <button className="staff-primary-button focus-ring" type="submit">{language === 'en' ? 'Save Google email' : 'Guardar correo'}</button>
+            <button className="staff-primary-button focus-ring" type="submit" disabled={emailBusy}>{emailForm.locked ? (language === 'en' ? 'Retry original restart' : 'Reintentar reinicio original') : (language === 'en' ? 'Restart onboarding' : 'Reiniciar incorporación')}</button>
           </form>
         </section>
       ) : null}

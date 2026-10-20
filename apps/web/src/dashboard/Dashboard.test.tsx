@@ -178,7 +178,7 @@ describe('Dashboard', () => {
         authContext: 'staff_oidc',
         account: {
           staffId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-          providerSubject: 'oidc:staff:owner',
+          bindingStatus: 'google_verified' as const, bindingVerifiedAt: '2026-10-20T12:00:00Z',
           providerEmail: 'beatrice.santos@example.test',
           displayName: 'Beatrice Santos',
           roleName: 'owner',

@@ -1978,6 +1978,13 @@ select {
   min-height: 2.75rem;
 }
 
+.staff-account-actions button:disabled,
+.staff-secondary-button:disabled,
+.staff-primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .staff-account-status {
   border-radius: 999px;
   display: inline-flex;

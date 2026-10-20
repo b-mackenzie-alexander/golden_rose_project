@@ -12,6 +12,7 @@ ADRs preserve material architecture, security, data-governance, delivery, and re
 Use `ADR-NNNN-short-title.md`, with monotonic numbers. Never renumber an existing ADR. Link superseding records both ways.
 
 ## Records
+- `ADR-0018-staff-google-binding-and-recovery.md` — accepted source contract for verified binding provenance, access isolation, actionable diagnostics and guarded retry-safe onboarding restart.
 - `ADR-0001-protected-integration-and-promotion-branches.md` — accepted protected-branch and promotion topology.
 - `ADR-0002-first-phase-1-slice-and-synthetic-data-boundary.md` — accepted first tracer scope, synthetic-data boundary, and planning/coding/review handoff.
 - `ADR-0003-phase-1-backend-toolchain.md` — accepted Python/FastAPI/PostgreSQL synchronous backend toolchain for the first slice.

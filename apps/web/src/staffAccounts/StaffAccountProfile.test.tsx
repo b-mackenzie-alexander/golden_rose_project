@@ -27,7 +27,7 @@ afterEach(() => {
 
 const account = {
   staffId: '22222222-2222-4222-8222-222222222222',
-  providerSubject: 'oidc:staff:123',
+  bindingStatus: 'google_verified' as const, bindingVerifiedAt: '2026-10-20T12:00:00Z',
   providerEmail: 'mariela.torres@example.test',
   displayName: 'Mariela Torres',
   roleName: 'operations_staff' as const,

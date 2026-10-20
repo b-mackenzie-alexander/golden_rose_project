@@ -30,6 +30,8 @@ class StaffAccountRecord:
     updated_at: datetime
     updated_by: UUID
     version: int
+    binding_status: Literal["pending", "legacy_unverified", "google_verified"] = "legacy_unverified"
+    binding_verified_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,6 +92,7 @@ def insert_staff_account(
             updated_at=created_at,
             updated_by=actor_id,
             version=1,
+            binding_status="pending",
         )
     )
     return StaffAccountRecord(
@@ -105,6 +108,7 @@ def insert_staff_account(
         updated_at=created_at,
         updated_by=actor_id,
         version=1,
+        binding_status="pending",
     )
 
 
@@ -123,6 +127,8 @@ def get_staff_account_by_id_for_update(*, session: Session, staff_id: UUID) -> S
             staff_accounts.c.updated_at,
             staff_accounts.c.updated_by,
             staff_accounts.c.version,
+            staff_accounts.c.binding_status,
+            staff_accounts.c.binding_verified_at,
         )
         .where(staff_accounts.c.staff_id == staff_id)
         .with_for_update()
@@ -149,6 +155,8 @@ def get_staff_account_by_provider_subject(
             staff_accounts.c.updated_at,
             staff_accounts.c.updated_by,
             staff_accounts.c.version,
+            staff_accounts.c.binding_status,
+            staff_accounts.c.binding_verified_at,
         ).where(staff_accounts.c.provider_subject == provider_subject)
     ).one()
     return StaffAccountRecord(*row)
@@ -173,6 +181,8 @@ def get_staff_account_by_provider_email(
             staff_accounts.c.updated_at,
             staff_accounts.c.updated_by,
             staff_accounts.c.version,
+            staff_accounts.c.binding_status,
+            staff_accounts.c.binding_verified_at,
         ).where(staff_accounts.c.provider_email == provider_email)
     ).one_or_none()
     if row is None:
@@ -200,10 +210,13 @@ def get_pending_staff_account_by_provider_email_for_update(
             staff_accounts.c.updated_at,
             staff_accounts.c.updated_by,
             staff_accounts.c.version,
+            staff_accounts.c.binding_status,
+            staff_accounts.c.binding_verified_at,
         )
         .where(
             staff_accounts.c.provider_email == provider_email,
             staff_accounts.c.lifecycle_status == "suspended",
+            staff_accounts.c.binding_status == "pending",
             staff_accounts.c.provider_subject.startswith(pending_subject_prefix),
         )
         .with_for_update()
@@ -226,6 +239,8 @@ def get_staff_account_by_id(*, session: Session, staff_id: UUID) -> StaffAccount
             staff_accounts.c.updated_at,
             staff_accounts.c.updated_by,
             staff_accounts.c.version,
+            staff_accounts.c.binding_status,
+            staff_accounts.c.binding_verified_at,
         ).where(staff_accounts.c.staff_id == staff_id)
     ).one()
     return StaffAccountRecord(*row)
@@ -246,6 +261,8 @@ def list_staff_accounts(*, session: Session, limit: int = 50) -> tuple[StaffAcco
             staff_accounts.c.updated_at,
             staff_accounts.c.updated_by,
             staff_accounts.c.version,
+            staff_accounts.c.binding_status,
+            staff_accounts.c.binding_verified_at,
         )
         .order_by(staff_accounts.c.updated_at.desc(), staff_accounts.c.staff_id.asc())
         .limit(limit)
@@ -289,6 +306,8 @@ def update_staff_account_lifecycle(
             staff_accounts.c.updated_at,
             staff_accounts.c.updated_by,
             staff_accounts.c.version,
+            staff_accounts.c.binding_status,
+            staff_accounts.c.binding_verified_at,
         )
     ).one()
     return StaffAccountRecord(*row)
@@ -299,11 +318,8 @@ def update_staff_account_onboarding(
     session: Session,
     staff_id: UUID,
     expected_version: int,
-    provider_subject: str,
-    provider_email: str | None,
     display_name: str,
     role_name: str,
-    mfa_enrolled: bool,
     updated_at: datetime,
     actor_id: UUID,
 ) -> StaffAccountRecord:
@@ -314,11 +330,8 @@ def update_staff_account_onboarding(
             staff_accounts.c.version == expected_version,
         )
         .values(
-            provider_subject=provider_subject,
-            provider_email=provider_email,
             display_name=display_name,
             role_name=role_name,
-            mfa_enrolled=mfa_enrolled,
             updated_at=updated_at,
             updated_by=actor_id,
             version=expected_version + 1,
@@ -336,6 +349,8 @@ def update_staff_account_onboarding(
             staff_accounts.c.updated_at,
             staff_accounts.c.updated_by,
             staff_accounts.c.version,
+            staff_accounts.c.binding_status,
+            staff_accounts.c.binding_verified_at,
         )
     ).one()
     return StaffAccountRecord(*row)
@@ -358,6 +373,8 @@ def update_staff_account_provider_binding(
         )
         .values(
             provider_subject=provider_subject,
+            binding_status="google_verified",
+            binding_verified_at=updated_at,
             mfa_enrolled=mfa_enrolled,
             updated_at=updated_at,
             updated_by=staff_id,
@@ -376,6 +393,8 @@ def update_staff_account_provider_binding(
             staff_accounts.c.updated_at,
             staff_accounts.c.updated_by,
             staff_accounts.c.version,
+            staff_accounts.c.binding_status,
+            staff_accounts.c.binding_verified_at,
         )
     ).one()
     return StaffAccountRecord(*row)
@@ -421,6 +440,8 @@ def update_staff_account_signin_email(
             staff_accounts.c.updated_at,
             staff_accounts.c.updated_by,
             staff_accounts.c.version,
+            staff_accounts.c.binding_status,
+            staff_accounts.c.binding_verified_at,
         )
     ).one()
     return StaffAccountRecord(*row)

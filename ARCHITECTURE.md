@@ -1,5 +1,11 @@
 # Architecture — Golden Rose Operations Platform
 
+## 2026-10-20 — Staff identity provenance and recovery source contract
+
+[ADR-0018](docs/adr/ADR-0018-staff-google-binding-and-recovery.md) separates account access from Google identity management. Ordinary creation accepts the intended email and stores suspended pending onboarding. Only verified credential resolution records `google_verified` with a timestamp. Historical nonpending identities migrate to `legacy_unverified` without fabricated proof or a mass access interruption; exact-subject sign-in records proof under a row lock. Suspended verification never activates access.
+
+Access edits update display name, role and durable grants without writing identity/MFA columns. Explicit onboarding restart requires `staff_account:create` and `staff_account:signin:reset`, rejects self/deprovisioned targets, suspends access and clears binding/MFA evidence while retaining staff ID, history and grants. Immutable receipts make exact retries safe after later binding. A temporary recovery holder cannot manufacture durable recovery authority or redelegate it. Authenticated diagnostics report safe state and current action capabilities; routine responses contain no raw subject. This is a source candidate, not deployed behavior.
+
 ## 2026-10-06 — Current architecture status after PR #167 deployment
 
 Protected `develop@3ddf85b1e3ca68cc1eea366cad61decde147cb00` is deployed to the controlled staff-pilot Cloud Run service with the PR #167 staff OIDC remediation. The service now exercises the intended staff identity architecture in the browser: Google provides the external sign-in token, Golden Rose remains the durable account, lifecycle, permission, delegation, recovery-evidence and session-evidence authority, and the staff personal account/admin surfaces resolve the initial owner account only after a verified staff identity-provider session.

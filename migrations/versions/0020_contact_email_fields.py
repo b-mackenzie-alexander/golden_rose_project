@@ -57,10 +57,28 @@ def correction_section_function(specs: dict[str, tuple[str, str, tuple[str, ...]
 
 
 corrections_address = ("line1", "line2", "locality", "region", "postal_code", "country")
+INTAKE_CONTENT_KIND_WITH_EMAIL = (
+    "(kind='worker' AND content - ARRAY['full_name','phone','email','interests','availability']::text[]="
+    "'{}'::jsonb) OR "
+    "(kind='employer' AND content - ARRAY['employer_type','display_name','representative_name',"
+    "'phone','email','role_title','duties_summary','worker_count','schedule','offer']::text[]="
+    "'{}'::jsonb)"
+)
+INTAKE_CONTENT_KIND_WITHOUT_EMAIL = (
+    "(kind='worker' AND content - ARRAY['full_name','phone','interests','availability']::text[]="
+    "'{}'::jsonb) OR "
+    "(kind='employer' AND content - ARRAY['employer_type','display_name','representative_name',"
+    "'phone','role_title','duties_summary','worker_count','schedule','offer']::text[]="
+    "'{}'::jsonb)"
+)
 
 
 def upgrade() -> None:
-    execute("LOCK TABLE worker_contacts,employer_contact_details IN SHARE ROW EXCLUSIVE MODE")
+    execute(
+        "LOCK TABLE intakes,worker_contacts,employer_contact_details IN SHARE ROW EXCLUSIVE MODE"
+    )
+    op.drop_constraint("ck_intakes_content_kind", "intakes", type_="check")
+    op.create_check_constraint("ck_intakes_content_kind", "intakes", INTAKE_CONTENT_KIND_WITH_EMAIL)
     op.add_column("worker_contacts", sa.Column("email", sa.String(320), nullable=True))
     op.add_column("employer_contact_details", sa.Column("email", sa.String(320), nullable=True))
     for table, constraint in (
@@ -150,15 +168,22 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    execute("LOCK TABLE worker_contacts,employer_contact_details IN SHARE ROW EXCLUSIVE MODE")
+    execute(
+        "LOCK TABLE intakes,worker_contacts,employer_contact_details IN SHARE ROW EXCLUSIVE MODE"
+    )
     has_email = op.get_bind().scalar(
         sa.text(
             "SELECT EXISTS(SELECT 1 FROM worker_contacts WHERE email IS NOT NULL) OR "
-            "EXISTS(SELECT 1 FROM employer_contact_details WHERE email IS NOT NULL)"
+            "EXISTS(SELECT 1 FROM employer_contact_details WHERE email IS NOT NULL) OR "
+            "EXISTS(SELECT 1 FROM intakes WHERE content ? 'email')"
         )
     )
     if has_email:
         raise RuntimeError("contact email data blocks downgrade before DDL")
+    op.drop_constraint("ck_intakes_content_kind", "intakes", type_="check")
+    op.create_check_constraint(
+        "ck_intakes_content_kind", "intakes", INTAKE_CONTENT_KIND_WITHOUT_EMAIL
+    )
     for table, constraint in (
         ("worker_contacts", "ck_worker_contacts_email_shape"),
         ("employer_contact_details", "ck_employer_contact_details_email_shape"),

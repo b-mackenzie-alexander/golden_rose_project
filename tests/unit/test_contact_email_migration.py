@@ -41,6 +41,10 @@ def test_contact_email_migration_preserves_contact_correction_and_review_boundar
     assert 'sa.Column("email", sa.String(320), nullable=True)' in sql
     assert "ck_worker_contacts_email_shape" in sql
     assert "ck_employer_contact_details_email_shape" in sql
+    assert "LOCK TABLE intakes,worker_contacts,employer_contact_details" in sql
+    assert "INTAKE_CONTENT_KIND_WITH_EMAIL" in sql
+    assert "INTAKE_CONTENT_KIND_WITHOUT_EMAIL" in sql
+    assert "content ? 'email'" in sql
     assert "GRANT UPDATE(phone,email,version,updated_at,updated_by)" in sql
     assert "GRANT UPDATE(representative_name,phone,email,version,updated_at,updated_by)" in sql
     assert "canonical_correction_section" in sql

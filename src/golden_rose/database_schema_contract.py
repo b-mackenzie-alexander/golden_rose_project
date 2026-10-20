@@ -1681,11 +1681,11 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "intake_reviews.intake_reviews_reviewed_record_version_check": "CHECK (reviewed_record_version >= "
     "1)",
     "intakes.ck_intakes_content_kind": "CHECK (kind::text = 'worker'::text AND (content - "
-    "ARRAY['full_name'::text, 'phone'::text, 'interests'::text, "
+    "ARRAY['full_name'::text, 'phone'::text, 'email'::text, 'interests'::text, "
     "'availability'::text]) = '{}'::jsonb OR kind::text = "
     "'employer'::text AND (content - ARRAY['employer_type'::text, "
     "'display_name'::text, 'representative_name'::text, "
-    "'phone'::text, 'role_title'::text, 'duties_summary'::text, "
+    "'phone'::text, 'email'::text, 'role_title'::text, 'duties_summary'::text, "
     "'worker_count'::text, 'schedule'::text, 'offer'::text]) = "
     "'{}'::jsonb)",
     "intakes.ck_intakes_content_object": "CHECK (jsonb_typeof(content) = 'object'::text)",

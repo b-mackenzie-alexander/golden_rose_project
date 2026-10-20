@@ -1,11 +1,11 @@
 # Current Work — Golden Rose Operations Platform
 
-## 2026-10-20 — Google binding repair qualified for source publication
+## 2026-10-20 — Google binding repair published as PR #189
 
 - **Staffing:** One independent developer. Fresh agent/session review and automated checks provide quality evidence, not independent-human authorization.
-- **Human-visible outcome:** The separately authorized owner-present recovery is complete and the user confirmed account/workspace access. The permanent source candidate now separates access editing from identity, records Google binding provenance, and provides bilingual sign-in diagnostics and guarded onboarding restart. It has not been deployed.
+- **Human-visible outcome:** The separately authorized owner-present recovery is complete and the user confirmed account/workspace access. The permanent source candidate now separates access editing from identity, records Google binding provenance, and provides bilingual sign-in diagnostics and guarded onboarding restart. It is published as [PR #189](https://github.com/b-mackenzie-alexander/golden_rose_project/pull/189) to `develop` and has not been deployed.
 - **Gate budget:** Approved source/backend/frontend/schema work, disposable fictional local validation and a PR to protected `develop`. The one-account live recovery is consumed. Image admission, live migration, deployment, bootstrap provisioning and additional live/provider actions require a separate packet.
-- **Next executable action:** Publish the qualified bounded source PR and read protected CI at its final head. Fresh review, combined backend qualification and production-build fictional browser checks are recorded in `NOTES.md`. The implementation was rebased onto PR #188 at `develop@f8b9ee8` before qualification; the other session's checkout is preserved.
+- **Next executable action:** Read protected CI at PR #189’s final head, repair any findings, and leave protected review/merge to the owner. Fresh review, combined backend qualification and production-build fictional browser checks are recorded in `NOTES.md`. The implementation was rebased onto PR #188 at `develop@f8b9ee8` before qualification; the other session's checkout is preserved.
 - **Do not regress:** Stable staff IDs/history/grants; exact named authority; separate identity planes; verified Google credentials; account-level MFA; no active-account email-only linking; no-store safe responses; English/Spanish and accessibility parity; no raw identity material; human operational decisions; evidence-only provider recovery/revocation wording.
 
 

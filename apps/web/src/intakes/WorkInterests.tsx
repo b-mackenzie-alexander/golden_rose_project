@@ -209,7 +209,8 @@ export function WorkInterestCatalog() {
     m = intakeMessages[language];
   const [selected, setSelected] = useState<WorkInterest | null>(null),
     [section, setSection] = useState<Section>(initialSection({})),
-    [conflict, setConflict] = useState(false);
+    [conflict, setConflict] = useState(false),
+    [editing, setEditing] = useState(false);
   const current = useRef(section),
     active = useRef(true);
   const update = (s: Section) => {
@@ -224,6 +225,7 @@ export function WorkInterestCatalog() {
       current.current = initialSection({});
       setSection(current.current);
       setSelected(null);
+      setEditing(false);
     };
     window.addEventListener('pagehide', clear);
     return () => {
@@ -320,6 +322,7 @@ export function WorkInterestCatalog() {
               onClick={() => {
                 setSelected(entry);
                 setConflict(false);
+                setEditing(true);
                 update(
                   initialSection({
                     label_en: entry.label_en,
@@ -345,6 +348,7 @@ export function WorkInterestCatalog() {
         onClick={() => {
           setSelected(null);
           setConflict(false);
+          setEditing(true);
           update(initialSection({}));
         }}
       >
@@ -352,7 +356,7 @@ export function WorkInterestCatalog() {
       </button>
       {section.status === 'unavailable' ? (
         <p role="status">{t('unavailable')}</p>
-      ) : (
+      ) : editing ? (
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -396,7 +400,7 @@ export function WorkInterestCatalog() {
             </button>
           </fieldset>
         </form>
-      )}
+      ) : null}
     </div>
   );
 }

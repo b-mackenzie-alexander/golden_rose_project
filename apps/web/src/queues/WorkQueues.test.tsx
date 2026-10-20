@@ -180,6 +180,21 @@ describe('WorkQueues', () => {
     );
   });
 
+  it('opens directly to the urgent filter when the queue URL requests it', async () => {
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/staff/queues?filter=urgent']}>
+          <WorkQueues />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await screen.findByText('Shift pending review');
+    expect(screen.getByText('Shift pending review')).toBeInTheDocument();
+    expect(screen.queryByText('Prepare staffing request')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Urgent' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('falls back to static rows when projection and intake reads fail', async () => {
     vi.mocked(intakeApi.queryIntakes).mockResolvedValue({ ok: false, failure: 'failed' });
     vi.mocked(operationsApi.getOperationsProjection).mockRejectedValue(new TypeError('offline'));

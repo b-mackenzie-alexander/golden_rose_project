@@ -6,6 +6,7 @@ import { BrandRose, IconSymbol } from '../dashboard/artwork';
 import type { IconName } from '../dashboard/artwork';
 import { queryIntakes } from '../api/intakeClient';
 import type { DraftObject, IntakeKind, IntakeSummary } from '../api/intakeContracts';
+import { getOperationsProjection } from '../api/operationsProjectionClient';
 import { getStaffSession } from '../api/staffAccountClient';
 import { clearStaffIdToken, useStaffAuthSession } from '../auth/staffAuthSession';
 import { useLanguage } from '../i18n/LanguageProvider';
@@ -23,6 +24,25 @@ type SearchItem = {
 type DataSearchItem = SearchItem & {
   id: string;
 };
+
+function urgentIntakeCount(items: IntakeSummary[]) {
+  return items.filter((item) => item.complete === false || item.follow_up?.overdue === true).length;
+}
+
+async function queryUrgentIntakeCount(kind: IntakeKind) {
+  let cursor: string | null = null;
+  let count = 0;
+  const seenCursors = new Set<string>();
+  do {
+    if (cursor !== null && seenCursors.has(cursor)) return null;
+    if (cursor !== null) seenCursors.add(cursor);
+    const result = await queryIntakes(kind, { page_size: 50, ...(cursor === null ? {} : { cursor }) });
+    if (!result.ok) return null;
+    count += urgentIntakeCount(result.value.items);
+    cursor = result.value.next_cursor;
+  } while (cursor !== null);
+  return count;
+}
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -56,8 +76,11 @@ export function AppShell() {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [dataSearchItems, setDataSearchItems] = useState<DataSearchItem[]>([]);
   const [staffDisplayName, setStaffDisplayName] = useState<string | null>(null);
+  const [urgentWorkCount, setUrgentWorkCount] = useState<number | null>(null);
+  const [urgentWorkRefreshVersion, setUrgentWorkRefreshVersion] = useState(0);
   const isDark = theme === 'dark';
   const hasStaffBrowserSession = staffAuthSession.idToken !== null;
+  const visibleUrgentWorkCount = hasStaffBrowserSession ? urgentWorkCount : null;
   const verifiedStaffDisplayName = hasStaffBrowserSession ? staffDisplayName?.trim() : '';
   const accountLabel = verifiedStaffDisplayName || (language === 'en' ? 'Staff account' : 'Cuenta del personal');
   const accountMeta = verifiedStaffDisplayName
@@ -268,6 +291,49 @@ export function AppShell() {
   }, [hasStaffBrowserSession, staffAuthSession.idToken]);
 
   useEffect(() => {
+    if (!hasStaffBrowserSession) {
+      return undefined;
+    }
+    const refreshUrgentWork = () => {
+      if (document.visibilityState === 'visible') {
+        setUrgentWorkRefreshVersion((version) => version + 1);
+      }
+    };
+    window.addEventListener('focus', refreshUrgentWork);
+    document.addEventListener('visibilitychange', refreshUrgentWork);
+    return () => {
+      window.removeEventListener('focus', refreshUrgentWork);
+      document.removeEventListener('visibilitychange', refreshUrgentWork);
+    };
+  }, [hasStaffBrowserSession]);
+
+  useEffect(() => {
+    if (!hasStaffBrowserSession) {
+      return undefined;
+    }
+    let cancelled = false;
+    Promise.all([
+      queryUrgentIntakeCount('worker'),
+      queryUrgentIntakeCount('employer'),
+      getOperationsProjection(),
+    ])
+      .then(([workers, employers, operations]) => {
+        if (cancelled) return;
+        setUrgentWorkCount(
+          workers === null || employers === null || !operations.ok
+            ? null
+            : workers + employers + operations.value.queueSummary.highPriorityCount,
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setUrgentWorkCount(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasStaffBrowserSession, location.key, staffAuthSession.idToken, urgentWorkRefreshVersion]);
+
+  useEffect(() => {
     if (location.pathname !== '/') {
       return undefined;
     }
@@ -421,9 +487,22 @@ export function AppShell() {
               <span aria-hidden="true" className="theme-toggle__track"><span /></span>
               <IconSymbol name="moon" />
             </button>
-            <button aria-label={language === 'en' ? 'Notifications: 3 unread' : 'Notificaciones: 3 sin leer'} className="icon-action focus-ring" type="button">
+            <button
+              aria-label={visibleUrgentWorkCount === null
+                ? language === 'en' ? 'Open urgent work queue' : 'Abrir cola de trabajo urgente'
+                : language === 'en'
+                  ? `Open urgent work queue: ${String(visibleUrgentWorkCount)} urgent item${visibleUrgentWorkCount === 1 ? '' : 's'}`
+                  : `Abrir cola de trabajo urgente: ${String(visibleUrgentWorkCount)} elemento${visibleUrgentWorkCount === 1 ? '' : 's'} urgente${visibleUrgentWorkCount === 1 ? '' : 's'}`}
+              className="icon-action focus-ring"
+              type="button"
+              onClick={() => {
+                void navigate('/staff/queues?filter=urgent');
+              }}
+            >
               <IconSymbol name="bell" />
-              <span className="notification-badge">3</span>
+              {visibleUrgentWorkCount !== null && visibleUrgentWorkCount > 0 ? (
+                <span className="notification-badge">{visibleUrgentWorkCount > 99 ? '99+' : String(visibleUrgentWorkCount)}</span>
+              ) : null}
             </button>
             {hasStaffBrowserSession ? (
               <button

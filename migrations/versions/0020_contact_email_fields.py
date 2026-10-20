@@ -27,7 +27,14 @@ def module(name: str):
 
 
 def replace_function(sql: str) -> str:
-    return sql.replace("CREATE FUNCTION", "CREATE OR REPLACE FUNCTION", 1)
+    return sql.replace("CREATE FUNCTION", "CREATE OR REPLACE FUNCTION")
+
+
+def replace_exact(sql: str, old: str, new: str) -> str:
+    """Patch one known predecessor fragment or stop before applying unsafe SQL."""
+    if sql.count(old) != 1:
+        raise RuntimeError("Expected exactly one predecessor SQL fragment")
+    return sql.replace(old, new)
 
 
 def correction_section_function(specs: dict[str, tuple[str, str, tuple[str, ...]]]) -> str:
@@ -75,7 +82,8 @@ def upgrade() -> None:
     )
 
     worker = module("0008_intake_finalization")
-    worker_output = replace_function(worker.OUTPUT_AUTHORITY).replace(
+    worker_output = replace_exact(
+        replace_function(worker.OUTPUT_AUTHORITY),
         "to_jsonb(NEW)->>'phone' IS DISTINCT FROM candidate->>'phone'",
         "(to_jsonb(NEW)->>'phone',to_jsonb(NEW)->>'email') IS DISTINCT FROM "
         "(candidate->>'phone',candidate->>'email')",
@@ -83,23 +91,23 @@ def upgrade() -> None:
     execute(worker_output)
 
     employer = module("0008a_employer_finalization")
-    employer_output = replace_function(employer.OUTPUT_AUTHORITY).replace(
+    employer_output = replace_exact(
+        replace_function(employer.OUTPUT_AUTHORITY),
         "(actual->>'representative_name',actual->>'phone') IS DISTINCT FROM\n    (candidate->>'representative_name',candidate->>'phone')",
         "(actual->>'representative_name',actual->>'phone',actual->>'email') IS DISTINCT FROM\n    (candidate->>'representative_name',candidate->>'phone',candidate->>'email')",
     )
     execute(employer_output)
 
     linked = module("0008c_intake_link_authority")
-    snapshot = (
-        replace_function(linked.SNAPSHOT)
-        .replace(
-            "'phone',facts->'worker_contact'->'phone',\n     'interests'",
-            "'phone',facts->'worker_contact'->'phone','email',facts->'worker_contact'->'email',\n     'interests'",
-        )
-        .replace(
-            "'phone',facts->'employer_contact_details'->'phone');",
-            "'phone',facts->'employer_contact_details'->'phone','email',facts->'employer_contact_details'->'email');",
-        )
+    snapshot = replace_exact(
+        replace_function(linked.SNAPSHOT),
+        "'phone',facts->'worker_contact'->'phone',\n     'interests'",
+        "'phone',facts->'worker_contact'->'phone','email',facts->'worker_contact'->'email',\n     'interests'",
+    )
+    snapshot = replace_exact(
+        snapshot,
+        "'phone',facts->'employer_contact_details'->'phone');",
+        "'phone',facts->'employer_contact_details'->'phone','email',facts->'employer_contact_details'->'email');",
     )
     execute(snapshot)
 
@@ -115,30 +123,28 @@ def upgrade() -> None:
         ("representative_name", "phone", "email"),
     )
     execute(correction_section_function(corrections.SPECS))
-    guards = (
-        replace_function(corrections.GUARDS)
-        .replace(
-            "WHEN 'worker_contact' THEN ARRAY['phone']",
-            "WHEN 'worker_contact' THEN ARRAY['phone','email']",
-        )
-        .replace(
-            "ARRAY['representative_name','phone','line1'",
-            "ARRAY['representative_name','phone','email','line1'",
-        )
+    guards = replace_exact(
+        replace_function(corrections.GUARDS),
+        "WHEN 'worker_contact' THEN ARRAY['phone']",
+        "WHEN 'worker_contact' THEN ARRAY['phone','email']",
+    )
+    guards = replace_exact(
+        guards,
+        "ARRAY['representative_name','phone','line1'",
+        "ARRAY['representative_name','phone','email','line1'",
     )
     execute(guards)
 
     reviews = module("0009a_canonical_reviews")
-    current_facts = (
-        replace_function(reviews.CURRENT_FACTS)
-        .replace(
-            "'full_name',records->'worker'->'full_name','phone',records->'worker_contact'->'phone',\n     'interests'",
-            "'full_name',records->'worker'->'full_name','phone',records->'worker_contact'->'phone',\n     'email',records->'worker_contact'->'email','interests'",
-        )
-        .replace(
-            "'representative_name',records->'employer_contact_details'->'representative_name','phone',records->'employer_contact_details'->'phone',\n     'role_title'",
-            "'representative_name',records->'employer_contact_details'->'representative_name','phone',records->'employer_contact_details'->'phone',\n     'email',records->'employer_contact_details'->'email','role_title'",
-        )
+    current_facts = replace_exact(
+        replace_function(reviews.CURRENT_FACTS),
+        "body:=jsonb_build_object('full_name',records->'worker'->'full_name','phone',records->'worker_contact'->'phone',\n     'interests',records->'worker_preferences'->'interests','availability',records->'worker_preferences'->'availability');",
+        "body:=jsonb_strip_nulls(jsonb_build_object('full_name',records->'worker'->'full_name','phone',records->'worker_contact'->'phone',\n     'email',records->'worker_contact'->'email','interests',records->'worker_preferences'->'interests','availability',records->'worker_preferences'->'availability'));",
+    )
+    current_facts = replace_exact(
+        current_facts,
+        "body:=jsonb_build_object('employer_type',records->'employer'->'employer_type','display_name',records->'employer'->'display_name',\n     'representative_name',records->'employer_contact_details'->'representative_name','phone',records->'employer_contact_details'->'phone',\n     'role_title',records->'staffing_request'->'role_title','duties_summary',records->'staffing_request'->'duties_summary',\n     'worker_count',records->'staffing_request'->'worker_count','schedule',records->'staffing_request'->'schedule','offer',records->'staffing_request'->'offer');",
+        "body:=jsonb_strip_nulls(jsonb_build_object('employer_type',records->'employer'->'employer_type','display_name',records->'employer'->'display_name',\n     'representative_name',records->'employer_contact_details'->'representative_name','phone',records->'employer_contact_details'->'phone',\n     'email',records->'employer_contact_details'->'email','role_title',records->'staffing_request'->'role_title','duties_summary',records->'staffing_request'->'duties_summary',\n     'worker_count',records->'staffing_request'->'worker_count','schedule',records->'staffing_request'->'schedule','offer',records->'staffing_request'->'offer'));",
     )
     execute(current_facts)
 

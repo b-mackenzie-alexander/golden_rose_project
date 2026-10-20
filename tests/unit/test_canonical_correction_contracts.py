@@ -159,6 +159,23 @@ def test_contact_phone_correction_cannot_erase_address():
         ),
     ],
 )
-def test_contact_corrections_allow_an_optional_email_to_be_cleared(model, values):
+def test_contact_corrections_preserve_an_omitted_email(model, values):
     request = model.model_validate({"expected_version": 1, "reason_text": "Clear email", **values})
+    assert "email" not in request.section_values()
+
+
+@pytest.mark.parametrize(
+    ("model", "values"),
+    [
+        (contracts.CorrectWorkerContactRequest, {"phone": "2125550100"}),
+        (
+            contracts.CorrectContactDetailsRequest,
+            {"representative_name": "Fictional Representative", "phone": "2125550101"},
+        ),
+    ],
+)
+def test_contact_corrections_allow_an_explicit_null_email_to_clear(model, values):
+    request = model.model_validate(
+        {"expected_version": 1, "reason_text": "Clear email", "email": None, **values}
+    )
     assert request.section_values()["email"] is None

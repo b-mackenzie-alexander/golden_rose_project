@@ -123,6 +123,8 @@ def execute_correction(
             raise IntakeError("version_conflict")
         values = request.section_values()
         before = section_snapshot(spec, row)
+        if "email" in spec.fields and "email" not in values:
+            values = {**before, **values}
         if values == before:
             raise IntakeError("no_change")
         if request.corrects_event_id is not None:

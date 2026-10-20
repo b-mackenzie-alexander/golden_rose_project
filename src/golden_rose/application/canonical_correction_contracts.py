@@ -59,7 +59,10 @@ class CorrectWorkerContactRequest(CorrectionRequest):
     email: Email | None = None
 
     def section_values(self) -> dict[str, Any]:
-        return {"phone": self.phone, "email": self.email}
+        values: dict[str, Any] = {"phone": self.phone}
+        if "email" in self.model_fields_set:
+            values["email"] = self.email
+        return values
 
 
 class CompleteAddress(Address):
@@ -99,11 +102,13 @@ class CorrectContactDetailsRequest(CorrectionRequest):
     email: Email | None = None
 
     def section_values(self) -> dict[str, Any]:
-        return {
+        values: dict[str, Any] = {
             "representative_name": self.representative_name,
             "phone": self.phone,
-            "email": self.email,
         }
+        if "email" in self.model_fields_set:
+            values["email"] = self.email
+        return values
 
 
 class CorrectContactAddressRequest(CorrectionRequest):

@@ -6,6 +6,7 @@ import { BrandRose, IconSymbol } from '../dashboard/artwork';
 import type { IconName } from '../dashboard/artwork';
 import { queryIntakes } from '../api/intakeClient';
 import type { DraftObject, IntakeKind, IntakeSummary } from '../api/intakeContracts';
+import { getOperationsProjection } from '../api/operationsProjectionClient';
 import { getStaffSession } from '../api/staffAccountClient';
 import { clearStaffIdToken, useStaffAuthSession } from '../auth/staffAuthSession';
 import { useLanguage } from '../i18n/LanguageProvider';
@@ -23,6 +24,10 @@ type SearchItem = {
 type DataSearchItem = SearchItem & {
   id: string;
 };
+
+function urgentIntakeCount(items: IntakeSummary[]) {
+  return items.filter((item) => item.complete === false || item.follow_up?.overdue === true).length;
+}
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -56,6 +61,7 @@ export function AppShell() {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [dataSearchItems, setDataSearchItems] = useState<DataSearchItem[]>([]);
   const [staffDisplayName, setStaffDisplayName] = useState<string | null>(null);
+  const [urgentWorkCount, setUrgentWorkCount] = useState<number | null>(null);
   const isDark = theme === 'dark';
   const hasStaffBrowserSession = staffAuthSession.idToken !== null;
   const verifiedStaffDisplayName = hasStaffBrowserSession ? staffDisplayName?.trim() : '';
@@ -268,6 +274,28 @@ export function AppShell() {
   }, [hasStaffBrowserSession, staffAuthSession.idToken]);
 
   useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      queryIntakes('worker', { page_size: 50 }),
+      queryIntakes('employer', { page_size: 50 }),
+      getOperationsProjection(),
+    ])
+      .then(([workers, employers, operations]) => {
+        if (cancelled) return;
+        const intakeUrgent = (workers.ok ? urgentIntakeCount(workers.value.items) : 0)
+          + (employers.ok ? urgentIntakeCount(employers.value.items) : 0);
+        const projectedUrgent = operations.ok ? operations.value.queueSummary.highPriorityCount : 0;
+        setUrgentWorkCount(intakeUrgent + projectedUrgent);
+      })
+      .catch(() => {
+        if (!cancelled) setUrgentWorkCount(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (location.pathname !== '/') {
       return undefined;
     }
@@ -421,9 +449,22 @@ export function AppShell() {
               <span aria-hidden="true" className="theme-toggle__track"><span /></span>
               <IconSymbol name="moon" />
             </button>
-            <button aria-label={language === 'en' ? 'Notifications: 3 unread' : 'Notificaciones: 3 sin leer'} className="icon-action focus-ring" type="button">
+            <button
+              aria-label={urgentWorkCount === null
+                ? language === 'en' ? 'Open urgent work queue' : 'Abrir cola de trabajo urgente'
+                : language === 'en'
+                  ? `Open urgent work queue: ${String(urgentWorkCount)} urgent item${urgentWorkCount === 1 ? '' : 's'}`
+                  : `Abrir cola de trabajo urgente: ${String(urgentWorkCount)} elemento${urgentWorkCount === 1 ? '' : 's'} urgente${urgentWorkCount === 1 ? '' : 's'}`}
+              className="icon-action focus-ring"
+              type="button"
+              onClick={() => {
+                void navigate('/staff/queues?filter=urgent');
+              }}
+            >
               <IconSymbol name="bell" />
-              <span className="notification-badge">3</span>
+              {urgentWorkCount !== null && urgentWorkCount > 0 ? (
+                <span className="notification-badge">{urgentWorkCount > 99 ? '99+' : String(urgentWorkCount)}</span>
+              ) : null}
             </button>
             {hasStaffBrowserSession ? (
               <button

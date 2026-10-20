@@ -1,4 +1,4 @@
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { useEffect, useMemo, useState } from 'react';
 
 import { queryIntakes } from '../api/intakeClient';
@@ -414,8 +414,12 @@ function dynamicSummary(copy: WorkQueuesCopy, items: QueueItem[]) {
 
 export function WorkQueues() {
   const { language } = useLanguage();
+  const [searchParams, setSearchParams] = useSearchParams();
   const copy = language === 'es' ? spanishQueues : englishQueues;
-  const [filter, setFilter] = useState<QueueFilter>('all');
+  const requestedFilter = searchParams.get('filter');
+  const filter: QueueFilter = requestedFilter === 'urgent' || requestedFilter === 'worker' || requestedFilter === 'employer'
+    ? requestedFilter
+    : 'all';
   const [queueData, setQueueData] = useState<QueueData | null>({
     employers: [],
     loaded: false,
@@ -507,7 +511,7 @@ export function WorkQueues() {
                 key={queueFilter.id}
                 type="button"
                 onClick={() => {
-                  setFilter(queueFilter.id);
+                  setSearchParams(queueFilter.id === 'all' ? {} : { filter: queueFilter.id });
                 }}
               >
                 {queueFilter.label}

@@ -88,6 +88,8 @@ it('removes historical selection explicitly and reports catalog read denial', as
 it('creates and revises bilingual catalog entries with staff-facing labels and version checks', async () => {
   const view = mount();
   await screen.findByRole('button', { name: 'Revise interest' });
+  expect(screen.queryByLabelText('English label')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Create interest' }));
   fireEvent.change(screen.getByLabelText('English label'), { target: { value: 'Fictional interest' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save catalog entry' }));
   await waitFor(() => {
@@ -175,7 +177,7 @@ it('blocks a newer catalog replay baseline, handles pagination failure, and clea
   act(() => {
     window.dispatchEvent(new Event('pagehide'));
   });
-  expect(screen.getByLabelText('English label')).toHaveValue('');
+  expect(screen.queryByLabelText('English label')).not.toBeInTheDocument();
 });
 it('discards pending catalog success after unmount', async () => {
   let resolve!: (value: Result<CatalogResult>) => void;
@@ -185,6 +187,7 @@ it('discards pending catalog success after unmount', async () => {
   vi.mocked(api.saveWorkInterest).mockReturnValue(pending);
   const view = mount();
   await screen.findByRole('button', { name: 'Revise interest' });
+  fireEvent.click(screen.getByRole('button', { name: 'Revise interest' }));
   fireEvent.click(screen.getByRole('button', { name: 'Save catalog entry' }));
   view.unmount();
   await act(async () => {

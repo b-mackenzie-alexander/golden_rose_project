@@ -4,11 +4,15 @@ import { MemoryRouter } from 'react-router';
 import { afterEach, vi } from 'vitest';
 
 import { AppShell } from './AppShell';
+import * as intakeApi from '../api/intakeClient';
+import * as operationsApi from '../api/operationsProjectionClient';
 import * as staffAccountApi from '../api/staffAccountClient';
 import { bearerHeaders, clearStaffIdToken, setStaffIdToken } from '../auth/staffAuthSession';
 import { LanguageProvider } from '../i18n/LanguageProvider';
 
 vi.mock('../api/staffAccountClient');
+vi.mock('../api/intakeClient');
+vi.mock('../api/operationsProjectionClient');
 
 afterEach(() => {
   clearStaffIdToken();
@@ -25,6 +29,45 @@ describe('AppShell', () => {
       ok: false,
       failure: { kind: 'sign_in_required' },
     });
+    vi.mocked(intakeApi.queryIntakes).mockResolvedValue({ ok: true, value: { items: [], next_cursor: null } });
+    vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue({
+      ok: false,
+      failure: { kind: 'unavailable' },
+    });
+  });
+
+  it('shows the authorized urgent-work count and opens the urgent queue', async () => {
+    const user = userEvent.setup();
+    vi.mocked(intakeApi.queryIntakes).mockImplementation((kind) => Promise.resolve({
+      ok: true,
+      value: {
+        items: kind === 'worker'
+          ? [{
+              intake_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              kind: 'worker',
+              version: 1,
+              lifecycle: 'draft',
+              display_name: 'Urgent worker',
+              complete: false,
+              missing_fields: ['worker_residence'],
+              review_status: 'unreviewed',
+              updated_at: '2026-10-20T12:00:00Z',
+            }]
+          : [],
+        next_cursor: null,
+      },
+    }));
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/']}>
+          <AppShell />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    const urgentButton = await screen.findByRole('button', { name: 'Open urgent work queue: 1 urgent item' });
+    expect(urgentButton).toHaveTextContent('1');
+    await user.click(urgentButton);
   });
 
   it('renders the dashboard shell navigation and language action', () => {

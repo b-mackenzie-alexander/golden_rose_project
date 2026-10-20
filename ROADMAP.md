@@ -18,6 +18,7 @@
 - **Do not regress:** Draft intake and canonical record boundaries, audited current-fact corrections, restricted-address authority, bilingual/accessibility parity, named staff accounts, immutable intake history and exact retries.
 
 **Validation to date:** Focused frontend typecheck/lint and 77 tests pass. The complete affected backend group passes 458 tests; repository Ruff formatting/lint, mypy and the Alembic single-head check pass. The disposable PostgreSQL target was unavailable at `127.0.0.1:55432`, so PostgreSQL migration integration remains pending without any environment mutation.
+
 ## 2026-10-20 — Owner access restored; permanent identity-binding repair pending
 
 - **Staffing:** One independent developer; fresh agent/session review and automated checks supply quality evidence, not independent-human authorization.
@@ -33,7 +34,8 @@
 - [x] Accept the identity/schema implementation contract.
 - [x] Implement and qualify access-only editing, verified binding provenance and guarded onboarding restart.
 - [x] Publish the qualified source candidate as PR #189 to `develop`.
-- [ ] Complete protected CI/review and owner merge.
+- [x] Implement the four verified CodeRabbit findings with fault-path and accessibility regression coverage.
+- [ ] Complete fresh protected CI/review and owner merge.
 - [ ] Separately authorize and qualify schema/image/service rollout and bounded staff acceptance.
 
 Account recovery is complete; the cross-account design gap remains open.

@@ -1167,7 +1167,7 @@ export function StaffAccountAdmin() {
       ) : null}
 
       {(diagnosticLoading || diagnosticError || diagnostic) ? (
-        <section ref={diagnosticPanelRef} tabIndex={-1} className="staff-account-panel focus-ring" aria-label={language === 'en' ? 'Sign-in diagnostics' : 'Diagnóstico de acceso'} aria-live="polite">
+        <section ref={diagnosticPanelRef} tabIndex={-1} className="staff-account-panel focus-ring" aria-label={language === 'en' ? 'Sign-in diagnostics' : 'Diagnóstico de acceso'}>
           <div className="staff-account-panel-header">
           <h3>{language === 'en' ? 'Sign-in diagnostics' : 'Diagnóstico de acceso'}{diagnostic ? `: ${diagnostic.displayName}` : ''}</h3>
           <button className="staff-secondary-button focus-ring" type="button" onClick={() => { diagnosticGeneration.current++; setDiagnosticLoading(false); setDiagnostic(null); setDiagnosticError(''); setDiagnosticRights(null); }}>{language === 'en' ? 'Close diagnostics' : 'Cerrar diagnóstico'}</button>

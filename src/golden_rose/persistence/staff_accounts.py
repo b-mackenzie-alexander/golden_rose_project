@@ -400,53 +400,6 @@ def update_staff_account_provider_binding(
     return StaffAccountRecord(*row)
 
 
-def update_staff_account_signin_email(
-    *,
-    session: Session,
-    staff_id: UUID,
-    expected_version: int,
-    provider_subject: str,
-    provider_email: str,
-    lifecycle_status: StaffAccountStatus,
-    mfa_enrolled: bool,
-    updated_at: datetime,
-    actor_id: UUID,
-) -> StaffAccountRecord:
-    row = session.execute(
-        update(staff_accounts)
-        .where(
-            staff_accounts.c.staff_id == staff_id,
-            staff_accounts.c.version == expected_version,
-        )
-        .values(
-            provider_subject=provider_subject,
-            provider_email=provider_email,
-            lifecycle_status=lifecycle_status,
-            mfa_enrolled=mfa_enrolled,
-            updated_at=updated_at,
-            updated_by=actor_id,
-            version=expected_version + 1,
-        )
-        .returning(
-            staff_accounts.c.staff_id,
-            staff_accounts.c.provider_subject,
-            staff_accounts.c.provider_email,
-            staff_accounts.c.display_name,
-            staff_accounts.c.role_name,
-            staff_accounts.c.lifecycle_status,
-            staff_accounts.c.mfa_enrolled,
-            staff_accounts.c.created_at,
-            staff_accounts.c.created_by,
-            staff_accounts.c.updated_at,
-            staff_accounts.c.updated_by,
-            staff_accounts.c.version,
-            staff_accounts.c.binding_status,
-            staff_accounts.c.binding_verified_at,
-        )
-    ).one()
-    return StaffAccountRecord(*row)
-
-
 def revoke_active_staff_permission_grants(
     *,
     session: Session,

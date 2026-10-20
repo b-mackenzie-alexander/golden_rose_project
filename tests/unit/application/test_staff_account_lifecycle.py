@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import Mock
@@ -1554,3 +1555,37 @@ def test_staff_account_lifecycle_database_failure_is_safe_and_rolls_back(
 
     assert session.rollbacks == 1
     assert session.commits == 0
+
+
+@pytest.mark.parametrize("stage", ["lock", "update", "audit", "commit"])
+def test_legacy_verification_database_failure_is_safe_and_rolls_back(
+    monkeypatch: pytest.MonkeyPatch, stage: str
+) -> None:
+    account = replace(
+        _record(status="active", mfa_enrolled=True),
+        binding_status="legacy_unverified",
+        binding_verified_at=None,
+    )
+    session = Mock()
+    failure = SQLAlchemyError("private legacy storage detail")
+    lookup = Mock(return_value=account)
+    lock = Mock(return_value=account)
+    audit = Mock()
+    permissions = Mock(return_value=frozenset({"intake:read"}))
+    monkeypatch.setattr(lifecycle_module, "get_staff_account_by_provider_subject", lookup)
+    monkeypatch.setattr(lifecycle_module, "get_staff_account_by_id_for_update", lock)
+    monkeypatch.setattr(lifecycle_module, "insert_lifecycle_event", audit)
+    monkeypatch.setattr(lifecycle_module, "list_active_staff_permissions", permissions)
+    {"lock": lock, "update": session.execute, "audit": audit, "commit": session.commit}[
+        stage
+    ].side_effect = failure
+    with pytest.raises(SafePersistenceError, match="^persistence operation failed$") as caught:
+        resolve_staff_principal_from_claims(
+            session=session,
+            claims=StaffIdentityClaims(
+                provider_subject=account.provider_subject, mfa_verified=False
+            ),
+        )
+    assert caught.value.__cause__ is failure
+    session.rollback.assert_called_once_with()
+    permissions.assert_not_called()

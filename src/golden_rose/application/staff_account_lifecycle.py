@@ -615,6 +615,9 @@ def resolve_staff_principal_from_claims(
                 session.commit()
             else:
                 account = current
+        except SQLAlchemyError as exc:
+            session.rollback()
+            raise SafePersistenceError("persistence operation failed") from exc
         except Exception:
             session.rollback()
             raise

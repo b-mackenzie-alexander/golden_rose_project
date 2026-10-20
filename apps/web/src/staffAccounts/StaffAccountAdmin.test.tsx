@@ -792,6 +792,7 @@ it.each([
   const panel = await screen.findByRole('region', { name: 'Sign-in diagnostics' });
   expect(await within(panel).findByText(message)).toBeInTheDocument();
   expect(panel).toHaveFocus();
+  expect(panel).not.toHaveAttribute('aria-live');
   expect(within(panel).queryByText(/oidc:staff/)).not.toBeInTheDocument();
   expect(within(panel).getByRole('button', { name: 'Restart Google sign-in' })).toBeDisabled();
   expect(await runAxe(panel)).toEqual([]);

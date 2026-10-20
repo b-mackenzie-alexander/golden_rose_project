@@ -2,6 +2,14 @@
 
 This is the concise, dated engineering and operational note log. It records observed evidence, decisions, verification, and handoffs. It is not a location for client personal data, credentials, raw exports, legal advice, or unapproved policy text.
 
+## 2026-10-20 — PR #189 bounded CodeRabbit follow-up
+
+- **Observed:** The original `eea8752` head passed all required checks and build validation; its clean GitHub application suite passed 2,724 tests with one expected skip and 95.01% coverage. CodeRabbit then reported three minor findings and one trivial unused-helper finding. The user authorized addressing these before merge.
+- **Changed:** Removed the diagnostics section's duplicate outer live region while preserving focus, loading status and alert roles. Legacy verification now rolls back SQLAlchemy failures and maps them to the existing safe persistence error/503 boundary. Removed the unused identity-update helper after verifying it had no callers. Completed ADR alternatives, evidence/owner/revisit sections and the small Markdown spacing/wording nits.
+- **Validated:** Five new backend fault regressions and the pending-state announcement assertion failed before the fixes. The affected backend group now passes 132 tests; the focused frontend group passes 49 tests. Fresh agent source review found no material regression or security issues. Full frontend verification also passes all 586 tests at 85.26% branch coverage, lock validation, lint, typecheck and production build. Repository Ruff format/lint, strict mypy, Bandit, whitespace and the redacted directory scan pass. Updated-head protected CI remains separate evidence.
+- **Assessed:** The `jsonify` suggestion does not apply to deterministic fingerprint/stored JSON in this FastAPI service. The loading-reset warnings do not identify a rejecting production promise: the client catches transport/body failures and returns typed failure results, including uncertainty handling. Their existing error semantics were preserved.
+- **Boundary:** No schema, grants, successful identity-resolution policy, live account, cloud or provider behavior was changed. Updated PR CI and owner review/merge remain before any separately approved rollout.
+
 ## 2026-10-20 — Staff Google binding repair source candidate qualified
 
 - **Staffing:** One independent developer; fresh backend and frontend agent reviews are quality evidence, not independent-human authorization.

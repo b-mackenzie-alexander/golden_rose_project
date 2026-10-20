@@ -5,7 +5,7 @@
 - **Staffing:** One independent developer. Fresh agent/session review and automated checks provide quality evidence, not independent-human authorization.
 - **Human-visible outcome:** The separately authorized owner-present recovery is complete and the user confirmed account/workspace access. The permanent source candidate now separates access editing from identity, records Google binding provenance, and provides bilingual sign-in diagnostics and guarded onboarding restart. It is published as [PR #189](https://github.com/b-mackenzie-alexander/golden_rose_project/pull/189) to `develop` and has not been deployed.
 - **Gate budget:** Approved source/backend/frontend/schema work, disposable fictional local validation and a PR to protected `develop`. The one-account live recovery is consumed. Image admission, live migration, deployment, bootstrap provisioning and additional live/provider actions require a separate packet.
-- **Next executable action:** Read protected CI at PR #189’s final head, repair any findings, and leave protected review/merge to the owner. Fresh review, combined backend qualification and production-build fictional browser checks are recorded in `NOTES.md`. The implementation was rebased onto PR #188 at `develop@f8b9ee8` before qualification; the other session's checkout is preserved.
+- **Next executable action:** Complete fresh protected CI for the narrowly scoped CodeRabbit follow-up at PR #189’s updated head, and leave protected review/merge to the owner. Fresh review, combined backend qualification and production-build fictional browser checks are recorded in `NOTES.md`. The implementation was rebased onto PR #188 at `develop@f8b9ee8` before qualification; the other session's checkout is preserved.
 - **Do not regress:** Stable staff IDs/history/grants; exact named authority; separate identity planes; verified Google credentials; account-level MFA; no active-account email-only linking; no-store safe responses; English/Spanish and accessibility parity; no raw identity material; human operational decisions; evidence-only provider recovery/revocation wording.
 
 
@@ -18,6 +18,7 @@
 - **Do not regress:** Worker and Employer intake drafts remain separate from canonical records until staff review/finalization; canonical contact changes remain versioned, attributable and evidence-backed; restricted addresses stay separately authorized; staff-only named-account access, bilingual/accessibility parity, immutable intake history and exact retries remain intact.
 
 **Validation to date:** Focused frontend typecheck/lint and 77 IntakeFields/EmployerWorkspace tests pass. The complete affected backend contact/finalization/resolution/read group passes 458 tests; repository Ruff formatting/lint and mypy pass; Alembic reports `0020_contact_email_fields` as the sole head. The disposable PostgreSQL migration tests could not start because the configured local test database at `127.0.0.1:55432` refused connections; no temporary database or cloud resource was created or changed.
+
 ## 2026-10-20 — Owner sign-in recovered; binding design repair proposed
 
 - **Staffing:** One independent developer. Fresh agent/session review and automated checks provide quality evidence, not independent-human authorization.

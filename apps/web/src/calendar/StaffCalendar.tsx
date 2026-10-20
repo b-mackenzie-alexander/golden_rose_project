@@ -106,7 +106,7 @@ const englishCalendar: CalendarCopy = {
   eventUpdated: 'Event updated',
   events: [
     { accent: 'danger', assignee: 'Mariela Torres', dayId: 'mon', duration: '30 min', id: 'seed-mon-team', kind: 'staff', meta: 'Staff meeting', scope: 'company', sortMinutes: 540, time: '9:00 AM', title: 'Team check-in' },
-    { accent: 'warning', assignee: 'Carlos Ramirez', dayId: 'mon', duration: '30 min', id: 'seed-mon-restaurant', kind: 'employer', meta: 'Employer follow-up', scope: 'company', sortMinutes: 630, time: '10:30 AM', title: 'Call Restaurante La Esperanza' },
+    { accent: 'warning', assignee: 'Operations', dayId: 'mon', duration: '30 min', id: 'seed-mon-employer-queue', kind: 'employer', meta: 'Employer queue', scope: 'company', sortMinutes: 630, time: '10:30 AM', title: 'Review employer drafts' },
     { accent: 'success', assignee: 'Ana Torres', dayId: 'mon', duration: '45 min', id: 'seed-mon-ana', kind: 'interview', meta: 'Worker registration', scope: 'company', sortMinutes: 720, time: '12:00 PM', title: 'Interview with Ana Quispe' },
     { accent: 'info', assignee: 'Operations', dayId: 'mon', duration: '45 min', id: 'seed-mon-review', kind: 'review', meta: 'Queue review', scope: 'company', sortMinutes: 840, time: '2:00 PM', title: 'Review pending intakes' },
     { accent: 'success', assignee: 'Sofia Diaz', dayId: 'mon', duration: '30 min', id: 'seed-mon-maria', kind: 'employer', meta: 'Document check', scope: 'company', sortMinutes: 960, time: '4:00 PM', title: 'Follow-up with Maria Lopez' },
@@ -174,7 +174,7 @@ const spanishCalendar: CalendarCopy = {
   eventUpdated: 'Evento actualizado',
   events: [
     { accent: 'danger', assignee: 'Mariela Torres', dayId: 'mon', duration: '30 min', id: 'seed-mon-team', kind: 'staff', meta: 'Reunion del equipo', scope: 'company', sortMinutes: 540, time: '9:00 a. m.', title: 'Revision diaria' },
-    { accent: 'warning', assignee: 'Carlos Ramirez', dayId: 'mon', duration: '30 min', id: 'seed-mon-restaurant', kind: 'employer', meta: 'Seguimiento de empleador', scope: 'company', sortMinutes: 630, time: '10:30 a. m.', title: 'Llamada con Restaurante La Esperanza' },
+    { accent: 'warning', assignee: 'Operaciones', dayId: 'mon', duration: '30 min', id: 'seed-mon-employer-queue', kind: 'employer', meta: 'Cola de empleadores', scope: 'company', sortMinutes: 630, time: '10:30 a. m.', title: 'Revisar borradores de empleadores' },
     { accent: 'success', assignee: 'Ana Torres', dayId: 'mon', duration: '45 min', id: 'seed-mon-ana', kind: 'interview', meta: 'Registro de trabajador', scope: 'company', sortMinutes: 720, time: '12:00 p. m.', title: 'Entrevista con Ana Quispe' },
     { accent: 'info', assignee: 'Operaciones', dayId: 'mon', duration: '45 min', id: 'seed-mon-review', kind: 'review', meta: 'Revision de cola', scope: 'company', sortMinutes: 840, time: '2:00 p. m.', title: 'Revisar registros pendientes' },
     { accent: 'success', assignee: 'Sofia Diaz', dayId: 'mon', duration: '30 min', id: 'seed-mon-maria', kind: 'employer', meta: 'Verificar documentos', scope: 'company', sortMinutes: 960, time: '4:00 p. m.', title: 'Seguimiento con Maria Lopez' },

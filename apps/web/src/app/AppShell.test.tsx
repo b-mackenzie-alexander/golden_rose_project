@@ -4,8 +4,11 @@ import { MemoryRouter } from 'react-router';
 import { afterEach, vi } from 'vitest';
 
 import { AppShell } from './AppShell';
+import * as staffAccountApi from '../api/staffAccountClient';
 import { bearerHeaders, clearStaffIdToken, setStaffIdToken } from '../auth/staffAuthSession';
 import { LanguageProvider } from '../i18n/LanguageProvider';
+
+vi.mock('../api/staffAccountClient');
 
 afterEach(() => {
   clearStaffIdToken();
@@ -18,6 +21,10 @@ describe('AppShell', () => {
     window.localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
     clearStaffIdToken();
+    vi.mocked(staffAccountApi.getStaffSession).mockResolvedValue({
+      ok: false,
+      failure: { kind: 'sign_in_required' },
+    });
   });
 
   it('renders the dashboard shell navigation and language action', () => {
@@ -70,6 +77,91 @@ describe('AppShell', () => {
     expect(accountButton).not.toHaveTextContent('Mariela Torres');
     expect(accountButton).not.toHaveTextContent('Operations team');
     expect(screen.queryByRole('button', { name: 'Sign out of Golden Rose session' })).not.toBeInTheDocument();
+  });
+
+  it('shows the signed-in staff account name after session verification', async () => {
+    setStaffIdToken('stored-token', Date.now() + 60_000);
+    vi.mocked(staffAccountApi.getStaffSession).mockResolvedValue({
+      ok: true,
+      value: {
+        actorId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        roleName: 'owner',
+        permissionNames: ['staff_account:read'],
+        authContext: 'staff_oidc',
+        account: {
+          staffId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          providerSubject: 'oidc:staff:owner',
+          providerEmail: 'owner@example.test',
+          displayName: 'Beatrice Santos',
+          roleName: 'owner',
+          lifecycleStatus: 'active',
+          mfaEnrolled: true,
+          permissionNames: ['staff_account:read'],
+          createdAt: '2026-10-06T12:00:00Z',
+          createdBy: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          updatedAt: '2026-10-06T12:00:00Z',
+          updatedBy: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          version: 1,
+        },
+        delegations: [],
+      },
+    });
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppShell />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    const accountButton = screen.getByRole('button', { name: 'Open my staff account' });
+    await waitFor(() => {
+      expect(accountButton).toHaveTextContent('Beatrice Santos');
+    });
+    expect(accountButton).toHaveTextContent('Signed in');
+    expect(accountButton).not.toHaveTextContent('Staff account');
+  });
+
+  it('keeps the generic account label when server session verification is denied', async () => {
+    setStaffIdToken('stored-token', Date.now() + 60_000);
+    vi.mocked(staffAccountApi.getStaffSession).mockResolvedValue({
+      ok: false,
+      failure: { kind: 'sign_in_required' },
+    });
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppShell />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await waitFor(() => {
+      expect(staffAccountApi.getStaffSession).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.getByRole('button', { name: 'Open my staff account' })).toHaveTextContent('Staff account');
+    expect(screen.getByRole('button', { name: 'Open my staff account' })).toHaveTextContent('Verify session');
+  });
+
+  it('keeps the generic account label when session verification is unavailable', async () => {
+    setStaffIdToken('stored-token', Date.now() + 60_000);
+    vi.mocked(staffAccountApi.getStaffSession).mockRejectedValue(new Error('Network unavailable'));
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/employers']}>
+          <AppShell />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await waitFor(() => {
+      expect(staffAccountApi.getStaffSession).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.getByRole('button', { name: 'Open my staff account' })).toHaveTextContent('Staff account');
+    expect(screen.getByRole('button', { name: 'Open my staff account' })).toHaveTextContent('Verify session');
   });
 
   it('clears the Golden Rose staff browser session from the header', async () => {

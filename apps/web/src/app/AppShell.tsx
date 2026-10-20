@@ -6,6 +6,7 @@ import { BrandRose, IconSymbol } from '../dashboard/artwork';
 import type { IconName } from '../dashboard/artwork';
 import { queryIntakes } from '../api/intakeClient';
 import type { DraftObject, IntakeKind, IntakeSummary } from '../api/intakeContracts';
+import { getStaffSession } from '../api/staffAccountClient';
 import { clearStaffIdToken, useStaffAuthSession } from '../auth/staffAuthSession';
 import { useLanguage } from '../i18n/LanguageProvider';
 
@@ -54,8 +55,14 @@ export function AppShell() {
   const [searchValue, setSearchValue] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [dataSearchItems, setDataSearchItems] = useState<DataSearchItem[]>([]);
+  const [staffDisplayName, setStaffDisplayName] = useState<string | null>(null);
   const isDark = theme === 'dark';
   const hasStaffBrowserSession = staffAuthSession.idToken !== null;
+  const verifiedStaffDisplayName = hasStaffBrowserSession ? staffDisplayName?.trim() : '';
+  const accountLabel = verifiedStaffDisplayName || (language === 'en' ? 'Staff account' : 'Cuenta del personal');
+  const accountMeta = verifiedStaffDisplayName
+    ? language === 'en' ? 'Signed in' : 'Sesion activa'
+    : language === 'en' ? 'Verify session' : 'Verificar sesion';
   const primaryNavItems = [
     { icon: 'home', label: language === 'en' ? 'Home' : 'Inicio', to: '/' },
     {
@@ -136,14 +143,14 @@ export function AppShell() {
     {
       href: '/staff/intakes/employers',
       icon: 'employerIntake',
-      keywords: 'employer intake sunshine home care family first caring hands restaurante la esperanza empleador registro',
+      keywords: 'employer intake employer onboarding demand request empleador registro demanda',
       label: language === 'en' ? 'Employer intakes' : 'Registros de empleadores',
       meta: language === 'en' ? 'Employer demand and intake drafts' : 'Demandas y borradores de empleadores',
     },
     {
       href: '/employers',
       icon: 'building',
-      keywords: 'employers search records clean homes llc restaurante la esperanza employer follow up empleadores buscar',
+      keywords: 'employers search records employer follow up empleadores buscar',
       label: language === 'en' ? 'Employer records' : 'Registros de empleadores',
       meta: language === 'en' ? 'Search and revise employer records' : 'Buscar y actualizar empleadores',
     },
@@ -239,6 +246,26 @@ export function AppShell() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  useEffect(() => {
+    if (!hasStaffBrowserSession) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    void getStaffSession()
+      .then((result) => {
+        if (cancelled) return;
+        setStaffDisplayName(result.ok ? result.value.account?.displayName ?? null : null);
+      })
+      .catch(() => {
+        if (!cancelled) setStaffDisplayName(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasStaffBrowserSession, staffAuthSession.idToken]);
 
   useEffect(() => {
     if (location.pathname !== '/') {
@@ -419,8 +446,8 @@ export function AppShell() {
             >
               <span className="user-avatar" aria-hidden="true">GR</span>
               <span>
-                <strong>{language === 'en' ? 'Staff account' : 'Cuenta del personal'}</strong>
-                <small>{language === 'en' ? 'Verify session' : 'Verificar sesion'}</small>
+                <strong>{accountLabel}</strong>
+                <small>{accountMeta}</small>
               </span>
             </button>
           </div>

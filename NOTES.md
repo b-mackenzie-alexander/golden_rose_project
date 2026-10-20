@@ -8,6 +8,16 @@ This is the concise, dated engineering and operational note log. It records obse
 - **Proposed:** a design direction, not yet approved.
 - **Validated:** corroborated and approved for the stated use.
 
+## 2026-10-14 — Live-pilot dashboard/session label repair
+- **Reported:** The provisioning update is live, staff browser refreshes no longer interrupt sessions, and the home page shows an unexpected Employer follow-up for `Restaurante La Esperanza`. The header account chip still says `Staff account` instead of the signed-in person's name.
+- **Observed:** Source inspection found `Restaurante La Esperanza` in staff-facing fallback/demo rows for the dashboard, work queues, calendar, and global search keywords. Those rows can appear when live projection reads fail or when the UI uses static fallback content.
+- **Observed:** Source inspection found the header account chip used a static localized label even when a valid Golden Rose staff browser session existed.
+- **Observed:** The source repair replaces the named employer fallback with generic employer-queue review copy and reads the current staff session to display `account.displayName` in the header, falling back to the generic label only when no verified staff account name is available.
+- **Validated:** Focused frontend tests passed: `npm --prefix apps/web test -- AppShell.test.tsx Dashboard.test.tsx WorkQueues.test.tsx StaffCalendar.test.tsx` reported 43 passing tests with existing jsdom canvas notices. `npm --prefix apps/web run typecheck`, `npm --prefix apps/web run lint`, `git diff --check` and `gitleaks dir --no-banner --redact .` passed.
+- **Observed:** PR #186 application-quality CI then failed because frontend branch coverage measured 84.99% against the 85.00% required threshold. The implementation was otherwise passing application compilation; branch policy, repository hygiene, image validation and CodeRabbit checks passed.
+- **Validated:** The remediation adds AppShell coverage for both server-denied and transport-failed staff-session verification, confirming that the header remains generic rather than showing stale identity. The full `npm --prefix apps/web run verify` gate passed lock validation, lock tests, lint, typecheck, 559 coverage tests at 85.00% branch coverage, and the production build.
+- **Boundary:** This is source/frontend/local-validation work only. No cloud inspection, image build, deployment, migration, live-data deletion or cleanup, provider-side identity action, production-completion claim or automated matching/ranking/eligibility/referral/placement occurred. If the named restaurant remains visible after this source patch is deployed, it should be treated as possible persisted pilot data requiring separate live-data authorization and evidence.
+
 ## 2026-10-12 — Staff-pilot intake write gate repair
 - **Reported:** Staff testing found that no account can submit Worker or Employer intakes in the controlled staff pilot; update/correction flows were suspected to have a similar problem.
 - **Observed:** Source investigation found the draft-intake create route still blocked every environment except `local` and `test`. Because the controlled staff pilot runs as `production` with named staff OIDC, that gate would reject every account before role-specific intake permissions were evaluated.

@@ -45,7 +45,10 @@ def insert_worker_group(
         (
             "worker_contact",
             worker_contacts,
-            {"phone": content["phone"], "email": content.get("email")},
+            {
+                "phone": content["phone"],
+                **({"email": content["email"]} if "email" in content else {}),
+            },
         ),
         ("worker_residence", worker_residences, address),
         (

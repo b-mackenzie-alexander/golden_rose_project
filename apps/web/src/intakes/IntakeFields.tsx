@@ -428,6 +428,7 @@ export function IntakeFields({
             change(withValue(value, 'phone', typeof v === 'string' ? normalizeUsPhone(v) : undefined));
           }}
         />
+        {field('email', ['Email', 'Correo electrónico'], 'email', 320)}
       </div> : null}
       {kind === 'worker' ? (
         <>

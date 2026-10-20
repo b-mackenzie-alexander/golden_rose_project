@@ -30,7 +30,7 @@ def read_contact_details(
     names = (
         address_names
         if address
-        else ("employer_id", "employer_contact_id", "representative_name", "phone")
+        else ("employer_id", "employer_contact_id", "representative_name", "phone", "email")
     )
     statement = (
         select(

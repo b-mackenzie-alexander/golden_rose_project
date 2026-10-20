@@ -146,6 +146,7 @@ def insert_employer_group(
                 employer_contact_id=identities["employer_contact"],
                 representative_name=content["representative_name"],
                 phone=content["phone"],
+                **({"email": content["email"]} if "email" in content else {}),
                 **({} if business else party),
                 **attribution,
             )

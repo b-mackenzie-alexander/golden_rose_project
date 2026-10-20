@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""PostgreSQL 16 schema contract through 0009a, captured from disposable migrations."""
+"""PostgreSQL 16 schema contract through 0020, captured from disposable migrations."""
 
 EXPECTED_INTAKE_CONSTRAINTS = {
     "alembic_version.alembic_version_pkc": "PRIMARY KEY (version_num)",
@@ -772,6 +772,10 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "employer_contact_id)",
     "employer_contact_details.employer_contact_details_phone_check": "CHECK (btrim(phone::text) <> "
     "''::text)",
+    "employer_contact_details.ck_employer_contact_details_email_shape": "CHECK (email IS NULL "
+    "OR email::text = lower(email::text) AND char_length(email::text) >= 3 AND "
+    "char_length(email::text) <= 320 AND email::text ~ "
+    "'^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$'::text)",
     "employer_contact_details.employer_contact_details_pkey": "PRIMARY KEY "
     "(employer_contact_details_id)",
     "employer_contact_details.employer_contact_details_representative_name_check": "CHECK "
@@ -1677,11 +1681,11 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "intake_reviews.intake_reviews_reviewed_record_version_check": "CHECK (reviewed_record_version >= "
     "1)",
     "intakes.ck_intakes_content_kind": "CHECK (kind::text = 'worker'::text AND (content - "
-    "ARRAY['full_name'::text, 'phone'::text, 'interests'::text, "
+    "ARRAY['full_name'::text, 'phone'::text, 'email'::text, 'interests'::text, "
     "'availability'::text]) = '{}'::jsonb OR kind::text = "
     "'employer'::text AND (content - ARRAY['employer_type'::text, "
     "'display_name'::text, 'representative_name'::text, "
-    "'phone'::text, 'role_title'::text, 'duties_summary'::text, "
+    "'phone'::text, 'email'::text, 'role_title'::text, 'duties_summary'::text, "
     "'worker_count'::text, 'schedule'::text, 'offer'::text]) = "
     "'{}'::jsonb)",
     "intakes.ck_intakes_content_object": "CHECK (jsonb_typeof(content) = 'object'::text)",
@@ -1794,6 +1798,10 @@ EXPECTED_INTAKE_CONSTRAINTS = {
     "worker_contacts.guard_canonical_correction": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
     "worker_contacts.guard_worker_output": "TRIGGER DEFERRABLE INITIALLY DEFERRED",
     "worker_contacts.worker_contacts_phone_check": "CHECK (btrim(phone::text) <> ''::text)",
+    "worker_contacts.ck_worker_contacts_email_shape": "CHECK (email IS NULL OR "
+    "email::text = lower(email::text) AND char_length(email::text) >= 3 AND "
+    "char_length(email::text) <= 320 AND email::text ~ "
+    "'^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$'::text)",
     "worker_contacts.worker_contacts_pkey": "PRIMARY KEY (worker_contact_id)",
     "worker_contacts.worker_contacts_version_check": "CHECK (version >= 1)",
     "worker_contacts.worker_contacts_worker_id_fkey": "FOREIGN KEY (worker_id) REFERENCES "
@@ -2049,16 +2057,16 @@ EXPECTED_INTAKE_TRIGGERS = {
 }
 
 EXPECTED_FUNCTION_HASHES = {
-    "canonical_correction_section(text, jsonb)": "979959c10181080d46247451413bfac49ccd6e99346902fbff3bfe784e7bc31e",
-    "canonical_current_facts(uuid)": "ceaac29b900a833a456a640342236c65f8dcd548c1ffb7f52a21a5378825bca8",
+    "canonical_correction_section(text, jsonb)": "9af4eaaf300b0ace1f39530714c0b5e371178d1e8e6e80fcaf8353b0c4bd8e44",
+    "canonical_current_facts(uuid)": "34c5eda6634063bdf57546d13f39b2acef73a60358ab62da3a32b183aa6bbad1",
     "canonical_details_complete(text, jsonb)": "8bc001e1f5274d3eaef5bbd94ff4ace6db4273e087417cb034f712b20beccb3a",
     "deny_mutation_on_append_only_tables()": "9fcd9dd2284343c0077c314e8b8749be31a66413591df02ea9487fdb3c9732ba",
     "guard_canonical_correction()": "7832b059628865d42bd3acc0b2a2b97d29530087ef2f554da1b3e4cb625c2b88",
-    "guard_canonical_identity()": "b392b9406a029abf618a1a1dec104068862f329a6d0bab06fdebc8946a1aabec",
+    "guard_canonical_identity()": "9dba8b8cb994d946b87ea76d7868437e46ad38e8739063e943752c6acece980f",
     "guard_canonical_review()": "368b981d3edd1d14d5f5637bfa0a4bff4ce9703d87c9a0308f6ec0439ec6618e",
     "guard_canonical_review_identity()": "c5e2e5278346fc2d0123c0a1b7bf3a5d5e2ef63984439dad768fd098589897f6",
     "guard_correction_evidence()": "2f234a59e00db11c15355c84ff8da43b7cbdde75c9f468940efc7dc379718ac1",
-    "guard_employer_output()": "7a7cf9b344a37250e28029a07a9129486ebe0f53407a665c21467d4b88f2b6f3",
+    "guard_employer_output()": "774bab5aca684a40fbf6d5e2c78eabb36af7fbae6b207ce327f52725abbc66c7",
     "guard_finalization_results()": "9d47698402a27977b18499a0dc97e953488c4b89db87fec3a62b598e43169375",
     "guard_intake_address_authority()": "47e030480919160c7a63fb7d159c0adec69e497ffb36bf04b4fdb840fa73a9c0",
     "guard_intake_identity()": "0fd1221d4d55acaca292163c903191776acc530528a088f086b9670da95410c6",
@@ -2069,10 +2077,10 @@ EXPECTED_FUNCTION_HASHES = {
     "guard_intake_write_authority()": "26f547b0c18f3db97ed3a4e43a4a271857ae8602cb7600972953c8a46394bf0f",
     "guard_work_interest_authority()": "de664918f8177bcc7213334c97d99743e159ac24e85a36f0438b4ae56b35c355",
     "guard_work_interest_identity()": "649cfbb47d70d1b22a944219996dfce183dfd5e1643186b378d1cc4a64357590",
-    "guard_worker_output()": "3d025f918dc182d9dd84c8962de75ca452dc2e695154e5d99326eac203881edc",
+    "guard_worker_output()": "5252be6abbc252c62a659a4581ba616487ce1537217b04b3b8cea7bce0430ed0",
     "guard_worker_selection()": "33a379e2d9676e1e4c52582596b832efb70965b0118b1f9e8bbb2f86195ee86a",
     "intake_canonical_record(text, uuid)": "d9f5b2bc60e835ec63dc0f4fe120770de49c273e0696693db120c366f7b1934d",
-    "intake_effective_snapshot(uuid)": "8fb41ff7e57951108b8bd6928e9e698355ea116962774246458754e6e76102ef",
+    "intake_effective_snapshot(uuid)": "6a7fcc9e0d8561dcc42efed75160b029397b5062664794a6a392da330f286c6f",
     "intake_link_refs(uuid)": "d27438e2ee115ba40ebd46c2abcbed31755c99f6e6bca5bacc28f3c9961475c0",
     "populate_command_receipt_revision_compatibility_fields()": "7a6e9a3a156344ecc76103331d2e6c7844edb9a8f8600ebb415ae4b547adbded",
     "populate_employer_revision_compatibility_fields()": "b0b862c8bb628e3f487c7e16702041299e8ba4bd9d0a32d23e276e56a1635e95",

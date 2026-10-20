@@ -178,6 +178,9 @@ export function EmployerWorkspace({ onPersistedRestore }: EmployerWorkspaceProps
       <div className="workspace-hero">
         <h2>{messages.employerWorkspaceTitle}</h2>
         <p>{messages.employerWorkspaceIntro}</p>
+        <a className="staff-secondary-button focus-ring" href="/staff/intakes/employers">
+          {messages.employerOnboardingDrafts}
+        </a>
       </div>
 
       <section aria-labelledby="workspace-overview-heading" className="workspace-panel workspace-overview">

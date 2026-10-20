@@ -2,6 +2,13 @@
 
 This is the concise, dated engineering and operational note log. It records observed evidence, decisions, verification, and handoffs. It is not a location for client personal data, credentials, raw exports, legal advice, or unapproved policy text.
 
+## 2026-10-20 — Unified party workspaces and contact email slice
+- **Reported:** The owner could create an Employer onboarding draft but could not find it again in the Employer workflow. She also requested dedicated email entry for Workers and Employers.
+- **Observed:** The shared draft intake workspace remains at `/staff/intakes/employers`, while the canonical employer record workspace is `/employers`; the latter now includes an explicit bilingual link to the former.
+- **Observed:** Optional email input is now represented in worker/employer draft content. The source migration adds nullable bounded email columns to canonical worker and employer-contact-detail records, carries them through finalization and authorized reads/current facts, and extends the existing versioned correction evidence boundary. No email use beyond data entry and authorized staff display is implemented.
+- **Validated:** PR #188 now accepts email in both draft and canonical contact records, preserves omitted-vs-explicit-null correction behavior, and keeps linked/current-fact snapshots consistent. Repair validation covered the full CI suite (2,710 passed, one expected skip, 95.10% coverage), migration compatibility, quality checks, dependency audit, and backend SBOM generation. No cloud or pilot environment was accessed.
+- **Boundary:** This is source/frontend/backend/schema/local-validation work only. No cloud inspection, image publication, deployment, migration execution, live-data change, provider action, production-completion claim or automated matching/ranking/eligibility/referral/placement occurred.
+
 ## Evidence labels
 - **Observed:** directly supplied, seen, or tool-verified.
 - **Reported:** stated by client/staff but not independently validated.

@@ -336,10 +336,10 @@ intakes = Table(
     CheckConstraint("jsonb_typeof(content)='object'", name="ck_intakes_content_object"),
     CheckConstraint("octet_length(content::text)<=32768", name="ck_intakes_content_size"),
     CheckConstraint(
-        "(kind='worker' AND content - ARRAY['full_name','phone','interests','availab"
+        "(kind='worker' AND content - ARRAY['full_name','phone','email','interests','availab"
         "ility']::text[]='{}'::jsonb) OR "
         "(kind='employer' AND content - ARRAY['employer_type','display_name','representative_name',"
-        "'phone','role_title','duties_summary','worker_count','schedule','offer']::t"
+        "'phone','email','role_title','duties_summary','worker_count','schedule','offer']::t"
         "ext[]='{}'::jsonb)",
         name="ck_intakes_content_kind",
     ),
@@ -1279,6 +1279,7 @@ worker_contacts = Table(
     Column("worker_contact_id", UUID(as_uuid=True), primary_key=True),
     Column("worker_id", UUID(as_uuid=True), nullable=False),
     Column("phone", String(40), nullable=False),
+    Column("email", String(320)),
     *_canonical_attribution(),
 )
 worker_residences = Table(
@@ -1350,6 +1351,7 @@ employer_contact_details = Table(
     Column("employer_contact_id", UUID(as_uuid=True), nullable=False, unique=True),
     Column("representative_name", String(200), nullable=False),
     Column("phone", String(40), nullable=False),
+    Column("email", String(320)),
     *_employer_output_address(nullable=True),
     *_canonical_attribution(),
     ForeignKeyConstraint(

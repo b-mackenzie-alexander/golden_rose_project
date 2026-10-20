@@ -34,7 +34,21 @@ def test_populated_prc_upgrade_and_unused_prd_downgrade_preserve_every_original_
     )
     before = {table: rows(migration_database, table) for table in tables}
     migrate(migration_database, "head")
-    assert {table: rows(migration_database, table) for table in tables} == before
+    expected_after_upgrade = {
+        table: [
+            {
+                **row,
+                **(
+                    {"email": None}
+                    if table in {"worker_contacts", "employer_contact_details"}
+                    else {}
+                ),
+            }
+            for row in values
+        ]
+        for table, values in before.items()
+    }
+    assert {table: rows(migration_database, table) for table in tables} == expected_after_upgrade
     migrate(migration_database, "0008c_intake_link_authority", downgrade=True)
     assert {table: rows(migration_database, table) for table in tables} == before
     migrate(migration_database, "head")
@@ -54,6 +68,6 @@ def test_current_review_head_blocks_downgrade_before_schema_changes(migration_da
     with pytest.raises(RuntimeError, match="before DDL"):
         migrate(migration_database, "0008c_intake_link_authority", downgrade=True)
     assert (
-        rows(migration_database, "alembic_version")[0]["version_num"] == "0019_ext_calendar_imports"
+        rows(migration_database, "alembic_version")[0]["version_num"] == "0020_contact_email_fields"
     )
     assert len(rows(migration_database, "canonical_review_heads")) == 1

@@ -14,12 +14,12 @@ from golden_rose.persistence.intake_links import get_link_dependencies
 
 FIELDS = {
     "worker": ("full_name",),
-    "worker_contact": ("phone",),
+    "worker_contact": ("phone", "email"),
     "worker_preferences": ("interests", "availability"),
     "worker_residence": (),
     "employer": ("employer_type", "display_name"),
     "employer_contact": ("full_name",),
-    "employer_contact_details": ("phone",),
+    "employer_contact_details": ("phone", "email"),
     "employer_address": (),
     "worksite": (),
 }
@@ -104,7 +104,7 @@ def resolved_detail_fields(
         stale = stale or record["version"] != refs[name].version
         for field in FIELDS[name]:
             output = "representative_name" if name == "employer_contact" else field
-            if record[field] is not None:
+            if record.get(field) is not None:
                 resolved[output] = record[field]
         if name in ADDRESS_SECTIONS:
             if name == "employer_contact_details" and resolved["employer_type"] != "household":

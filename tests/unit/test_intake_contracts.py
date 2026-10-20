@@ -136,6 +136,23 @@ def test_phone_rejects_invalid(value):
         validate_content("worker", {"phone": value})
 
 
+def test_optional_contact_email_normalizes_for_workers_and_employers():
+    assert validate_content("worker", {"email": " Worker@Example.Test "}).to_content() == {
+        "email": "worker@example.test"
+    }
+    assert validate_content("employer", {"email": "Employer@Example.Test"}).to_content() == {
+        "email": "employer@example.test"
+    }
+
+
+@pytest.mark.parametrize(
+    "value", ["worker", "worker@", "worker @example.test", "a@b", "x" * 321 + "@e.t"]
+)
+def test_contact_email_rejects_invalid_values(value):
+    with pytest.raises(ValidationError):
+        validate_content("worker", {"email": value})
+
+
 def test_offer_zero_is_substantive_and_null_clears():
     from golden_rose.application.intake_contracts import has_substantive_content
 

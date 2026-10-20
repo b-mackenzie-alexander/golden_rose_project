@@ -71,7 +71,7 @@ def build_review_snapshot(
             for field in ("employer_type", "display_name"):
                 content.pop(field, None)
             if "employer_contact" in dependencies:
-                for field in ("representative_name", "phone"):
+                for field in ("representative_name", "phone", "email"):
                     content.pop(field, None)
                 if linked.content["employer_type"] == "household":
                     replaced_addresses.add("party_address")

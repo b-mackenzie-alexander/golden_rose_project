@@ -591,6 +591,16 @@ def phone(value: str) -> str:
 Phone = Annotated[str, Field(strict=True), AfterValidator(phone)]
 
 
+def email(value: str) -> str:
+    value = normalize_text(value).lower()
+    if not 3 <= len(value) <= 320 or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value):
+        raise ValueError("Invalid email")
+    return value
+
+
+Email = Annotated[str, Field(strict=True), AfterValidator(email)]
+
+
 def money(value: str) -> str:
     if not re.fullmatch(r"(?:0|[1-9][0-9]{0,8})(?:\.[0-9]{1,2})?", value):
         raise ValueError("Invalid decimal amount")
@@ -753,6 +763,7 @@ class Interests(IntakeValue):
 class WorkerDraftContent(IntakeValue):
     full_name: Text200 | None = None
     phone: Phone | None = None
+    email: Email | None = None
     interests: Interests | None = None
     availability: Availability | None = None
 
@@ -762,6 +773,7 @@ class EmployerDraftContent(IntakeValue):
     display_name: Text200 | None = None
     representative_name: Text200 | None = None
     phone: Phone | None = None
+    email: Email | None = None
     role_title: Text200 | None = None
     duties_summary: Text1000 | None = None
     worker_count: int | None = Field(default=None, ge=1, le=1000)

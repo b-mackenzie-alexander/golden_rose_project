@@ -120,6 +120,18 @@ describe('typed partial fields', () => {
     input('Requested schedule', '');
     expect(captured()).not.toContain('per_worker');
   });
+  it('captures an optional email for each party without coupling it to the phone field', () => {
+    const { rerender } = render(<Form kind="worker" />);
+    expect(screen.getByLabelText('Email')).toHaveAttribute('type', 'email');
+    input('Email', 'worker@example.test');
+    expect(captured()).toContain('"email":"worker@example.test"');
+    input('Email', '');
+    expect(captured()).not.toContain('"email"');
+
+    rerender(<Form kind="employer" />);
+    input('Email', 'employer@example.test');
+    expect(captured()).toContain('"email":"employer@example.test"');
+  });
   it('defaults address country to the agency service country without asking staff', () => {
     render(<Form kind="address" />);
     input('Address line 1', 'Fictional line');

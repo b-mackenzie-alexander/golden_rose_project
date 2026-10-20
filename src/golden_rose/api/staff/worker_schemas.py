@@ -10,6 +10,7 @@ from golden_rose.api.staff.intake_schemas import QueryIntakesRequest
 from golden_rose.application.intake_contracts import (
     Address,
     Availability,
+    Email,
     IntakeValue,
     Interests,
     Phone,
@@ -63,6 +64,7 @@ class WorkerContactDetail(IntakeValue):
     worker_id: UUID
     version: int = Field(ge=1, le=2147483647)
     phone: Phone
+    email: Email | None
 
 
 class WorkerResidenceDetail(IntakeValue):

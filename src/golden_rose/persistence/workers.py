@@ -42,7 +42,14 @@ def insert_worker_group(
     }
     for kind, table, values in (
         ("worker", workers, {"full_name": content["full_name"]}),
-        ("worker_contact", worker_contacts, {"phone": content["phone"]}),
+        (
+            "worker_contact",
+            worker_contacts,
+            {
+                "phone": content["phone"],
+                **({"email": content["email"]} if "email" in content else {}),
+            },
+        ),
         ("worker_residence", worker_residences, address),
         (
             "worker_preferences",

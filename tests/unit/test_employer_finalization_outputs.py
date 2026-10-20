@@ -105,6 +105,7 @@ def test_employer_outputs_keep_exact_parentage_and_attribution(kind, count):
     assert details["employer_contact_id"] == identities["employer_contact"]
     assert details["representative_name"] == "Fictional Representative"
     assert details["phone"] == "202-555-0151"
+    assert "email" not in details
     if kind == "household":
         assert details["line1"] == PARTY["line1"]
         assert "employer_address" not in identities
@@ -128,6 +129,26 @@ def test_employer_outputs_keep_exact_parentage_and_attribution(kind, count):
     assert rows["worksites"]["map_area_status"] == "pending"
     session.commit.assert_not_called()
     session.rollback.assert_not_called()
+
+
+def test_employer_output_writes_contact_email_when_supplied():
+    session = Mock()
+    supplied_content = content()
+    supplied_content["email"] = "employer@example.test"
+    insert_new_employer_group(
+        session,
+        content=supplied_content,
+        party_address=PARTY,
+        worksite_address=WORKSITE,
+        actor_id=ACTOR,
+        now=NOW,
+    )
+    details = next(
+        call.args[0].compile().params
+        for call in session.execute.call_args_list
+        if call.args[0].table.name == "employer_contact_details"
+    )
+    assert details["email"] == "employer@example.test"
 
 
 @pytest.mark.parametrize(

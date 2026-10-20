@@ -46,6 +46,7 @@ def test_sections_have_safe_headers_and_separate_values(http, suffix):
             "employer_contact_id": uuid4(),
             "version": 1,
             "phone": "202-555-0151",
+            "email": None,
             "representative_name": "Fictional Representative",
         }
     )

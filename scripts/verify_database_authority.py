@@ -442,10 +442,10 @@ for _table in _CANONICAL_EVIDENCE_TABLES:
 _ADDRESS_COLUMNS = {"line1", "line2", "locality", "region", "postal_code", "country"}
 for _table, _fields in {
     "workers": {"full_name"},
-    "worker_contacts": {"phone"},
+    "worker_contacts": {"phone", "email"},
     "worker_residences": _ADDRESS_COLUMNS,
     "worker_preferences": {"interests", "availability"},
-    "employer_contact_details": _ADDRESS_COLUMNS | {"representative_name", "phone"},
+    "employer_contact_details": _ADDRESS_COLUMNS | {"representative_name", "phone", "email"},
     "employer_addresses": _ADDRESS_COLUMNS,
     "worksites": _ADDRESS_COLUMNS,
     "staffing_requests": {

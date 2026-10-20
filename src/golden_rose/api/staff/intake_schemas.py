@@ -8,6 +8,7 @@ from pydantic import Field, field_validator, model_validator
 
 from golden_rose.application.intake_contracts import (
     Address,
+    Email,
     EmployerCreateContent,
     EmployerDraftContent,
     IntakeValue,
@@ -203,6 +204,7 @@ class ResolvedEmployerContent(IntakeValue):
     display_name: Text200 | None = None
     representative_name: Text200 | None = None
     phone: Phone | None = None
+    email: Email | None = None
 
 
 LinkEntity = Literal[

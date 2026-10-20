@@ -35,7 +35,7 @@ SPECS = {
         "worker_contact",
         models.worker_contacts,
         contracts.CorrectWorkerContactRequest,
-        ("phone",),
+        ("phone", "email"),
         _WORKER | {"worker_contact:read", "worker_contact:correct"},
     ),
     "correct_worker_residence": CorrectionSpec(
@@ -57,7 +57,7 @@ SPECS = {
         "employer_contact_details",
         models.employer_contact_details,
         contracts.CorrectContactDetailsRequest,
-        ("representative_name", "phone"),
+        ("representative_name", "phone", "email"),
         _CONTACT | {"employer_contact:details:correct"},
     ),
     "correct_contact_address": CorrectionSpec(
@@ -111,5 +111,5 @@ SPECS = {
 
 
 def section_snapshot(spec: CorrectionSpec, row: dict[str, Any]) -> dict[str, Any]:
-    values = {name: row[name] for name in spec.fields if row[name] is not None}
+    values = {name: row[name] for name in spec.fields if row[name] is not None or name == "email"}
     return {"address": values} if spec.address else values

@@ -12,6 +12,7 @@ from pydantic import AfterValidator, Field, field_validator, model_validator
 from golden_rose.application.intake_contracts import (
     Address,
     Availability,
+    Email,
     IntakeValue,
     Interests,
     Offer,
@@ -55,6 +56,13 @@ class CorrectWorkerRequest(CorrectionRequest):
 
 class CorrectWorkerContactRequest(CorrectionRequest):
     phone: Phone
+    email: Email | None = None
+
+    def section_values(self) -> dict[str, Any]:
+        values: dict[str, Any] = {"phone": self.phone}
+        if "email" in self.model_fields_set:
+            values["email"] = self.email
+        return values
 
 
 class CompleteAddress(Address):
@@ -91,6 +99,16 @@ class CorrectWorkerPreferencesRequest(CorrectionRequest):
 class CorrectContactDetailsRequest(CorrectionRequest):
     representative_name: Text200
     phone: Phone
+    email: Email | None = None
+
+    def section_values(self) -> dict[str, Any]:
+        values: dict[str, Any] = {
+            "representative_name": self.representative_name,
+            "phone": self.phone,
+        }
+        if "email" in self.model_fields_set:
+            values["email"] = self.email
+        return values
 
 
 class CorrectContactAddressRequest(CorrectionRequest):

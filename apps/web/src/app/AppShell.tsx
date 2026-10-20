@@ -77,6 +77,7 @@ export function AppShell() {
   const [dataSearchItems, setDataSearchItems] = useState<DataSearchItem[]>([]);
   const [staffDisplayName, setStaffDisplayName] = useState<string | null>(null);
   const [urgentWorkCount, setUrgentWorkCount] = useState<number | null>(null);
+  const [urgentWorkRefreshVersion, setUrgentWorkRefreshVersion] = useState(0);
   const isDark = theme === 'dark';
   const hasStaffBrowserSession = staffAuthSession.idToken !== null;
   const visibleUrgentWorkCount = hasStaffBrowserSession ? urgentWorkCount : null;
@@ -293,6 +294,23 @@ export function AppShell() {
     if (!hasStaffBrowserSession) {
       return undefined;
     }
+    const refreshUrgentWork = () => {
+      if (document.visibilityState === 'visible') {
+        setUrgentWorkRefreshVersion((version) => version + 1);
+      }
+    };
+    window.addEventListener('focus', refreshUrgentWork);
+    document.addEventListener('visibilitychange', refreshUrgentWork);
+    return () => {
+      window.removeEventListener('focus', refreshUrgentWork);
+      document.removeEventListener('visibilitychange', refreshUrgentWork);
+    };
+  }, [hasStaffBrowserSession]);
+
+  useEffect(() => {
+    if (!hasStaffBrowserSession) {
+      return undefined;
+    }
     let cancelled = false;
     Promise.all([
       queryUrgentIntakeCount('worker'),
@@ -313,7 +331,7 @@ export function AppShell() {
     return () => {
       cancelled = true;
     };
-  }, [hasStaffBrowserSession, location.key, staffAuthSession.idToken]);
+  }, [hasStaffBrowserSession, location.key, staffAuthSession.idToken, urgentWorkRefreshVersion]);
 
   useEffect(() => {
     if (location.pathname !== '/') {

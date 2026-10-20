@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, useLocation } from 'react-router';
 import { afterEach, vi } from 'vitest';
 
 import { AppShell } from './AppShell';
@@ -24,6 +24,11 @@ function successfulOperationsProjection(highPriorityCount = 0) {
       queueSummary: { openItemCount: highPriorityCount, draftCount: highPriorityCount, pendingReviewCount: 0, highPriorityCount, oldestItemUpdatedAt: null, newestItemUpdatedAt: null },
     },
   };
+}
+
+function LocationObserver() {
+  const location = useLocation();
+  return <output data-testid="location-observer">{`${location.pathname}${location.search}`}</output>;
 }
 
 afterEach(() => {
@@ -75,6 +80,7 @@ describe('AppShell', () => {
       <LanguageProvider>
         <MemoryRouter initialEntries={['/']}>
           <AppShell />
+          <LocationObserver />
         </MemoryRouter>
       </LanguageProvider>,
     );
@@ -82,6 +88,7 @@ describe('AppShell', () => {
     const urgentButton = await screen.findByRole('button', { name: 'Open urgent work queue: 1 urgent item' });
     expect(urgentButton).toHaveTextContent('1');
     await user.click(urgentButton);
+    expect(screen.getByTestId('location-observer')).toHaveTextContent('/staff/queues?filter=urgent');
   });
 
   it('counts urgent drafts across intake pages', async () => {
@@ -180,6 +187,48 @@ describe('AppShell', () => {
       expect(intakeApi.queryIntakes).toHaveBeenCalledTimes(2);
     });
     expect(screen.getByRole('button', { name: 'Open urgent work queue' })).not.toHaveTextContent('0');
+  });
+
+  it('refreshes urgent work after the staff workspace regains focus', async () => {
+    setStaffIdToken('stored-token', Date.now() + 60_000);
+    vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue(successfulOperationsProjection(0));
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/']}><AppShell /></MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await waitFor(() => {
+      expect(intakeApi.queryIntakes).toHaveBeenCalledTimes(2);
+    });
+    window.dispatchEvent(new Event('focus'));
+    await waitFor(() => {
+      expect(intakeApi.queryIntakes).toHaveBeenCalledTimes(4);
+    });
+  });
+
+  it('does not refresh urgent work while the staff workspace is hidden', async () => {
+    const visibilityDescriptor = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    try {
+      setStaffIdToken('stored-token', Date.now() + 60_000);
+      vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue(successfulOperationsProjection(0));
+      render(
+        <LanguageProvider>
+          <MemoryRouter initialEntries={['/']}><AppShell /></MemoryRouter>
+        </LanguageProvider>,
+      );
+
+      await waitFor(() => {
+        expect(intakeApi.queryIntakes).toHaveBeenCalledTimes(2);
+      });
+      window.dispatchEvent(new Event('focus'));
+      expect(intakeApi.queryIntakes).toHaveBeenCalledTimes(2);
+    } finally {
+      if (visibilityDescriptor) {
+        Object.defineProperty(document, 'visibilityState', visibilityDescriptor);
+      }
+    }
   });
 
   it('localizes large urgent-work counts without changing the displayed cap', async () => {

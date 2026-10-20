@@ -14,6 +14,18 @@ vi.mock('../api/staffAccountClient');
 vi.mock('../api/intakeClient');
 vi.mock('../api/operationsProjectionClient');
 
+function successfulOperationsProjection(highPriorityCount = 0) {
+  return {
+    ok: true as const,
+    value: {
+      requestItems: [], shiftItems: [], areaSummary: [],
+      reportSummary: { requestCount: 0, shiftCount: 0, workerSlots: 0, pendingReviewCount: 0, activeAreaCount: 0, unmappedRequestCount: 0 },
+      calendarSummary: { projectedShiftCount: 0, workerSlots: 0, pendingReviewShiftCount: 0, coverageDayCount: 0, firstShiftStartsAt: null, lastShiftEndsAt: null },
+      queueSummary: { openItemCount: highPriorityCount, draftCount: highPriorityCount, pendingReviewCount: 0, highPriorityCount, oldestItemUpdatedAt: null, newestItemUpdatedAt: null },
+    },
+  };
+}
+
 afterEach(() => {
   clearStaffIdToken();
   vi.restoreAllMocks();
@@ -38,6 +50,8 @@ describe('AppShell', () => {
 
   it('shows the authorized urgent-work count and opens the urgent queue', async () => {
     const user = userEvent.setup();
+    setStaffIdToken('stored-token', Date.now() + 60_000);
+    vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue(successfulOperationsProjection(0));
     vi.mocked(intakeApi.queryIntakes).mockImplementation((kind) => Promise.resolve({
       ok: true,
       value: {
@@ -68,6 +82,119 @@ describe('AppShell', () => {
     const urgentButton = await screen.findByRole('button', { name: 'Open urgent work queue: 1 urgent item' });
     expect(urgentButton).toHaveTextContent('1');
     await user.click(urgentButton);
+  });
+
+  it('counts urgent drafts across intake pages', async () => {
+    setStaffIdToken('stored-token', Date.now() + 60_000);
+    vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue(successfulOperationsProjection(0));
+    vi.mocked(intakeApi.queryIntakes).mockImplementation((kind, filter) => Promise.resolve({
+      ok: true,
+      value: {
+        items: kind === 'worker'
+          ? filter?.cursor === 'second-worker-page'
+            ? [{
+                intake_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', kind: 'worker', version: 1, lifecycle: 'draft',
+                display_name: 'Overdue worker', complete: true, missing_fields: [], review_status: 'unreviewed',
+                follow_up: { owner_staff_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', next_follow_up_at: '2026-10-19T12:00:00Z', overdue: true }, updated_at: '2026-10-20T12:00:00Z',
+              }]
+            : [{
+                intake_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', kind: 'worker', version: 1, lifecycle: 'draft',
+                display_name: 'Incomplete worker', complete: false, missing_fields: ['worker_residence'], review_status: 'unreviewed',
+                updated_at: '2026-10-20T12:00:00Z',
+              }]
+          : [],
+        next_cursor: kind === 'worker' && filter?.cursor === undefined ? 'second-worker-page' : null,
+      },
+    }));
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/']}><AppShell /></MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    expect(await screen.findByRole('button', { name: 'Open urgent work queue: 2 urgent items' })).toHaveTextContent('2');
+    expect(intakeApi.queryIntakes).toHaveBeenCalledWith('worker', { page_size: 50, cursor: 'second-worker-page' });
+  });
+
+  it('does not show a zero count when an urgent-work source is unavailable', async () => {
+    setStaffIdToken('stored-token', Date.now() + 60_000);
+    vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue(successfulOperationsProjection(0));
+    vi.mocked(intakeApi.queryIntakes).mockResolvedValue({ ok: false, failure: 'failed' });
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/']}><AppShell /></MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await waitFor(() => {
+      expect(intakeApi.queryIntakes).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.getByRole('button', { name: 'Open urgent work queue' })).not.toHaveTextContent('0');
+  });
+
+  it('keeps the count unavailable when intake pagination repeats a cursor', async () => {
+    setStaffIdToken('stored-token', Date.now() + 60_000);
+    vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue(successfulOperationsProjection(0));
+    vi.mocked(intakeApi.queryIntakes).mockImplementation(() => Promise.resolve({
+      ok: true,
+      value: { items: [], next_cursor: 'repeated-cursor' },
+    }));
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/']}><AppShell /></MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await waitFor(() => {
+      expect(intakeApi.queryIntakes).toHaveBeenCalledWith('worker', { page_size: 50, cursor: 'repeated-cursor' });
+    });
+    expect(screen.getByRole('button', { name: 'Open urgent work queue' })).not.toHaveTextContent('0');
+  });
+
+  it('keeps the count unavailable when the projection is unavailable', async () => {
+    setStaffIdToken('stored-token', Date.now() + 60_000);
+    vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue({ ok: false, failure: { kind: 'unavailable' } });
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/']}><AppShell /></MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await waitFor(() => {
+      expect(intakeApi.queryIntakes).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.getByRole('button', { name: 'Open urgent work queue' })).not.toHaveTextContent('0');
+  });
+
+  it('keeps the count unavailable when an urgent-work request rejects', async () => {
+    setStaffIdToken('stored-token', Date.now() + 60_000);
+    vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue(successfulOperationsProjection(0));
+    vi.mocked(intakeApi.queryIntakes).mockRejectedValue(new Error('network unavailable'));
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/']}><AppShell /></MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    await waitFor(() => {
+      expect(intakeApi.queryIntakes).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.getByRole('button', { name: 'Open urgent work queue' })).not.toHaveTextContent('0');
+  });
+
+  it('localizes large urgent-work counts without changing the displayed cap', async () => {
+    const user = userEvent.setup();
+    setStaffIdToken('stored-token', Date.now() + 60_000);
+    vi.mocked(operationsApi.getOperationsProjection).mockResolvedValue(successfulOperationsProjection(100));
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/']}><AppShell /></MemoryRouter>
+      </LanguageProvider>,
+    );
+
+    expect(await screen.findByRole('button', { name: 'Open urgent work queue: 100 urgent items' })).toHaveTextContent('99+');
+    await user.click(screen.getByRole('button', { name: 'Cambiar a español' }));
+    expect(await screen.findByRole('button', { name: 'Abrir cola de trabajo urgente: 100 elementos urgentes' })).toHaveTextContent('99+');
   });
 
   it('renders the dashboard shell navigation and language action', () => {

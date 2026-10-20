@@ -29,6 +29,21 @@ function urgentIntakeCount(items: IntakeSummary[]) {
   return items.filter((item) => item.complete === false || item.follow_up?.overdue === true).length;
 }
 
+async function queryUrgentIntakeCount(kind: IntakeKind) {
+  let cursor: string | null = null;
+  let count = 0;
+  const seenCursors = new Set<string>();
+  do {
+    if (cursor !== null && seenCursors.has(cursor)) return null;
+    if (cursor !== null) seenCursors.add(cursor);
+    const result = await queryIntakes(kind, { page_size: 50, ...(cursor === null ? {} : { cursor }) });
+    if (!result.ok) return null;
+    count += urgentIntakeCount(result.value.items);
+    cursor = result.value.next_cursor;
+  } while (cursor !== null);
+  return count;
+}
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function intakeSearchHref(kind: IntakeKind, item: IntakeSummary) {
@@ -64,6 +79,7 @@ export function AppShell() {
   const [urgentWorkCount, setUrgentWorkCount] = useState<number | null>(null);
   const isDark = theme === 'dark';
   const hasStaffBrowserSession = staffAuthSession.idToken !== null;
+  const visibleUrgentWorkCount = hasStaffBrowserSession ? urgentWorkCount : null;
   const verifiedStaffDisplayName = hasStaffBrowserSession ? staffDisplayName?.trim() : '';
   const accountLabel = verifiedStaffDisplayName || (language === 'en' ? 'Staff account' : 'Cuenta del personal');
   const accountMeta = verifiedStaffDisplayName
@@ -274,18 +290,22 @@ export function AppShell() {
   }, [hasStaffBrowserSession, staffAuthSession.idToken]);
 
   useEffect(() => {
+    if (!hasStaffBrowserSession) {
+      return undefined;
+    }
     let cancelled = false;
     Promise.all([
-      queryIntakes('worker', { page_size: 50 }),
-      queryIntakes('employer', { page_size: 50 }),
+      queryUrgentIntakeCount('worker'),
+      queryUrgentIntakeCount('employer'),
       getOperationsProjection(),
     ])
       .then(([workers, employers, operations]) => {
         if (cancelled) return;
-        const intakeUrgent = (workers.ok ? urgentIntakeCount(workers.value.items) : 0)
-          + (employers.ok ? urgentIntakeCount(employers.value.items) : 0);
-        const projectedUrgent = operations.ok ? operations.value.queueSummary.highPriorityCount : 0;
-        setUrgentWorkCount(intakeUrgent + projectedUrgent);
+        setUrgentWorkCount(
+          workers === null || employers === null || !operations.ok
+            ? null
+            : workers + employers + operations.value.queueSummary.highPriorityCount,
+        );
       })
       .catch(() => {
         if (!cancelled) setUrgentWorkCount(null);
@@ -293,7 +313,7 @@ export function AppShell() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [hasStaffBrowserSession, location.key, staffAuthSession.idToken]);
 
   useEffect(() => {
     if (location.pathname !== '/') {
@@ -450,11 +470,11 @@ export function AppShell() {
               <IconSymbol name="moon" />
             </button>
             <button
-              aria-label={urgentWorkCount === null
+              aria-label={visibleUrgentWorkCount === null
                 ? language === 'en' ? 'Open urgent work queue' : 'Abrir cola de trabajo urgente'
                 : language === 'en'
-                  ? `Open urgent work queue: ${String(urgentWorkCount)} urgent item${urgentWorkCount === 1 ? '' : 's'}`
-                  : `Abrir cola de trabajo urgente: ${String(urgentWorkCount)} elemento${urgentWorkCount === 1 ? '' : 's'} urgente${urgentWorkCount === 1 ? '' : 's'}`}
+                  ? `Open urgent work queue: ${String(visibleUrgentWorkCount)} urgent item${visibleUrgentWorkCount === 1 ? '' : 's'}`
+                  : `Abrir cola de trabajo urgente: ${String(visibleUrgentWorkCount)} elemento${visibleUrgentWorkCount === 1 ? '' : 's'} urgente${visibleUrgentWorkCount === 1 ? '' : 's'}`}
               className="icon-action focus-ring"
               type="button"
               onClick={() => {
@@ -462,8 +482,8 @@ export function AppShell() {
               }}
             >
               <IconSymbol name="bell" />
-              {urgentWorkCount !== null && urgentWorkCount > 0 ? (
-                <span className="notification-badge">{urgentWorkCount > 99 ? '99+' : String(urgentWorkCount)}</span>
+              {visibleUrgentWorkCount !== null && visibleUrgentWorkCount > 0 ? (
+                <span className="notification-badge">{visibleUrgentWorkCount > 99 ? '99+' : String(visibleUrgentWorkCount)}</span>
               ) : null}
             </button>
             {hasStaffBrowserSession ? (

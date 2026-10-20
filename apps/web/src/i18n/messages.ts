@@ -8,6 +8,7 @@ export type MessageCatalog = {
   employersWorkspaceLabel: string;
   employerWorkspaceTitle: string;
   employerWorkspaceIntro: string;
+  employerOnboardingDrafts: string;
   employerWorkspaceOverviewHeading: string;
   employerWorkspaceOverviewBody: string;
   employerWorkflowGuideHeading: string;
@@ -166,6 +167,7 @@ export const englishMessages: MessageCatalog = {
   employersWorkspaceLabel: 'Employers workspace',
   employerWorkspaceTitle: 'Employer workspace',
   employerWorkspaceIntro: 'Find an existing employer before creating a new draft, then review and revise the current draft from one work area.',
+  employerOnboardingDrafts: 'Employer onboarding drafts',
   employerWorkspaceOverviewHeading: 'Workspace overview',
   employerWorkspaceOverviewBody: 'Start with employer search. Create a draft only when the current search does not find the employer you need.',
   employerWorkflowGuideHeading: 'Workflow guide',
@@ -326,6 +328,7 @@ export const spanishMessages: MessageCatalog = {
   employersWorkspaceLabel: 'Espacio de trabajo de empleadores',
   employerWorkspaceTitle: 'Espacio de trabajo de empleadores',
   employerWorkspaceIntro: 'Busque un empleador existente antes de crear un nuevo borrador, luego revise y actualice el borrador actual desde un solo espacio de trabajo.',
+  employerOnboardingDrafts: 'Borradores de registro de empleadores',
   employerWorkspaceOverviewHeading: 'Resumen del espacio de trabajo',
   employerWorkspaceOverviewBody: 'Comience con la búsqueda de empleadores. Cree un borrador solo cuando la búsqueda actual no encuentre el empleador que necesita.',
   employerWorkflowGuideHeading: 'Guía del flujo de trabajo',

@@ -2,6 +2,14 @@
 
 This is the concise, dated engineering and operational note log. It records observed evidence, decisions, verification, and handoffs. It is not a location for client personal data, credentials, raw exports, legal advice, or unapproved policy text.
 
+## 2026-10-20 — Unified party workspaces and contact email slice
+- **Reported:** The owner could create an Employer onboarding draft but could not find it again in the Employer workflow. She also requested dedicated email entry for Workers and Employers.
+- **Observed:** The shared draft intake workspace remains at `/staff/intakes/employers`, while the canonical employer record workspace is `/employers`; the latter now includes an explicit bilingual link to the former.
+- **Observed:** Optional email input is now represented in worker/employer draft content. The source migration adds nullable bounded email columns to canonical worker and employer-contact-detail records, carries them through finalization and authorized reads/current facts, and extends the existing versioned correction evidence boundary. No email use beyond data entry and authorized staff display is implemented.
+- **Validated:** Focused frontend typecheck/lint and 77 focused IntakeFields/EmployerWorkspace tests passed. The complete affected backend contact/finalization/resolution/read group passed 458 tests; repository Ruff formatting/lint and mypy passed; Alembic reports one head, `0020_contact_email_fields`.
+- **Blocked:** The disposable PostgreSQL migration integration tests could not connect to `127.0.0.1:55432`; the service refused connections before the fixture created a temporary database. No cloud or pilot environment was accessed.
+- **Boundary:** This is source/frontend/backend/schema/local-validation work only. No cloud inspection, image publication, deployment, migration execution, live-data change, provider action, production-completion claim or automated matching/ranking/eligibility/referral/placement occurred.
+
 ## Evidence labels
 - **Observed:** directly supplied, seen, or tool-verified.
 - **Reported:** stated by client/staff but not independently validated.

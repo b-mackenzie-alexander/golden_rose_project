@@ -201,6 +201,10 @@ describe('EmployerWorkspace', () => {
     expect(within(workspace).getByRole('region', { name: 'Find an employer' })).toBeInTheDocument();
     expect(within(workspace).getByRole('region', { name: 'Create a draft employer' })).toBeInTheDocument();
     expect(within(workspace).getByRole('region', { name: 'Work area' })).toBeInTheDocument();
+    expect(within(workspace).getByRole('link', { name: 'Employer onboarding drafts' })).toHaveAttribute(
+      'href',
+      '/staff/intakes/employers',
+    );
   });
 
   it('shows the current employer workflow without prominent environment copy', () => {

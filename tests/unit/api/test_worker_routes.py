@@ -37,7 +37,12 @@ def projection(section: str, worker_id: UUID) -> dict[str, Any]:
             "updated_at": datetime.now(UTC),
         }
     if section == "/contact":
-        return {**base, "worker_contact_id": uuid4(), "phone": "+12025550123"}
+        return {
+            **base,
+            "worker_contact_id": uuid4(),
+            "phone": "+12025550123",
+            "email": None,
+        }
     if section == "/residence":
         return {
             **base,

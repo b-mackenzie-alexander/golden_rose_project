@@ -18,7 +18,10 @@ ADDRESS = {
 }
 CASES: list[tuple[str, dict[str, Any]]] = [
     ("CorrectWorkerRequest", {"full_name": "Fictional Worker"}),
-    ("CorrectWorkerContactRequest", {"phone": "2125550100"}),
+    (
+        "CorrectWorkerContactRequest",
+        {"phone": "2125550100", "email": "worker@example.test"},
+    ),
     ("CorrectWorkerResidenceRequest", {"address": ADDRESS}),
     (
         "CorrectWorkerPreferencesRequest",
@@ -29,7 +32,11 @@ CASES: list[tuple[str, dict[str, Any]]] = [
     ),
     (
         "CorrectContactDetailsRequest",
-        {"representative_name": "Fictional Representative", "phone": "2125550101"},
+        {
+            "representative_name": "Fictional Representative",
+            "phone": "2125550101",
+            "email": "employer@example.test",
+        },
     ),
     ("CorrectContactAddressRequest", {"address": ADDRESS}),
     ("CorrectEmployerAddressRequest", {"address": ADDRESS}),
@@ -53,6 +60,8 @@ def test_correction_dtos_require_reason_version_and_only_authorized_section(name
     body = {"expected_version": 1, "reason_text": "Correct reported facts", **deepcopy(values)}
     assert model.model_validate(body).section_values() == values
     for key in body:
+        if key == "email":
+            continue
         invalid = deepcopy(body)
         del invalid[key]
         with pytest.raises(ValidationError):
@@ -138,3 +147,18 @@ def test_contact_phone_correction_cannot_erase_address():
         contracts.CorrectContactDetailsRequest.model_validate(
             {"expected_version": 1, "reason_text": "Correction", **CASES[4][1], "address": ADDRESS}
         )
+
+
+@pytest.mark.parametrize(
+    ("model", "values"),
+    [
+        (contracts.CorrectWorkerContactRequest, {"phone": "2125550100"}),
+        (
+            contracts.CorrectContactDetailsRequest,
+            {"representative_name": "Fictional Representative", "phone": "2125550101"},
+        ),
+    ],
+)
+def test_contact_corrections_allow_an_optional_email_to_be_cleared(model, values):
+    request = model.model_validate({"expected_version": 1, "reason_text": "Clear email", **values})
+    assert request.section_values()["email"] is None

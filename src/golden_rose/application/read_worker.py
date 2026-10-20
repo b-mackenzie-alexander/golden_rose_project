@@ -55,7 +55,10 @@ def read_worker(
         )
     else:
         table, names = {
-            "contact": (worker_contacts, ("worker_contact_id", "worker_id", "version", "phone")),
+            "contact": (
+                worker_contacts,
+                ("worker_contact_id", "worker_id", "version", "phone", "email"),
+            ),
             "residence": (
                 worker_residences,
                 (

@@ -110,6 +110,7 @@ def current_snapshot(
         body = {
             "full_name": records["worker"]["full_name"],
             "phone": records["contact"]["phone"],
+            "email": records["contact"]["email"],
             "interests": records["preferences"]["interests"],
             "availability": records["preferences"]["availability"],
         }
@@ -120,6 +121,7 @@ def current_snapshot(
             "display_name": records["employer"]["display_name"],
             "representative_name": records["contact_details"]["representative_name"],
             "phone": records["contact_details"]["phone"],
+            "email": records["contact_details"]["email"],
             **{
                 field: records["request"][field]
                 for field in ("role_title", "duties_summary", "worker_count", "schedule", "offer")

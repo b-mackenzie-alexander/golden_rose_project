@@ -1279,6 +1279,7 @@ worker_contacts = Table(
     Column("worker_contact_id", UUID(as_uuid=True), primary_key=True),
     Column("worker_id", UUID(as_uuid=True), nullable=False),
     Column("phone", String(40), nullable=False),
+    Column("email", String(320)),
     *_canonical_attribution(),
 )
 worker_residences = Table(
@@ -1350,6 +1351,7 @@ employer_contact_details = Table(
     Column("employer_contact_id", UUID(as_uuid=True), nullable=False, unique=True),
     Column("representative_name", String(200), nullable=False),
     Column("phone", String(40), nullable=False),
+    Column("email", String(320)),
     *_employer_output_address(nullable=True),
     *_canonical_attribution(),
     ForeignKeyConstraint(

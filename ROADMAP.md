@@ -1,5 +1,15 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-10-20 — Unified party workspaces and contact email active
+
+- **Staffing:** One independent developer; source/frontend/backend implementation, focused automated checks and later protected PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** The active `feat/unified-party-workspaces` slice keeps Employer onboarding drafts reachable from the Employer workspace and adds an optional dedicated email fact to Worker and Employer intake, canonical contacts, authorized current facts and audited corrections. It does not introduce communication, synchronization, matching or automated decision behavior.
+- **Gate budget:** Source/frontend/backend/schema/local-validation only. No cloud inspection or mutation, Terraform plan/apply, image build, live migration execution, service update, live/client data entry, export/import execution, production-completion claim, destructive cleanup, shared-runtime rollout or automated matching/ranking/eligibility/referral/placement follows.
+- **Next executable action:** Finish local validation and publish a protected PR to `develop` when authorized. Migration/image/service execution and pilot browser acceptance remain separately approved work.
+- **Do not regress:** Draft intake and canonical record boundaries, audited current-fact corrections, restricted-address authority, bilingual/accessibility parity, named staff accounts, immutable intake history and exact retries.
+
+**Validation to date:** Focused frontend typecheck/lint and 77 tests pass. The complete affected backend group passes 458 tests; repository Ruff formatting/lint, mypy and the Alembic single-head check pass. The disposable PostgreSQL target was unavailable at `127.0.0.1:55432`, so PostgreSQL migration integration remains pending without any environment mutation.
+
 ## 2026-10-14 — Live-pilot dashboard/session label repair active
 
 - **Staffing:** One independent developer; source/frontend investigation, focused UI tests and later protected PR gates provide quality evidence, not independent-human authorization.

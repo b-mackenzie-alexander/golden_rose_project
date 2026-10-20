@@ -1,5 +1,15 @@
 # Current Work — Golden Rose Operations Platform
 
+## 2026-10-20 — Unified party workspaces and contact email active
+
+- **Staffing:** One independent developer; source/frontend/backend implementation, focused automated checks and later protected PR gates provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** Fresh source work on `feat/unified-party-workspaces` makes Employer onboarding drafts discoverable from the canonical Employer workspace and adds an optional dedicated email field to Worker and Employer intake entry. Finalized emails are carried to the appropriate canonical contact record, authorized current-fact/read projections and audited contact corrections. The email field is contact data only; no message delivery, consent flow, matching, ranking or automated operational action is introduced.
+- **Gate budget:** Source/frontend/backend/schema/local-validation only. No cloud inspection or mutation, Terraform plan/apply, image build, live migration execution, service update, live/client data entry, export/import execution, production-completion claim, destructive cleanup, shared-runtime rollout or automated matching/ranking/eligibility/referral/placement follows.
+- **Next executable action:** Complete local validation, publish a bounded PR to `develop` when authorized, then use a separately approved image/migration/service path and named-staff browser acceptance to verify draft continuation and optional email entry in the pilot.
+- **Do not regress:** Worker and Employer intake drafts remain separate from canonical records until staff review/finalization; canonical contact changes remain versioned, attributable and evidence-backed; restricted addresses stay separately authorized; staff-only named-account access, bilingual/accessibility parity, immutable intake history and exact retries remain intact.
+
+**Validation to date:** Focused frontend typecheck/lint and 77 IntakeFields/EmployerWorkspace tests pass. The complete affected backend contact/finalization/resolution/read group passes 458 tests; repository Ruff formatting/lint and mypy pass; Alembic reports `0020_contact_email_fields` as the sole head. The disposable PostgreSQL migration tests could not start because the configured local test database at `127.0.0.1:55432` refused connections; no temporary database or cloud resource was created or changed.
+
 ## 2026-10-14 — Live-pilot dashboard/session label repair active
 
 - **Staffing:** One independent developer; source/frontend investigation, focused UI tests and later protected PR gates provide quality evidence, not independent-human authorization.

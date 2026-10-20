@@ -48,4 +48,5 @@ def test_contact_email_migration_preserves_contact_correction_and_review_boundar
     assert 'sql.replace("CREATE FUNCTION", "CREATE OR REPLACE FUNCTION")' in sql
     assert "reviews.CURRENT_FACTS" in sql
     assert "jsonb_strip_nulls(jsonb_build_object" in sql
+    assert "linked.SNAPSHOT" in sql
     assert "contact email data blocks downgrade before DDL" in sql

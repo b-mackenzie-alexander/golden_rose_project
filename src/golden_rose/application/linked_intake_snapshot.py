@@ -30,7 +30,7 @@ from golden_rose.persistence.models import (
 ADDRESS_FIELDS = ("line1", "line2", "locality", "region", "postal_code", "country")
 WORKER_FIELDS = {
     "worker": (workers, ("full_name",)),
-    "worker_contact": (worker_contacts, ("phone",)),
+    "worker_contact": (worker_contacts, ("phone", "email")),
     "worker_preferences": (worker_preferences, ("interests", "availability", "self_reported")),
     "worker_residence": (worker_residences, ADDRESS_FIELDS),
 }
@@ -39,7 +39,7 @@ EMPLOYER_FIELDS = {
     "employer_contact": (employer_contacts, ("full_name",)),
     "employer_contact_details": (
         employer_contact_details,
-        ("representative_name", "phone", *ADDRESS_FIELDS),
+        ("representative_name", "phone", "email", *ADDRESS_FIELDS),
     ),
     "employer_address": (employer_addresses, ("purpose", *ADDRESS_FIELDS)),
     "worksite": (worksites, ADDRESS_FIELDS),
@@ -155,6 +155,7 @@ def read_linked_snapshot(
                 {
                     "full_name": records["worker"]["full_name"],
                     "phone": records["worker_contact"]["phone"],
+                    "email": records["worker_contact"]["email"],
                     "interests": preferences["interests"],
                     "availability": preferences["availability"],
                 }
@@ -170,6 +171,7 @@ def read_linked_snapshot(
                 content.update(
                     representative_name=records["employer_contact_details"]["representative_name"],
                     phone=records["employer_contact_details"]["phone"],
+                    email=records["employer_contact_details"]["email"],
                 )
                 if parent["employer_type"] == "household":
                     address("party_address", records["employer_contact_details"])

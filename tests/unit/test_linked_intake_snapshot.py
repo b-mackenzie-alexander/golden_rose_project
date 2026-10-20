@@ -15,7 +15,7 @@ def worker_data() -> tuple[Any, ...]:
     refs = {name: {"id": str(uuid4()), "version": 1} for name in names}
     values: dict[str, dict[str, Any]] = {
         "worker": {"full_name": "Canonical Worker"},
-        "worker_contact": {"phone": "202-555-0151"},
+        "worker_contact": {"phone": "202-555-0151", "email": None},
         "worker_preferences": {
             "interests": {"other_description": "Fictional gardening"},
             "availability": {"mode": "flexible"},
@@ -62,6 +62,19 @@ def test_current_version_mismatch_is_flagged_not_overwritten():
     assert result.dependency_stale
     assert result.current_dependencies["worker_contact"]["version"] == 2
     assert refs["worker_contact"]["version"] == 1
+
+
+def test_worker_snapshot_includes_canonical_contact_email_when_present():
+    refs, data = worker_data()
+    data[1]["email"] = "worker@example.test"
+    session = Mock()
+    rows(session, data)
+
+    result = read_linked_snapshot(
+        session=session, principal=PRINCIPAL, kind="worker", dependencies=refs
+    )
+
+    assert result.content["email"] == "worker@example.test"
 
 
 @pytest.mark.parametrize(
@@ -134,6 +147,7 @@ def employer_data(kind="business") -> tuple[Any, ...]:
         "employer_contact_details": {
             **address,
             "phone": "202-555-0151",
+            "email": None,
             "representative_name": "Canonical Representative",
         },
         "worksite": address,
@@ -167,6 +181,20 @@ def test_employer_snapshot_owns_only_selected_party_facts(kind):
     assert UUID(refs["employer_contact"]["id"]) in details.compile().params.values()
     assert "Canonical Representative" not in repr(result)
     assert "10 Fictional Road" not in repr(result)
+
+
+@pytest.mark.parametrize("kind", ["household", "business"])
+def test_employer_snapshot_includes_canonical_contact_email_when_present(kind):
+    refs, data = employer_data(kind)
+    data[3 if kind == "business" else 2]["email"] = "employer@example.test"
+    session = Mock()
+    rows(session, data)
+
+    result = read_linked_snapshot(
+        session=session, principal=PRINCIPAL, kind="employer", dependencies=refs
+    )
+
+    assert result.content["email"] == "employer@example.test"
 
 
 @pytest.mark.parametrize(

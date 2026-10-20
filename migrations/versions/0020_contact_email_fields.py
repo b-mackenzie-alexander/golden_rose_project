@@ -101,13 +101,13 @@ def upgrade() -> None:
     linked = module("0008c_intake_link_authority")
     snapshot = replace_exact(
         replace_function(linked.SNAPSHOT),
-        "'phone',facts->'worker_contact'->'phone',\n     'interests'",
-        "'phone',facts->'worker_contact'->'phone','email',facts->'worker_contact'->'email',\n     'interests'",
+        "body:=jsonb_build_object('full_name',parent->'full_name',\n     'phone',facts->'worker_contact'->'phone',\n     'interests',facts->'worker_preferences'->'interests',\n     'availability',facts->'worker_preferences'->'availability');",
+        "body:=jsonb_strip_nulls(jsonb_build_object('full_name',parent->'full_name',\n     'phone',facts->'worker_contact'->'phone','email',facts->'worker_contact'->'email',\n     'interests',facts->'worker_preferences'->'interests',\n     'availability',facts->'worker_preferences'->'availability'));",
     )
     snapshot = replace_exact(
         snapshot,
-        "'phone',facts->'employer_contact_details'->'phone');",
-        "'phone',facts->'employer_contact_details'->'phone','email',facts->'employer_contact_details'->'email');",
+        "body:=body||jsonb_build_object('representative_name',facts->'employer_contact'->'full_name',\n       'phone',facts->'employer_contact_details'->'phone');",
+        "body:=body||jsonb_strip_nulls(jsonb_build_object('representative_name',facts->'employer_contact'->'full_name',\n       'phone',facts->'employer_contact_details'->'phone','email',facts->'employer_contact_details'->'email'));",
     )
     execute(snapshot)
 

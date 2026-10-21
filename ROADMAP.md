@@ -1,5 +1,14 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-10-20 — Merged pilot changes: rollout preparation and readiness repair
+
+- **Staffing:** One independent developer; automated checks and fresh agent/session review provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** PR #189 is merged into protected `develop` at `cd916f357d69c969dbe3f7995c6c975a1d092efd`. The owner previously confirmed access after the separately authorized recovery. The latest recorded successful image/migration/service workflows use PR #186 source `0464401`; current cloud state has not been rechecked. PRs #187–189 remain unqualified in the running pilot.
+- **Gate budget:** The user requested preparation for an approved cloud image/migration refresh. Prepare the bounded controlled staff-pilot packet and necessary source repair; no image publication, cloud inspection/mutation, live migration, bootstrap execution or additional account/provider action has been executed under this request.
+- **Next executable action:** Repair the stale readiness expectation (`0019` versus Alembic head `0021`), qualify and publish the bounded follow-up, and bind the reviewed rollout packet to its protected merge before execution. The packet must distinguish image admission, schema migration, service readiness, recovery-permission provisioning and staff acceptance.
+- **Do not regress:** Durable pilot records and immutable staff IDs/history/grants; exact named authority; Google verification and account-level MFA; no active-account email-only linking; private identity material; no-store handling; bilingual/accessibility parity; human operational decisions; evidence-only provider recovery/revocation claims.
+
+
 ## 2026-10-20 — Google binding repair published as PR #189
 
 - **Staffing:** One independent developer. Fresh agent/session review and automated checks provide quality evidence, not independent-human authorization.
@@ -35,7 +44,7 @@
 - [x] Implement and qualify access-only editing, verified binding provenance and guarded onboarding restart.
 - [x] Publish the qualified source candidate as PR #189 to `develop`.
 - [x] Implement the four verified CodeRabbit findings with fault-path and accessibility regression coverage.
-- [ ] Complete fresh protected CI/review and owner merge.
+- [x] Complete fresh protected CI/review and owner merge (PR #189 at `cd916f3`).
 - [ ] Separately authorize and qualify schema/image/service rollout and bounded staff acceptance.
 
 Account recovery is complete; the cross-account design gap remains open.

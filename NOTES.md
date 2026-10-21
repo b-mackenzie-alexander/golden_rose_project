@@ -2,6 +2,17 @@
 
 This is the concise, dated engineering and operational note log. It records observed evidence, decisions, verification, and handoffs. It is not a location for client personal data, credentials, raw exports, legal advice, or unapproved policy text.
 
+
+## 2026-10-20 — PR #189 merged; rollout readiness prerequisite
+
+- **Observed:** GitHub confirms PR #189 merged at protected `develop@cd916f357d69c969dbe3f7995c6c975a1d092efd`. Its final `da91e8e` application CI passed 2,729 backend tests with one expected skip and 95.03% coverage; frontend verification passed 586 tests at 85.26% branch coverage. The four actionable CodeRabbit threads were resolved. The automatic CodeRabbit rerun was rate-limited, so it is not counted as a fresh review; separate fresh agent review passed.
+- **Observed:** The most recent successful protected image publication (`39360627431`), migration (`39361277019`) and service (`39361431684`) workflows use PR #186 source `0464401`. PRs #187–189 are the accumulated source delta. This is historical workflow evidence; current cloud state was not inspected.
+- **Found:** The merged runtime `/readiness` constant still expected revision `0019_ext_calendar_imports`, although the sole Alembic head is `0021_staff_google_binding`. A successful migration would therefore make the candidate report not ready. No image was published or cloud mutation attempted.
+- **Changed:** A narrow follow-up sets readiness to revision21 and updates its fake-connection fixtures. A repository-head regression and HTTP checks reject revisions19/20 and unknown schemas while retaining safe no-store responses and no business mutation. Three regressions failed before the production fix; all 31 focused health/demo-access/main/migration-runtime tests pass afterward. Scoped Ruff formatting/lint, strict mypy and whitespace checks pass. Fresh agent source review found no material findings.
+- **Prepared:** An operator-held proposed eight-hour controlled staff-pilot packet binds the final protected follow-up merge, signed image admission, jobs-first saved Terraform plans, guarded migrations20/21, database authority verification, service refresh and read-only smoke. Recovery authority is a separate explicit paragraph limited to the existing bootstrap account and the new durable reset grant. Generated image/plan/run evidence must be bound during execution; this proposal is not execution evidence.
+- **Boundary:** The user requested an approved cloud refresh; the exact packet remains pending approval. No current cloud inspection, image publication, Terraform init/plan/apply, live migration, bootstrap execution, new account change or provider operation occurred. Protected follow-up CI/merge precedes the final source binding. Pilot records remain durable; synthetic-write qualification, destructive recovery and production promotion are excluded.
+
+
 ## 2026-10-20 — PR #189 bounded CodeRabbit follow-up
 
 - **Observed:** The original `eea8752` head passed all required checks and build validation; its clean GitHub application suite passed 2,724 tests with one expected skip and 95.01% coverage. CodeRabbit then reported three minor findings and one trivial unused-helper finding. The user authorized addressing these before merge.

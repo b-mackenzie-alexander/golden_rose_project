@@ -1,8 +1,12 @@
 import base64
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+import pytest
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from fastapi.testclient import TestClient
 
 import golden_rose.application.create_draft_employer as create_draft_employer_module
@@ -12,7 +16,22 @@ import golden_rose.application.get_employer_contact as get_employer_contact_modu
 import golden_rose.application.query_employer_contacts as query_employer_contacts_module
 import golden_rose.application.revise_draft_employer as revise_draft_employer_module
 import golden_rose.application.search_employers as search_employers_module
+from golden_rose.api.health import EXPECTED_SCHEMA_REVISION
 from golden_rose.main import create_app
+
+
+def _migration_head() -> str:
+    config = Config()
+    config.set_main_option(
+        "script_location", str(Path(__file__).resolve().parents[3] / "migrations")
+    )
+    head = ScriptDirectory.from_config(config).get_current_head()
+    assert head is not None
+    return head
+
+
+def test_readiness_contract_matches_single_migration_head() -> None:
+    assert _migration_head() == EXPECTED_SCHEMA_REVISION
 
 
 class FakeEngine:
@@ -32,7 +51,7 @@ class FakeScalarResult:
 
 
 class FakeConnection:
-    def __init__(self, revision: str = "0019_ext_calendar_imports") -> None:
+    def __init__(self, revision: str = "0021_staff_google_binding") -> None:
         self.revision = revision
         self.statements: list[str] = []
 
@@ -109,7 +128,7 @@ def test_health_is_database_independent_and_value_safe(monkeypatch) -> None:
 
 def test_readiness_checks_database_schema_without_business_mutation(monkeypatch) -> None:
     _set_develop_env(monkeypatch)
-    connection = FakeConnection()
+    connection = FakeConnection(revision=_migration_head())
     engine: Any = ReadinessEngine(connection)
     app = create_app(engine_factory=lambda: engine)
 
@@ -128,6 +147,26 @@ def test_readiness_checks_database_schema_without_business_mutation(monkeypatch)
     assert "command_receipts" not in statement
     assert "audit_events" not in statement
     assert "employers" not in statement
+
+
+@pytest.mark.parametrize(
+    "revision", ["0019_ext_calendar_imports", "0020_contact_email_fields", "unknown_revision"]
+)
+def test_readiness_rejects_incomplete_or_unknown_schema(monkeypatch, revision: str) -> None:
+    _set_develop_env(monkeypatch)
+    engine: Any = ReadinessEngine(FakeConnection(revision=revision))
+    app = create_app(engine_factory=lambda: engine)
+
+    with TestClient(app) as client:
+        response = client.get("/readiness")
+
+    assert response.status_code == 503
+    assert response.headers["Cache-Control"] == "no-store"
+    assert response.json() == {
+        "status": "not_ready",
+        "reason": "database_schema_unavailable",
+    }
+    assert revision not in response.text
 
 
 def test_readiness_failure_is_static_and_value_safe(monkeypatch) -> None:

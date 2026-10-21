@@ -17,6 +17,7 @@ from golden_rose.persistence.staff_accounts import (
     get_staff_account_by_id,
     get_staff_delegation_by_id,
     insert_staff_delegation,
+    list_active_staff_permission_grants,
     list_staff_delegations,
     revoke_staff_delegation,
 )
@@ -100,6 +101,14 @@ def grant_staff_delegation(
     if permission_name not in principal.permissions:
         raise StaffDelegationPermissionUnavailableError(
             "staff account cannot delegate permission it does not hold"
+        )
+    if (
+        permission_name == "staff_account:signin:reset"
+        and permission_name
+        not in list_active_staff_permission_grants(session=session, staff_id=principal.actor_id)
+    ):
+        raise StaffDelegationPermissionUnavailableError(
+            "temporary recovery authority cannot be regranted"
         )
     now = clock.now()
     if expires_at <= now:

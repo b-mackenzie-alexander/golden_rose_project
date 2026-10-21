@@ -73,8 +73,8 @@ function statusText(
       es: 'Inicie sesion con Google para continuar.',
     },
     signed_in: {
-      en: 'Google sign-in token is ready for this browser session.',
-      es: 'El token de Google esta listo para esta sesion del navegador.',
+      en: 'Google sign-in received. Golden Rose must still verify your account access.',
+      es: 'Se recibió el inicio de Google. Golden Rose aún debe verificar su acceso.',
     },
     synthetic: {
       en: 'Local synthetic staff auth is active.',

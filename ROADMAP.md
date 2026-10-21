@@ -1,5 +1,14 @@
 # Golden Rose Operations Platform — Roadmap
 
+## 2026-10-20 — Google binding repair published as PR #189
+
+- **Staffing:** One independent developer. Fresh agent/session review and automated checks provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** The separately authorized owner-present recovery is complete and the user confirmed account/workspace access. The permanent source candidate now separates access editing from identity, records Google binding provenance, and provides bilingual sign-in diagnostics and guarded onboarding restart. It is published as [PR #189](https://github.com/b-mackenzie-alexander/golden_rose_project/pull/189) to `develop` and has not been deployed.
+- **Gate budget:** Approved source/backend/frontend/schema work, disposable fictional local validation and a PR to protected `develop`. The one-account live recovery is consumed. Image admission, live migration, deployment, bootstrap provisioning and additional live/provider actions require a separate packet.
+- **Next executable action:** Read protected CI at PR #189’s final head, repair any findings, and leave protected review/merge to the owner. Fresh review, combined backend qualification and production-build fictional browser checks are recorded in `NOTES.md`. The implementation was rebased onto PR #188 at `develop@f8b9ee8` before qualification; the other session's checkout is preserved.
+- **Do not regress:** Stable staff IDs/history/grants; exact named authority; separate identity planes; verified Google credentials; account-level MFA; no active-account email-only linking; no-store safe responses; English/Spanish and accessibility parity; no raw identity material; human operational decisions; evidence-only provider recovery/revocation wording.
+
+
 ## 2026-10-20 — Unified party workspaces and contact email active
 
 - **Staffing:** One independent developer; source/frontend/backend implementation, focused automated checks and later protected PR gates provide quality evidence, not independent-human authorization.
@@ -9,6 +18,27 @@
 - **Do not regress:** Draft intake and canonical record boundaries, audited current-fact corrections, restricted-address authority, bilingual/accessibility parity, named staff accounts, immutable intake history and exact retries.
 
 **Validation to date:** Focused frontend typecheck/lint and 77 tests pass. The complete affected backend group passes 458 tests; repository Ruff formatting/lint, mypy and the Alembic single-head check pass. The disposable PostgreSQL target was unavailable at `127.0.0.1:55432`, so PostgreSQL migration integration remains pending without any environment mutation.
+
+## 2026-10-20 — Owner access restored; permanent identity-binding repair pending
+
+- **Staffing:** One independent developer; fresh agent/session review and automated checks supply quality evidence, not independent-human authorization.
+- **Human-visible outcome:** One explicitly authorized owner-present recovery restored the existing staff account through verified Google binding and reactivation. The user confirmed account/workspace access. All 49 grants and historical attribution were retained. Protected `develop@8fbfb38` includes merged PR #187; no new deployment is inferred.
+- **Gate budget:** The one-account application recovery is complete. The proposed source design grants no additional live-account, provider-side, cloud, migration or rollout authority.
+- **Next executable action:** Review and implement the [binding repair contract](docs/planning/2026-10-20-staff-google-binding-repair.md) as a coherent source outcome, preserving the separate urgent-alert/catalog work and existing-account continuity.
+- **Do not regress:** Staff IDs/history; named permissions; signature/issuer/audience/expiry verification and MFA; no email-only takeover of active accounts; private auth evidence; bilingual/accessibility parity; separate public/staff planes; human staff decisions.
+
+- [x] Diagnose the manual-subject binding failure with source and application evidence.
+- [x] Recover the one authorized owner account and obtain user confirmation of access.
+- [x] Draft the permanent source repair contract and acceptance cases.
+- [x] Complete fresh design review; revised contract has no remaining material review blockers.
+- [x] Accept the identity/schema implementation contract.
+- [x] Implement and qualify access-only editing, verified binding provenance and guarded onboarding restart.
+- [x] Publish the qualified source candidate as PR #189 to `develop`.
+- [x] Implement the four verified CodeRabbit findings with fault-path and accessibility regression coverage.
+- [ ] Complete fresh protected CI/review and owner merge.
+- [ ] Separately authorize and qualify schema/image/service rollout and bounded staff acceptance.
+
+Account recovery is complete; the cross-account design gap remains open.
 
 ## 2026-10-14 — Live-pilot dashboard/session label repair active
 

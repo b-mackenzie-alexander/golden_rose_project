@@ -329,7 +329,8 @@ def test_staff_session_returns_current_account_context_no_store(
         "auth_context": "synthetic",
         "account": {
             "staff_id": str(ACTOR_ID),
-            "provider_subject": "oidc:staff:123",
+            "binding_status": "legacy_unverified",
+            "binding_verified_at": None,
             "provider_email": None,
             "display_name": "Mariela Torres",
             "role_name": "operations_staff",
@@ -420,7 +421,7 @@ def test_create_staff_account_routes_normalized_admin_request(
         "/api/staff/v1/staff-accounts",
         headers=command_headers(),
         json={
-            "provider_subject": " oidc:staff:123 ",
+            "provider_email": "staff@example.test",
             "display_name": " Mariela   Torres ",
             "role_name": "operations_staff",
             "permission_names": ["intake:read", "worker:read"],
@@ -437,8 +438,8 @@ def test_create_staff_account_routes_normalized_admin_request(
     assert response.json()["event_type"] == "staff_account.created"
     assert identifiers.generated == [GENERATED_STAFF_ID]
     assert create.call_args.kwargs["staff_id"] == GENERATED_STAFF_ID
-    assert create.call_args.kwargs["provider_subject"] == "oidc:staff:123"
-    assert create.call_args.kwargs["provider_email"] is None
+    assert create.call_args.kwargs["provider_subject"] == ""
+    assert create.call_args.kwargs["provider_email"] == "staff@example.test"
     assert create.call_args.kwargs["display_name"] == "Mariela Torres"
     assert create.call_args.kwargs["permission_names"] == frozenset({"intake:read", "worker:read"})
     assert create.call_args.kwargs["reason_text"] == "Initial onboarding"
@@ -464,7 +465,6 @@ def test_create_staff_account_accepts_google_email_onboarding(
         "/api/staff/v1/staff-accounts",
         headers=command_headers(),
         json={
-            "provider_subject": "",
             "provider_email": " Mariela.Torres@Example.Test ",
             "display_name": "Mariela Torres",
             "role_name": "operations_staff",
@@ -498,11 +498,9 @@ def test_correct_staff_account_routes_normalized_admin_request(
         headers=command_headers(),
         json={
             "expected_version": 1,
-            "provider_subject": " oidc:staff:corrected ",
             "display_name": " Mariela   Rivera ",
             "role_name": "operations_staff",
             "permission_names": ["intake:read", "worker:read"],
-            "mfa_enrolled": True,
             "reason_text": " Correct onboarding record ",
         },
     )
@@ -514,11 +512,11 @@ def test_correct_staff_account_routes_normalized_admin_request(
     assert response.json()["event_type"] == "staff_account.corrected"
     assert correct.call_args.kwargs["staff_id"] == STAFF_ID
     assert correct.call_args.kwargs["expected_version"] == 1
-    assert correct.call_args.kwargs["provider_subject"] == "oidc:staff:corrected"
-    assert correct.call_args.kwargs["provider_email"] is None
+    assert "provider_subject" not in correct.call_args.kwargs
+    assert "provider_email" not in correct.call_args.kwargs
     assert correct.call_args.kwargs["display_name"] == "Mariela Rivera"
     assert correct.call_args.kwargs["permission_names"] == frozenset({"intake:read", "worker:read"})
-    assert correct.call_args.kwargs["mfa_enrolled"] is True
+    assert "mfa_enrolled" not in correct.call_args.kwargs
     assert correct.call_args.kwargs["reason_text"] == "Correct onboarding record"
 
 
@@ -535,11 +533,9 @@ def test_staff_account_correction_route_preserves_forbidden_boundary(
         headers=command_headers(),
         json={
             "expected_version": 1,
-            "provider_subject": "oidc:staff:corrected",
             "display_name": "Mariela Rivera",
             "role_name": "operations_staff",
             "permission_names": ["staff_account:read"],
-            "mfa_enrolled": True,
             "reason_text": "Correct onboarding record",
         },
     )
@@ -563,11 +559,9 @@ def test_staff_account_correction_route_returns_recoverable_lifecycle_error(
         headers=command_headers(),
         json={
             "expected_version": 1,
-            "provider_subject": "oidc:staff:corrected",
             "display_name": "Mariela Rivera",
             "role_name": "operations_staff",
             "permission_names": ["staff_account:read"],
-            "mfa_enrolled": True,
             "reason_text": "Correct onboarding record",
         },
     )
@@ -1187,7 +1181,7 @@ def test_staff_account_routes_preserve_forbidden_and_validation_boundaries(
         "/api/staff/v1/staff-accounts",
         headers=command_headers(),
         json={
-            "provider_subject": "oidc:staff:123",
+            "provider_email": "staff@example.test",
             "display_name": "Mariela Torres",
             "role_name": "operations_staff",
             "permission_names": ["intake:read"],
@@ -1198,7 +1192,7 @@ def test_staff_account_routes_preserve_forbidden_and_validation_boundaries(
         "/api/staff/v1/staff-accounts",
         headers=command_headers(),
         json={
-            "provider_subject": "oidc:staff:123",
+            "provider_email": "staff@example.test",
             "display_name": "Bad\nName",
             "role_name": "operations_staff",
             "permission_names": ["intake:read", " intake:read "],

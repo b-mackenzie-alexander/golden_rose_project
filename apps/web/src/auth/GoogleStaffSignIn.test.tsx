@@ -109,7 +109,7 @@ describe('GoogleStaffSignIn', () => {
 
     renderSignIn();
 
-    expect(await screen.findByText('Google sign-in token is ready for this browser session.')).toBeInTheDocument();
+    expect(await screen.findByText('Google sign-in received. Golden Rose must still verify your account access.')).toBeInTheDocument();
     const clearSession = screen.getByRole('button', { name: 'Clear Golden Rose session' });
     expect(clearSession).toBeInTheDocument();
 

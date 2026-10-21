@@ -1,5 +1,9 @@
 # Technology Decisions — Golden Rose Operations Platform
 
+## 2026-10-20 — Staff Google binding and recovery decision
+
+[ADR-0018](docs/adr/ADR-0018-staff-google-binding-and-recovery.md) is accepted for source implementation. Email identifies the intended suspended onboarding target; verified Google subject remains the durable external identity key. Explicit provenance replaces prefix-derived assurance. Access editing cannot mutate identity, and guarded restart preserves the existing staff account and immutable history. The source candidate introduces a narrowly held recovery permission and immutable restart receipts. No migration auto-grants that permission. Deployment, operator provisioning and provider-side identity actions remain separately authorized.
+
 ## 2026-10-06 — PR #167 staff-pilot identity deployment status
 
 PR #167 is merged at protected `develop@3ddf85b1e3ca68cc1eea366cad61decde147cb00` and deployed through the existing signed-image, Terraform service-stage and protected service-gate path for the controlled live-data staff-pilot runtime. This is not a new technology decision, but it validates the selected Google Sign-In plus Golden Rose durable staff-account architecture for the initial onboarding account.

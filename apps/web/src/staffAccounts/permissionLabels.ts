@@ -32,6 +32,7 @@ const permissionLabels: Record<string, { en: string; es: string }> = {
   'staff_account:read': { en: 'Staff Accounts: Read', es: 'Cuentas del personal: Leer' },
   'staff_account:recovery:record': { en: 'Staff Accounts: Record Recovery Evidence', es: 'Cuentas del personal: Registrar recuperacion' },
   'staff_account:session:revoke': { en: 'Staff Accounts: Record Session Revocation', es: 'Cuentas del personal: Registrar revocacion de sesion' },
+  'staff_account:signin:reset': { en: 'Staff Accounts: Restart Google Sign-in', es: 'Cuentas del personal: Reiniciar acceso de Google' },
   'staff_account:suspend': { en: 'Staff Accounts: Suspend', es: 'Cuentas del personal: Suspender' },
   'staffing_request:correct': { en: 'Staffing Requests: Correct', es: 'Solicitudes de personal: Corregir' },
   'staffing_request:read': { en: 'Staffing Requests: Read', es: 'Solicitudes de personal: Leer' },

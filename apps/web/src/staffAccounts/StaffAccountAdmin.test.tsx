@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -11,6 +11,7 @@ import {
   listStaffAccounts,
   listStaffAccountEvents,
   listStaffDelegations,
+  readStaffAccountDiagnostics,
   recordRecoveryEvidence,
   recordSessionRevocationEvidence,
   revokeStaffDelegation,
@@ -18,7 +19,7 @@ import {
   updateStaffAccountGoogleEmail,
 } from '../api/staffAccountClient';
 import type { StaffAccount, StaffAccountLifecycleEvent, StaffDelegation } from '../api/staffAccountClient';
-import { LanguageProvider } from '../i18n/LanguageProvider';
+import { LanguageProvider, useLanguage } from '../i18n/LanguageProvider';
 import { runAxe } from '../test/axe';
 import { AppRoutes } from '../app/App';
 import { StaffAccountAdmin } from './StaffAccountAdmin';
@@ -36,6 +37,7 @@ vi.mock('../api/staffAccountClient', () => ({
   listStaffAccountEvents: vi.fn(),
   listStaffAccounts: vi.fn(),
   listStaffDelegations: vi.fn(),
+  readStaffAccountDiagnostics: vi.fn(),
   recordRecoveryEvidence: vi.fn(),
   recordSessionRevocationEvidence: vi.fn(),
   revokeStaffDelegation: vi.fn(),
@@ -51,7 +53,7 @@ vi.mock('../auth/GoogleStaffSignIn', () => ({
 
 const suspended: StaffAccount = {
   staffId: '22222222-2222-4222-8222-222222222222',
-  providerSubject: 'oidc:staff:123',
+  bindingStatus: 'google_verified' as const, bindingVerifiedAt: '2026-10-20T12:00:00Z',
   providerEmail: 'mariela.torres@example.test',
   displayName: 'Mariela Torres',
   roleName: 'operations_staff',
@@ -126,6 +128,7 @@ const activatedLifecycleEvent: StaffAccountLifecycleEvent = {
 
 beforeEach(() => {
   vi.mocked(listStaffAccounts).mockResolvedValue({ ok: true, value: [suspended] });
+  vi.mocked(readStaffAccountDiagnostics).mockResolvedValue({ ok: true, value: { account: suspended, canRestartSignin: true, canActivate: true, restartUnavailableReason: null } });
   vi.mocked(createStaffAccount).mockReset();
   vi.mocked(correctStaffAccount).mockReset();
   vi.mocked(activateStaffAccount).mockReset();
@@ -151,20 +154,25 @@ function lastElement<T>(items: T[]): T {
   return item;
 }
 
+async function openRecovery(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Sign-in diagnostics' }));
+  await user.click(await screen.findByRole('button', { name: 'Restart Google sign-in' }));
+}
+
 it('creates a suspended onboarding account and shows field-local validation', async () => {
   const user = userEvent.setup();
   const created = {
     ...suspended,
     staffId: '33333333-3333-4333-8333-333333333333',
     displayName: 'Sofia Diaz',
-    providerSubject: 'pending-google-email:abc123',
+    bindingStatus: 'pending' as const, bindingVerifiedAt: null,
     providerEmail: 'sofia.diaz@example.test',
   };
   vi.mocked(createStaffAccount).mockResolvedValue({ ok: true, value: { account: created, eventType: 'staff_account.created', resultVersion: 1 } });
 
   render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
   await screen.findByText('Mariela Torres');
-  expect(screen.getByText('Google sign-in binding recorded')).toBeInTheDocument();
+  expect(screen.getByText('Google identity verified')).toBeInTheDocument();
   expect(screen.queryByText('oidc:staff:123')).not.toBeInTheDocument();
   expect(screen.getByText('1 named permissions')).toBeInTheDocument();
   expect(screen.getByText('Residential intake: missing')).toBeInTheDocument();
@@ -172,7 +180,7 @@ it('creates a suspended onboarding account and shows field-local validation', as
 
   await user.click(screen.getByRole('button', { name: 'Create staff account' }));
   expect(screen.getByText('Display name is required.')).toBeInTheDocument();
-  expect(screen.getByText('Google email or provider subject is required.')).toBeInTheDocument();
+  expect(screen.getByText('Google sign-in email is required.')).toBeInTheDocument();
 
   const createPanel = screen.getByRole('heading', { name: /Onboard staff account/ }).closest('section');
   expect(createPanel).not.toBeNull();
@@ -198,7 +206,7 @@ it('creates a suspended onboarding account and shows field-local validation', as
   const createCall = vi.mocked(createStaffAccount).mock.calls[0]?.[0];
   expect(createCall?.displayName).toBe('Sofia Diaz');
   expect(createCall?.providerEmail).toBe('sofia.diaz@example.test');
-  expect(createCall?.providerSubject).toBe('');
+  expect(createCall).not.toHaveProperty('providerSubject');
   expect(createCall?.roleName).toBe('delegated_manager');
   expect(createCall?.mfaEnrolled).toBe(true);
   expect(createCall?.permissionNames).toEqual(expect.arrayContaining(['staff_account:read', 'staff_account:create']));
@@ -213,7 +221,7 @@ it('applies durable role presets and provisioning add-ons during onboarding', as
     ...suspended,
     staffId: '33333333-3333-4333-8333-333333333333',
     displayName: 'Residential Staff',
-    providerSubject: 'pending-google-email:abc123',
+    bindingStatus: 'pending' as const, bindingVerifiedAt: null,
     providerEmail: 'residential.staff@example.test',
     permissionNames: ['intake:read', 'worker:read', 'calendar_import:manage'],
   };
@@ -288,7 +296,7 @@ it('corrects suspended onboarding details without deleting the account', async (
   const corrected = {
     ...suspended,
     displayName: 'Mariela Rivera',
-    providerSubject: 'oidc:staff:corrected',
+    bindingStatus: 'google_verified' as const, bindingVerifiedAt: '2026-10-20T12:00:00Z',
     mfaEnrolled: true,
     version: 2,
   };
@@ -307,12 +315,10 @@ it('corrects suspended onboarding details without deleting the account', async (
   expect(correction.getByText(/permanent role and permission changes/)).toBeInTheDocument();
   await user.clear(correction.getByRole('textbox', { name: /Display name/ }));
   await user.type(correction.getByRole('textbox', { name: /Display name/ }), 'Mariela Rivera');
-  await user.clear(correction.getByRole('textbox', { name: /Provider subject/ }));
-  await user.type(correction.getByRole('textbox', { name: /Provider subject/ }), 'oidc:staff:corrected');
   await user.selectOptions(correction.getByRole('combobox', { name: /Role/ }), 'delegated_manager');
-  await user.click(correction.getByLabelText('MFA already enrolled'));
   await user.click(correction.getByLabelText('Intakes: Read'));
-  await user.type(correction.getByLabelText('Reason'), 'Corrected provider subject before activation');
+  await user.type(correction.getByLabelText('Reason'), 'Correct display name before activation');
+  vi.mocked(listStaffAccounts).mockResolvedValue({ ok: true, value: [corrected] });
   await user.click(correction.getByRole('button', { name: 'Save correction' }));
 
   expect(correctStaffAccount).toHaveBeenCalledTimes(1);
@@ -321,10 +327,8 @@ it('corrects suspended onboarding details without deleting the account', async (
     staffId: suspended.staffId,
     expectedVersion: 1,
     displayName: 'Mariela Rivera',
-    providerSubject: 'oidc:staff:corrected',
     roleName: 'delegated_manager',
-    mfaEnrolled: true,
-    reasonText: 'Corrected provider subject before activation',
+    reasonText: 'Correct display name before activation',
   });
   expect(correctionInput?.permissionNames).toEqual(expect.arrayContaining(['staff_account:read', 'intake:read']));
   expect(await screen.findByText('Staff account onboarding details corrected.')).toBeInTheDocument();
@@ -380,7 +384,7 @@ it('updates Google email for an existing account', async () => {
     providerEmail: 'new.email@example.test',
     lifecycleStatus: 'suspended' as const,
     mfaEnrolled: false,
-    providerSubject: 'pending-google-email:def456',
+    bindingStatus: 'pending' as const, bindingVerifiedAt: null,
     version: 3,
   };
   vi.mocked(listStaffAccounts).mockResolvedValue({ ok: true, value: [active] });
@@ -389,18 +393,20 @@ it('updates Google email for an existing account', async () => {
     value: { account: updated, eventType: 'staff_account.signin_email_updated', resultVersion: 3 },
   });
 
+  vi.mocked(readStaffAccountDiagnostics).mockResolvedValue({ ok: true, value: { account: active, canRestartSignin: true, canActivate: false, restartUnavailableReason: null } });
   render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
   await screen.findByText('Mariela Torres');
 
-  await user.click(screen.getByRole('button', { name: 'Google email' }));
-  const emailPanel = screen.getByRole('heading', { name: 'Manage Google email: Mariela Torres' }).closest('section');
+  await openRecovery(user);
+  const emailPanel = screen.getByRole('heading', { name: 'Restart Google sign-in: Mariela Torres' }).closest('section');
   expect(emailPanel).not.toBeNull();
   const emailForm = within(emailPanel as HTMLElement);
-  expect(emailForm.getByText(/Replacing an existing email resets/)).toBeInTheDocument();
+  expect(emailForm.getByText(/Restart sign-in using this email/)).toBeInTheDocument();
   await user.clear(emailForm.getByRole('textbox', { name: /Google email/ }));
   await user.type(emailForm.getByRole('textbox', { name: /Google email/ }), 'new.email@example.test');
   await user.type(emailForm.getByRole('textbox', { name: /Reason/ }), 'Correct the staff Google email');
-  await user.click(emailForm.getByRole('button', { name: 'Save Google email' }));
+  vi.mocked(listStaffAccounts).mockResolvedValue({ ok: true, value: [updated] });
+  await user.click(emailForm.getByRole('button', { name: /Restart onboarding|Retry original restart/ }));
 
   expect(updateStaffAccountGoogleEmail).toHaveBeenCalledWith(expect.objectContaining({
     staffId: active.staffId,
@@ -408,21 +414,22 @@ it('updates Google email for an existing account', async () => {
     providerEmail: 'new.email@example.test',
     reasonText: 'Correct the staff Google email',
   }));
-  expect(await screen.findByText('Staff account Google email updated.')).toBeInTheDocument();
+  expect(await screen.findByText('Google onboarding restarted. Ask the person to sign in, then confirm MFA and activate.')).toBeInTheDocument();
   expect(screen.getByText('new.email@example.test')).toBeInTheDocument();
-  expect(screen.getByText('Waiting for verified Google sign-in')).toBeInTheDocument();
+  expect(screen.getByText('Waiting for Google sign-in')).toBeInTheDocument();
 });
 
 it('validates and preserves the Google email form after recoverable errors', async () => {
   const user = userEvent.setup();
   vi.mocked(listStaffAccounts).mockResolvedValue({ ok: true, value: [active] });
+  vi.mocked(readStaffAccountDiagnostics).mockResolvedValue({ ok: true, value: { account: active, canRestartSignin: true, canActivate: false, restartUnavailableReason: null } });
   vi.mocked(updateStaffAccountGoogleEmail).mockResolvedValue({ ok: false, failure: { kind: 'stale' } });
 
   render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
   await screen.findByText('Mariela Torres');
 
-  await user.click(screen.getByRole('button', { name: 'Google email' }));
-  const firstPanel = screen.getByRole('heading', { name: 'Manage Google email: Mariela Torres' }).closest('section');
+  await openRecovery(user);
+  const firstPanel = screen.getByRole('heading', { name: 'Restart Google sign-in: Mariela Torres' }).closest('section');
   expect(firstPanel).not.toBeNull();
   const firstForm = within(firstPanel as HTMLElement);
   const firstFormElement = firstPanel?.querySelector('form');
@@ -437,22 +444,22 @@ it('validates and preserves the Google email form after recoverable errors', asy
 
   await user.clear(firstForm.getByRole('textbox', { name: /Google email/ }));
   await user.type(firstForm.getByRole('textbox', { name: /Google email/ }), 'missing.reason@example.test');
-  await user.click(firstForm.getByRole('button', { name: 'Save Google email' }));
+  await user.click(firstForm.getByRole('button', { name: /Restart onboarding|Retry original restart/ }));
 
   expect(firstForm.getByText('Reason is required.')).toBeInTheDocument();
   expect(updateStaffAccountGoogleEmail).not.toHaveBeenCalled();
 
   await user.click(firstForm.getByRole('button', { name: 'Close' }));
-  expect(screen.queryByRole('heading', { name: 'Manage Google email: Mariela Torres' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Restart Google sign-in: Mariela Torres' })).not.toBeInTheDocument();
 
-  await user.click(screen.getByRole('button', { name: 'Google email' }));
-  const secondPanel = screen.getByRole('heading', { name: 'Manage Google email: Mariela Torres' }).closest('section');
+  await openRecovery(user);
+  const secondPanel = screen.getByRole('heading', { name: 'Restart Google sign-in: Mariela Torres' }).closest('section');
   expect(secondPanel).not.toBeNull();
   const secondForm = within(secondPanel as HTMLElement);
   await user.clear(secondForm.getByRole('textbox', { name: /Google email/ }));
   await user.type(secondForm.getByRole('textbox', { name: /Google email/ }), 'corrected@example.test');
   await user.type(secondForm.getByRole('textbox', { name: /Reason/ }), 'Version changed during email correction');
-  await user.click(secondForm.getByRole('button', { name: 'Save Google email' }));
+  await user.click(secondForm.getByRole('button', { name: /Restart onboarding|Retry original restart/ }));
 
   expect(updateStaffAccountGoogleEmail).toHaveBeenCalledWith(expect.objectContaining({
     staffId: active.staffId,
@@ -461,7 +468,7 @@ it('validates and preserves the Google email form after recoverable errors', asy
     reasonText: 'Version changed during email correction',
   }));
   expect(await screen.findByText('The account changed in another session. Reload before trying again.')).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: 'Manage Google email: Mariela Torres' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Restart Google sign-in: Mariela Torres' })).toBeInTheDocument();
 });
 
 it('shows correction validation and recoverable command errors', async () => {
@@ -476,13 +483,11 @@ it('shows correction validation and recoverable command errors', async () => {
   expect(firstPanel).not.toBeNull();
   const firstCorrection = within(firstPanel as HTMLElement);
   await user.clear(firstCorrection.getByRole('textbox', { name: /Display name/ }));
-  await user.clear(firstCorrection.getByRole('textbox', { name: /Google email/ }));
-  await user.clear(firstCorrection.getByRole('textbox', { name: /Provider subject/ }));
   await user.click(firstCorrection.getByLabelText('Staff Accounts: Read'));
   await user.click(firstCorrection.getByRole('button', { name: 'Save correction' }));
 
   expect(firstCorrection.getByText('Display name is required.')).toBeInTheDocument();
-  expect(firstCorrection.getByText('Google email or provider subject is required.')).toBeInTheDocument();
+  expect(firstCorrection.queryByRole('textbox', { name: /Google email|Provider subject/ })).not.toBeInTheDocument();
   expect(firstCorrection.getByText('Select at least one permission.')).toBeInTheDocument();
   expect(firstCorrection.getByText('Reason is required.')).toBeInTheDocument();
   expect(correctStaffAccount).not.toHaveBeenCalled();
@@ -506,13 +511,13 @@ it('filters staff accounts by lifecycle, MFA readiness, and search text', async 
     ...active,
     staffId: '33333333-3333-4333-8333-333333333333',
     displayName: 'Sofia Diaz',
-    providerSubject: 'oidc:staff:456',
+    bindingStatus: 'google_verified' as const, bindingVerifiedAt: '2026-10-20T12:00:00Z',
   };
   const deprovisioned: StaffAccount = {
     ...suspended,
     staffId: '55555555-5555-4555-8555-555555555555',
     displayName: 'Elena Ruiz',
-    providerSubject: 'oidc:staff:789',
+    bindingStatus: 'google_verified' as const, bindingVerifiedAt: '2026-10-20T12:00:00Z',
     lifecycleStatus: 'deprovisioned',
     version: 3,
   };
@@ -587,8 +592,8 @@ it('activates with MFA evidence and records recovery evidence without provider-s
   await user.click(screen.getByRole('button', { name: 'Activate' }));
   expect(screen.getByText('Activation requires confirmed MFA enrollment.')).toBeInTheDocument();
   await user.click(lastElement(screen.getAllByLabelText('MFA enrollment confirmed')));
-  await user.click(lastElement(screen.getAllByLabelText('MFA enrollment confirmed')));
   await user.type(lastElement(screen.getAllByLabelText('Reason')), 'MFA confirmed in provider console');
+  vi.mocked(listStaffAccounts).mockResolvedValue({ ok: true, value: [active] });
   await user.click(lastElement(screen.getAllByRole('button', { name: 'Activate' })));
 
   expect(activateStaffAccount).toHaveBeenCalledWith(expect.objectContaining({
@@ -624,7 +629,7 @@ it('shows recoverable list, create, and action errors', async () => {
   expect((await screen.findAllByText('Active')).length).toBeGreaterThan(0);
 
   await user.type(screen.getByRole('textbox', { name: 'Display name' }), 'Denied Staff');
-  await user.type(screen.getByRole('textbox', { name: /Provider subject/ }), 'oidc:staff:789');
+  await user.type(screen.getByRole('textbox', { name: /Google email/ }), 'staff@example.test');
   await user.type(screen.getByRole('textbox', { name: 'Reason' }), 'Try denied create');
   await user.click(screen.getByRole('button', { name: 'Create staff account' }));
   expect(await screen.findByText('This staff session does not have permission for that account action.')).toBeInTheDocument();
@@ -760,4 +765,166 @@ it('renders Spanish account administration and has no automated axe violations',
   expect(screen.getByRole('heading', { name: 'Cuentas del personal' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Crear cuenta' })).toBeInTheDocument();
   expect(await runAxe(view.container)).toEqual([]);
+});
+
+function DiagnosticLanguageSwitch() {
+  const { toggleLanguage } = useLanguage();
+  return <button onClick={toggleLanguage}>Switch diagnostic language</button>;
+}
+
+it.each([
+  ['pending', 'suspended', false, /Ask this person to sign in with the assigned Google account/],
+  ['legacy_unverified', 'active', true, /verify the existing identity/],
+  ['google_verified', 'suspended', false, /Confirm MFA enrollment and activate/],
+  ['google_verified', 'active', true, /Account evidence permits sign-in/],
+  ['google_verified', 'deprovisioned', false, /cannot be reactivated/],
+] as const)('explains %s identity and %s lifecycle with a concrete next step', async (bindingStatus, lifecycleStatus, mfaEnrolled, message) => {
+  const user = userEvent.setup();
+  const account = { ...suspended, bindingStatus, lifecycleStatus, mfaEnrolled,
+    bindingVerifiedAt: bindingStatus === 'google_verified' ? '2026-10-20T12:00:00Z' : null };
+  vi.mocked(readStaffAccountDiagnostics).mockResolvedValue({ ok: true, value: {
+    account, canRestartSignin: false, canActivate: lifecycleStatus === 'suspended' && bindingStatus === 'google_verified',
+    restartUnavailableReason: lifecycleStatus === 'deprovisioned' ? 'deprovisioned' : 'permission_required',
+  } });
+  render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
+  await screen.findByText('Mariela Torres');
+  await user.click(screen.getByRole('button', { name: 'Sign-in diagnostics' }));
+  const panel = await screen.findByRole('region', { name: 'Sign-in diagnostics' });
+  expect(await within(panel).findByText(message)).toBeInTheDocument();
+  expect(panel).toHaveFocus();
+  expect(panel).not.toHaveAttribute('aria-live');
+  expect(within(panel).queryByText(/oidc:staff/)).not.toBeInTheDocument();
+  expect(within(panel).getByRole('button', { name: 'Restart Google sign-in' })).toBeDisabled();
+  expect(await runAxe(panel)).toEqual([]);
+});
+
+it('offers the same diagnostic next steps and safe recovery controls in Spanish', async () => {
+  const user = userEvent.setup();
+  vi.mocked(readStaffAccountDiagnostics).mockResolvedValue({ ok: true, value: {
+    account: { ...suspended, bindingStatus: 'legacy_unverified', bindingVerifiedAt: null },
+    canRestartSignin: true, canActivate: false, restartUnavailableReason: null,
+  } });
+  render(<LanguageProvider><DiagnosticLanguageSwitch /><StaffAccountAdmin /></LanguageProvider>);
+  await screen.findByText('Mariela Torres');
+  await user.click(screen.getByRole('button', { name: 'Switch diagnostic language' }));
+  await user.click(await screen.findByRole('button', { name: 'Diagnóstico de acceso' }));
+  const panel = await screen.findByRole('region', { name: 'Diagnóstico de acceso' });
+  expect(await within(panel).findByText(/Pida iniciar sesión para verificar la identidad anterior/)).toBeInTheDocument();
+  await user.click(within(panel).getByRole('button', { name: 'Reiniciar inicio de Google' }));
+  expect(screen.getByRole('heading', { name: 'Reiniciar inicio de Google: Mariela Torres' })).toBeInTheDocument();
+  expect(await runAxe(panel)).toEqual([]);
+});
+
+it('keeps the original restart payload and command identity when retrying an unknown outcome', async () => {
+  const user = userEvent.setup();
+  vi.mocked(updateStaffAccountGoogleEmail).mockReset().mockResolvedValue({ ok: false, failure: { kind: 'unknown_outcome' } });
+  render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
+  await screen.findByText('Mariela Torres');
+  await openRecovery(user);
+  const panel = screen.getByRole('heading', { name: 'Restart Google sign-in: Mariela Torres' }).closest('section');
+  expect(panel).not.toBeNull();
+  const form = within(panel as HTMLElement);
+  await user.type(form.getByRole('textbox', { name: /Reason/ }), 'Owner-present recovery');
+  await user.click(form.getByRole('button', { name: 'Restart onboarding' }));
+  expect(form.getByRole('textbox', { name: /Google email/ })).toBeDisabled();
+  expect(form.getByRole('textbox', { name: /Reason/ })).toBeDisabled();
+  expect(form.getByRole('button', { name: 'Close' })).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: 'Sign-in diagnostics' }));
+  await user.click(await screen.findByRole('button', { name: 'Restart Google sign-in' }));
+  expect(form.getByRole('textbox', { name: /Reason/ })).toHaveValue('Owner-present recovery');
+  await user.click(form.getByRole('button', { name: 'Retry original restart' }));
+  const calls = vi.mocked(updateStaffAccountGoogleEmail).mock.calls;
+  expect(calls).toHaveLength(2);
+  expect(calls[1]?.[0]).toEqual(calls[0]?.[0]);
+});
+
+it('shows diagnostic authorization failures and clears the diagnostic when account access is lost', async () => {
+  const user = userEvent.setup();
+  vi.mocked(readStaffAccountDiagnostics).mockResolvedValue({ ok: false, failure: { kind: 'forbidden' } });
+  render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
+  await screen.findByText('Mariela Torres');
+  await user.click(screen.getByRole('button', { name: 'Sign-in diagnostics' }));
+  const panel = await screen.findByRole('region', { name: 'Sign-in diagnostics' });
+  expect(await within(panel).findByRole('alert')).toHaveTextContent('does not have permission');
+  vi.mocked(listStaffAccounts).mockResolvedValue({ ok: false, failure: { kind: 'forbidden' } });
+  await user.click(screen.getByRole('button', { name: 'Reload accounts' }));
+  expect(screen.queryByRole('region', { name: 'Sign-in diagnostics' })).not.toBeInTheDocument();
+});
+
+it.each(['forbidden', 'sign_in_required', 'unavailable'] as const)('keeps an unresolved restart immutable after a later %s retry failure', async (kind) => {
+  const user = userEvent.setup();
+  vi.mocked(updateStaffAccountGoogleEmail).mockResolvedValueOnce({ ok: false, failure: { kind: 'unknown_outcome' } })
+    .mockResolvedValueOnce({ ok: false, failure: { kind } });
+  render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
+  await screen.findByText('Mariela Torres');
+  await openRecovery(user);
+  const section = screen.getByRole('heading', { name: 'Restart Google sign-in: Mariela Torres' }).closest('section');
+  const form = within(section as HTMLElement);
+  await user.type(form.getByLabelText('Reason'), 'Recover unchanged identity');
+  await user.click(form.getByRole('button', { name: 'Restart onboarding' }));
+  await user.click(form.getByRole('button', { name: 'Retry original restart' }));
+  expect(form.getByRole('button', { name: 'Close' })).toBeDisabled();
+  expect(form.getByLabelText('Reason')).toBeDisabled();
+  expect(vi.mocked(updateStaffAccountGoogleEmail).mock.calls[1]?.[0]).toEqual(vi.mocked(updateStaffAccountGoogleEmail).mock.calls[0]?.[0]);
+});
+
+it('clears diagnostic evidence after activation succeeds and reloads the current account', async () => {
+  const user = userEvent.setup();
+  vi.mocked(activateStaffAccount).mockResolvedValue({ ok: true, value: { account: active, eventType: 'staff_account.activated', resultVersion: active.version } });
+  render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
+  await screen.findByText('Mariela Torres');
+  await user.click(screen.getByRole('button', { name: 'Sign-in diagnostics' }));
+  await user.click(await screen.findByRole('button', { name: 'Activate verified account' }));
+  const form = within(screen.getByRole('heading', { name: 'Activate: Mariela Torres' }).closest('section') as HTMLElement);
+  await user.click(form.getByLabelText('MFA enrollment confirmed'));
+  await user.type(form.getByLabelText('Reason'), 'Verified onboarding');
+  vi.mocked(listStaffAccounts).mockResolvedValue({ ok: true, value: [active] });
+  await user.click(form.getByRole('button', { name: 'Activate' }));
+  await waitFor(() => expect(screen.queryByRole('region', { name: 'Sign-in diagnostics' })).not.toBeInTheDocument());
+  expect((await screen.findAllByText('Active')).length).toBeGreaterThan(0);
+});
+
+it('requires deliberate MFA confirmation even when diagnostics show prior enrollment', async () => {
+  const user = userEvent.setup();
+  vi.mocked(activateStaffAccount).mockResolvedValue({ ok: false, failure: { kind: 'stale' } });
+  vi.mocked(readStaffAccountDiagnostics).mockResolvedValue({ ok: true, value: {
+    account: { ...suspended, mfaEnrolled: true }, canRestartSignin: true, canActivate: true, restartUnavailableReason: null,
+  } });
+  render(<LanguageProvider><StaffAccountAdmin /></LanguageProvider>);
+  await screen.findByText('Mariela Torres');
+  await user.click(screen.getByRole('button', { name: 'Sign-in diagnostics' }));
+  await user.click(await screen.findByRole('button', { name: 'Activate verified account' }));
+  const section = screen.getByRole('heading', { name: 'Activate: Mariela Torres' }).closest('section');
+  const form = within(section as HTMLElement);
+  expect(form.getByLabelText('MFA enrollment confirmed')).not.toBeChecked();
+  await user.type(form.getByLabelText('Reason'), 'Confirm onboarding');
+  await user.click(form.getByRole('button', { name: 'Activate' }));
+  expect(activateStaffAccount).not.toHaveBeenCalled();
+  expect(form.getByRole('alert')).toHaveTextContent('Confirm MFA enrollment before activation.');
+  await user.click(form.getByLabelText('MFA enrollment confirmed'));
+  await user.click(form.getByRole('button', { name: 'Activate' }));
+  expect(activateStaffAccount).toHaveBeenCalledWith(expect.objectContaining({ mfaEnrolled: true }));
+});
+
+it.each(['denial', 'language'] as const)('ignores a late diagnostic after %s changes the visible account context', async (change) => {
+  const user = userEvent.setup();
+  let finish: ((result: Awaited<ReturnType<typeof readStaffAccountDiagnostics>>) => void) | undefined;
+  vi.mocked(readStaffAccountDiagnostics).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+  render(<LanguageProvider><DiagnosticLanguageSwitch /><StaffAccountAdmin /></LanguageProvider>);
+  await screen.findByText('Mariela Torres');
+  await user.click(screen.getByRole('button', { name: 'Sign-in diagnostics' }));
+  if (change === 'denial') {
+    vi.mocked(listStaffAccounts).mockResolvedValue({ ok: false, failure: { kind: 'forbidden' } });
+    await user.click(screen.getByRole('button', { name: 'Reload accounts' }));
+    await waitFor(() => expect(screen.queryByText('Mariela Torres')).not.toBeInTheDocument());
+  } else {
+    await user.click(screen.getByRole('button', { name: 'Switch diagnostic language' }));
+    await screen.findByRole('button', { name: 'Diagnóstico de acceso' });
+  }
+  await act(async () => { finish?.({ ok: true, value: { account: active, canRestartSignin: true, canActivate: false, restartUnavailableReason: null } }); await Promise.resolve(); });
+  expect(screen.queryByRole('region', { name: /Sign-in diagnostics|Diagnóstico de acceso/ })).not.toBeInTheDocument();
+  if (change === 'language') {
+    await user.click(screen.getByRole('button', { name: 'Diagnóstico de acceso' }));
+    expect(await screen.findByRole('button', { name: 'Reiniciar inicio de Google' })).toBeEnabled();
+  }
 });

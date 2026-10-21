@@ -1,5 +1,14 @@
 # Current Work — Golden Rose Operations Platform
 
+## 2026-10-20 — Google binding repair published as PR #189
+
+- **Staffing:** One independent developer. Fresh agent/session review and automated checks provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** The separately authorized owner-present recovery is complete and the user confirmed account/workspace access. The permanent source candidate now separates access editing from identity, records Google binding provenance, and provides bilingual sign-in diagnostics and guarded onboarding restart. It is published as [PR #189](https://github.com/b-mackenzie-alexander/golden_rose_project/pull/189) to `develop` and has not been deployed.
+- **Gate budget:** Approved source/backend/frontend/schema work, disposable fictional local validation and a PR to protected `develop`. The one-account live recovery is consumed. Image admission, live migration, deployment, bootstrap provisioning and additional live/provider actions require a separate packet.
+- **Next executable action:** Complete fresh protected CI for the narrowly scoped CodeRabbit follow-up at PR #189’s updated head, and leave protected review/merge to the owner. Fresh review, combined backend qualification and production-build fictional browser checks are recorded in `NOTES.md`. The implementation was rebased onto PR #188 at `develop@f8b9ee8` before qualification; the other session's checkout is preserved.
+- **Do not regress:** Stable staff IDs/history/grants; exact named authority; separate identity planes; verified Google credentials; account-level MFA; no active-account email-only linking; no-store safe responses; English/Spanish and accessibility parity; no raw identity material; human operational decisions; evidence-only provider recovery/revocation wording.
+
+
 ## 2026-10-20 — Unified party workspaces and contact email active
 
 - **Staffing:** One independent developer; source/frontend/backend implementation, focused automated checks and later protected PR gates provide quality evidence, not independent-human authorization.
@@ -9,6 +18,16 @@
 - **Do not regress:** Worker and Employer intake drafts remain separate from canonical records until staff review/finalization; canonical contact changes remain versioned, attributable and evidence-backed; restricted addresses stay separately authorized; staff-only named-account access, bilingual/accessibility parity, immutable intake history and exact retries remain intact.
 
 **Validation to date:** Focused frontend typecheck/lint and 77 IntakeFields/EmployerWorkspace tests pass. The complete affected backend contact/finalization/resolution/read group passes 458 tests; repository Ruff formatting/lint and mypy pass; Alembic reports `0020_contact_email_fields` as the sole head. The disposable PostgreSQL migration tests could not start because the configured local test database at `127.0.0.1:55432` refused connections; no temporary database or cloud resource was created or changed.
+
+## 2026-10-20 — Owner sign-in recovered; binding design repair proposed
+
+- **Staffing:** One independent developer. Fresh agent/session review and automated checks provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** The user-authorized recovery of one existing staff owner account is complete. Administration exposed an invalid manually supplied role-label binding; existing application commands reset it to pending, the owner completed Google sign-in, and the account was reactivated with previously confirmed MFA evidence. The user confirmed access to her account and workspace. Staff ID, history and all 49 grants were preserved; no account was deleted. PR #187 is merged at protected `develop@8fbfb38`; its merge is not deployment evidence.
+- **Gate budget:** The one-account application recovery authorization is consumed. Current work prepares and reviews the permanent source design in an isolated checkout. No further live-account change, provider-side action, infrastructure mutation, migration, image build, service deployment, export/import or broad live-data action follows.
+- **Next executable action:** Review the [Google binding repair contract](docs/planning/2026-10-20-staff-google-binding-repair.md), then implement the agreed separation of identity and access editing, explicit verification provenance, guarded same-email onboarding restart and regression coverage. Source implementation/publication and deployment remain separate stages; preserve the other session's urgent-alert/catalog work.
+- **Do not regress:** Stable actor IDs and immutable history; exact named permissions; verified Google tokens and separate identity planes; account-level MFA policy; auth-sensitive no-store handling; bilingual/accessibility parity; no raw identity material or private runtime URLs in source/chat; no active-account auto-linking by email; no provider reset/revocation claims; no production-completion or automated hiring/matching claims.
+
+The source gap remains open: arbitrary subject text can appear bound, ordinary access corrections round-trip identity, and historical accounts lack explicit Google verification provenance. The repaired live account does not establish that this design gap has been fixed for other accounts. Fresh agent review cleared the revised design after repairing legacy-account continuity and recovery-permission grant controls. User acceptance of the identity/schema contract remains before coding; whitespace and redacted secret checks passed for the documentation-only checkout.
 
 ## 2026-10-14 — Live-pilot dashboard/session label repair active
 

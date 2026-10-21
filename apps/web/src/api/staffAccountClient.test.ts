@@ -11,6 +11,7 @@ import {
   listStaffAccountEvents,
   listStaffAccounts,
   listStaffDelegations,
+  readStaffAccountDiagnostics,
   recordRecoveryEvidence,
   recordSessionRevocationEvidence,
   revokeStaffDelegation,
@@ -20,7 +21,7 @@ import {
 
 const account = {
   staff_id: '22222222-2222-4222-8222-222222222222',
-  provider_subject: 'oidc:staff:123',
+  binding_status: 'google_verified', binding_verified_at: '2026-10-20T12:00:00Z',
   provider_email: 'mariela.torres@example.test',
   display_name: 'Mariela Torres',
   role_name: 'operations_staff',
@@ -106,7 +107,8 @@ it('lists staff accounts with no-store fetch options and strict response parsing
     ok: true,
     value: [{
       staffId: account.staff_id,
-      providerSubject: account.provider_subject,
+      bindingStatus: account.binding_status,
+      bindingVerifiedAt: account.binding_verified_at,
       providerEmail: account.provider_email,
       displayName: account.display_name,
       roleName: account.role_name,
@@ -158,7 +160,8 @@ it('reads the current staff session with account and delegation context', async 
       authContext: 'staff_oidc',
       account: {
         staffId: account.staff_id,
-        providerSubject: account.provider_subject,
+        bindingStatus: account.binding_status,
+      bindingVerifiedAt: account.binding_verified_at,
         providerEmail: account.provider_email,
         displayName: account.display_name,
         roleName: account.role_name,
@@ -393,7 +396,6 @@ it('creates, corrects, updates Google email, and activates accounts with idempot
     displayName: 'Mariela Torres',
     mfaEnrolled: false,
     permissionNames: ['staff_account:read'],
-    providerSubject: 'oidc:staff:123',
     reasonText: 'Initial onboarding',
     roleName: 'operations_staff',
   });
@@ -401,9 +403,7 @@ it('creates, corrects, updates Google email, and activates accounts with idempot
     commandId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
     expectedVersion: 1,
     displayName: 'Mariela Rivera',
-    mfaEnrolled: true,
     permissionNames: ['staff_account:read', 'intake:read'],
-    providerSubject: 'oidc:staff:corrected',
     reasonText: 'Correct onboarding',
     roleName: 'operations_staff',
     staffId: account.staff_id,
@@ -433,16 +433,13 @@ it('creates, corrects, updates Google email, and activates accounts with idempot
     method: 'POST',
     headers: { 'Idempotency-Key': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
   });
-  expect(fetchMock).toHaveBeenNthCalledWith(2, `/api/staff/v1/staff-accounts/${account.staff_id}/correct-onboarding`, expect.objectContaining({
+  expect(fetchMock).toHaveBeenNthCalledWith(2, `/api/staff/v1/staff-accounts/${account.staff_id}/access`, expect.objectContaining({
     method: 'POST',
     body: JSON.stringify({
       expected_version: 1,
-      provider_subject: 'oidc:staff:corrected',
-      provider_email: null,
       display_name: 'Mariela Rivera',
       role_name: 'operations_staff',
       permission_names: ['staff_account:read', 'intake:read'],
-      mfa_enrolled: true,
       reason_text: 'Correct onboarding',
     }),
   }));
@@ -450,7 +447,7 @@ it('creates, corrects, updates Google email, and activates accounts with idempot
     method: 'POST',
     body: JSON.stringify({ expected_version: 1, reason_text: 'MFA confirmed', mfa_enrolled: true }),
   }));
-  expect(fetchMock).toHaveBeenNthCalledWith(4, `/api/staff/v1/staff-accounts/${account.staff_id}/google-email`, expect.objectContaining({
+  expect(fetchMock).toHaveBeenNthCalledWith(4, `/api/staff/v1/staff-accounts/${account.staff_id}/restart-google-signin`, expect.objectContaining({
     method: 'POST',
     body: JSON.stringify({
       expected_version: 2,
@@ -632,7 +629,6 @@ it('maps list and lifecycle problem responses without reading private payloads',
     displayName: 'Mariela Torres',
     mfaEnrolled: false,
     permissionNames: ['staff_account:read'],
-    providerSubject: 'oidc:staff:123',
     reasonText: 'Initial onboarding',
     roleName: 'operations_staff',
   });
@@ -707,8 +703,29 @@ it('rejects malformed account payloads for list and command reads', async () => 
     displayName: 'Mariela Torres',
     mfaEnrolled: false,
     permissionNames: ['staff_account:read'],
-    providerSubject: 'oidc:staff:123',
     reasonText: 'Initial onboarding',
     roleName: 'operations_staff',
   })).toEqual({ ok: false, failure: { kind: 'unknown_outcome' } });
+});
+
+it('reads safe diagnostics and rejects private identity material or invalid evidence', async () => {
+  const diagnostic = { account, can_restart_signin: false, can_activate: true, restart_unavailable_reason: 'self_reset' };
+  const payloads = [diagnostic, null, { ...diagnostic, provider_subject: 'private' },
+    { ...diagnostic, account: { ...account, provider_subject: 'private' } },
+    { ...diagnostic, account: { ...account, binding_status: 'unrecognized' } },
+    { ...diagnostic, account: { ...account, binding_verified_at: null } },
+    { ...diagnostic, account: { ...account, binding_status: 'pending' } },
+    { ...diagnostic, account: { ...account, binding_verified_at: 'bad-date' } },
+    { ...diagnostic, can_activate: 'yes' }, { ...diagnostic, can_restart_signin: null },
+    { ...diagnostic, restart_unavailable_reason: 'unrecognized' },
+    { ...diagnostic, restart_unavailable_reason: 7 },
+  ];
+  const fetchMock = vi.fn<typeof fetch>();
+  for (const value of payloads) fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(value), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  vi.stubGlobal('fetch', fetchMock);
+  expect(await readStaffAccountDiagnostics(account.staff_id)).toMatchObject({ ok: true, value: { canRestartSignin: false, canActivate: true, restartUnavailableReason: 'self_reset' } });
+  for (const _ of payloads.slice(1)) {
+    void _;
+    expect(await readStaffAccountDiagnostics(account.staff_id)).toEqual({ ok: false, failure: { kind: 'unexpected' } });
+  }
 });

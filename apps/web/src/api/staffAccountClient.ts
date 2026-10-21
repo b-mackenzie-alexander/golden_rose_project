@@ -7,6 +7,9 @@ export type StaffAccountEvent =
   | 'staff_account.activated'
   | 'staff_account.suspended'
   | 'staff_account.deprovisioned'
+  | 'staff_account.access_updated'
+  | 'staff_account.binding_verified'
+  | 'staff_account.binding_restarted'
   | 'staff_account.corrected'
   | 'staff_account.signin_email_updated'
   | 'staff_account.recovery_recorded'
@@ -38,7 +41,8 @@ export type StaffIdentityReadiness = {
 
 export type StaffAccount = {
   staffId: string;
-  providerSubject: string;
+  bindingStatus: 'pending' | 'legacy_unverified' | 'google_verified';
+  bindingVerifiedAt: string | null;
   providerEmail: string | null;
   displayName: string;
   roleName: StaffAccountRole;
@@ -122,7 +126,6 @@ export type StaffAccountFailureKind =
 export type StaffAccountResult<T> = { ok: true; value: T } | { ok: false; failure: { kind: StaffAccountFailureKind } };
 
 export type CreateStaffAccountInput = {
-  providerSubject: string;
   providerEmail?: string;
   displayName: string;
   roleName: StaffAccountRole;
@@ -132,7 +135,7 @@ export type CreateStaffAccountInput = {
   commandId: string;
 };
 
-export type CorrectStaffAccountInput = CreateStaffAccountInput & {
+export type CorrectStaffAccountInput = Omit<CreateStaffAccountInput, 'providerEmail' | 'mfaEnrolled'> & {
   staffId: string;
   expectedVersion: number;
 };
@@ -191,6 +194,9 @@ const events = new Set<StaffAccountEvent>([
   'staff_account.activated',
   'staff_account.suspended',
   'staff_account.deprovisioned',
+  'staff_account.access_updated',
+  'staff_account.binding_verified',
+  'staff_account.binding_restarted',
   'staff_account.corrected',
   'staff_account.signin_email_updated',
   'staff_account.recovery_recorded',
@@ -282,7 +288,8 @@ function parseAccount(value: unknown): StaffAccount | null {
   if (!object(value)) return null;
   const keys = new Set([
     'staff_id',
-    'provider_subject',
+    'binding_status',
+    'binding_verified_at',
     'provider_email',
     'display_name',
     'role_name',
@@ -297,7 +304,10 @@ function parseAccount(value: unknown): StaffAccount | null {
   ]);
   if (Object.keys(value).some((key) => !keys.has(key))) return null;
   if (typeof value.staff_id !== 'string' || !uuid.test(value.staff_id)) return null;
-  if (!text(value.provider_subject, 256) || !text(value.display_name, 160)) return null;
+  if (!text(value.display_name, 160)) return null;
+  if (!['pending', 'legacy_unverified', 'google_verified'].includes(String(value.binding_status))) return null;
+  if (value.binding_verified_at !== null && !timestamp(value.binding_verified_at)) return null;
+  if ((value.binding_status === 'google_verified') !== (value.binding_verified_at !== null)) return null;
   if (value.provider_email !== null && !text(value.provider_email, 320)) return null;
   if (typeof value.role_name !== 'string' || !roles.has(value.role_name as StaffAccountRole)) return null;
   if (typeof value.lifecycle_status !== 'string' || !statuses.has(value.lifecycle_status as StaffAccountStatus)) return null;
@@ -310,7 +320,8 @@ function parseAccount(value: unknown): StaffAccount | null {
   if (!positive(value.version)) return null;
   return {
     staffId: value.staff_id,
-    providerSubject: value.provider_subject,
+    bindingStatus: value.binding_status as StaffAccount['bindingStatus'],
+    bindingVerifiedAt: value.binding_verified_at,
     providerEmail: value.provider_email,
     displayName: value.display_name,
     roleName: value.role_name as StaffAccountRole,
@@ -564,7 +575,6 @@ export async function createStaffAccount(input: CreateStaffAccountInput): Promis
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'Idempotency-Key': input.commandId },
     body: JSON.stringify({
-      provider_subject: input.providerSubject,
       provider_email: providerEmail.length > 0 ? providerEmail : null,
       display_name: input.displayName,
       role_name: input.roleName,
@@ -576,18 +586,14 @@ export async function createStaffAccount(input: CreateStaffAccountInput): Promis
 }
 
 export async function correctStaffAccount(input: CorrectStaffAccountInput): Promise<StaffAccountResult<StaffAccountLifecycleResult>> {
-  const providerEmail = input.providerEmail ?? '';
-  return request(`/staff-accounts/${input.staffId}/correct-onboarding`, {
+  return request(`/staff-accounts/${input.staffId}/access`, {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'Idempotency-Key': input.commandId },
     body: JSON.stringify({
       expected_version: input.expectedVersion,
-      provider_subject: input.providerSubject,
-      provider_email: providerEmail.length > 0 ? providerEmail : null,
       display_name: input.displayName,
       role_name: input.roleName,
       permission_names: input.permissionNames,
-      mfa_enrolled: input.mfaEnrolled,
       reason_text: input.reasonText,
     }),
   }, parseLifecycle, true);
@@ -611,7 +617,7 @@ async function transition(
 export const activateStaffAccount = (input: ActivateStaffAccountInput) =>
   transition(`/staff-accounts/${input.staffId}/activate`, input);
 export const updateStaffAccountGoogleEmail = (input: UpdateStaffAccountGoogleEmailInput) =>
-  request(`/staff-accounts/${input.staffId}/google-email`, {
+  request(`/staff-accounts/${input.staffId}/restart-google-signin`, {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'Idempotency-Key': input.commandId },
     body: JSON.stringify({
@@ -657,4 +663,21 @@ export async function revokeStaffDelegation(input: RevokeStaffDelegationInput): 
     headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'Idempotency-Key': input.commandId },
     body: JSON.stringify({ reason_text: input.reasonText }),
   }, parseDelegationCommand, true);
+}
+
+export type StaffAccountDiagnostics = {
+  account: StaffAccount;
+  canRestartSignin: boolean;
+  canActivate: boolean;
+  restartUnavailableReason: 'permission_required' | 'self_reset' | 'deprovisioned' | null;
+};
+export async function readStaffAccountDiagnostics(staffId: string): Promise<StaffAccountResult<StaffAccountDiagnostics>> {
+  return request(`/staff-accounts/${staffId}/diagnostics`, { method: 'GET', headers: { Accept: 'application/json' } }, (value) => {
+    if (!object(value) || Object.keys(value).some(key => !['account', 'can_restart_signin', 'can_activate', 'restart_unavailable_reason'].includes(key))) return null;
+    const account = parseAccount(value.account);
+    if (account === null || typeof value.can_restart_signin !== 'boolean' || typeof value.can_activate !== 'boolean') return null;
+    if (value.restart_unavailable_reason !== null && (typeof value.restart_unavailable_reason !== 'string' || !['permission_required', 'self_reset', 'deprovisioned'].includes(value.restart_unavailable_reason))) return null;
+    return { account, canRestartSignin: value.can_restart_signin, canActivate: value.can_activate,
+      restartUnavailableReason: value.restart_unavailable_reason as StaffAccountDiagnostics['restartUnavailableReason'] };
+  });
 }

@@ -1,12 +1,15 @@
 from types import SimpleNamespace
 from typing import Annotated, cast
+from unittest.mock import MagicMock, Mock
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi import Depends, FastAPI, Request
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import SQLAlchemyError
 
 import golden_rose.api.dependencies as dependencies_module
+import golden_rose.application.staff_account_lifecycle as lifecycle_module
 from golden_rose.api.dependencies import (
     get_db_session,
     get_settings,
@@ -384,6 +387,43 @@ def test_staff_oidc_provider_unavailable_returns_no_store_service_unavailable() 
     assert response.json()["type"] == (
         "https://golden-rose.local/problems/staff-identity-provider-unavailable"
     )
+
+
+def test_legacy_verification_database_fault_returns_value_safe_no_store_503(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = MagicMock()
+    session.__enter__.return_value = session
+    monkeypatch.setattr(dependencies_module, "Session", lambda _engine: session)
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_provider_subject",
+        Mock(
+            return_value=SimpleNamespace(
+                staff_id=uuid4(), binding_status="legacy_unverified", lifecycle_status="active"
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        lifecycle_module,
+        "get_staff_account_by_id_for_update",
+        Mock(side_effect=SQLAlchemyError("private legacy storage detail")),
+    )
+    app = _auth_probe_app(
+        _staff_oidc_settings(),
+        FakeOidcVerifier(
+            StaffIdentityClaims(provider_subject="fictional-legacy-subject", mfa_verified=False)
+        ),
+    )
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.get(
+            "/staff-auth-probe", headers={"Authorization": "Bearer fictional-token"}
+        )
+    assert response.status_code == 503
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["detail"] == "service unavailable"
+    assert "private legacy storage detail" not in response.text
+    session.rollback.assert_called_once_with()
 
 
 def test_staff_oidc_missing_mfa_is_authentication_failure(

@@ -498,6 +498,18 @@ staff_accounts = Table(
     Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
     Column("updated_by", UUID(as_uuid=True), nullable=False),
     Column("version", Integer, nullable=False),
+    Column("binding_status", String(32), nullable=False, server_default="legacy_unverified"),
+    Column("binding_verified_at", TIMESTAMP(timezone=True)),
+    CheckConstraint(
+        "(binding_status='pending' AND binding_verified_at IS NULL "
+        "AND provider_subject LIKE 'pending-google-email:%' AND provider_email IS NOT NULL "
+        "AND lifecycle_status<>'active') OR "
+        "(binding_status='legacy_unverified' AND binding_verified_at IS NULL "
+        "AND provider_subject NOT LIKE 'pending-google-email:%') OR "
+        "(binding_status='google_verified' AND binding_verified_at IS NOT NULL "
+        "AND provider_subject NOT LIKE 'pending-google-email:%')",
+        name="ck_staff_binding_proof",
+    ),
     UniqueConstraint("provider_subject", name="uq_staff_accounts_provider_subject"),
     UniqueConstraint("provider_email", name="uq_staff_accounts_provider_email"),
     CheckConstraint("btrim(provider_subject)<>''", name="ck_staff_accounts_subject_nonblank"),
@@ -605,6 +617,7 @@ staff_account_lifecycle_events = Table(
         "'staff_account.created','staff_account.activated',"
         "'staff_account.suspended','staff_account.deprovisioned',"
         "'staff_account.corrected','staff_account.signin_email_updated',"
+        "'staff_account.access_updated','staff_account.binding_restarted','staff_account.binding_verified',"
         "'staff_account.recovery_recorded','staff_account.sessions_revoked')",
         name="ck_staff_account_lifecycle_events_event_type",
     ),
@@ -632,7 +645,8 @@ staff_account_lifecycle_events = Table(
         "event_type IN ("
         "'staff_account.activated','staff_account.suspended',"
         "'staff_account.deprovisioned','staff_account.corrected',"
-        "'staff_account.signin_email_updated') "
+        "'staff_account.signin_email_updated','staff_account.access_updated',"
+        "'staff_account.binding_restarted','staff_account.binding_verified') "
         "AND previous_status IS NOT NULL "
         "AND previous_version IS NOT NULL "
         "AND new_version=previous_version+1"
@@ -1600,3 +1614,18 @@ canonical_output_review_payloads = Table(
     Column("note", String(512)),
 )
 entity_authorities.append_column(Column("canonical_output_review_id", UUID(as_uuid=True)))
+
+
+staff_signin_restarts = Table(
+    "staff_signin_restarts",
+    metadata,
+    Column("command_id", UUID(as_uuid=True), primary_key=True),
+    Column("staff_id", UUID(as_uuid=True), nullable=False),
+    Column("actor_id", UUID(as_uuid=True), nullable=False),
+    Column("request_fingerprint", String(64), nullable=False),
+    Column("result", JSONB, nullable=False),
+    ForeignKeyConstraint(["staff_id"], ["staff_accounts.staff_id"]),
+    ForeignKeyConstraint(["actor_id"], ["staff_accounts.staff_id"]),
+    CheckConstraint("length(request_fingerprint)=64"),
+    CheckConstraint("jsonb_typeof(result)='object'"),
+)

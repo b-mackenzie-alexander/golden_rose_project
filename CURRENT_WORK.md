@@ -1,5 +1,14 @@
 # Current Work — Golden Rose Operations Platform
 
+## 2026-10-20 — Controlled staff-pilot refresh completed through PR #190
+
+- **Staffing:** One independent developer. Automated checks and fresh agent/session review provide quality evidence, not independent-human authorization.
+- **Human-visible outcome:** Protected `develop@2822b646e8d293aaab4aab337e927843c834e9ce` (PRs #187–190) is running in the existing controlled staff pilot. Signed image admission, migrations 20/21, authenticated database-authority verification, service readiness and read-only health/schema/entrypoint smoke passed. The staff maintenance pause can end. Bounded browser navigation using the existing separate owner session confirmed Home, staff administration and verified sign-in diagnostics after refreshing a stale tab. No account-management or permission changes were performed; normal verified sign-in can record binding provenance. The actual owner cannot test now; her post-refresh acceptance remains pending. The earlier owner recovery/access confirmation is separate evidence.
+- **Gate budget:** The user approved one bounded eight-hour packet and a reviewed amendment after Terraform targeting pulled in the service and a full plan proposed clearing an unmodeled service-level scaling limit. Both resource plans were rejected. The amendment used exact reviewed/validated Cloud Run image updates and normal Terraform refresh-only reconciliation. The runtime refresh is complete; it grants no further account, provider, cloud or live-data action.
+- **Next executable action:** Obtain the actual owner's post-refresh sign-in/diagnostics acceptance; reload tabs retained across this response-contract update. Separately provide a read-only existing-bootstrap identity/grant precheck before executing the deferred initial recovery grant. Reconcile the Terraform job/service dependency and service-scaling model before a later resource-plan rollout; preserve the existing service max 10 and revision max 1.
+- **Do not regress:** Durable pilot records; stable staff IDs/history/grants; exact named staff authority; verified Google binding and account MFA; no active-account email-only linking; no-store safe responses; English/Spanish and accessibility parity; private identity material; human operational decisions; evidence-only provider recovery/revocation wording.
+
+
 ## 2026-10-20 — Merged pilot changes: rollout preparation and readiness repair
 
 - **Staffing:** One independent developer; automated checks and fresh agent/session review provide quality evidence, not independent-human authorization.
